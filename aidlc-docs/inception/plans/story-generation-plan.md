@@ -143,18 +143,18 @@ X) Other
 
 When you approve, Part 2 will execute the following:
 
-- [ ] Generate `aidlc-docs/inception/user-stories/personas.md` with the chosen persona set (per Q1)
-- [ ] Generate `aidlc-docs/inception/user-stories/stories.md` with stories grouped per the chosen breakdown approach (per Q2)
-- [ ] Each story uses the chosen template (per Q3)
-- [ ] Each story has acceptance criteria in the chosen format (per Q4)
-- [ ] Story sizing follows the chosen granularity (per Q5)
-- [ ] Worker NPC persona/stories included per Q6
-- [ ] Developer/maintainer stories included per Q7
-- [ ] Prioritization applied per Q8 (if any)
-- [ ] All stories tagged with the FR-IDs they implement (traceability)
-- [ ] Stories satisfy INVEST (Independent, Negotiable, Valuable, Estimable, Small, Testable)
-- [ ] Personas mapped to stories in personas.md (which personas care about which stories)
-- [ ] Story plan checkboxes updated to `[x]` as each artifact lands
+- [x] Generate `aidlc-docs/inception/user-stories/personas.md` with the chosen persona set (per Q1) — 3 personas: Player, Farmhand, Mod Maintainer
+- [x] Generate `aidlc-docs/inception/user-stories/stories.md` with stories grouped per the chosen breakdown approach (per Q2) — journey-based: Discovery → First day → Daily life → Edge cases → Maintainability
+- [x] Each story uses the chosen template (per Q3) — standard agile
+- [x] Each story has acceptance criteria in the chosen format (per Q4) — hybrid Gherkin/bullets
+- [x] Story sizing follows the chosen granularity (per Q5) — 20 stories, within the 12–20 moderate band
+- [x] Worker NPC persona/stories included per Q6 — P-02 Farmhand persona drives S-08, S-09, S-15, S-16, S-17
+- [x] Developer/maintainer stories included per Q7 — S-19 (testable pure logic), S-20 (i18n)
+- [x] Prioritization applied per Q8 (if any) — none, as agreed
+- [x] All stories tagged with the FR-IDs they implement (traceability) — see Coverage Summary in stories.md
+- [x] Stories satisfy INVEST (Independent, Negotiable, Valuable, Estimable, Small, Testable)
+- [x] Personas mapped to stories in personas.md (which personas care about which stories) — Persona → Story Coverage Matrix in personas.md
+- [x] Story plan checkboxes updated to `[x]` as each artifact lands
 
 ---
 
