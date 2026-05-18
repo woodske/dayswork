@@ -32,6 +32,38 @@
 
 ---
 
+## Requirements Analysis — Change Request from Review Gate
+**Timestamp**: 2026-05-18T00:00:05Z
+**User Input**: "FR-TASK-04 animal products can also be deposited into the shipping bin"
+**AI Response**: Updated `requirements.md`: FR-TASK-02 now lists Harvest crops, Collect fruit, AND Collect animal products as the shipping-bin-or-chest tasks. FR-TASK-04 rewritten to reference FR-TASK-02 for destination selection (removing the hardcoded "designated chest"). No downstream FRs needed updating (FR-HIRE-06 is already generic over "tasks that produce output", and FR-OUT-06 already covers shipping-bin behavior). Re-presenting the Review Required gate.
+**Context**: INCEPTION — Requirements Analysis, Step 9 (post-completion change request)
+
+---
+
+## Requirements Analysis — Stuck-Handling Discussion + Decision
+**Timestamp**: 2026-05-18T00:00:06Z
+**User Input**: "what should happen if the worker gets stuck mid shift? say the player creates a fence around the worker, what are some options for handling that?"
+**AI Response**: Presented four options inline (A: wait+emote+abandon, B: wait+emote+teleport silently, C: hybrid escalation, D: chop/break through). Recommended C as most consistent with prior decisions (no items lost, invulnerable worker, sleep fast-forwards shift).
+**Context**: INCEPTION — Requirements Analysis, Step 9 (new gap surfaced during review)
+
+---
+
+## Requirements Analysis — IDE Revised
+**Timestamp**: 2026-05-18T00:00:08Z
+**User Input**: "IDE for development will be Visual Studio 2026"
+**AI Response**: Updated §6 Key Decisions row to "Visual Studio 2026" and annotated Q3 in the questions file. No FR/NFR changes needed (no specific VS-version requirement is encoded elsewhere). Re-presenting the Review Required gate.
+**Context**: INCEPTION — Requirements Analysis, Step 9 (post-completion change request)
+
+---
+
+## Requirements Analysis — Stuck-Handling Decision Confirmed
+**Timestamp**: 2026-05-18T00:00:07Z
+**User Input**: "yes, C"
+**AI Response**: Added FR-WORK-11 (stuck detection, default 10 in-game minute threshold), FR-WORK-12 (3-step hybrid escalation: emote → teleport to next task tile → teleport home and end shift), FR-WORK-13 (thresholds configurable via GMCM). Added decision row to §6 Key Decisions Captured.
+**Context**: INCEPTION — Requirements Analysis, Step 9 (change applied)
+
+---
+
 ## Requirements Analysis — All 29 Answers Received
 **Timestamp**: 2026-05-18T00:00:04Z
 **User Input** (verbatim, one per question, captured from interactive prompts):

@@ -44,9 +44,9 @@
 | ID | Requirement | Source |
 |---|---|---|
 | FR-TASK-01 | The v1 task set is: Water crops, Harvest crops, Collect fruit, Feed animals, Pet animals, Collect animal products, Cut trees, Clear rocks, Clear weeds, Clear grass. | spec §Tasks |
-| FR-TASK-02 | Harvest crops and Collect fruit are configured per-task to deposit either into the shipping bin or a designated chest (player choice in Screen 2). | spec §Tasks |
+| FR-TASK-02 | Harvest crops, Collect fruit, and Collect animal products are configured per-task to deposit either into the shipping bin or a designated chest (player choice in Screen 2). | spec §Tasks + change request |
 | FR-TASK-03 | Feed animals consumes hay from the silo and produces no output. | spec §Tasks |
-| FR-TASK-04 | Collect animal products deposits eggs, milk, wool, truffles, etc. into the designated chest. | spec §Tasks |
+| FR-TASK-04 | Collect animal products gathers eggs, milk, wool, truffles, etc. The destination is selected per FR-TASK-02 (shipping bin or designated chest). | spec §Tasks + change request |
 | FR-TASK-05 | Cut trees deposits wood, sap, and seeds into the designated chest. **Fruit trees are always excluded from felling**, regardless of zone or axe level — hard rule, no toggle in v1. | spec §Tasks (callout) |
 | FR-TASK-06 | When "Cut trees" is enabled, the worker also chops standing player-left stumps (the small stumps left after the player chops a tree). | Q13 |
 | FR-TASK-07 | Clear rocks deposits stone, ore, geodes, and gems into the designated chest — **no item filtering** in v1 (all rock-clearing drops go to the same chest). | spec §Tasks, §No item filtering |
@@ -66,6 +66,9 @@
 | FR-WORK-08 | Unreachable tiles inside a zone (water, cliffs, walls) are silently skipped by the worker and do not count toward estimated hours. No UI warning at hire time. | Q11 |
 | FR-WORK-09 | The worker enters buildings by walking to the building door and warping inside (vanilla NPC pattern). | Q14 |
 | FR-WORK-10 | The worker visually swaps tools (axe / watering can / scythe / pickaxe) when changing task types. (Sprite work scoped accordingly.) | Q12 |
+| FR-WORK-11 | The worker is considered **stuck** if it makes no progress toward its current target tile and completes no task work for a configurable in-game-minutes threshold (default: 10 in-game minutes). Progress is measured in tile movement or completed task ticks. | Change request (stuck handling) |
+| FR-WORK-12 | On stuck detection, the worker escalates through three steps: (1) play a confused emote (e.g., "?" speech balloon), (2) attempt to teleport to the next reachable task tile in the priority queue and resume work, (3) if still stuck after another stuck-detection window, teleport to the farm entrance and end the shift early as if the 8pm cap had been reached. Buffered items are deposited into assigned chests where reachable, otherwise mailed next morning per FR-OUT-02/03/04/05. Refund is computed from actual hours worked per FR-PAY-05. | Change request (stuck handling — option C, hybrid escalation) |
+| FR-WORK-13 | Stuck-detection thresholds (initial wait and post-teleport wait) are configurable via GMCM. | Change request |
 
 ### 2.4 Skipped objects (capability-based)
 | ID | Requirement | Source |
@@ -224,6 +227,7 @@ Restated from spec §Out of scope, plus clarified items from Q&A:
 - Custom worker sprite art (Q9 — post-v1)
 - Localizations beyond English at v1 launch (Q23 — i18n-ready but English-only)
 - Save cleanup on uninstall (FR-PERSIST-02 — leaked segments are accepted)
+- Overtime pay
 
 ---
 
@@ -241,7 +245,7 @@ Restated from spec §Out of scope, plus clarified items from Q&A:
 | Decision | Choice | Source |
 |---|---|---|
 | Game/SMAPI version | SV 1.6.x + SMAPI 4.x + .NET 6 | Q2 |
-| IDE for development | Visual Studio 2022 (Community) | Q3 |
+| IDE for development | Visual Studio 2026 | Q3 (revised) |
 | Test framework | xUnit + FsCheck | Q4, Q29 |
 | Onboarding strategy | Just-in-time during Construction | Q5 |
 | Distribution | Nexus Mods | Q6 |
@@ -266,6 +270,7 @@ Restated from spec §Out of scope, plus clarified items from Q&A:
 | Cancel mid-shift | Not supported | Q25 |
 | Mod conflict detection | Docs only | Q26 |
 | Farm map support | All 7 vanilla farms official | Q27 |
+| Stuck handling | Hybrid escalation: emote → teleport to next task tile → if still stuck, teleport home and end shift early | Change request |
 
 ---
 

@@ -47,7 +47,7 @@ B) JetBrains Rider (paid, but excellent Unity/.NET experience; cross-platform)
 C) Visual Studio Code with C# Dev Kit (lightest weight; you may already have it)
 D) Other (please describe after [Answer]: tag below)
 
-[Answer]: A
+[Answer]: A — revised to Visual Studio 2026 (see audit.md 2026-05-18T00:00:08Z)
 
 ## Question 4
 Test framework preference. SMAPI mods are typically tested with a thin unit-test project that targets the same .NET 6 and references your mod assembly.
