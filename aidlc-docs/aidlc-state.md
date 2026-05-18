@@ -1,0 +1,53 @@
+# AI-DLC State Tracking — Dayswork
+
+## Project Information
+- **Project Name**: Dayswork
+- **Description**: Stardew Valley SMAPI mod that lets the player hire generic worker NPCs from the bulletin board
+- **Project Type**: Greenfield
+- **Start Date**: 2026-05-18
+- **Current Phase**: INCEPTION
+- **Current Stage**: Requirements Analysis
+
+## Workspace State
+- **Existing Code**: No
+- **Programming Languages**: (to be: C# / .NET targeting Stardew Valley + SMAPI)
+- **Build System**: (to be: MSBuild / `dotnet`)
+- **Project Structure**: Empty (greenfield)
+- **Reverse Engineering Needed**: No
+- **Workspace Root**: `C:\Users\kwood\Repos\dayswork`
+
+## Code Location Rules
+- **Application Code**: Workspace root (NEVER in `aidlc-docs/`)
+- **Documentation**: `aidlc-docs/` only
+- **Source spec**: `aidlc-docs/inception/source-spec.md` (copy of user-provided design doc)
+
+## User Profile (informs onboarding-level docs)
+- Experienced software engineer
+- New to C# / .NET
+- New to Stardew Valley modding / SMAPI ecosystem
+- Implication: tech stack rationale, project scaffolding, and SMAPI conventions need to be documented explicitly during Inception and Construction.
+
+## Extension Configuration
+| Extension | Enabled | Mode | Decided At |
+|---|---|---|---|
+| Security Baseline | No | — | Requirements Analysis (Q28: B — no network/PII/auth surface) |
+| Property-Based Testing | Yes | Partial — enforces PBT-02, PBT-03, PBT-07, PBT-08, PBT-09; remainder advisory | Requirements Analysis (Q29: B) |
+
+**PBT framework**: FsCheck (per PBT-09 recommendation for C#/.NET; integrates with xUnit chosen in Q4).
+
+## Stage Progress
+### INCEPTION PHASE
+- [x] Workspace Detection
+- [ ] Reverse Engineering (N/A — greenfield)
+- [x] Requirements Analysis (awaiting user approval)
+- [ ] User Stories
+- [ ] Workflow Planning
+- [ ] Application Design
+- [ ] Units Generation
+
+### CONSTRUCTION PHASE
+- [ ] Per-unit loop (Functional Design / NFR / Infrastructure / Code Generation)
+- [ ] Build and Test
+
+### OPERATIONS PHASE
+- [ ] Operations (placeholder)
