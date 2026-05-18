@@ -64,6 +64,52 @@
 
 ---
 
+## Application Design — V9 Decision (Mail Attachment Strategy)
+**Timestamp**: 2026-05-18T00:00:19Z
+**User Input**: "A"
+**AI Response**: V9 locked to **Option A — Mail Framework Mod (MFM)** as a required dependency. Corrected my earlier mistaken recommendation of C (vanilla `%item id` token with multiple items picks ONE RANDOMLY per wiki, not all together — breaking the overflow-multi-item use case). Updated `design-verification-notes.md` V9 section with decision + rationale + implications. Updated `components.md` M-16 MailDispatcher description to reference MFM adapter + manifest dependency. Updated `requirements.md` NFR-COMPAT-04 to add MFM as required dependency alongside Harmony (and noted the `<EnableHarmony>true</EnableHarmony>` csproj flag from V1).
+**Context**: INCEPTION — Application Design verification complete; ready to proceed to Units Generation
+
+---
+
+## Application Design — Verification Pass Against Live Docs
+**Timestamp**: 2026-05-18T00:00:18Z
+**User Input**: "yes, use the current docs as reference"
+**AI Response**: User had questioned whether my SMAPI/Stardew advice was derived from live docs (it wasn't — it was training-data knowledge). Fetched 8 wiki pages (Get_Started, Events, APIs, Harmony, Translation, Data, Multiplayer, Utilities, Common_tasks, Migrate_to_Stardew_Valley_1.6) plus web searches for PathFindController, IClickableMenu, GMCM. Produced `aidlc-docs/inception/application-design/design-verification-notes.md` documenting: 13 confirmed decisions (Part 1), 8 mechanical adjustments needed before Construction (Part 2: csproj Harmony flag, ModBuildConfig NuGet, MultiplayerGuard implementation, PathFindController namespace shift in 1.6, HashSet collection migration, QualifiedItemId pattern, Harmony try-catch wrapper, ModContent/GameContent distinction), 1 user decision needed (Part 3 V9: mail-with-attached-items delivery strategy — recommend approach C using AssetRequested), 4 items deferred to Construction (Part 4: IClickableMenu gamepad surface, custom NPC spawning, GMCM API stub vendoring, Billboard class name). Core architecture (D1–D6) survives verification. Added pointer to verification notes at top of application-design.md.
+**Context**: INCEPTION — Application Design (post-completion verification addendum requested by user)
+
+---
+
+## Application Design — Answers + Artifacts Generated
+**Timestamp**: 2026-05-18T00:00:17Z
+**User Input** (verbatim, interactive prompts):
+- D1 Pure-logic separation: "Separate Core project (Recommended)"
+- D2 DI / composition: "Hand-wired in ModEntry (Recommended)"
+- D3 Shift orchestrator: "Explicit state machine (Recommended)"
+- D4 Config access: "Immutable IConfigSnapshot per shift (Recommended)"
+- D5 Eventing: "Direct method calls in fixed order (Recommended for v1)"
+- D6 UI structure: "Four separate menu classes (Recommended)"
+**AI Response**: All 6 recommendations accepted. No ambiguity, no contradictions. Generated 5 artifacts in `aidlc-docs/inception/application-design/`: components.md (14 Core + 21 Mod = 35 components), component-methods.md (interface signatures only — no business logic per stage scope), services.md (6 orchestration services A–F), component-dependency.md (Mermaid + text fallback adjacency list, with coupling assessment), application-design.md (consolidated overview with high-level diagram + FR/NFR coverage matrix). All checkboxes in application-design-plan.md marked [x]. Presenting Review Required gate.
+**Context**: INCEPTION — Application Design complete
+
+---
+
+## Application Design — Plan + Embedded Questions
+**Timestamp**: 2026-05-18T00:00:16Z
+**User Input**: (none — automated stage start)
+**AI Response**: Created `aidlc-docs/inception/plans/application-design-plan.md` with 6 focused design questions (D1: pure-logic separation strategy, D2: DI / composition, D3: shift orchestrator pattern, D4: configuration access, D5: cross-component eventing, D6: UI menu structure) and the Part 2 artifact checklist. Awaiting answers.
+**Context**: INCEPTION — Application Design (gate: awaiting answers)
+
+---
+
+## Workflow Planning — Approved
+**Timestamp**: 2026-05-18T00:00:15Z
+**User Input**: "approve and continue"
+**AI Response**: Workflow Planning approved. Proceeding to **Application Design**. Loading application-design.md rules.
+**Context**: INCEPTION — Workflow Planning approved → Application Design starting
+
+---
+
 ## Workflow Planning — Execution Plan Created
 **Timestamp**: 2026-05-18T00:00:14Z
 **User Input**: (none — automated stage)

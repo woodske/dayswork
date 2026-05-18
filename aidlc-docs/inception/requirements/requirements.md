@@ -156,7 +156,7 @@
 | NFR-COMPAT-01 | Targets Stardew Valley 1.6.x and SMAPI 4.x on .NET 6. (Q2) |
 | NFR-COMPAT-02 | No new buildings are required; relies on the existing Pelican Town bulletin board as the entry point. (Spec §Design goals) |
 | NFR-COMPAT-03 | Single-player only. (FR-MP-01) |
-| NFR-COMPAT-04 | Optional dependency: GenericModConfigMenu (GMCM). Required dependency: Harmony (bundled with SMAPI). |
+| NFR-COMPAT-04 | **Required dependencies**: Harmony (bundled with SMAPI; enabled via `<EnableHarmony>true</EnableHarmony>` csproj flag); **Mail Framework Mod (MFM)** by DIGUS — used by `MailDispatcher` for multi-item letter attachments, declared in `manifest.json` `Dependencies` (see [design-verification-notes.md](../application-design/design-verification-notes.md) V9). **Optional dependency**: GenericModConfigMenu (GMCM) — registered if present, no-op if absent. |
 
 ### 3.2 Safety & data integrity
 | ID | Requirement |
