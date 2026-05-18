@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: INCEPTION
-- **Current Stage**: User Stories (Part 2 — Generated, awaiting approval)
+- **Current Stage**: Workflow Planning
 
 ## Workspace State
 - **Existing Code**: No
@@ -40,14 +40,18 @@
 - [x] Workspace Detection
 - [ ] Reverse Engineering (N/A — greenfield)
 - [x] Requirements Analysis (approved 2026-05-18)
-- [x] User Stories (awaiting user approval)
-- [ ] Workflow Planning
-- [ ] Application Design
-- [ ] Units Generation
+- [x] User Stories (approved 2026-05-18)
+- [x] Workflow Planning (awaiting user approval)
+- [ ] Application Design — **EXECUTE**
+- [ ] Units Generation — **EXECUTE**
 
-### CONSTRUCTION PHASE
-- [ ] Per-unit loop (Functional Design / NFR / Infrastructure / Code Generation)
-- [ ] Build and Test
+### CONSTRUCTION PHASE (per-unit loop)
+- [ ] Functional Design — **EXECUTE** (per unit)
+- [ ] NFR Requirements — **EXECUTE** (per unit)
+- [ ] NFR Design — **EXECUTE** (per unit)
+- [ ] Infrastructure Design — **SKIP** (no cloud / container / IaC; SMAPI is the platform)
+- [ ] Code Generation — **EXECUTE** (per unit, always)
+- [ ] Build and Test — **EXECUTE** (after all units complete)
 
 ### OPERATIONS PHASE
-- [ ] Operations (placeholder)
+- [ ] Operations — **PLACEHOLDER** (v1 ships without deployment automation)
