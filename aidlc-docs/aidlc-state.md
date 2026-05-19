@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-04 Geometry & Domain Primitives — NFR Requirements (Awaiting Approval)
+- **Current Stage**: U-04 Geometry & Domain Primitives — NFR Design (Awaiting Approval)
 
 ## Workspace State
 - **Existing Code**: No

@@ -1,5 +1,13 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-04 NFR Design — Complete, Awaiting Approval
+**Timestamp**: 2026-05-19T00:05:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. NFR Design generated directly (no user questions). Three patterns documented: (1) HashSet deduplication in EnumerateUniqueTiles — inline seen-set using TileCoord struct keys, O(1) lookup, ~100KB max for largest farm, directly supports PBT-03 idempotency invariant; (2) Zone bounds normalization at UI layer (U-11 ZoneDrawOverlay) — Core stays dumb value records, no defensive bounds checking in ZoneGeometry; (3) DestinationKey as sealed record discriminated union — abstract record + sealed subtypes gives structural equality, HashSet-safe keys, exhaustive switch matching. ZoneGen generation strategy documented: sorted-pair generation for Zone (no rejection sampling), TileCoord X/Y in [-5, 200], LocationName drawn from small enum set. State advanced to NFR Design Awaiting Approval. Presenting REVIEW REQUIRED gate.
+**Context**: CONSTRUCTION — U-04 Geometry & Domain Primitives, NFR Design complete (awaiting approval)
+
+---
+
 ## U-04 NFR Requirements — Complete, Awaiting Approval
 **Timestamp**: 2026-05-18T23:55:00Z
 **User Input**: "continue"
