@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-03 Functional Design Complete — Architectural Decisions + Artifacts
+**Timestamp**: 2026-05-18T00:00:34Z
+**User Input**: Q1: "Move TaskKind to U-03 (Recommended)" | Q2: "Full FR-CFG-01 scope now (Recommended)" | Q3: "int (Recommended)"
+**AI Response**: Architectural decisions locked: (Q1) TaskKind moves from U-04 to U-03 — small plan deviation, gives ConfigSnapshot a typed `IReadOnlyDictionary<TaskKind, int>` for per-task rate increments; (Q2) Full FR-CFG-01 scope now — ConfigSnapshot includes BaseRate, TaskIncrements, AverageSpeedConstant, HardCapTime (8pm cap), StuckInitialWaitMinutes, StuckPostTeleportWaitMinutes (no retroactive Extends in U-10/U-13); (Q3) Rates are `int` (matches Stardew gold semantics; deposit math uses double internally and rounds at boundary per NFR-SAFE-02). Generated 4 files: u-03-config-foundation-functional-design-plan.md, business-logic-model.md (lifecycle + GMCM edit semantics for FR-PAY-08), business-rules.md (INV-CFG-01..07 invariants + full default values table from spec §Pricing), domain-entities.md (TaskKind enum + IConfigSnapshot + ConfigSnapshot record + ConfigDefaults factory schemas). State advanced to U-03 Functional Design (Awaiting Approval). Presenting REVIEW REQUIRED gate per functional-design.md Step 7.
+**Context**: CONSTRUCTION — U-03 Config Foundation, Functional Design
+
+---
+
+## U-02 Approved → U-03 Config Foundation Starting
+**Timestamp**: 2026-05-18T00:00:33Z
+**User Input**: "continue"
+**AI Response**: U-02 Test Infrastructure approved. Beginning **U-03 Config Foundation**. Loading unit-of-work.md, component-design.md, and component-dependency.md to determine per-unit stage decisions. U-03 owns config schema + loading logic (pure-Core); will require Functional Design (config schema is business data structure) + Code Generation; likely SKIP NFR Requirements (config is plain JSON read, no perf/security NFRs beyond defaults) and Infrastructure Design (per execution plan).
+**Context**: CONSTRUCTION — U-02 complete → U-03 Config Foundation loop starting
+
+---
+
 ## U-02 Code Generation — Part 2 Complete
 **Timestamp**: 2026-05-18T00:00:32Z
 **User Input**: (none — generation step)
