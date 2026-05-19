@@ -6,6 +6,22 @@
 **AI Response**: Resumed from aidlc-state.md — current stage is U-05 Pricing Core, Functional Design (Pending). Loaded functional-design.md rules, content-validation.md, U-05 unit definition, requirements FR-PAY-01..09 + NFR-SAFE-02, U-04 code summary. Created functional design plan at aidlc-docs/construction/plans/u-05-pricing-core-functional-design-plan.md with 6 clarifying questions: Q1 HoursEstimator formula, Q2 Hours unit (in-game vs. real-time), Q3 Integer arithmetic/rounding, Q4 Rain handling in RateCalculator, Q5 Refund clamping edge cases, Q6 Raw zone area vs. actionable tile count. Awaiting user answers.
 **Context**: CONSTRUCTION — U-05 Pricing Core, Functional Design, Part 1
 
+## U-05 NFR Requirements — Complete
+**Timestamp**: 2026-05-19T00:55:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements assessed. All NFR categories evaluated: NFR-SAFE-02 and NFR-MAINT-03 are the two blocking NFRs applicable to U-05's pure-math scope; all others are N/A with rationale. PBT-03 (12 invariant properties, ≥1000 inputs each) and PBT-07 (PricingGen shared generators) are enforced. No new tech stack decisions needed — all inherited from U-01/U-02. AverageSpeedConstant calibration deferred to Code Generation with gameplay-balance target of 300-800g deposit for a representative early-game contract. Generated nfr-requirements.md and tech-stack-decisions.md. Awaiting approval.
+**Context**: CONSTRUCTION — U-05 Pricing Core, NFR Requirements — artifacts generated, awaiting approval
+
+---
+
+## U-05 Functional Design — Approved
+**Timestamp**: 2026-05-19T00:50:00Z
+**User Input**: "continue"
+**AI Response**: Functional Design approved. Advancing to NFR Requirements for U-05.
+**Context**: CONSTRUCTION — U-05 Pricing Core, NFR Requirements starting
+
+---
+
 ## U-05 Functional Design — Answers Received
 **Timestamp**: 2026-05-19T00:45:00Z
 **User Input**: "D, B, B, B, upper A, lower B, A"
