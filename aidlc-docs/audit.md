@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-09 NFR Design — Complete
+**Timestamp**: 2026-05-19T04:15:00Z
+**User Input**: (none — generation step)
+**AI Response**: NFR Design generated directly (no questions — all patterns fully determined by NFR requirements). Six patterns documented: (1) Cached-Computation Draw Pattern — rate cached on toggle, hours/deposit cached in SummaryMenu ctor, draw() reads fields only; (2) Coordinator-Driven Screen Transition — HiringFlowCoordinator owns Game1.activeClickableMenu assignments; menus signal via Action delegates; (3) Constructor-Injected Core Services — ModEntry is sole composition root; no `new` in menus; (4) Inline Afford-Guard + HUDMessage — single sequential check before Money -=, uses HUDMessage.error_type; (5) SMAPI Gamepad Snapping — populateClickableComponentList + neighbor ID graph + receiveGamePadButton override; (6) SMAPI Data API Read/Write — ReadSaveData/WriteSaveData in SaveLoaded/Saving events; null read → serializer handles → empty list. Logical components map covers ModEntry extension, 2-screen flow diagram, persistence adapter call flow. Awaiting approval.
+**Context**: CONSTRUCTION — U-09 Minimum Hiring Flow, NFR Design complete — awaiting approval
+
+---
+
+## U-09 NFR Requirements — Approved
+**Timestamp**: 2026-05-19T04:10:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Advancing to NFR Design for U-09.
+**Context**: CONSTRUCTION — U-09 Minimum Hiring Flow, NFR Requirements approved → NFR Design
+
+---
+
 ## U-09 NFR Requirements — Complete
 **Timestamp**: 2026-05-19T04:05:00Z
 **User Input**: (none — generation step)
