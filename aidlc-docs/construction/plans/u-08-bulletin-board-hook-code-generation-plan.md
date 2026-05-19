@@ -29,7 +29,7 @@ U-08 — Bulletin Board Hook + i18n + Multiplayer Guard
 ## Steps
 
 ### Step 1 — Create `Dayswork/Guards/MultiplayerGuard.cs`
-[ ]
+[x]
 
 Thin static class; single property delegation to `Context.IsMultiplayer`.
 
@@ -49,7 +49,7 @@ internal static class MultiplayerGuard
 ---
 
 ### Step 2 — Create `Dayswork/Integration/I18nHelper.cs`
-[ ]
+[x]
 
 Static wrapper initialized once in `ModEntry.Entry`. All string lookups in `Dayswork/` go through `Get(key)`.
 
@@ -75,7 +75,7 @@ internal static class I18nHelper
 ---
 
 ### Step 3 — Create `Dayswork/Patches/BulletinBoardPatch.cs`
-[ ]
+[x]
 
 One class, three postfixes targeting `StardewValley.Menus.Billboard`. All three are declared in the same file (one file per patched class, NFR-MAINT-04).
 
@@ -187,7 +187,7 @@ internal static class BulletinBoardPatch
 ---
 
 ### Step 4 — Modify `Dayswork/i18n/default.json`
-[ ]
+[x]
 
 Replace `{}` with the first two keys. All subsequent units append keys; existing keys are never removed.
 
@@ -201,7 +201,7 @@ Replace `{}` with the first two keys. All subsequent units append keys; existing
 ---
 
 ### Step 5 — Modify `Dayswork/ModEntry.cs`
-[ ]
+[x]
 
 Extend the U-01 stub to:
 1. Expose `internal static IMonitor ModMonitor` (named `ModMonitor` to avoid shadowing `Mod.Monitor`)
@@ -242,7 +242,7 @@ public sealed class ModEntry : Mod
 ---
 
 ### Step 6 — Build verification
-[ ]
+[x]
 
 ```
 dotnet build
@@ -253,14 +253,14 @@ Expected: **0 errors, 0 warnings**. If Harmony can't resolve the Billboard targe
 ---
 
 ### Step 7 — Create code summary doc
-[ ]
+[x]
 
 `aidlc-docs/construction/U-08-bulletin-board-hook/code/u-08-code-summary.md`
 
 ---
 
 ### Step 8 — Update state and audit
-[ ]
+[x]
 
 - Mark U-08 Code Generation complete in `aidlc-state.md`
 - Append completion entry to `audit.md`

@@ -14,7 +14,12 @@
       "Bash(Out-Null)",
       "Bash(Write-Output \"OK\")",
       "Bash(dotnet list *)",
-      "Bash(echo \"Exit: $?\")"
+      "Bash(echo \"Exit: $?\")",
+      "Bash(Get-ChildItem \"X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\" -Filter \"*.dll\")",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem \"X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\" -Recurse -Filter \"Billboard*\")",
+      "PowerShell(Get-Process | Where-Object { $_.Name -match \"Stardew|SMAPI|dotnet\" } | Select-Object Id, Name, MainWindowTitle)",
+      "PowerShell(& cmd /c \"dir `\"X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\\\\Mods\\\\Dayswork`\"\")"
     ]
   }
 }
