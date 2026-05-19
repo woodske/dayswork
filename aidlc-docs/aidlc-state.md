@@ -5,8 +5,8 @@
 - **Description**: Stardew Valley SMAPI mod that lets the player hire generic worker NPCs from the bulletin board
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
-- **Current Phase**: INCEPTION → CONSTRUCTION (pending Units Generation approval)
-- **Current Stage**: Units Generation (Part 2 complete; awaiting user approval to enter CONSTRUCTION)
+- **Current Phase**: CONSTRUCTION
+- **Current Stage**: U-01 Project Scaffold — Code Generation (Part 1: Planning)
 
 ## Workspace State
 - **Existing Code**: No
@@ -43,7 +43,7 @@
 - [x] User Stories (approved 2026-05-18)
 - [x] Workflow Planning (approved 2026-05-18)
 - [x] Application Design (approved 2026-05-18, with live-docs verification addendum)
-- [x] Units Generation — Part 2 complete 2026-05-18 (pending approval gate)
+- [x] Units Generation — approved 2026-05-18
 
 ### CONSTRUCTION PHASE (per-unit loop)
 - [ ] Functional Design — **EXECUTE** (per unit)

@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-01 Code Generation — Part 1 Plan Drafted, Awaiting Approval
+**Timestamp**: 2026-05-18T00:00:26Z
+**User Input**: (none — generation step)
+**AI Response**: Created `aidlc-docs/construction/plans/u-01-project-scaffold-code-generation-plan.md` with 12 numbered steps covering: solution file, Dayswork.Core csproj (no SMAPI refs), Dayswork csproj (ModBuildConfig + Harmony enabled + auto-deploy), manifest.json (Bindicle.Dayswork, SMAPI 4.0.0 minimum), ModEntry.cs stub (single log line), empty i18n/default.json, .gitignore, MIT LICENSE, README.md extension (preserving existing title), code summary doc, state + audit updates. Total: 10 created files + 1 modified (README) + 3 doc files. Verification is manual since test infra arrives in U-02. Asking: **"Code generation plan for U-01 Project Scaffold complete. Review the plan in aidlc-docs/construction/plans/u-01-project-scaffold-code-generation-plan.md. Ready to proceed to generation?"**
+**Context**: CONSTRUCTION — U-01 Project Scaffold, Code Generation Part 1 (gate: awaiting plan approval per code-generation.md Step 7)
+
+---
+
+## Units Generation — Approved → CONSTRUCTION PHASE Starting (U-01)
+**Timestamp**: 2026-05-18T00:00:25Z
+**User Input**: "approve and continue"
+**AI Response**: Units Generation approved. Marking Units Generation stage [x] in aidlc-state.md and transitioning to CONSTRUCTION phase. Beginning per-unit loop for **U-01 Project Scaffold**. Per-unit stage decisions for U-01: Functional Design → SKIP (no business logic in scaffold); NFR Requirements → SKIP (architectural NFRs are enforced by the project file structure, which is the scaffold itself — no separate NFR doc needed); NFR Design → SKIP (cascades from NFR Requirements skip); Infrastructure Design → SKIP (per execution plan, all units skip Infra); Code Generation → EXECUTE. Loading code-generation.md rules to begin Part 1 planning.
+**Context**: INCEPTION complete → CONSTRUCTION phase, U-01 Project Scaffold loop starting
+
+---
+
 ## Units Generation — Part 2 Complete (Awaiting Approval Gate)
 **Timestamp**: 2026-05-18T00:00:24Z
 **User Input**: (none — generation step)
