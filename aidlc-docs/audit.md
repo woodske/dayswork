@@ -534,3 +534,28 @@
 **Context**: CONSTRUCTION — U-06 Persistence Core, Code Generation complete; awaiting approval to proceed to U-07
 
 ---
+
+## Session Resumption — U-07 Functional Design Start
+**Timestamp**: 2026-05-19T10:00:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Loaded aidlc-state.md. U-06 complete. Starting U-07 — Capability & Priority Core, Functional Design (Part 1 — Plan). Loaded functional-design.md rules, content-validation.md, unit-of-work.md (U-07 definition), requirements.md (FR-SKIP-01..05, FR-TOOL-01..04, FR-WORK-03), source-spec.md (tool-inheritance table), existing domain code (TaskKind, TileCoord, Zone, etc.), prior code summaries. Creating functional design plan with clarifying questions.
+**Context**: CONSTRUCTION — U-07 Capability & Priority Core, Functional Design, Steps 1–4
+
+---
+
+## U-07 Functional Design — Q&A (8 questions, answered one-by-one)
+**Timestamp**: 2026-05-19T10:15:00Z
+**User Input**: Answered each question individually via chat
+**AI Response**: All 8 answers recorded, no ambiguities detected. Decisions:
+- Q1 (ObjectClass granularity): "B" → Tool-grouped enums: AxeTarget + PickTarget
+- Q2 (ToolLevel representation): "B" → Dedicated ToolLevel enum (Basic=0..Iridium=4)
+- Q3 (Tool not owned): "Default to basic tool if tool is absent" → ToolLevel.Basic; Mod layer handles mail warning separately; no sentinel needed
+- Q4 (CapabilityMatrix role): "B" → Static lookup table called internally by CapabilityEvaluator
+- Q5 (FR-SKIP-04/05 scope): "A" → Pure tool-level scope; trellis/readiness filtered by ShiftOrchestrator (Mod layer)
+- Q6 (TaskPriorityOrderer contract): "A" → IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> enabledTasks)
+- Q7 (CapabilityEvaluator DI): "A" → Interface + implementation, constructor injection
+- Q8 (WateringCan): "A" → Not evaluated at all; any level works; no capability gate
+Generated 3 artifacts: domain-entities.md, business-logic-model.md, business-rules.md
+**Context**: CONSTRUCTION — U-07 Capability & Priority Core, Functional Design, Steps 3–6 complete
+
+---
