@@ -575,3 +575,19 @@ Generated 3 artifacts: domain-entities.md, business-logic-model.md, business-rul
 **Context**: CONSTRUCTION — U-07 Capability & Priority Core, NFR Requirements complete, awaiting approval
 
 ---
+
+## U-07 NFR Requirements — Approved
+**Timestamp**: 2026-05-19T10:30:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Proceeding to NFR Design for U-07.
+**Context**: CONSTRUCTION — U-07 Capability & Priority Core, NFR Requirements → NFR Design
+
+---
+
+## U-07 NFR Design — Complete
+**Timestamp**: 2026-05-19T10:35:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. NFR Design generated directly (no questions — all design categories N/A for pure stateless Core). Three patterns documented: (1) Pure Function Isolation (NFR-MAINT-03) — ToolLevelReader extracts game state at 6am boundary, ToolSnapshot passed as plain record into Core; (2) Static Threshold Table (CapabilityMatrix) — static class with switch expression, FruitTree unconditional branch first; (3) ToolSnapshotGen (PBT-07) — Gen.Elements over all 5 ToolLevel values, shrinks toward Basic. Logical components: 8 production files, 2 test files (41 [Fact] + 2 [Property]). No infrastructure components. Generated nfr-design-patterns.md and logical-components.md. Awaiting approval.
+**Context**: CONSTRUCTION — U-07 Capability & Priority Core, NFR Design complete, awaiting approval
+
+---
