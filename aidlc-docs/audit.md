@@ -559,3 +559,19 @@ Generated 3 artifacts: domain-entities.md, business-logic-model.md, business-rul
 **Context**: CONSTRUCTION — U-07 Capability & Priority Core, Functional Design, Steps 3–6 complete
 
 ---
+
+## U-07 Functional Design — Approved
+**Timestamp**: 2026-05-19T10:20:00Z
+**User Input**: "continue"
+**AI Response**: Functional Design approved. Proceeding to NFR Requirements for U-07.
+**Context**: CONSTRUCTION — U-07 Capability & Priority Core, Functional Design → NFR Requirements
+
+---
+
+## U-07 NFR Requirements — Complete
+**Timestamp**: 2026-05-19T10:25:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements generated directly (no user questions — all NFRs determinable from prior decisions + unit scope). Applicable NFRs: NFR-MAINT-03 (Core isolation, BLOCKING), NFR-MAINT-01/02 (xUnit + FsCheck, BLOCKING). PBT: PBT-03 (2 invariant properties on TaskPriorityOrderer: determinism + ordering); PBT-07 (ToolSnapshotGen for downstream use); PBT-08/09 inherited. Capability tests are exhaustive table-driven [Fact]s (40 cases), not PBT — domain too small for property testing. No new tech stack decisions. Generated nfr-requirements.md and tech-stack-decisions.md. Awaiting approval.
+**Context**: CONSTRUCTION — U-07 Capability & Priority Core, NFR Requirements complete, awaiting approval
+
+---
