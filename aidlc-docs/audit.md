@@ -6,6 +6,14 @@
 **AI Response**: Resumed from aidlc-state.md — current stage is U-05 Pricing Core, Functional Design (Pending). Loaded functional-design.md rules, content-validation.md, U-05 unit definition, requirements FR-PAY-01..09 + NFR-SAFE-02, U-04 code summary. Created functional design plan at aidlc-docs/construction/plans/u-05-pricing-core-functional-design-plan.md with 6 clarifying questions: Q1 HoursEstimator formula, Q2 Hours unit (in-game vs. real-time), Q3 Integer arithmetic/rounding, Q4 Rain handling in RateCalculator, Q5 Refund clamping edge cases, Q6 Raw zone area vs. actionable tile count. Awaiting user answers.
 **Context**: CONSTRUCTION — U-05 Pricing Core, Functional Design, Part 1
 
+## U-05 NFR Design — Complete
+**Timestamp**: 2026-05-19T01:00:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. NFR Design generated directly (no questions needed — all five design categories are N/A for pure stateless calculators). Three patterns documented: (1) Gold Integrity via Ceiling-Clamp Arithmetic (NFR-SAFE-02) — Math.Ceiling on deposit and billable, Math.Clamp on refund; (2) Pure Function Isolation (NFR-MAINT-03) — compile-time enforcement via Dayswork.Core.csproj reference list; (3) Typed Discriminated Union (DepositResult) for explicit degenerate-contract handling. No infrastructure components needed. Logical component map shows 4 calculators + DepositResult, planned DI wiring into U-09/U-10 consumers, and test component map with PricingGen composing ConfigSnapshotGen and ZoneGen. Generated nfr-design-patterns.md and logical-components.md. Awaiting approval.
+**Context**: CONSTRUCTION — U-05 Pricing Core, NFR Design — artifacts generated, awaiting approval
+
+---
+
 ## U-05 NFR Requirements — Complete
 **Timestamp**: 2026-05-19T00:55:00Z
 **User Input**: "continue"
