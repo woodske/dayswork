@@ -1,5 +1,13 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-04 NFR Requirements — Complete, Awaiting Approval
+**Timestamp**: 2026-05-18T23:55:00Z
+**User Input**: "continue"
+**AI Response**: Functional Design approved. NFR Requirements generated directly (no user questions — all NFRs determined by prior decisions). Applicable NFRs: NFR-MAINT-01 (Core/Mod separation verified by .csproj reference list), PBT-02 (Zone JSON round-trip, ≥1000 inputs, using ZoneGen), PBT-03 (three invariant properties on EnumerateUniqueTiles: commutativity + idempotency + area conservation), PBT-07 (ZoneGen shared generator for TileCoord/Zone/ChestRef/ZoneList, used by U-05/U-06/U-07 downstream). Tech stack: no new packages — Newtonsoft.Json already present, FsCheck.Xunit 2.16.5 already installed. N/A list: NFR-SAFE-01/02/03, NFR-UX-01/02, NFR-MAINT-02/04, Security Baseline. Presenting REVIEW REQUIRED gate.
+**Context**: CONSTRUCTION — U-04 Geometry & Domain Primitives, NFR Requirements complete (awaiting approval)
+
+---
+
 ## U-04 Functional Design — Artifacts Generated, Awaiting Approval
 **Timestamp**: 2026-05-18T23:45:00Z
 **User Input**: Q1: "A) Two corners (TopLeft + BottomRight, both inclusive)" | Q2: "A) Yes — Zone includes LocationName (Recommended)" | Q3: "B) Sealed record hierarchy (Recommended)" | Q4-Q6: "Q4-A, Q5-A, Q6-A (all recommended)"
