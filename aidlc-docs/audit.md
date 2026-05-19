@@ -1,5 +1,29 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-09 NFR Requirements — Complete
+**Timestamp**: 2026-05-19T04:05:00Z
+**User Input**: (none — generation step)
+**AI Response**: NFR Requirements generated directly (no questions — all patterns fully determined). Seven applicable NFRs: NFR-SAFE-03 (save data via SMAPI API; null read → empty list), NFR-SAFE-02 (afford-check before Money -=; integer deduction), NFR-PERF-01 (no computation in draw(); rate/deposit/hours cached as fields), NFR-PERF-02 (HoursEstimator called once at SummaryMenu construction), NFR-UX-01 (full gamepad via receiveGamePadButton + ClickableComponent snapping), NFR-UX-02 (all menu strings via I18nHelper; 22 new i18n keys listed), NFR-MAINT-03 (Core interfaces injected; no Game1 refs in Core), NFR-ONBOARD-01 (IClickableMenu anatomy + SMAPI Data API JIT in Code Gen). Seven tech-stack decisions: T9-01 through T9-07. Awaiting approval.
+**Context**: CONSTRUCTION — U-09 Minimum Hiring Flow, NFR Requirements complete — awaiting approval
+
+---
+
+## Session Resumption — U-09 Start
+**Timestamp**: 2026-05-19T04:00:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resuming Construction phase. U-08 complete (play-tested ✓). Starting U-09 — Minimum Hiring Flow per-unit loop. Assessment: Functional Design SKIP (UI rendering + SMAPI wiring, no new business logic per unit-of-work.md); NFR Requirements EXECUTE; NFR Design EXECUTE; Infrastructure Design SKIP; Code Generation EXECUTE.
+**Context**: CONSTRUCTION — Session resumption, beginning U-09 NFR Requirements
+
+---
+
+## U-08 Post-Generation Fixes
+**Timestamp**: 2026-05-19T03:00:00Z
+**User Input**: (play-test feedback)
+**AI Response**: Three fixes applied after play-testing: (1) Harmony parameter name — Billboard constructor param is `dailyQuest` not `onlyViewDailyQuest`; (2) Wrong billboard mode — button was showing on calendar (dailyQuest=false); inverted guard to show only on help wanted board (dailyQuest=true); (3) Button width — hardcoded 200px clipped "Farmhand" text; replaced with `Game1.smallFont.MeasureString(label).X + 32` for dynamic sizing; (4) Button Y position — overlapped vanilla Accept Quest button at bottom; moved to `yPositionOnScreen + 16` (top of wooden frame). All fixes built 0 errors 0 warnings and auto-deployed. U-08 Definition of Done satisfied via play-test.
+**Context**: CONSTRUCTION — U-08 Bulletin Board Hook, post-generation play-test fixes
+
+---
+
 ## U-08 Code Generation — Complete
 **Timestamp**: 2026-05-19T02:35:00Z
 **User Input**: "approve and generate"
