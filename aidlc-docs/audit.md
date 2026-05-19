@@ -1,5 +1,19 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-05 Functional Design — Plan Created, Awaiting Answers
+**Timestamp**: 2026-05-19T00:30:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resumed from aidlc-state.md — current stage is U-05 Pricing Core, Functional Design (Pending). Loaded functional-design.md rules, content-validation.md, U-05 unit definition, requirements FR-PAY-01..09 + NFR-SAFE-02, U-04 code summary. Created functional design plan at aidlc-docs/construction/plans/u-05-pricing-core-functional-design-plan.md with 6 clarifying questions: Q1 HoursEstimator formula, Q2 Hours unit (in-game vs. real-time), Q3 Integer arithmetic/rounding, Q4 Rain handling in RateCalculator, Q5 Refund clamping edge cases, Q6 Raw zone area vs. actionable tile count. Awaiting user answers.
+**Context**: CONSTRUCTION — U-05 Pricing Core, Functional Design, Part 1
+
+## U-05 Functional Design — Answers Received
+**Timestamp**: 2026-05-19T00:45:00Z
+**User Input**: "D, B, B, B, upper A, lower B, A"
+**AI Response**: Recorded all 6 answers. Q1:D (tile×tasks formula with single shared constant). Q2:B (real-time hours; AverageSpeedConstant unit finalized as real min/tile/task, overrides U-03 placeholder). Q3:B (int rates, double hours, Math.Ceiling for deposit, refund clamped). Q4:B (RateCalculator takes isRaining bool; handles Water Crops exclusion internally). Q5 upper:A (silent clamp), lower:B (DepositResult.Zero for estimatedHours<=0). Q6:A (raw zone rectangle area). Generated three artifacts: domain-entities.md (4 interfaces, DepositResult discriminated union, data flow diagram, directory layout), business-logic-model.md (pseudocode for all 4 calculators, composition example), business-rules.md (BR-PRICE-01..07, BR-HOURS-01..07, BR-DEP-01..06, BR-REF-01..08, BR-XPRICE-01..03, full PBT obligations table, PricingGen spec, rain-day recurring note). Plan checkboxes marked complete.
+**Context**: CONSTRUCTION — U-05 Pricing Core, Functional Design — artifacts generated, awaiting approval
+
+---
+
 ## U-04 Code Generation — Complete
 **Timestamp**: 2026-05-19T00:20:00Z
 **User Input**: "approve and generate"
