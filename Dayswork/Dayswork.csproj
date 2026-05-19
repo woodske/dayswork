@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>10.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AssemblyName>Dayswork</AssemblyName>
+    <RootNamespace>Dayswork</RootNamespace>
+    <!-- Required for BulletinBoardPatch (M-02) added in U-08 -->
+    <EnableHarmony>true</EnableHarmony>
+    <!-- Auto-deploy built mod to <StardewModsPath>/Dayswork/ after each build -->
+    <EnableModDeploy>true</EnableModDeploy>
+    <!-- Release zip deferred until U-16 (v1 release candidate) -->
+    <EnableModZip>false</EnableModZip>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Pathoschild.Stardew.ModBuildConfig resolves the Stardew Valley install path
+      automatically and brings in SMAPI, StardewValley, and Harmony references.
+      Version 4.x targets SMAPI 4.x / Stardew 1.6.x (Q2 decision).
+    -->
+    <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dayswork.Core\Dayswork.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Copy mod content files to build output so the auto-deploy works correctly -->
+  <ItemGroup>
+    <Content Include="manifest.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="i18n\default.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

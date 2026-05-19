@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-01 Project Scaffold — Code Generation (Part 1: Planning)
+- **Current Stage**: U-01 Project Scaffold — Code Generation complete (pending approval gate → U-02)
 
 ## Workspace State
 - **Existing Code**: No

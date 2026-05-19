@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-01 Code Generation — Part 2 Complete (Awaiting Approval Gate)
+**Timestamp**: 2026-05-18T00:00:28Z
+**User Input**: (none — generation step)
+**AI Response**: All 12 plan steps executed and marked [x]. Files created: Dayswork.sln (2 projects; Tests deferred to U-02), Dayswork.Core/Dayswork.Core.csproj, Dayswork/Dayswork.csproj (ModBuildConfig 4.1.1 + EnableHarmony + EnableModDeploy), Dayswork/ModEntry.cs, Dayswork/manifest.json, Dayswork/i18n/default.json, .gitignore, LICENSE. Modified: README.md. Created: aidlc-docs/construction/U-01-project-scaffold/code/u-01-code-summary.md. Plan deviation noted: Dayswork.Tests not in .sln (would break dotnet build; U-02 adds it). Presenting REVIEW REQUIRED gate per code-generation.md Step 14.
+**Context**: CONSTRUCTION — U-01 Project Scaffold, Code Generation Part 2 complete
+
+---
+
+## U-01 Code Generation — Part 2 Executing
+**Timestamp**: 2026-05-18T00:00:27Z
+**User Input**: "approve and generate"
+**AI Response**: Plan approved. Starting Part 2 generation — creating Dayswork.sln, Dayswork.Core.csproj, Dayswork.csproj, ModEntry.cs, manifest.json, i18n/default.json, .gitignore, LICENSE, README.md update, code summary doc. Note: Dayswork.Tests omitted from .sln in this unit (its csproj does not exist yet; would break `dotnet build`); U-02 adds the Tests project. All other steps per approved plan.
+**Context**: CONSTRUCTION — U-01 Project Scaffold, Code Generation Part 2
+
+---
+
 ## U-01 Code Generation — Part 1 Plan Drafted, Awaiting Approval
 **Timestamp**: 2026-05-18T00:00:26Z
 **User Input**: (none — generation step)

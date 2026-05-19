@@ -38,80 +38,44 @@
 ## Code Generation Steps (Part 2 — executes after approval)
 
 ### Step 1 — Create solution file
-- [ ] Create `Dayswork.sln` at workspace root
-- [ ] Solution lists the three projects: `Dayswork.Core`, `Dayswork`, `Dayswork.Tests`
-- [ ] Place `Dayswork.Tests` reference even though U-02 creates the actual csproj — leaving an unbuilt-but-referenced project is the simpler alternative to re-editing the .sln in U-02. (Alternative: U-02 adds the reference itself; both are valid. Default to "U-01 lists all three, U-02 fills in the missing csproj" for forward stability.)
+- [x] Create `Dayswork.sln` at workspace root
+- [x] Solution lists the two projects with existing csproj files: `Dayswork.Core`, `Dayswork`
+- [x] **Plan deviation**: Dayswork.Tests omitted from .sln (no csproj yet — would break `dotnet build`); U-02 adds the Tests reference
 
 ### Step 2 — Create `Dayswork.Core` project
-- [ ] Create directory `Dayswork.Core/`
-- [ ] Create `Dayswork.Core/Dayswork.Core.csproj`:
-  - `<TargetFramework>net6.0</TargetFramework>`
-  - `<Nullable>enable</Nullable>` (catch null-ref bugs early per NFR-SAFE-04 spirit)
-  - `<LangVersion>10.0</LangVersion>` (record types, file-scoped namespaces)
-  - `<ImplicitUsings>enable</ImplicitUsings>`
-  - `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` (enforces clean code from day one)
-  - PackageReference to `Newtonsoft.Json` (explicit, so Core stays self-contained per [component-dependency.md](../../inception/application-design/component-dependency.md) rule 1)
-  - **No** PackageReference or ProjectReference to SMAPI / StardewValley / Harmony — this is what makes the Core/Mod separation a compile-time guarantee
+- [x] Create directory `Dayswork.Core/`
+- [x] Create `Dayswork.Core/Dayswork.Core.csproj` (net6.0, Nullable=enable, LangVersion=10.0, TreatWarningsAsErrors=true, Newtonsoft.Json 13.0.3, no SMAPI/Stardew refs)
 
 ### Step 3 — Create `Dayswork` (the SMAPI mod) project
-- [ ] Create directory `Dayswork/`
-- [ ] Create `Dayswork/Dayswork.csproj`:
-  - `<TargetFramework>net6.0</TargetFramework>`, `<Nullable>enable</Nullable>`, `<LangVersion>10.0</LangVersion>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`
-  - `<EnableHarmony>true</EnableHarmony>` (per components.md M-01)
-  - `<EnableModDeploy>true</EnableModDeploy>` and `<EnableModZip>false</EnableModZip>` (auto-deploy to `<StardewModsPath>/Dayswork/` on build for fast iteration; defer release-zip until U-16)
-  - PackageReference to `Pathoschild.Stardew.ModBuildConfig` (`Version="4.*"` to track current; this brings in SMAPI/Stardew/Harmony references via the standard Stardew dev pattern)
-  - ProjectReference to `..\Dayswork.Core\Dayswork.Core.csproj`
-  - Include `manifest.json` and `i18n/default.json` as `Content` with `CopyToOutputDirectory="Always"`
+- [x] Create directory `Dayswork/`
+- [x] Create `Dayswork/Dayswork.csproj` (net6.0, EnableHarmony=true, EnableModDeploy=true, EnableModZip=false, ModBuildConfig 4.1.1, ProjectReference to Core, Content includes manifest.json and i18n/default.json)
 
 ### Step 4 — Create `Dayswork/manifest.json`
-- [ ] UniqueID: `Bindicle.Dayswork` (per user's modding handle from memory)
-- [ ] Name: `Dayswork`
-- [ ] Author: `Bindicle`
-- [ ] Version: `0.1.0`
-- [ ] Description: `Hire NPC farmhands from the Pelican Town bulletin board to work your farm while you adventure.`
-- [ ] MinimumApiVersion: `4.0.0` (SMAPI 4.x per Q2)
-- [ ] EntryDll: `Dayswork.dll`
-- [ ] UpdateKeys: leave empty for now (filled when first published; deferred)
-- [ ] Dependencies / OptionalDependencies: leave empty for now (MFM added in U-14; GMCM in U-16 per [unit-of-work.md](../../inception/application-design/unit-of-work.md))
+- [x] UniqueID: `Bindicle.Dayswork`, Version: 0.1.0, MinimumApiVersion: 4.0.0, EntryDll: Dayswork.dll, UpdateKeys: []
 
 ### Step 5 — Create `Dayswork/ModEntry.cs` stub
-- [ ] File contents: a single sealed class `ModEntry : Mod` in namespace `Dayswork` with an `Entry(IModHelper helper)` override that calls `this.Monitor.Log("Dayswork loaded", LogLevel.Info);` and nothing else
-- [ ] Use file-scoped namespace syntax (`namespace Dayswork;`) — convention for the project per `<LangVersion>10.0</LangVersion>`
+- [x] Sealed class `ModEntry : Mod`, file-scoped namespace, Entry() logs "Dayswork loaded" at Info level only
 
 ### Step 6 — Create `Dayswork/i18n/default.json`
-- [ ] Empty JSON object `{}` (placeholder; U-08 populates first real entries)
-- [ ] Ensures SMAPI's i18n helper has *something* to load and doesn't log a warning at startup
+- [x] Empty `{}` placeholder
 
 ### Step 7 — Create `.gitignore`
-- [ ] Standard .NET ignores: `bin/`, `obj/`, `*.user`, `*.suo`, `.vs/`, `*.lock.json`, `out/`, `[Bb]in/`, `[Oo]bj/`
-- [ ] IDE: `.idea/`, `.vscode/` (kept locally where individual prefs differ)
-- [ ] OS: `.DS_Store`, `Thumbs.db`
-- [ ] Do NOT ignore `.csproj`, `.sln`, `manifest.json`, `i18n/`, source files
+- [x] .NET / IDE / OS ignores (bin/, obj/, .vs/, *.user, .idea/, .vscode/, .DS_Store, etc.)
 
 ### Step 8 — Create `LICENSE`
-- [ ] MIT license per Q7 decision
-- [ ] Copyright 2026 Kevin Woods (Bindicle)
-- [ ] Standard MIT text
+- [x] MIT, copyright 2026 Kevin Woods (Bindicle)
 
 ### Step 9 — Update `README.md`
-- [ ] Preserve existing title `# Dayswork` and tagline `A Stardew Valley mod for hiring NPC farmhands`
-- [ ] Append: **Status** section (currently "Pre-alpha — v1 development in progress")
-- [ ] Append: **Build From Source** section with Visual Studio 2026 instructions (per Q3 decision)
-- [ ] Append: **License** section (MIT)
-- [ ] Append: **Author** section (Bindicle)
+- [x] Preserved title + tagline; appended Status / Build From Source (VS 2026 instructions) / Solution structure / License / Author sections
 
 ### Step 10 — Create code summary doc
-- [ ] Create `aidlc-docs/construction/U-01-project-scaffold/code/u-01-code-summary.md`
-- [ ] Lists every file created in U-01 with its path and one-line purpose
-- [ ] Records the verification steps that satisfy the Definition of Done
+- [x] Created `aidlc-docs/construction/U-01-project-scaffold/code/u-01-code-summary.md` with file list, plan deviation note, verification steps, and what U-02 inherits
 
 ### Step 11 — Update aidlc-state.md
-- [ ] Mark U-01 Construction loop complete (pending user approval gate)
-- [ ] Current Stage advances to U-02 Test Infrastructure
-- [ ] Record the per-unit-stage decisions table for U-01
+- [x] Marks U-01 complete; Current Stage advances to U-02
 
 ### Step 12 — Update audit.md
-- [ ] Append entry recording Part 2 execution complete
+- [x] Part 2 execution log appended
 
 ---
 

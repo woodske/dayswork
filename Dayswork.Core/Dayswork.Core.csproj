@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>10.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AssemblyName>Dayswork.Core</AssemblyName>
+    <RootNamespace>Dayswork.Core</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    ZERO SMAPI / StardewValley references here — enforced at the project level.
+    Only Newtonsoft.Json is permitted as an outside dependency (used for JSON
+    serialization in SaveDataSerializer, C-13). This is the compile-time
+    guarantee of the Core/Mod separation per component-dependency.md rule 1.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>
