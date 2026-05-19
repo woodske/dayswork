@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-08 Bulletin Board Hook — Complete (play-tested ✓); ready to start U-09
+- **Current Stage**: U-09 Minimum Hiring Flow — Code generated, build 0 errors/0 warnings; awaiting play-test
 
 ## Workspace State
 - **Existing Code**: No

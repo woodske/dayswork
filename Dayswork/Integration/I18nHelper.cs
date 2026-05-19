@@ -10,4 +10,7 @@ internal static class I18nHelper
 
     internal static string Get(string key) =>
         _helper.Translation.Get(key).ToString();
+
+    internal static string Get(string key, object tokens) =>
+        _helper.Translation.Get(key, tokens).ToString();
 }

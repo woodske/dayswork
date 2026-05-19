@@ -1,4 +1,30 @@
 {
     "bulletin.hire_a_farmhand": "Hire a Farmhand",
-    "multiplayer.refused_log_message": "Dayswork is single-player only. The hiring option has been disabled for this multiplayer session."
+    "multiplayer.refused_log_message": "Dayswork is single-player only. The hiring option has been disabled for this multiplayer session.",
+
+    "ui.task_selection.title": "Hire a Farmhand",
+    "ui.task_selection.water_crops": "Water Crops",
+    "ui.task_selection.harvest_crops": "Harvest Crops",
+    "ui.task_selection.collect_fruit": "Collect Fruit",
+    "ui.task_selection.feed_animals": "Feed Animals",
+    "ui.task_selection.pet_animals": "Pet Animals",
+    "ui.task_selection.collect_animal_products": "Collect Animal Products",
+    "ui.task_selection.cut_trees": "Cut Trees",
+    "ui.task_selection.clear_rocks": "Clear Rocks",
+    "ui.task_selection.clear_weeds": "Clear Weeds",
+    "ui.task_selection.clear_grass": "Clear Grass",
+    "ui.task_selection.rate_label": "Hourly rate: {{rate}}g",
+    "ui.task_selection.confirm_btn": "Next",
+    "ui.task_selection.cancel_btn": "Cancel",
+
+    "ui.summary.title": "Confirm Hiring",
+    "ui.summary.tasks_label": "Tasks:",
+    "ui.summary.hours_label": "Est. hours: {{hours}}",
+    "ui.summary.rate_label": "Rate: {{rate}}g/hr",
+    "ui.summary.deposit_label": "Deposit: {{deposit}}g",
+    "ui.summary.refund_policy": "Unused deposit refunded at shift end.",
+    "ui.summary.confirm_btn": "Confirm",
+    "ui.summary.back_btn": "Back",
+
+    "ui.error.cant_afford": "You can't afford this contract."
 }

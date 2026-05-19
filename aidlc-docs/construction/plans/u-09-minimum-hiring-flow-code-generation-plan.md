@@ -73,7 +73,7 @@ U-09 — Minimum Hiring Flow
 
 ## Step Details
 
-### Step 1 — Create `Dayswork/UI/ContractDraft.cs`  [ ]
+### Step 1 — Create `Dayswork/UI/ContractDraft.cs`  [x]
 Mutable class holding the player's in-progress hiring choices. Lives in `Dayswork.UI` namespace. Not a Core type — never serialized. Properties:
 - `HashSet<TaskKind> EnabledTasks` — tasks the player has toggled on
 - `List<Zone> Zones` — empty in U-09 (whole-farm default applied by coordinator); populated in U-11
@@ -84,7 +84,7 @@ Using directives: `Dayswork.Core.Domain`
 
 ---
 
-### Step 2 — Create `Dayswork/UI/HiringFlowCoordinator.cs`  [ ]
+### Step 2 — Create `Dayswork/UI/HiringFlowCoordinator.cs`  [x]
 The sole owner of screen transitions. Holds references to Core singletons (injected via constructor). Key members:
 
 **Constructor**: `HiringFlowCoordinator(IRateCalculator rateCalc, IDepositCalculator depositCalc, IHoursEstimator hoursEst, IConfigSnapshot config, IContractStore contractStore)`
@@ -134,7 +134,7 @@ Using directives: `Dayswork.Core.Config`, `Dayswork.Core.Domain`, `Dayswork.Core
 
 ---
 
-### Step 3 — Create `Dayswork/UI/TaskSelectionMenu.cs`  [ ]
+### Step 3 — Create `Dayswork/UI/TaskSelectionMenu.cs`  [x]
 **Extends** `IClickableMenu`. Screen 1 of the hiring flow.
 
 **Layout** (centered on screen):
@@ -167,7 +167,7 @@ Using directives: `Dayswork.Core.Config`, `Dayswork.Core.Domain`, `Dayswork.Core
 
 ---
 
-### Step 4 — Create `Dayswork/UI/SummaryMenu.cs`  [ ]
+### Step 4 — Create `Dayswork/UI/SummaryMenu.cs`  [x]
 **Extends** `IClickableMenu`. Screen 4 (thin) of the hiring flow.
 
 **Layout** (centered on screen):
@@ -203,7 +203,7 @@ Using directives same as TaskSelectionMenu + `Dayswork.Core.Pricing.DepositResul
 
 ---
 
-### Step 5 — Create `Dayswork/Integration/ContractPersistenceAdapter.cs`  [ ]
+### Step 5 — Create `Dayswork/Integration/ContractPersistenceAdapter.cs`  [x]
 
 **Constructor**: `ContractPersistenceAdapter(IContractStore store, ISaveDataSerializer serializer, IDataHelper dataHelper, string modVersion)`
 
@@ -223,7 +223,7 @@ Using directives: `Dayswork.Core.Domain`, `Dayswork.Core.Persistence`, `Dayswork
 
 ---
 
-### Step 6 — Modify `Dayswork.Core/Persistence/ContractStore.cs` — Implement `ListActiveForDate`  [ ]
+### Step 6 — Modify `Dayswork.Core/Persistence/ContractStore.cs` — Implement `ListActiveForDate`  [x]
 
 Replace the `throw new NotImplementedException(...)` body with:
 
@@ -258,7 +258,7 @@ private static bool IsNextGameDay(GameDate hire, GameDate candidate)
 
 ---
 
-### Step 7 — Modify `Dayswork/Patches/BulletinBoardPatch.cs` — Wire Coordinator  [ ]
+### Step 7 — Modify `Dayswork/Patches/BulletinBoardPatch.cs` — Wire Coordinator  [x]
 
 In `ReceiveLeftClick_Postfix`, replace:
 ```csharp
@@ -273,7 +273,7 @@ Add a corresponding `internal static HiringFlowCoordinator Coordinator { get; pr
 
 ---
 
-### Step 8 — Modify `Dayswork/ModEntry.cs` — Wire Singletons + Events  [ ]
+### Step 8 — Modify `Dayswork/ModEntry.cs` — Wire Singletons + Events  [x]
 
 Add:
 1. `internal static HiringFlowCoordinator Coordinator { get; private set; } = null!;` field
@@ -297,7 +297,7 @@ Using directives to add: `Dayswork.Core.Config`, `Dayswork.Core.Persistence`, `D
 
 ---
 
-### Step 9 — Modify `Dayswork/i18n/default.json` — Add 22 New Keys  [ ]
+### Step 9 — Modify `Dayswork/i18n/default.json` — Add 23 New Keys  [x]
 
 Add all keys from NFR-UX-02 (nfr-requirements.md). Key list:
 - `ui.task_selection.title`, `ui.task_selection.water_crops`, `ui.task_selection.harvest_crops`, `ui.task_selection.collect_fruit`, `ui.task_selection.feed_animals`, `ui.task_selection.pet_animals`, `ui.task_selection.collect_animal_products`, `ui.task_selection.cut_trees`, `ui.task_selection.clear_rocks`, `ui.task_selection.clear_weeds`, `ui.task_selection.clear_grass`, `ui.task_selection.rate_label`, `ui.task_selection.confirm_btn`, `ui.task_selection.cancel_btn`, `ui.summary.title`, `ui.summary.tasks_label`, `ui.summary.hours_label`, `ui.summary.rate_label`, `ui.summary.deposit_label`, `ui.summary.refund_policy`, `ui.summary.confirm_btn`, `ui.summary.back_btn`, `ui.error.cant_afford`
@@ -308,15 +308,15 @@ SMAPI token format: `{{token}}` (double braces) for Translation.Get substitution
 
 ---
 
-### Step 10 — `dotnet build`  [ ]
+### Step 10 — `dotnet build`  [x]
 Run from workspace root. Target: 0 errors, 0 warnings.
 
 ---
 
-### Step 11 — Code Summary Doc  [ ]
+### Step 11 — Code Summary Doc  [x]
 Create `aidlc-docs/construction/U-09-minimum-hiring-flow/code/u-09-code-summary.md`
 
 ---
 
-### Step 12 — Update `aidlc-state.md` + `audit.md`  [ ]
+### Step 12 — Update `aidlc-state.md` + `audit.md`  [x]
 Mark U-09 complete in aidlc-state.md. Append generation summary to audit.md.

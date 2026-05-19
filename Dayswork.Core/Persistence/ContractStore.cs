@@ -67,8 +67,34 @@ public sealed class ContractStore : IContractStore
     public IReadOnlyList<Contract> List() =>
         _contracts.Values.ToList().AsReadOnly();
 
-    public IReadOnlyList<Contract> ListActiveForDate(int day, Season season, int year) =>
-        throw new NotImplementedException("ListActiveForDate is implemented in U-09.");
+    public IReadOnlyList<Contract> ListActiveForDate(int day, Season season, int year)
+    {
+        var target = new GameDate(day, season, year);
+        return _contracts.Values
+            .Where(c => c.Status == ContractStatus.Active && IsScheduledForDate(c, target))
+            .ToList()
+            .AsReadOnly();
+    }
+
+    private static bool IsScheduledForDate(Contract contract, GameDate date) =>
+        contract.Schedule == ContractSchedule.Recurring || IsNextGameDay(contract.HireDate, date);
+
+    // Stardew seasons are 28 days; four seasons per year cycling Spring→Summer→Fall→Winter→Spring.
+    private static bool IsNextGameDay(GameDate hire, GameDate candidate)
+    {
+        var nextDay    = hire.Day + 1;
+        var nextSeason = hire.Season;
+        var nextYear   = hire.Year;
+
+        if (nextDay > 28)
+        {
+            nextDay    = 1;
+            nextSeason = (Season)(((int)hire.Season + 1) % 4);
+            if (nextSeason == Season.Spring) nextYear++;   // wrapped past Winter
+        }
+
+        return candidate == new GameDate(nextDay, nextSeason, nextYear);
+    }
 
     public void Hydrate(IReadOnlyList<Contract> contracts)
     {

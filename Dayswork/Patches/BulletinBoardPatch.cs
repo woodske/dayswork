@@ -11,9 +11,11 @@ namespace Dayswork.Patches;
 
 // One class per patched game class (NFR-MAINT-04).
 // Three postfixes cover the full bulletin-board interaction lifecycle:
-//   Constructor  → injects our ClickableComponent into the live menu
-//   draw         → renders the button on top of the vanilla board
-//   receiveLeftClick → detects a click on our button and responds
+//   Constructor      → injects our ClickableComponent and snaps the gamepad cursor to it
+//   draw             → renders the button on top of the vanilla board
+//   receiveLeftClick → detects mouse clicks and gamepad A presses (SDV converts A to a
+//                      left-click at the cursor position; the cursor is already snapped
+//                      to our button by the constructor postfix)
 [HarmonyPatch(typeof(Billboard))]
 internal static class BulletinBoardPatch
 {
@@ -47,7 +49,21 @@ internal static class BulletinBoardPatch
                 buttonWidth,
                 buttonHeight),
             name: "DaysworkHire",
-            label: label);
+            label: label)
+        {
+            myID            = 999,
+            upNeighborID    = -1,
+            downNeighborID  = -1,
+            leftNeighborID  = -1,
+            rightNeighborID = -1,
+        };
+
+        // Register in the snap graph and snap the cursor here immediately so the
+        // player can press A without having to D-pad to the button first.
+        __instance.allClickableComponents ??= new System.Collections.Generic.List<ClickableComponent>();
+        __instance.allClickableComponents.Add(_hireButton);
+        __instance.currentlySnappedComponent = _hireButton;
+        __instance.snapCursorToCurrentSnappedComponent();
     }
 
     // ── Draw postfix ─────────────────────────────────────────────────────────
@@ -99,7 +115,6 @@ internal static class BulletinBoardPatch
         if (_hireButton is null) return;
         if (!_hireButton.bounds.Contains(x, y)) return;
 
-        // U-09 replaces this with HiringFlowCoordinator.OpenMenu().
-        ModEntry.ModMonitor.Log("[Dayswork] Hire-flow placeholder opened", LogLevel.Info);
+        ModEntry.Coordinator.OpenHiringFlow();
     }
 }
