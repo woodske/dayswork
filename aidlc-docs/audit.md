@@ -445,3 +445,29 @@
 **Context**: INCEPTION — Requirements Analysis, Step 6 gate passed → Step 7
 
 ---
+
+## Session Resumption — U-06 Functional Design Start
+**Timestamp**: 2026-05-19T00:00:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Loaded aidlc-state.md. Current stage: U-06 Persistence Core — Functional Design (Pending). Loaded context: unit-of-work.md, functional-design.md rules, U-03/U-04/U-05 domain entity artifacts, requirements.md, component-methods.md. Creating functional design plan with questions.
+**Context**: CONSTRUCTION — U-06 Persistence Core, Functional Design, Step 1–4
+
+---
+
+## U-06 Functional Design — Q&A (10 questions, answered one-by-one)
+**Timestamp**: 2026-05-19T00:01:00Z
+**User Input**: "go through them one by one" then answered each question interactively:
+- Q1 (ContractId type): "A" → `readonly record struct ContractId(Guid Value)`
+- Q2 (Game date representation): "A" → `readonly record struct GameDate(int Day, Season Season, int Year)` + `Season` enum
+- Q3 (Contract status states): "A" → Three states: `Active`, `Paused`, `Cancelled`
+- Q4 (Task-destination storage): "A" → Dictionary of output-producing tasks only; missing key = mail fallback
+- Q5 (Schedule representation): "A" → `enum ContractSchedule { OneTime, Recurring }`
+- Q6 (JSON envelope structure): "C" → `DaysworkSaveDataV1` with `SchemaVersion`, `ModVersion`, and `Contracts`
+- Q7 (DestinationKey JSON): "A" → Type-tag pattern with `"Type"` string discriminator + custom `JsonConverter`
+- Q8 (ContractStore hydration): "A" → `Hydrate(IReadOnlyList<Contract>)` for atomic replacement
+- Q9 (Malformed contract handling): "A" → Skip malformed contracts with SMAPI warning, return the rest
+- Q10 (ListActiveForDate): "B" → Stub with `NotImplementedException` in U-06; implement in U-09
+**AI Response**: No ambiguities detected. Generated domain-entities.md, business-logic-model.md, business-rules.md.
+**Context**: CONSTRUCTION — U-06 Persistence Core, Functional Design, Steps 3–5 complete
+
+---
