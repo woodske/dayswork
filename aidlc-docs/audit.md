@@ -1,5 +1,13 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-04 Code Generation — Part 1 (Planning)
+**Timestamp**: 2026-05-19T00:10:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design approved. Advancing to Code Generation Part 1 (Planning). Generating code generation plan for U-04: 6 production files (TileCoord, Zone, ChestRef, DestinationKey, IZoneGeometry, ZoneGeometry), 2 test files (ZoneGen shared generator + ZoneGeometryTests with PBT-02/03 + unit tests), 1 code summary doc. Presenting plan for approval.
+**Context**: CONSTRUCTION — U-04 Geometry & Domain Primitives, Code Generation Part 1 (Planning)
+
+---
+
 ## U-04 NFR Design — Complete, Awaiting Approval
 **Timestamp**: 2026-05-19T00:05:00Z
 **User Input**: "continue"
