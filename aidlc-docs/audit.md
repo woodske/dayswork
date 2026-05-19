@@ -1,5 +1,13 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-08 NFR Requirements — Starting
+**Timestamp**: 2026-05-19T02:00:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resumed from aidlc-state.md — U-07 Capability & Priority Core complete; advancing to U-08 Bulletin Board Hook + i18n + Multiplayer Guard. Per-unit stage decisions: Functional Design SKIP (no domain business logic — Harmony postfix patch + SMAPI event wiring only; matches unit-of-work.md "likely skip" for U-08); NFR Requirements EXECUTE (minimal — NFR-MAINT-04, NFR-UX-02, FR-MP-01 all directly applicable); NFR Design EXECUTE; Infrastructure Design SKIP (always); Code Generation EXECUTE. Proceeding directly to NFR Requirements artifacts.
+**Context**: CONSTRUCTION — U-08 Bulletin Board Hook, starting; FD=SKIP → NFR Requirements beginning
+
+---
+
 ## U-05 Functional Design — Plan Created, Awaiting Answers
 **Timestamp**: 2026-05-19T00:30:00Z
 **User Input**: "continue ai-dlc workflow"
