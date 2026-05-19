@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-08 Bulletin Board Hook — NFR Design complete; awaiting approval to proceed to Code Generation
+- **Current Stage**: U-08 Bulletin Board Hook — Code Generation Part 1 (Planning)
 
 ## Workspace State
 - **Existing Code**: No
