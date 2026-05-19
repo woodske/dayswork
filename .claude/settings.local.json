@@ -9,7 +9,10 @@
       "Bash(gh api *)",
       "WebFetch(domain:www.nexusmods.com)",
       "Bash(dotnet test *)",
-      "Bash(dotnet build *)"
+      "Bash(dotnet build *)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\\\\aidlc-docs\\\\construction\\\\U-03-config-foundation\\\\code\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"OK\")"
     ]
   }
 }

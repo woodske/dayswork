@@ -43,45 +43,46 @@
 ## Code Generation Steps (Part 2 — executes after approval)
 
 ### Step 1 — Create `Dayswork.Core/Domain/TaskKind.cs`
-- [ ] Public enum with 10 values matching FR-TASK-01: `WaterCrops`, `HarvestCrops`, `CollectFruit`, `FeedAnimals`, `PetAnimals`, `CollectAnimalProducts`, `CutTrees`, `ClearRocks`, `ClearWeeds`, `ClearGrass`
-- [ ] File-scoped namespace `Dayswork.Core.Domain`
-- [ ] No XML doc comments (well-named enum values; comments would rot)
+- [x] Public enum with 10 values matching FR-TASK-01: `WaterCrops`, `HarvestCrops`, `CollectFruit`, `FeedAnimals`, `PetAnimals`, `CollectAnimalProducts`, `CutTrees`, `ClearRocks`, `ClearWeeds`, `ClearGrass`
+- [x] File-scoped namespace `Dayswork.Core.Domain`
+- [x] No XML doc comments (well-named enum values; comments would rot)
 
 ### Step 2 — Create `Dayswork.Core/Config/IConfigSnapshot.cs`
-- [ ] Public interface with 6 read-only properties per [domain-entities.md](../U-03-config-foundation/functional-design/domain-entities.md):
+- [x] Public interface with 6 read-only properties per [domain-entities.md](../U-03-config-foundation/functional-design/domain-entities.md):
   - `int BaseRate { get; }`
   - `IReadOnlyDictionary<TaskKind, int> TaskIncrements { get; }`
   - `double AverageSpeedConstant { get; }`
   - `int HardCapTime { get; }`
   - `int StuckInitialWaitMinutes { get; }`
   - `int StuckPostTeleportWaitMinutes { get; }`
-- [ ] File-scoped namespace `Dayswork.Core.Config`
-- [ ] `using Dayswork.Core.Domain;` for TaskKind reference
+- [x] File-scoped namespace `Dayswork.Core.Config`
+- [x] `using Dayswork.Core.Domain;` for TaskKind reference
 
 ### Step 3 — Create `Dayswork.Core/Config/ConfigSnapshot.cs`
-- [ ] Public `sealed record ConfigSnapshot` (positional) implementing `IConfigSnapshot`
-- [ ] 6 positional parameters in the order defined in [domain-entities.md](../U-03-config-foundation/functional-design/domain-entities.md)
-- [ ] File-scoped namespace `Dayswork.Core.Config`
+- [x] Public `sealed record ConfigSnapshot` (positional) implementing `IConfigSnapshot`
+- [x] 6 positional parameters in the order defined in [domain-entities.md](../U-03-config-foundation/functional-design/domain-entities.md)
+- [x] File-scoped namespace `Dayswork.Core.Config`
+- [x] Manual `Equals(ConfigSnapshot?)` (no modifier) for structural dictionary comparison; `GetHashCode` overridden for consistency
 
 ### Step 4 — Create `Dayswork.Core/Config/ConfigDefaults.cs`
-- [ ] Public static class with `public static IConfigSnapshot Build()`
-- [ ] Inline dictionary literal with all 10 TaskKind → int entries per spec §Pricing rate table
-- [ ] INV-CFG-03 enforcement: foreach over `Enum.GetValues<TaskKind>()` throws `InvalidOperationException` if any key missing
-- [ ] Returns `new ConfigSnapshot(...)` wrapped via `new ReadOnlyDictionary<TaskKind, int>(increments)`
-- [ ] All default values match [business-rules.md](../U-03-config-foundation/functional-design/business-rules.md) Defaults table
+- [x] Public static class with `public static IConfigSnapshot Build()`
+- [x] Inline dictionary literal with all 10 TaskKind → int entries per spec §Pricing rate table
+- [x] INV-CFG-03 enforcement: foreach over `Enum.GetValues<TaskKind>()` throws `InvalidOperationException` if any key missing
+- [x] Returns `new ConfigSnapshot(...)` wrapped via `new ReadOnlyDictionary<TaskKind, int>(increments)`
+- [x] All default values match [business-rules.md](../U-03-config-foundation/functional-design/business-rules.md) Defaults table
 
 ### Step 5 — Create `Dayswork.Tests/Generators/ConfigSnapshotGen.cs`
-- [ ] Public static class `ConfigSnapshotGen` in namespace `Dayswork.Tests.Generators`
-- [ ] `public static Arbitrary<IConfigSnapshot> Snapshot()` method using FsCheck `Gen` combinators:
+- [x] Public static class `ConfigSnapshotGen` in namespace `Dayswork.Tests.Generators`
+- [x] `public static Arbitrary<IConfigSnapshot> Snapshot()` method using FsCheck `Gen` combinators:
   - `BaseRate`: `Gen.Choose(0, 1000)` (non-negative; reasonable upper bound for shrinking)
   - `TaskIncrements`: for each `TaskKind` value generate `Gen.Choose(0, 200)`; wrap in `ReadOnlyDictionary`
   - `AverageSpeedConstant`: `Gen.Choose(1, 100).Select(x => (double)x)` (strictly positive integer doubles; satisfies INV-CFG-04 without floating-point edge cases)
   - `HardCapTime`: `Gen.Choose(1000, 2600)` (valid Stardew time range)
   - `StuckInitialWaitMinutes`, `StuckPostTeleportWaitMinutes`: `Gen.Choose(1, 120)` (≥ 1; reasonable upper bound)
-- [ ] Comment header: documents PBT-07 role + that this generator is used by U-05+ pricing PBTs
+- [x] Comment header: documents PBT-07 role + that this generator is used by U-05+ pricing PBTs
 
 ### Step 6 — Create `Dayswork.Tests/Config/ConfigDefaultsTests.cs`
-- [ ] xUnit `[Fact]` tests (per Functional Design "Validation expectations" §, items 1–8):
+- [x] xUnit `[Fact]` tests (per Functional Design "Validation expectations" §, items 1–8):
   - `Build_returns_non_null_snapshot`
   - `Build_BaseRate_is_50`
   - `Build_TaskIncrements_match_spec_rate_table` (parameterized via `[Theory]` + `[InlineData]` for each of the 10 tasks)
@@ -93,7 +94,7 @@
   - `Build_is_deterministic` — `ConfigDefaults.Build().Equals(ConfigDefaults.Build())` (exercises record value equality)
 
 ### Step 7 — Create `Dayswork.Tests/Config/ConfigSnapshotGenSmokeTests.cs`
-- [ ] One `[Property(Arbitrary = new[] { typeof(ConfigSnapshotGen) })]` PBT that asserts every generated `IConfigSnapshot` satisfies all 7 INV-CFG-* invariants:
+- [x] One `[Property(Arbitrary = new[] { typeof(ConfigSnapshotGen) })]` PBT that asserts every generated `IConfigSnapshot` satisfies all 7 INV-CFG-* invariants:
   - `BaseRate >= 0`
   - `TaskIncrements.Values.All(v => v >= 0)`
   - `TaskIncrements.Count == Enum.GetValues<TaskKind>().Length` AND every `TaskKind` is a key
@@ -101,19 +102,19 @@
   - `HardCapTime in [1000, 2600]`
   - `StuckInitialWaitMinutes >= 1`
   - `StuckPostTeleportWaitMinutes >= 1`
-- [ ] Test exists primarily to fail loudly if `ConfigSnapshotGen` ever drifts from invariant-preserving generation; U-05+ tests will exercise the generator with real assertions
+- [x] Test exists primarily to fail loudly if `ConfigSnapshotGen` ever drifts from invariant-preserving generation; U-05+ tests will exercise the generator with real assertions
 
 ### Step 8 — Create code summary doc
-- [ ] Create `aidlc-docs/construction/U-03-config-foundation/code/u-03-code-summary.md` with file list, PBT compliance summary, verification results, what U-04 inherits
+- [x] Create `aidlc-docs/construction/U-03-config-foundation/code/u-03-code-summary.md` with file list, PBT compliance summary, verification results, what U-04 inherits
 
 ### Step 9 — Update aidlc-state.md
-- [ ] Advance Current Stage to **U-04 Geometry & Domain Primitives — Functional Design (Pending)**
+- [x] Advance Current Stage to **U-04 Geometry & Domain Primitives — Functional Design (Pending)**
 
 ### Step 10 — Update audit.md
-- [ ] Append Part 2 execution entry
+- [x] Append Part 2 execution entry
 
 ### Step 11 — Mark all plan checkboxes [x]
-- [ ] This file's Steps 1–10 checkboxes all marked complete
+- [x] This file's Steps 1–10 checkboxes all marked complete
 
 ---
 
