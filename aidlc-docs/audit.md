@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-08 NFR Design — Complete
+**Timestamp**: 2026-05-19T02:15:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design generated directly (no questions — all patterns fully determined by NFR requirements). Three patterns documented: (1) Harmony Patch Isolation (NFR-MAINT-04) — one static class per patched method in Dayswork/Patches/; [HarmonyPostfix] for bulletin board entry append; guard check inline in postfix for stateless MP detection; (2) i18n Routing via Static Wrapper (NFR-UX-02) — I18nHelper.Init(helper) called first in Entry(); static Get(key) wraps Translation.Get; safe key-missing fallback; two initial keys established; (3) Stateless Multiplayer Guard (FR-MP-01) — MultiplayerGuard.IsMultiplayer() thin wrapper over Context.IsMultiplayer; BulletinBoardPatch owns the log call; re-evaluated per bulletin board open. Logical components map shows ModEntry init sequence and call flow. No Dayswork.Tests files (play-tested unit). Awaiting approval.
+**Context**: CONSTRUCTION — U-08 Bulletin Board Hook, NFR Design complete — awaiting approval
+
+---
+
+## U-08 NFR Requirements — Approved
+**Timestamp**: 2026-05-19T02:10:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Advancing to NFR Design for U-08.
+**Context**: CONSTRUCTION — U-08 Bulletin Board Hook, NFR Requirements approved → NFR Design starting
+
+---
+
 ## U-08 NFR Requirements — Starting
 **Timestamp**: 2026-05-19T02:00:00Z
 **User Input**: "continue ai-dlc workflow"
