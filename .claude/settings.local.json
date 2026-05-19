@@ -7,7 +7,9 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(gh api *)",
-      "WebFetch(domain:www.nexusmods.com)"
+      "WebFetch(domain:www.nexusmods.com)",
+      "Bash(dotnet test *)",
+      "Bash(dotnet build *)"
     ]
   }
 }

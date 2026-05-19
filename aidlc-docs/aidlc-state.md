@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-02 Test Infrastructure — Code Generation (Part 1: Planning)
+- **Current Stage**: U-03 Config Foundation — Code Generation (Part 1: Planning)
 
 ## Workspace State
 - **Existing Code**: No

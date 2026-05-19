@@ -46,7 +46,7 @@
 ## Code Generation Steps (Part 2 — executes after approval)
 
 ### Step 1 — Create `Dayswork.Tests` project file
-- [ ] Create `Dayswork.Tests/Dayswork.Tests.csproj`:
+- [x] Create `Dayswork.Tests/Dayswork.Tests.csproj`:
   - `<TargetFramework>net6.0</TargetFramework>`, `<Nullable>enable</Nullable>`, `<LangVersion>10.0</LangVersion>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` (mirrors U-01 conventions)
   - `<IsPackable>false</IsPackable>` and `<IsTestProject>true</IsTestProject>`
   - PackageReferences:
@@ -58,30 +58,30 @@
   - **ProjectReference only to `..\Dayswork.Core\Dayswork.Core.csproj`** — per [component-dependency.md](../../inception/application-design/component-dependency.md) rule 2, the Tests project must not reference the Dayswork SMAPI project (catches accidental SMAPI coupling at test build time)
 
 ### Step 2 — Update `Dayswork.sln` to include Dayswork.Tests
-- [ ] Edit `Dayswork.sln` (from U-01) to:
+- [x] Edit `Dayswork.sln` (from U-01) to:
   - Add Project line for `Dayswork.Tests` with a fresh project GUID
   - Add ProjectConfigurationPlatforms entries (Debug + Release × Any CPU, both ActiveCfg + Build) for the new project
 
 ### Step 3 — Create `Dayswork.Tests/Generators/` namespace placeholder
-- [ ] Create `Dayswork.Tests/Generators/DaysworkGenerators.cs`:
+- [x] Create `Dayswork.Tests/Generators/DaysworkGenerators.cs`:
   - Empty static class `DaysworkGenerators` in namespace `Dayswork.Tests.Generators`
   - File-level comment documenting that foundation units (U-03 ConfigSnapshotGen, U-04 ZoneGen + TileCoordGen, U-06 ContractGen) add their generators here per PBT-07 (centralized + reusable)
   - This empty-now-grows-later pattern lets the PBT-07 convention be enforced from the start
 
 ### Step 4 — Create smoke tests proving the framework is wired up
-- [ ] Create `Dayswork.Tests/Smoke/FrameworkSmokeTests.cs`:
+- [x] Create `Dayswork.Tests/Smoke/FrameworkSmokeTests.cs`:
   - One xUnit `[Fact]` test that asserts `Assert.True(true)` — proves xUnit + .NET 6 test SDK + xunit.runner.visualstudio are wired up
   - One FsCheck `[Property]` test that asserts `x + 0 == x` for generated `int x` — proves FsCheck.Xunit is wired up
   - These two tests collectively satisfy the Definition of Done's "dotnet test runs the stub property and passes" clause
 
 ### Step 5 — Document seed-logging convention via deliberate-failure example
-- [ ] Create `Dayswork.Tests/Smoke/SeedLoggingDemoTests.cs`:
+- [x] Create `Dayswork.Tests/Smoke/SeedLoggingDemoTests.cs`:
   - Contains a **disabled** (`Skip = "demonstrates PBT-08 seed logging — enable to see output"`) `[Property]` test that asserts a deliberately false property (e.g., `x => x != x`)
   - The test header comment explains: "Remove the Skip attribute to confirm FsCheck.Xunit prints the seed (`StdGen ...`) and the shrunk minimal failing input. This is PBT-08 satisfied by default — no custom seed-logging plumbing is required."
   - Leaves the disabled test in the codebase as living documentation; CI never runs it
 
 ### Step 6 — Create `Dayswork.Tests/README.md` documenting testing conventions
-- [ ] Sections:
+- [x] Sections:
   - **Project purpose**: pure-Core test project; cannot reference SMAPI/Stardew (compile-time enforcement)
   - **Test framework**: xUnit (Q4 decision) + FsCheck.Xunit (PBT-09 recommendation)
   - **Where tests live**: mirrors `Dayswork.Core/` directory layout — `Dayswork.Tests/Config/` tests `Dayswork.Core/Config/`, `Dayswork.Tests/Pricing/` tests `Dayswork.Core/Pricing/`, etc.
@@ -91,13 +91,13 @@
   - **CI (PBT-09)**: deferred to U-16's Build-and-Test wiring; the existing test output already includes seed values, so the only CI requirement is to capture stdout
 
 ### Step 7 — Create code summary doc
-- [ ] Create `aidlc-docs/construction/U-02-test-infrastructure/code/u-02-code-summary.md` with file list, PBT compliance summary, and verification steps
+- [x] Create `aidlc-docs/construction/U-02-test-infrastructure/code/u-02-code-summary.md` with file list, PBT compliance summary, and verification steps
 
 ### Step 8 — Update aidlc-state.md
-- [ ] Mark U-02 complete; Current Stage advances to U-03 Config Foundation
+- [x] Mark U-02 complete; Current Stage advances to U-03 Config Foundation
 
 ### Step 9 — Update audit.md
-- [ ] Append Part 2 execution entry
+- [x] Append Part 2 execution entry
 
 ---
 
