@@ -454,6 +454,22 @@
 
 ---
 
+## U-06 NFR Design — Complete
+**Timestamp**: 2026-05-19T00:05:00Z
+**User Input**: "continue"
+**AI Response**: No open questions for NFR Design — all patterns determined by prior decisions. Generated nfr-design-patterns.md (6 patterns) and logical-components.md. Presenting for approval.
+**Context**: CONSTRUCTION — U-06 Persistence Core, NFR Design complete
+
+---
+
+## U-06 NFR Requirements — Approved
+**Timestamp**: 2026-05-19T00:04:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Proceeding to NFR Design for U-06.
+**Context**: CONSTRUCTION — U-06 Persistence Core, NFR Requirements → NFR Design
+
+---
+
 ## U-06 NFR Requirements — Q&A
 **Timestamp**: 2026-05-19T00:03:00Z
 **User Input**: Q1: "B" (explicit ToString/Enum.Parse in mapping code); Q2: "A" (silent clear-and-replace, no guard)
