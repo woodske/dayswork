@@ -454,6 +454,22 @@
 
 ---
 
+## U-06 NFR Requirements — Q&A
+**Timestamp**: 2026-05-19T00:03:00Z
+**User Input**: Q1: "B" (explicit ToString/Enum.Parse in mapping code); Q2: "A" (silent clear-and-replace, no guard)
+**AI Response**: Generated nfr-requirements.md and tech-stack-decisions.md. Key finding: no custom JsonConverter needed — DestinationDtoV1 is a flat class; type dispatch is a plain switch in MapDtoToDomain(). Enum serialization handled explicitly in mapping code.
+**Context**: CONSTRUCTION — U-06 Persistence Core, NFR Requirements complete
+
+---
+
+## U-06 Functional Design — Approved
+**Timestamp**: 2026-05-19T00:02:00Z
+**User Input**: "continue"
+**AI Response**: Functional Design approved. Proceeding to NFR Requirements for U-06.
+**Context**: CONSTRUCTION — U-06 Persistence Core, Functional Design → NFR Requirements
+
+---
+
 ## U-06 Functional Design — Q&A (10 questions, answered one-by-one)
 **Timestamp**: 2026-05-19T00:01:00Z
 **User Input**: "go through them one by one" then answered each question interactively:

@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-06 Persistence Core — Functional Design (Pending)
+- **Current Stage**: U-06 Persistence Core — NFR Requirements
 
 ## Workspace State
 - **Existing Code**: No
