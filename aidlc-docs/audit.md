@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-02 Code Generation — Part 1 Plan Drafted, Awaiting Approval
+**Timestamp**: 2026-05-18T00:00:30Z
+**User Input**: (none — generation step)
+**AI Response**: Created `aidlc-docs/construction/plans/u-02-test-infrastructure-code-generation-plan.md` with 9 numbered steps. Loaded PBT extension rules. U-02 maps to PBT-07 (Generators/ namespace established as convention), PBT-08 (FsCheck.Xunit prints seed + shrunk input by default; demo file demonstrates), PBT-09 (FsCheck.Xunit 2.16.5 added as PackageReference). Tests project references ONLY Dayswork.Core (per component-dependency.md rule 2 — catches accidental SMAPI coupling at test build time). Package versions: Microsoft.NET.Test.Sdk 17.8.0, xunit 2.6.2, xunit.runner.visualstudio 2.5.4, FsCheck.Xunit 2.16.5, coverlet.collector 6.0.0. Asking: **"Code generation plan for U-02 Test Infrastructure complete. Review the plan in aidlc-docs/construction/plans/u-02-test-infrastructure-code-generation-plan.md. Ready to proceed to generation?"**
+**Context**: CONSTRUCTION — U-02 Test Infrastructure, Code Generation Part 1 (gate: awaiting plan approval)
+
+---
+
+## U-01 Approved → U-02 Test Infrastructure Starting
+**Timestamp**: 2026-05-18T00:00:29Z
+**User Input**: "continue"
+**AI Response**: U-01 Project Scaffold approved. Marking U-01 complete in aidlc-state.md. Beginning **U-02 Test Infrastructure**. Per-unit stage decisions for U-02: Functional Design → SKIP (no business logic; pure test scaffolding); NFR Requirements → SKIP (U-02 IS the NFR fulfillment for NFR-MAINT-01/02 testability); NFR Design → SKIP; Infrastructure Design → SKIP; Code Generation → EXECUTE. Loading PBT extension rules to ground the seed-logging + shared-generator infrastructure.
+**Context**: CONSTRUCTION — U-01 complete → U-02 Test Infrastructure loop starting
+
+---
+
 ## U-01 Code Generation — Part 2 Complete (Awaiting Approval Gate)
 **Timestamp**: 2026-05-18T00:00:28Z
 **User Input**: (none — generation step)
