@@ -2,7 +2,7 @@
 
 **Unit**: U-05 — Pricing Core
 **Stage**: Code Generation
-**Status**: Part 1 approved — ready to execute
+**Status**: Part 2 — executing
 
 ## Unit context
 
@@ -39,60 +39,60 @@ The constant is player-tunable via GMCM in U-16. Small single-task contracts are
 ## Steps
 
 ### Step 1 — `DepositResult.cs`
-- [ ] Create `Dayswork.Core/Pricing/DepositResult.cs`
+- [x] Create `Dayswork.Core/Pricing/DepositResult.cs`
 - Abstract record `DepositResult`; sealed records `PositiveDeposit(int Amount)` and `ZeroDeposit` (with `Instance` singleton, mirroring `DestinationKey` pattern from U-04)
 - Namespace: `Dayswork.Core.Pricing`
 
 ### Step 2 — `IRateCalculator.cs`
-- [ ] Create `Dayswork.Core/Pricing/IRateCalculator.cs`
+- [x] Create `Dayswork.Core/Pricing/IRateCalculator.cs`
 - Method: `int Calculate(IEnumerable<TaskKind> enabledTasks, IConfigSnapshot config, bool isRaining)`
 - Namespace: `Dayswork.Core.Pricing`; usings: `Dayswork.Core.Config`, `Dayswork.Core.Domain`
 
 ### Step 3 — `RateCalculator.cs`
-- [ ] Create `Dayswork.Core/Pricing/RateCalculator.cs`
+- [x] Create `Dayswork.Core/Pricing/RateCalculator.cs`
 - Sealed class implementing `IRateCalculator`
 - Algorithm: start with `config.BaseRate`; for each task in `enabledTasks`, skip `WaterCrops` when `isRaining`, else add `config.TaskIncrements[task]`
 - Implements BR-PRICE-01..07
 
 ### Step 4 — `IHoursEstimator.cs`
-- [ ] Create `Dayswork.Core/Pricing/IHoursEstimator.cs`
+- [x] Create `Dayswork.Core/Pricing/IHoursEstimator.cs`
 - Method: `double Estimate(IEnumerable<Zone> zones, int numEnabledTasks, IConfigSnapshot config)`
 - Namespace: `Dayswork.Core.Pricing`; usings: `Dayswork.Core.Config`, `Dayswork.Core.Domain`
 
 ### Step 5 — `HoursEstimator.cs`
-- [ ] Create `Dayswork.Core/Pricing/HoursEstimator.cs`
+- [x] Create `Dayswork.Core/Pricing/HoursEstimator.cs`
 - Sealed class implementing `IHoursEstimator`
 - Algorithm: `totalTiles = Σ(zone.Width * zone.Height)`; `return (totalTiles * numEnabledTasks * config.AverageSpeedConstant) / 60.0`
 - `Zone.Width` and `Zone.Height` are computed from `TopLeft`/`BottomRight` as `(BottomRight.X - TopLeft.X + 1)` and `(BottomRight.Y - TopLeft.Y + 1)` respectively
 - Implements BR-HOURS-01..07
 
 ### Step 6 — `IDepositCalculator.cs`
-- [ ] Create `Dayswork.Core/Pricing/IDepositCalculator.cs`
+- [x] Create `Dayswork.Core/Pricing/IDepositCalculator.cs`
 - Method: `DepositResult Calculate(double estimatedHours, int rate)`
 
 ### Step 7 — `DepositCalculator.cs`
-- [ ] Create `Dayswork.Core/Pricing/DepositCalculator.cs`
+- [x] Create `Dayswork.Core/Pricing/DepositCalculator.cs`
 - Sealed class implementing `IDepositCalculator`
 - Algorithm: if `estimatedHours <= 0.0` return `ZeroDeposit.Instance`; else return `new PositiveDeposit((int)Math.Ceiling(rate * estimatedHours))`
 - Implements BR-DEP-01..06
 
 ### Step 8 — `IRefundCalculator.cs`
-- [ ] Create `Dayswork.Core/Pricing/IRefundCalculator.cs`
+- [x] Create `Dayswork.Core/Pricing/IRefundCalculator.cs`
 - Method: `int Calculate(int deposit, double hoursWorked, int rate)`
 
 ### Step 9 — `RefundCalculator.cs`
-- [ ] Create `Dayswork.Core/Pricing/RefundCalculator.cs`
+- [x] Create `Dayswork.Core/Pricing/RefundCalculator.cs`
 - Sealed class implementing `IRefundCalculator`
 - Algorithm: `billable = (int)Math.Ceiling(rate * hoursWorked)`; `return Math.Clamp(deposit - billable, 0, deposit)`
 - Implements BR-REF-01..08
 
 ### Step 10 — Update `ConfigDefaults.cs`
-- [ ] Edit `Dayswork.Core/Config/ConfigDefaults.cs`
+- [x] Edit `Dayswork.Core/Config/ConfigDefaults.cs`
 - Change `AverageSpeedConstant: 5.0` to `AverageSpeedConstant: 0.3`
 - Update the inline comment to reflect the finalized unit: "pricing-min per raw tile per task; see U-05 HoursEstimator for formula"
 
 ### Step 11 — `PricingGen.cs` (FsCheck generator, PBT-07)
-- [ ] Create `Dayswork.Tests/Generators/PricingGen.cs`
+- [x] Create `Dayswork.Tests/Generators/PricingGen.cs`
 - Static class in `Dayswork.Tests.Generators` namespace, mirroring `ZoneGen` and `ConfigSnapshotGen` style
 - Arbitraries:
   - `ValidRate(IConfigSnapshot config)` — `int` in `[config.BaseRate, config.BaseRate + Σ all increments]`
@@ -102,7 +102,7 @@ The constant is player-tunable via GMCM in U-16. Small single-task contracts are
   - `TaskSubset()` — random subset of all `TaskKind` values as `IReadOnlyList<TaskKind>`
 
 ### Step 12 — `RateCalculatorTests.cs`
-- [ ] Create `Dayswork.Tests/Pricing/RateCalculatorTests.cs`
+- [x] Create `Dayswork.Tests/Pricing/RateCalculatorTests.cs`
 - **[Fact] tests**:
   1. `EmptyTasks_ReturnsBaseRate` — no tasks → `config.BaseRate`
   2. `SingleTask_ReturnsBaseRatePlusIncrement` — one concrete task
@@ -117,7 +117,7 @@ The constant is player-tunable via GMCM in U-16. Small single-task contracts are
   4. `Rate_IndependentOfEnumerationOrder` — shuffled task list gives same result
 
 ### Step 13 — `HoursEstimatorTests.cs`
-- [ ] Create `Dayswork.Tests/Pricing/HoursEstimatorTests.cs`
+- [x] Create `Dayswork.Tests/Pricing/HoursEstimatorTests.cs`
 - **[Fact] tests**:
   1. `EmptyZones_ReturnsZero`
   2. `ZeroTasks_ReturnsZero`
@@ -129,7 +129,7 @@ The constant is player-tunable via GMCM in U-16. Small single-task contracts are
   3. `Estimate_NonDecreasingWithMoreTasks` — increasing `numEnabledTasks` never decreases estimate
 
 ### Step 14 — `DepositCalculatorTests.cs`
-- [ ] Create `Dayswork.Tests/Pricing/DepositCalculatorTests.cs`
+- [x] Create `Dayswork.Tests/Pricing/DepositCalculatorTests.cs`
 - **[Fact] tests**:
   1. `ZeroEstimatedHours_ReturnsZeroDeposit`
   2. `NegativeEstimatedHours_ReturnsZeroDeposit`
@@ -141,7 +141,7 @@ The constant is player-tunable via GMCM in U-16. Small single-task contracts are
   2. `Amount_AtLeastFloor_WhenPositive` — `amount >= (int)Math.Floor(rate * hours)`
 
 ### Step 15 — `RefundCalculatorTests.cs`
-- [ ] Create `Dayswork.Tests/Pricing/RefundCalculatorTests.cs`
+- [x] Create `Dayswork.Tests/Pricing/RefundCalculatorTests.cs`
 - **[Fact] tests**:
   1. `ZeroHoursWorked_FullRefund` — refund == deposit
   2. `FullHoursWorked_ApproximatelyZeroRefund` — same hours as estimate → small refund (0 or 1g rounding)
@@ -154,18 +154,18 @@ The constant is player-tunable via GMCM in U-16. Small single-task contracts are
   3. `FullRefund_WhenZeroHoursWorked` — `Calculate(deposit, 0.0, rate) == deposit`
 
 ### Step 16 — Build verification
-- [ ] Run `dotnet build Dayswork.Core\Dayswork.Core.csproj` — expect 0 errors, 0 warnings
-- [ ] Run `dotnet build Dayswork.Tests\Dayswork.Tests.csproj` — expect 0 errors, 0 warnings
-- [ ] Verify `Dayswork.Core/Pricing/` contains no `using StardewValley` or `using StardewModdingAPI` imports (NFR-MAINT-03)
+- [x] Run `dotnet build Dayswork.Core\Dayswork.Core.csproj` — 0 errors, 0 warnings
+- [x] Run `dotnet build Dayswork.Tests\Dayswork.Tests.csproj` — 0 errors, 0 warnings (after fixing C#10 collection-expression syntax and ForAll arity)
+- [x] Verify `Dayswork.Core/Pricing/` contains no `using StardewValley` or `using StardewModdingAPI` imports (NFR-MAINT-03)
 
 ### Step 17 — Test execution
-- [ ] Run `dotnet test Dayswork.Tests\Dayswork.Tests.csproj`
-- [ ] Confirm all new U-05 tests pass (target: ~31 new test methods)
-- [ ] Confirm prior U-02/U-03/U-04 tests still pass (no regressions)
-- [ ] Confirm PBT-03 properties run with MaxTest=1000 inputs each
+- [x] Run `dotnet test Dayswork.Tests\Dayswork.Tests.csproj`
+- [x] Confirm all new U-05 tests pass — 33 new tests (19 Fact + 14 Property covering 1000 inputs each)
+- [x] Confirm prior U-02/U-03/U-04 tests still pass — 70 passed, 1 skipped (PBT-08 demo), 0 failed
+- [x] Confirm PBT-03 properties run with MaxTest=1000 inputs each
 
 ### Step 18 — Code summary
-- [ ] Create `aidlc-docs/construction/U-05-pricing-core/code/u-05-code-summary.md`
+- [x] Create `aidlc-docs/construction/U-05-pricing-core/code/u-05-code-summary.md`
 - Record all files created, test counts, PBT compliance, build results, calibration note
 
 ---

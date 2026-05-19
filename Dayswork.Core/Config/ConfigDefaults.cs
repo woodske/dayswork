@@ -32,7 +32,7 @@ public static class ConfigDefaults
         return new ConfigSnapshot(
             BaseRate: 50,
             TaskIncrements: new ReadOnlyDictionary<TaskKind, int>(increments),
-            AverageSpeedConstant: 5.0,
+            AverageSpeedConstant: 0.3,  // pricing-min per raw tile per task; see U-05 HoursEstimator
             HardCapTime: 2000,
             StuckInitialWaitMinutes: 10,
             StuckPostTeleportWaitMinutes: 10

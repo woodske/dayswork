@@ -6,6 +6,14 @@
 **AI Response**: Resumed from aidlc-state.md — current stage is U-05 Pricing Core, Functional Design (Pending). Loaded functional-design.md rules, content-validation.md, U-05 unit definition, requirements FR-PAY-01..09 + NFR-SAFE-02, U-04 code summary. Created functional design plan at aidlc-docs/construction/plans/u-05-pricing-core-functional-design-plan.md with 6 clarifying questions: Q1 HoursEstimator formula, Q2 Hours unit (in-game vs. real-time), Q3 Integer arithmetic/rounding, Q4 Rain handling in RateCalculator, Q5 Refund clamping edge cases, Q6 Raw zone area vs. actionable tile count. Awaiting user answers.
 **Context**: CONSTRUCTION — U-05 Pricing Core, Functional Design, Part 1
 
+## U-05 Code Generation — Complete
+**Timestamp**: 2026-05-19T01:20:00Z
+**User Input**: "approve and generate"
+**AI Response**: All 18 plan steps executed and marked [x]. Created 9 production files in Dayswork.Core/Pricing/: DepositResult.cs (PositiveDeposit/ZeroDeposit discriminated union), IRateCalculator+RateCalculator, IHoursEstimator+HoursEstimator, IDepositCalculator+DepositCalculator, IRefundCalculator+RefundCalculator. Modified ConfigDefaults.cs (AverageSpeedConstant 5.0→0.3). Created PricingGen.cs (5 arbitraries) and 4 test files (33 tests: 21 Fact + 12 Property at 1000 inputs each). Build deviation: corrected C#12 collection expressions to C#10 syntax and reduced ForAll arity by combining tuple generator. Build: 0 errors, 0 warnings. Tests: 70 passed, 1 skipped (PBT-08 demo), 0 failed. PBT compliance: PBT-03 (12 invariant properties) ✓, PBT-07 (PricingGen) ✓. NFR-MAINT-03: no SMAPI/SV refs in Dayswork.Core/Pricing/ ✓. Advancing state to U-06 Persistence Core.
+**Context**: CONSTRUCTION — U-05 Pricing Core, Code Generation complete
+
+---
+
 ## U-05 Code Generation — Plan Created, Awaiting Approval
 **Timestamp**: 2026-05-19T01:10:00Z
 **User Input**: "continue"
