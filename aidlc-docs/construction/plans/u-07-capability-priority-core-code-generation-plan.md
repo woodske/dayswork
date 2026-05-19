@@ -25,10 +25,10 @@ no raw string literals, no `Gen.zip*` (use LINQ query syntax). Consistent with U
 - [x] Step 3: Include unit generation context (see above)
 - [x] Step 4: Create unit plan document (this file)
 - [x] Step 5: Summarize plan to user
-- [ ] Step 6: Log approval prompt in audit.md
-- [ ] Step 7: Wait for explicit approval
-- [ ] Step 8: Record approval response in audit.md
-- [ ] Step 9: Update progress in aidlc-state.md
+- [x] Step 6: Log approval prompt in audit.md
+- [x] Step 7: Wait for explicit approval
+- [x] Step 8: Record approval response in audit.md
+- [x] Step 9: Update progress in aidlc-state.md
 
 ---
 
@@ -36,25 +36,25 @@ no raw string literals, no `Gen.zip*` (use LINQ query syntax). Consistent with U
 
 ### Domain types (Dayswork.Core/Domain/)
 
-- [ ] **Step 10**: Create `Dayswork.Core/Domain/ToolLevel.cs`
+- [x] **Step 10**: Create `Dayswork.Core/Domain/ToolLevel.cs`
   - `public enum ToolLevel { Basic = 0, Copper = 1, Steel = 2, Gold = 3, Iridium = 4 }`
   - XML doc: maps directly to SV `UpgradeLevel` int
 
-- [ ] **Step 11**: Create `Dayswork.Core/Domain/ToolSnapshot.cs`
+- [x] **Step 11**: Create `Dayswork.Core/Domain/ToolSnapshot.cs`
   - `public sealed record ToolSnapshot(ToolLevel AxeLevel, ToolLevel PickaxeLevel, ToolLevel WateringCanLevel)`
   - XML doc: immutable; built once at 6am spawn and locked for shift (FR-TOOL-01)
 
 ### Capability types (Dayswork.Core/Capabilities/)
 
-- [ ] **Step 12**: Create `Dayswork.Core/Capabilities/AxeTarget.cs`
+- [x] **Step 12**: Create `Dayswork.Core/Capabilities/AxeTarget.cs`
   - `public enum AxeTarget { StandingTree, FruitTree, SmallStump, LargeStump, LargeLog }`
   - XML doc per value noting the chopping requirement from spec
 
-- [ ] **Step 13**: Create `Dayswork.Core/Capabilities/PickTarget.cs`
+- [x] **Step **: Create `Dayswork.Core/Capabilities/PickTarget.cs`
   - `public enum PickTarget { SmallRock, LargeBoulder, Meteorite }`
   - XML doc per value
 
-- [ ] **Step 14**: Create `Dayswork.Core/Capabilities/CapabilityMatrix.cs`
+- [x] **Step **: Create `Dayswork.Core/Capabilities/CapabilityMatrix.cs`
   - `public static class CapabilityMatrix`
   - `public static bool CanChop(ToolLevel axeLevel, AxeTarget target)` — switch expression;
     `FruitTree` branch is unconditional `false` first (FR-SKIP-03); then `LargeLog >= Gold`,
@@ -63,12 +63,12 @@ no raw string literals, no `Gen.zip*` (use LINQ query syntax). Consistent with U
     `Meteorite >= Gold`, `LargeBoulder >= Steel`, default `true`
   - No constructor; static class cannot be instantiated
 
-- [ ] **Step 15**: Create `Dayswork.Core/Capabilities/ICapabilityEvaluator.cs`
+- [x] **Step **: Create `Dayswork.Core/Capabilities/ICapabilityEvaluator.cs`
   - `public interface ICapabilityEvaluator`
   - `bool CanChop(ToolSnapshot snap, AxeTarget target)`
   - `bool CanBreak(ToolSnapshot snap, PickTarget target)`
 
-- [ ] **Step 16**: Create `Dayswork.Core/Capabilities/CapabilityEvaluator.cs`
+- [x] **Step **: Create `Dayswork.Core/Capabilities/CapabilityEvaluator.cs`
   - `public sealed class CapabilityEvaluator : ICapabilityEvaluator`
   - `CanChop` delegates to `CapabilityMatrix.CanChop(snap.AxeLevel, target)`
   - `CanBreak` delegates to `CapabilityMatrix.CanBreak(snap.PickaxeLevel, target)`
@@ -76,12 +76,12 @@ no raw string literals, no `Gen.zip*` (use LINQ query syntax). Consistent with U
 
 ### Priority orderer (Dayswork.Core/Shifts/)
 
-- [ ] **Step 17**: Create `Dayswork.Core/Shifts/ITaskPriorityOrderer.cs`
+- [x] **Step **: Create `Dayswork.Core/Shifts/ITaskPriorityOrderer.cs`
   - `public interface ITaskPriorityOrderer`
   - `IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> enabledTasks)`
   - XML doc: returns only enabled tasks in FR-WORK-03 order; empty input → empty list
 
-- [ ] **Step 18**: Create `Dayswork.Core/Shifts/TaskPriorityOrderer.cs`
+- [x] **Step **: Create `Dayswork.Core/Shifts/TaskPriorityOrderer.cs`
   - `public sealed class TaskPriorityOrderer : ITaskPriorityOrderer`
   - `private static readonly Dictionary<TaskKind, int> s_rank` — FR-WORK-03 table:
     FeedAnimals=0, PetAnimals=1, CollectAnimalProducts=2, WaterCrops=3, HarvestCrops=4,
@@ -92,7 +92,7 @@ no raw string literals, no `Gen.zip*` (use LINQ query syntax). Consistent with U
 
 ### Test generator
 
-- [ ] **Step 19**: Create `Dayswork.Tests/Generators/ToolSnapshotGen.cs`
+- [x] **Step **: Create `Dayswork.Tests/Generators/ToolSnapshotGen.cs`
   - `public static class ToolSnapshotGen`
   - `private static readonly Arbitrary<ToolLevel> ArbToolLevel` — `Arb.From(Gen.Elements(...))`
     with all 5 `ToolLevel` values
@@ -102,7 +102,7 @@ no raw string literals, no `Gen.zip*` (use LINQ query syntax). Consistent with U
 
 ### Capability tests
 
-- [ ] **Step 20**: Create `Dayswork.Tests/Capabilities/CapabilityEvaluatorTests.cs`
+- [x] **Step **: Create `Dayswork.Tests/Capabilities/CapabilityEvaluatorTests.cs`
   - `[Theory] [InlineData(...)]` — `CanChop_ReturnsExpectedResult`: 20 cases covering all
     5 AxeLevel × 4 non-FruitTree AxeTarget combinations (expected results from spec table)
   - `[Theory] [InlineData(...)]` — `FruitTree_AlwaysReturnsFalse_FR_SKIP_03`: 5 cases,
@@ -113,7 +113,7 @@ no raw string literals, no `Gen.zip*` (use LINQ query syntax). Consistent with U
 
 ### Priority orderer tests
 
-- [ ] **Step 21**: Create `Dayswork.Tests/Shifts/TaskPriorityOrdererTests.cs`
+- [x] **Step **: Create `Dayswork.Tests/Shifts/TaskPriorityOrdererTests.cs`
   - `[Fact]` — `AllTenTasksEnabled_ReturnsInFRWork03Order`: passes all 10 `TaskKind` values,
     asserts output sequence matches FR-WORK-03 table exactly
   - `[Fact]` — `SingleTask_ReturnsOneElementList`: passes one `TaskKind`, asserts count == 1
@@ -126,15 +126,15 @@ no raw string literals, no `Gen.zip*` (use LINQ query syntax). Consistent with U
 
 ### Build and verification
 
-- [ ] **Step 22**: Run `dotnet build Dayswork.sln` — verify 0 errors, 0 warnings;
+- [x] **Step **: Run `dotnet build Dayswork.sln` — verify 0 errors, 0 warnings;
   confirm no SMAPI/SV imports in `Dayswork.Core/Capabilities/` or `Dayswork.Core/Shifts/`
 
-- [ ] **Step 23**: Run `dotnet test` — verify all new tests pass; verify 0 regressions
+- [x] **Step **: Run `dotnet test` — verify all new tests pass; verify 0 regressions
   against prior suite (U-02 through U-06: currently 100 passing tests)
 
 ### Documentation
 
-- [ ] **Step 24**: Create `aidlc-docs/construction/U-07-capability-priority-core/code/u-07-code-summary.md`
+- [x] **Step **: Create `aidlc-docs/construction/U-07-capability-priority-core/code/u-07-code-summary.md`
 
 ---
 

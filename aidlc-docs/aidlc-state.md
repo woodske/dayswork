@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-06 Persistence Core — Complete; awaiting approval to proceed to U-07
+- **Current Stage**: U-07 Capability & Priority Core — Complete; awaiting approval to proceed to U-08
 
 ## Workspace State
 - **Existing Code**: No
