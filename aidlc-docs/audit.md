@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-09 Code Generation — Part 1 Plan Created, Awaiting Approval
+**Timestamp**: 2026-05-19T04:25:00Z
+**User Input**: (none — planning step)
+**AI Response**: Code Generation Part 1 plan created at `aidlc-docs/construction/plans/u-09-minimum-hiring-flow-code-generation-plan.md`. 12 steps: (1) ContractDraft.cs — mutable UI-only state; (2) HiringFlowCoordinator.cs — owns screen transitions + BuildContract helper + whole-farm default zone; (3) TaskSelectionMenu.cs — 10 toggles + live rate + gamepad snapping (IDs 100–109, 200, 201); (4) SummaryMenu.cs — hours/rate/deposit cached in ctor + confirm/back; (5) ContractPersistenceAdapter.cs — SMAPI data API bridge using Hydrate on load; (6) ContractStore.cs — implement ListActiveForDate (currently NotImplementedException) with 28-day season arithmetic; (7) BulletinBoardPatch.cs — replace placeholder log with Coordinator.OpenHiringFlow(); (8) ModEntry.cs — wire all Core singletons + Coordinator + persistence adapter + events; (9) i18n/default.json — 23 new keys; (10) dotnet build; (11) code summary doc; (12) state+audit. Onboarding: IClickableMenu anatomy, ClickableComponent neighbor IDs, SMAPI data API, Game1.player.Money all documented inline. Awaiting approval.
+**Context**: CONSTRUCTION — U-09 Minimum Hiring Flow, Code Generation Part 1 (gate: awaiting plan approval)
+
+---
+
+## U-09 NFR Design — Approved
+**Timestamp**: 2026-05-19T04:20:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design approved. Advancing to Code Generation Part 1 (Planning) for U-09.
+**Context**: CONSTRUCTION — U-09 Minimum Hiring Flow, NFR Design approved → Code Generation Part 1
+
+---
+
 ## U-09 NFR Design — Complete
 **Timestamp**: 2026-05-19T04:15:00Z
 **User Input**: (none — generation step)
