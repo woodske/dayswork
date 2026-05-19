@@ -1,5 +1,13 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-04 Functional Design — Artifacts Generated, Awaiting Approval
+**Timestamp**: 2026-05-18T23:45:00Z
+**User Input**: Q1: "A) Two corners (TopLeft + BottomRight, both inclusive)" | Q2: "A) Yes — Zone includes LocationName (Recommended)" | Q3: "B) Sealed record hierarchy (Recommended)" | Q4-Q6: "Q4-A, Q5-A, Q6-A (all recommended)"
+**AI Response**: All 6 recommendations accepted. Locked decisions: (Q1) Zone defined by two inclusive-corner TileCoords; (Q2) Zone carries LocationName matching ChestRef pattern; (Q3) DestinationKey is a sealed record hierarchy — ChestDestination(ChestRef), ShippingBinDestination, MailDestination — each unique ChestRef gets its own ItemBuffer bucket; (Q4) No explicit Union method — multi-zone support via IReadOnlyList<Zone> in EnumerateUniqueTiles; (Q5) TileCoord is readonly record struct for zero heap allocation in tile-scan loops; (Q6) Passability oracle is a per-method parameter (stateless ZoneGeometry). Generated 3 artifacts: domain-entities.md (TileCoord/Zone/ChestRef/DestinationKey schemas + IZoneGeometry interface with 6 methods), business-logic-model.md (tile enumeration pipeline, passability oracle model, DestinationKey assignment flow, Zone JSON serialization format), business-rules.md (INV-GEO-01..05, PBT-03-GEO-A/B/C, PBT-02-GEO-01..03, DEST-01..07, LocationName rules). State advanced to Functional Design Awaiting Approval. Presenting REVIEW REQUIRED gate.
+**Context**: CONSTRUCTION — U-04 Geometry & Domain Primitives, Functional Design complete (awaiting approval)
+
+---
+
 ## U-03 Code Generation Part 2 — Execution Complete
 **Timestamp**: 2026-05-18T23:15:00Z
 **User Input**: "continue ai-dlc workflow"
