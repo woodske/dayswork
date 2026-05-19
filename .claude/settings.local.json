@@ -12,7 +12,9 @@
       "Bash(dotnet build *)",
       "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\\\\aidlc-docs\\\\construction\\\\U-03-config-foundation\\\\code\")",
       "Bash(Out-Null)",
-      "Bash(Write-Output \"OK\")"
+      "Bash(Write-Output \"OK\")",
+      "Bash(dotnet list *)",
+      "Bash(echo \"Exit: $?\")"
     ]
   }
 }

@@ -454,6 +454,14 @@
 
 ---
 
+## U-06 Code Generation — Plan Approved, Part 2 Starting
+**Timestamp**: 2026-05-19T00:08:00Z
+**User Input**: "approved"
+**AI Response**: Plan approved. Beginning Part 2 — code generation.
+**Context**: CONSTRUCTION — U-06 Persistence Core, Code Generation Part 2 (Generation)
+
+---
+
 ## U-06 Code Generation — Plan presented for approval
 **Timestamp**: 2026-05-19T00:07:00Z
 **AI Response**: Created u-06-persistence-core-code-generation-plan.md. 17 steps: 6 domain types, 2 interfaces, 5 DTOs, 2 impls, 1 generator, 2 test files, build/test, summary. Presenting plan for approval.
@@ -516,5 +524,13 @@
 - Q10 (ListActiveForDate): "B" → Stub with `NotImplementedException` in U-06; implement in U-09
 **AI Response**: No ambiguities detected. Generated domain-entities.md, business-logic-model.md, business-rules.md.
 **Context**: CONSTRUCTION — U-06 Persistence Core, Functional Design, Steps 3–5 complete
+
+---
+
+## U-06 Code Generation — Complete
+**Timestamp**: 2026-05-19T09:00:00Z
+**User Input**: (session resumed from context summary)
+**AI Response**: Continued Code Generation Part 2 from Step 14. Created SaveDataSerializerTests.cs (10 [Fact] + 1 [Property] PBT-02 round-trip with MaxTest=1000). Fixed C# 10 compatibility issues: replaced collection expressions ([]) with new() / Array.Empty<T>(), raw string literals with verbatim strings, and Gen.zip*/zip3/zip8 with LINQ query syntax. Both projects build clean (0 errors, 0 warnings). All 100 tests pass (1 skip expected). Verified no SMAPI imports in Core/Persistence/. Created u-06-code-summary.md. Updated plan checkboxes (all 17 steps [x]).
+**Context**: CONSTRUCTION — U-06 Persistence Core, Code Generation complete; awaiting approval to proceed to U-07
 
 ---

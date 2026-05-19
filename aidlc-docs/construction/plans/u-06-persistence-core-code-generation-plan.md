@@ -2,7 +2,7 @@
 
 **Unit**: U-06 — Persistence Core  
 **Stage**: Code Generation  
-**Status**: Part 1 — planning complete; awaiting approval to begin Part 2
+**Status**: Part 2 — complete
 
 ---
 
@@ -33,40 +33,40 @@
 ## Steps
 
 ### Step 1 — `Season.cs`
-- [ ] Create `Dayswork.Core/Domain/Season.cs`
+- [x] Create `Dayswork.Core/Domain/Season.cs`
 - Namespace: `Dayswork.Core.Domain`
 - `public enum Season { Spring, Summer, Fall, Winter }`
 - Core-side equivalent of SMAPI's `Season` — no SMAPI reference allowed in Core
 
 ### Step 2 — `GameDate.cs`
-- [ ] Create `Dayswork.Core/Domain/GameDate.cs`
+- [x] Create `Dayswork.Core/Domain/GameDate.cs`
 - Namespace: `Dayswork.Core.Domain`
 - `public readonly record struct GameDate(int Day, Season Season, int Year)`
 - No validation — caller's responsibility; Day range [1,28] documented in business rules
 
 ### Step 3 — `ContractId.cs`
-- [ ] Create `Dayswork.Core/Domain/ContractId.cs`
+- [x] Create `Dayswork.Core/Domain/ContractId.cs`
 - Namespace: `Dayswork.Core.Domain`
 - `public readonly record struct ContractId(Guid Value)` with `static ContractId New() => new(Guid.NewGuid())` and `ToString()` override returning `Value.ToString()`
 
 ### Step 4 — `ContractStatus.cs`
-- [ ] Create `Dayswork.Core/Domain/ContractStatus.cs`
+- [x] Create `Dayswork.Core/Domain/ContractStatus.cs`
 - Namespace: `Dayswork.Core.Domain`
 - `public enum ContractStatus { Active, Paused, Cancelled }`
 
 ### Step 5 — `ContractSchedule.cs`
-- [ ] Create `Dayswork.Core/Domain/ContractSchedule.cs`
+- [x] Create `Dayswork.Core/Domain/ContractSchedule.cs`
 - Namespace: `Dayswork.Core.Domain`
 - `public enum ContractSchedule { OneTime, Recurring }`
 
 ### Step 6 — `Contract.cs`
-- [ ] Create `Dayswork.Core/Domain/Contract.cs`
+- [x] Create `Dayswork.Core/Domain/Contract.cs`
 - Namespace: `Dayswork.Core.Domain`
 - `public sealed record Contract(ContractId Id, IReadOnlySet<TaskKind> EnabledTasks, IReadOnlyList<Zone> Zones, IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations, ContractSchedule Schedule, ContractStatus Status, GameDate HireDate, int DepositAmount, int HourlyRate)`
 - Usings: `Dayswork.Core.Domain` only — no SMAPI, no Newtonsoft
 
 ### Step 7 — `IContractStore.cs`
-- [ ] Create `Dayswork.Core/Persistence/IContractStore.cs`
+- [x] Create `Dayswork.Core/Persistence/IContractStore.cs`
 - Namespace: `Dayswork.Core.Persistence`
 - Interface with all methods from Application Design + `Hydrate`:
   ```csharp
@@ -82,7 +82,7 @@
   ```
 
 ### Step 8 — `ISaveDataSerializer.cs`
-- [ ] Create `Dayswork.Core/Persistence/ISaveDataSerializer.cs`
+- [x] Create `Dayswork.Core/Persistence/ISaveDataSerializer.cs`
 - Namespace: `Dayswork.Core.Persistence`
 - Interface:
   ```csharp
@@ -92,21 +92,21 @@
 - Note: `Serialize` signature extends the Application Design definition with `modVersion` parameter (Q6-C decision — `DaysworkSaveDataV1` stores `ModVersion`)
 
 ### Step 9 — DTO types (5 files)
-- [ ] Create `Dayswork.Core/Persistence/Dto/GameDateDtoV1.cs`
+- [x] Create `Dayswork.Core/Persistence/Dto/GameDateDtoV1.cs`
   - `public sealed class GameDateDtoV1 { public int Day { get; set; } public string Season { get; set; } = ""; public int Year { get; set; } }`
-- [ ] Create `Dayswork.Core/Persistence/Dto/DestinationDtoV1.cs`
+- [x] Create `Dayswork.Core/Persistence/Dto/DestinationDtoV1.cs`
   - `public sealed class DestinationDtoV1 { public string Type { get; set; } = ""; public string? LocationName { get; set; } public int? X { get; set; } public int? Y { get; set; } }`
-- [ ] Create `Dayswork.Core/Persistence/Dto/ZoneDtoV1.cs`
+- [x] Create `Dayswork.Core/Persistence/Dto/ZoneDtoV1.cs`
   - `public sealed class ZoneDtoV1 { public string LocationName { get; set; } = ""; public int TopLeftX, TopLeftY, BottomRightX, BottomRightY { get; set; } }`
-- [ ] Create `Dayswork.Core/Persistence/Dto/ContractDtoV1.cs`
+- [x] Create `Dayswork.Core/Persistence/Dto/ContractDtoV1.cs`
   - Fields: `string Id`, `List<string> EnabledTasks`, `List<ZoneDtoV1> Zones`, `Dictionary<string, DestinationDtoV1> TaskDestinations`, `string Schedule`, `string Status`, `GameDateDtoV1 HireDate`, `int DepositAmount`, `int HourlyRate`
   - All list/dict fields initialised to empty collections in property declarations
-- [ ] Create `Dayswork.Core/Persistence/Dto/DaysworkSaveDataV1.cs`
+- [x] Create `Dayswork.Core/Persistence/Dto/DaysworkSaveDataV1.cs`
   - `public sealed class DaysworkSaveDataV1 { public int SchemaVersion { get; set; } = 1; public string ModVersion { get; set; } = ""; public List<ContractDtoV1> Contracts { get; set; } = []; }`
 - Namespace for all: `Dayswork.Core.Persistence.Dto`
 
 ### Step 10 — `ContractStore.cs`
-- [ ] Create `Dayswork.Core/Persistence/ContractStore.cs`
+- [x] Create `Dayswork.Core/Persistence/ContractStore.cs`
 - Namespace: `Dayswork.Core.Persistence`; implements `IContractStore`
 - Internal state: `private readonly Dictionary<ContractId, Contract> _contracts = new()`
 - `Add`: duplicate-Id check → throw `InvalidOperationException`; store + return Id
@@ -120,7 +120,7 @@
 - `Hydrate`: `_contracts.Clear()`; loop → duplicate-Id skip with warn; insert
 
 ### Step 11 — `SaveDataSerializer.cs`
-- [ ] Create `Dayswork.Core/Persistence/SaveDataSerializer.cs`
+- [x] Create `Dayswork.Core/Persistence/SaveDataSerializer.cs`
 - Namespace: `Dayswork.Core.Persistence`; implements `ISaveDataSerializer`
 - Private static `_serializerSettings`: `Formatting.Indented`, `NullValueHandling.Ignore`
 - `Serialize`: maps `IReadOnlyList<Contract>` → `List<ContractDtoV1>` via `MapDomainToDto`; wraps in `DaysworkSaveDataV1 { SchemaVersion=1, ModVersion=modVersion, Contracts=dtos }`; returns `JsonConvert.SerializeObject`
@@ -131,7 +131,7 @@
 - **SMAPI Monitor**: `SaveDataSerializer` must NOT take `IMonitor` as a constructor parameter (Core has no SMAPI dependency). Logging is handled via a `ILogger` abstraction OR warnings are embedded as thrown exceptions caught by the caller. Decision: use a `Action<string> logWarning` delegate injected via constructor — allows tests to capture warnings without SMAPI; U-09 adapter passes `(msg) => Monitor.Log(msg, LogLevel.Warn)`.
 
 ### Step 12 — `ContractGen.cs` (FsCheck generator, PBT-07)
-- [ ] Create `Dayswork.Tests/Persistence/Generators/ContractGen.cs`
+- [x] Create `Dayswork.Tests/Persistence/Generators/ContractGen.cs`
 - Namespace: `Dayswork.Tests.Generators`; static class
 - `Arbitrary<Contract> Contract()` — composes all field generators per logical-components.md spec
 - Output-producing TaskKinds for `TaskDestinations` keys: `HarvestCrops`, `CollectFruit`, `CollectAnimalProducts`, `CutTrees`, `ClearRocks`, `ClearWeeds`
@@ -139,7 +139,7 @@
 - Registers as `Arb.Register<ContractGen>()` in the test assembly's `FsCheckConfig` (or via `[assembly: Properties]` attribute matching U-02 convention)
 
 ### Step 13 — `ContractStoreTests.cs`
-- [ ] Create `Dayswork.Tests/Persistence/ContractStoreTests.cs`
+- [x] Create `Dayswork.Tests/Persistence/ContractStoreTests.cs`
 - Namespace: `Dayswork.Tests.Persistence`
 - **[Fact] tests**:
   1. `Add_StoresContract_GetReturnsIt`
@@ -163,7 +163,7 @@
 - Helper: `MakeContract(ContractStatus status = Active)` — builds a minimal valid `Contract` with `ContractId.New()`
 
 ### Step 14 — `SaveDataSerializerTests.cs`
-- [ ] Create `Dayswork.Tests/Persistence/SaveDataSerializerTests.cs`
+- [x] Create `Dayswork.Tests/Persistence/SaveDataSerializerTests.cs`
 - Namespace: `Dayswork.Tests.Persistence`
 - **[Fact] tests** (NFR-SAFE-03 edge cases):
   1. `Deserialize_Null_ReturnsEmpty`
@@ -180,18 +180,18 @@
   1. `RoundTrip_DeserializeSerialize_IsIdentity` — `Deserialize(Serialize(contracts, "0.1.0")) == contracts` using `ContractGen.Contract()`, MaxTest=1000, verifies structural equality
 
 ### Step 15 — Build verification
-- [ ] Run `dotnet build Dayswork.Core\Dayswork.Core.csproj` — expect 0 errors, 0 warnings
-- [ ] Run `dotnet build Dayswork.Tests\Dayswork.Tests.csproj` — expect 0 errors, 0 warnings
-- [ ] Verify `Dayswork.Core/Persistence/` contains no `using StardewValley` or `using StardewModdingAPI` imports
+- [x] Run `dotnet build Dayswork.Core\Dayswork.Core.csproj` — expect 0 errors, 0 warnings
+- [x] Run `dotnet build Dayswork.Tests\Dayswork.Tests.csproj` — expect 0 errors, 0 warnings
+- [x] Verify `Dayswork.Core/Persistence/` contains no `using StardewValley` or `using StardewModdingAPI` imports
 
 ### Step 16 — Test execution
-- [ ] Run `dotnet test Dayswork.Tests\Dayswork.Tests.csproj`
-- [ ] Confirm all new U-06 tests pass: 18 `[Fact]` (ContractStore) + 10 `[Fact]` + 1 `[Property]` (Serializer) = 29 new tests
-- [ ] Confirm prior U-02/U-03/U-04/U-05 tests still pass (no regressions)
-- [ ] Confirm PBT-02 round-trip property runs with MaxTest=1000 inputs
+- [x] Run `dotnet test Dayswork.Tests\Dayswork.Tests.csproj`
+- [x] Confirm all new U-06 tests pass: 18 `[Fact]` (ContractStore) + 10 `[Fact]` + 1 `[Property]` (Serializer) = 29 new tests
+- [x] Confirm prior U-02/U-03/U-04/U-05 tests still pass (no regressions)
+- [x] Confirm PBT-02 round-trip property runs with MaxTest=1000 inputs
 
 ### Step 17 — Code summary
-- [ ] Create `aidlc-docs/construction/U-06-persistence-core/code/u-06-code-summary.md`
+- [x] Create `aidlc-docs/construction/U-06-persistence-core/code/u-06-code-summary.md`
 - Record all files created, test counts, PBT-02 compliance, build results
 
 ---
