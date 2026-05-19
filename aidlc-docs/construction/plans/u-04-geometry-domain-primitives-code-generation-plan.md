@@ -42,26 +42,26 @@
 ## Generation steps
 
 ### Step 1 — TileCoord.cs
-- [ ] Create `Dayswork.Core/Domain/TileCoord.cs`
+- [x] Create `Dayswork.Core/Domain/TileCoord.cs`
 - `readonly record struct TileCoord(int X, int Y)` in namespace `Dayswork.Core.Domain`
 - Value type: zero heap allocation per tile; compiler-synthesizes equality, GetHashCode, ToString
 - No additional members needed
 
 ### Step 2 — Zone.cs
-- [ ] Create `Dayswork.Core/Domain/Zone.cs`
+- [x] Create `Dayswork.Core/Domain/Zone.cs`
 - `sealed record Zone(string LocationName, TileCoord TopLeft, TileCoord BottomRight)` in namespace `Dayswork.Core.Domain`
 - LocationName identifies the Stardew game location (e.g., "Farm", "Greenhouse")
 - TopLeft and BottomRight are inclusive bounds (INV-GEO-01: TopLeft ≤ BottomRight — enforced by caller)
 - No members beyond positional properties; compiler-synthesized equality is correct
 
 ### Step 3 — ChestRef.cs
-- [ ] Create `Dayswork.Core/Domain/ChestRef.cs`
+- [x] Create `Dayswork.Core/Domain/ChestRef.cs`
 - `sealed record ChestRef(string LocationName, TileCoord Tile)` in namespace `Dayswork.Core.Domain`
 - Identifies a chest by location + tile (per FR-HIRE-08)
 - Compiler-synthesized equality is correct
 
 ### Step 4 — DestinationKey.cs
-- [ ] Create `Dayswork.Core/Domain/DestinationKey.cs`
+- [x] Create `Dayswork.Core/Domain/DestinationKey.cs`
 - `abstract record DestinationKey` (base)
 - `sealed record ChestDestination(ChestRef Ref) : DestinationKey` — wraps a specific ChestRef
 - `sealed record ShippingBinDestination : DestinationKey` — static `Instance` singleton
@@ -69,7 +69,7 @@
 - All in namespace `Dayswork.Core.Domain`, single file
 
 ### Step 5 — IZoneGeometry.cs
-- [ ] Create `Dayswork.Core/Geometry/IZoneGeometry.cs`
+- [x] Create `Dayswork.Core/Geometry/IZoneGeometry.cs`
 - Namespace: `Dayswork.Core.Geometry`
 - Using: `Dayswork.Core.Domain`
 - Six methods:
@@ -81,7 +81,7 @@
   - `bool Intersects(Zone a, Zone b)` — pure bounds check
 
 ### Step 6 — ZoneGeometry.cs
-- [ ] Create `Dayswork.Core/Geometry/ZoneGeometry.cs`
+- [x] Create `Dayswork.Core/Geometry/ZoneGeometry.cs`
 - `public sealed class ZoneGeometry : IZoneGeometry`
 - Namespace: `Dayswork.Core.Geometry`
 - No constructor parameters — stateless; lifecycle: single instance in ModEntry (U-10)
@@ -93,7 +93,7 @@
 - `Intersects`: pure interval overlap check on both axes
 
 ### Step 7 — ZoneGen.cs (shared FsCheck generators)
-- [ ] Create `Dayswork.Tests/Generators/ZoneGen.cs`
+- [x] Create `Dayswork.Tests/Generators/ZoneGen.cs`
 - Namespace: `Dayswork.Tests.Generators`
 - Using: `Dayswork.Core.Domain`, `FsCheck`
 - Static class with four `Arbitrary<T>` factory methods:
@@ -104,7 +104,7 @@
 - No rejection sampling — sorted-pair generation always produces valid Zone (INV-GEO-01 satisfied by construction)
 
 ### Step 8 — ZoneGeometryTests.cs
-- [ ] Create `Dayswork.Tests/Geometry/ZoneGeometryTests.cs`
+- [x] Create `Dayswork.Tests/Geometry/ZoneGeometryTests.cs`
 - Namespace: `Dayswork.Tests.Geometry`
 - Using: `Dayswork.Core.Domain`, `Dayswork.Core.Geometry`, `Dayswork.Tests.Generators`, `FsCheck`, `FsCheck.Xunit`, `Xunit`
 - Single `ZoneGeometry _geo = new()` field
@@ -127,18 +127,18 @@
   - `MailDestination_DifferentFromShippingBin` — distinct subtypes are not equal
 
 ### Step 9 — Run build and tests
-- [ ] Run `dotnet build Dayswork.Core\Dayswork.Core.csproj`; expect 0 errors 0 warnings
-- [ ] Run `dotnet build Dayswork.Tests\Dayswork.Tests.csproj`; expect 0 errors 0 warnings
-- [ ] Run `dotnet test Dayswork.Tests\Dayswork.Tests.csproj --logger "console;verbosity=normal"`; expect all tests pass
-- [ ] Verify: `dotnet build Dayswork.Core` produces no SMAPI/StardewValley references in output (NFR-MAINT-01)
-- [ ] PBT compliance: PBT-02 round-trip passes ≥1000 inputs; PBT-03 three invariants pass ≥1000 inputs each
+- [x] Run `dotnet build Dayswork.Core\Dayswork.Core.csproj`; expect 0 errors 0 warnings — PASSED
+- [x] Run `dotnet build Dayswork.Tests\Dayswork.Tests.csproj`; expect 0 errors 0 warnings — PASSED
+- [x] Run `dotnet test Dayswork.Tests\Dayswork.Tests.csproj --logger "console;verbosity=normal"`; expect all tests pass — 37 passed, 1 skipped (PBT-08 demo), 0 failed
+- [x] Verify: `dotnet build Dayswork.Core` produces no SMAPI/StardewValley references in output (NFR-MAINT-01) — CONFIRMED
+- [x] PBT compliance: PBT-02 round-trip passes ≥1000 inputs; PBT-03 three invariants pass ≥1000 inputs each — ALL PASSED
 
 ### Step 10 — Code summary doc
-- [ ] Create `aidlc-docs/construction/U-04-geometry-domain-primitives/code/u-04-code-summary.md`
+- [x] Create `aidlc-docs/construction/U-04-geometry-domain-primitives/code/u-04-code-summary.md`
 
 ### Step 11 — State and audit update
-- [ ] Update `aidlc-docs/aidlc-state.md` → U-04 complete, advance to U-05
-- [ ] Append to `aidlc-docs/audit.md`
+- [x] Update `aidlc-docs/aidlc-state.md` → U-04 complete, advance to U-05
+- [x] Append to `aidlc-docs/audit.md`
 
 ---
 

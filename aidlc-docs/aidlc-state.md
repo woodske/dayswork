@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-04 Geometry & Domain Primitives — NFR Design (Awaiting Approval)
+- **Current Stage**: U-05 Pricing Core — Functional Design (Pending)
 
 ## Workspace State
 - **Existing Code**: No

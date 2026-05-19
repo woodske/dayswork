@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-04 Code Generation — Complete
+**Timestamp**: 2026-05-19T00:20:00Z
+**User Input**: "approve and generate"
+**AI Response**: All 11 plan steps executed and marked [x]. Created 6 production files: TileCoord.cs (readonly record struct), Zone.cs (sealed record with LocationName), ChestRef.cs (sealed record), DestinationKey.cs (abstract record + 3 sealed subtypes with Instance singletons), IZoneGeometry.cs (6-method interface), ZoneGeometry.cs (stateless impl with HashSet deduplication). Created 2 test files: ZoneGen.cs (PBT-07 — sorted-pair Zone generation, TileCoord/Zone/ChestRef/ZoneList arbitraries), ZoneGeometryTests.cs (12 Fact + 4 Property tests). Build: 0 errors 0 warnings. Tests: 37 passed, 1 skipped (PBT-08 demo), 0 failed. PBT compliance: PBT-02 Zone round-trip 1000 inputs ✓, PBT-03 three invariants 1000 inputs each ✓, PBT-07 ZoneGen in Generators/ ✓. No deviations from plan. Advancing state to U-05 Pricing Core.
+**Context**: CONSTRUCTION — U-04 Geometry & Domain Primitives, Code Generation complete
+
+---
+
+## U-04 Code Generation — Part 2 (Generation)
+**Timestamp**: 2026-05-19T00:15:00Z
+**User Input**: "approve and generate"
+**AI Response**: Plan approved. Executing all 11 steps.
+**Context**: CONSTRUCTION — U-04 Geometry & Domain Primitives, Code Generation Part 2
+
+---
+
 ## U-04 Code Generation — Part 1 (Planning)
 **Timestamp**: 2026-05-19T00:10:00Z
 **User Input**: "continue"
