@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-11 Code Generation — Part 1 Plan Created, Awaiting Approval
+**Timestamp**: 2026-05-20T00:35:00Z
+**User Input**: (none — planning step)
+**AI Response**: Code Generation Part 1 plan created at `aidlc-docs/construction/plans/u-11-full-hiring-ui-code-generation-plan.md`. 9 steps: (1) ChestEntry + BuildingOutline UI DTOs; (2) ChestResolver (M-20) — GetAllChests/ResolveChest/GetDisplayName/GetBuildingOutlines; (3) ZoneDrawOverlay (M-08) — Display.RenderedWorld renderer with 1×1 pixel texture, O(zone-count) fills; (4) ZoneAndChestMenu (M-05) — full Screen 2 with zone-draw mode (mini-banner), building-select mode, per-task output picker, cleanupBeforeExit event unsubscribe; (5) HiringFlowCoordinator extension — insert ShowZoneAndChest between TaskSelection and Summary, add ChestResolver + IModHelper params, fix back-nav from Summary; (6) ModEntry extension — wire ChestResolver singleton; (7) i18n — 19 new keys; (8) dotnet build + fix errors; (9) code-summary + state update. Key JIT docs included: RenderedWorld usage, world→screen transform, leftClickHeld/releaseLeftClick for drag, cleanupBeforeExit lifecycle, Game1.getFarm() / Farm.buildings / buildings.indoors API.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, Code Generation Part 1 (gate: awaiting plan approval)
+
+---
+
+## U-11 Code Generation — Part 1 Planning
+**Timestamp**: 2026-05-20T00:25:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design approved. Advancing to Code Generation Part 1 (Planning) for U-11.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, NFR Design approved → Code Generation Part 1
+
+---
+
 ## U-11 NFR Design — Complete, Awaiting Approval
 **Timestamp**: 2026-05-20T00:20:00Z
 **User Input**: (none — all patterns fully determined from NFR requirements; no questions needed)
