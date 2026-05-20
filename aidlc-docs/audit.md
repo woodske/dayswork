@@ -1,5 +1,29 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-12 NFR Requirements — Complete
+**Timestamp**: 2026-05-20T18:35:00Z
+**User Input**: (none — NFR assessment executed, no questions needed)
+**AI Response**: NFR Requirements artifacts generated. Applicable NFRs: NFR-UX-01 (gamepad for ScheduleMenu + ContractListMenu), NFR-UX-02 (i18n — 19 new keys), NFR-PERF-01 (draw() frame budget), NFR-SAFE-03 (ContractStore Pause/Resume state persistence + IsPaused field backward-compat), NFR-MAINT-03 (Core/Mod separation), NFR-MAINT-04 (Patches namespace). PBT blocking: PBT-02 (round-trip with IsPaused field) and PBT-03 (Pause/Resume/Cancel state-transition invariants). No new tech stack decisions.
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, NFR Requirements stage complete
+
+---
+
+## U-12 Session Resume — NFR Requirements Start
+**Timestamp**: 2026-05-20T18:30:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resumed from U-11 accepted. Beginning U-12 — Hiring UI: Schedule + Edit/Pause/Cancel. Executing NFR Requirements stage (Functional Design SKIP per unit-of-work.md assessment for UI/SMAPI-wiring units).
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, NFR Requirements
+
+---
+
+## U-11 Play-test — Accepted
+**Timestamp**: 2026-05-20T18:00:00Z
+**User Input**: "I'm going to leave this as is, but mark as a todo item to confirm that the tree seeds are collected. I will double check after the worker AI is completed and the worker slows down. Mark this as accepted, but do not proceed with the next step."
+**AI Response**: U-11 marked accepted. Logged TODO-01 in aidlc-state.md: tree seeds not observed in shipping bin — suspected timing issue (worker teleports too fast for debris to resolve). Will revisit after U-13 Worker AI.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, play-test sign-off
+
+---
+
 ## U-11 Zone-Draw UX Fix v2 — Camera Pan (no warp) — Complete
 **Timestamp**: 2026-05-20T13:00:00Z
 **User Input**: "you've teleported the player to the farm, but when we go to draw the zones, I cannot move the screen around the farm. Is there anything preventing us from doing it exactly like how Robin's buildings are placed? Where the player is not teleported and we can scroll across the map?"
