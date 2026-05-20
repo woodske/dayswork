@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-10 Code Generation — Part 1 Plan Created, Awaiting Approval
+**Timestamp**: 2026-05-19T14:15:00Z
+**User Input**: (none — planning step)
+**AI Response**: Code Generation Part 1 plan created at `aidlc-docs/construction/plans/u-10-minimum-worker-shift-code-generation-plan.md`. 20 steps: (1) ShiftPhase enum; (2) ShiftIntent abstract record + 4 subtypes; (3) IShiftStateMachine + ShiftStateMachine (linear guard, throws on illegal); (4) WorkItem record; (5) ShiftContext mutable class; (6) IItemBuffer + ItemBuffer; (7) ContractStatus + Executed value; (8) ItemBufferGen FsCheck generator; (9) ShiftStateMachineTests (PBT-U10-01/02); (10) ItemBufferTests (PBT-U10-03/04); (11) ToolLevelReader; (12) PathFindControllerAdapter; (13) FarmhandNpc (placeholder sprite); (14) RecurringContractScheduler (one-time stub + dedup guard); (15) ShiftOrchestrator (throttled tick, work list build, intent dispatch, task invocation, hay routing); (16) ModEntry wire; (17) i18n npc.farmhand.name; (18) dotnet build; (19) code-summary.md; (20) state+audit. Key notes: animal tasks (feed/pet/collect) deferred to U-13; building pre-pass covers tile-based tasks only; ContractStatus.Executed added for dedup.
+**Context**: CONSTRUCTION — U-10 Minimum Worker Shift, Code Generation Part 1 (gate: awaiting plan approval)
+
+---
+
+## U-10 NFR Design — Approved
+**Timestamp**: 2026-05-19T14:05:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design approved. Advancing to Code Generation Part 1 (Planning) for U-10.
+**Context**: CONSTRUCTION — U-10 Minimum Worker Shift, NFR Design approved → Code Generation Part 1
+
+---
+
 ## U-10 NFR Design — Complete
 **Timestamp**: 2026-05-19T14:00:00Z
 **User Input**: (none — all patterns fully determined from NFR requirements; no questions needed)
