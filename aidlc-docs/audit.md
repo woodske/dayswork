@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-12 NFR Design — Complete
+**Timestamp**: 2026-05-20T18:45:00Z
+**User Input**: (none — NFR design executed from approved requirements)
+**AI Response**: NFR Design artifacts generated. 6 patterns: (1) Pre-Compute on Open for ScheduleMenu/ContractListMenu; (2) State Transition Result enum (ContractOperationResult: Success/NotFound/Blocked) for Pause/Resume/Cancel; (3) Backward-Compatible Save Field (IsPaused with DefaultValueHandling.Populate); (4) Cancel Guard via ShiftOrchestrator.ActiveContractId; (5) PBT invariant tests for ContractStore state transitions (5 properties); (6) Constructor injection for ContractListMenu. Logical components: ScheduleMenu, ContractListMenu, ContractOperationResult (new); ContractStore, HiringFlowCoordinator, BulletinBoardPatch, ShiftOrchestrator (extended).
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, NFR Design stage complete
+
+---
+
+## U-12 NFR Requirements — Approved
+**Timestamp**: 2026-05-20T18:40:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Proceeding to NFR Design.
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, NFR Requirements approved
+
+---
+
 ## U-12 NFR Requirements — Complete
 **Timestamp**: 2026-05-20T18:35:00Z
 **User Input**: (none — NFR assessment executed, no questions needed)
