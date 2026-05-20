@@ -1,5 +1,13 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-11 NFR Requirements — Complete, Awaiting Approval
+**Timestamp**: 2026-05-20T00:10:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resumed workflow at U-11. Functional Design skipped (UI/integration only, no new business logic). NFR Requirements generated: NFR-PERF-01 (draw() frame budget), NFR-PERF-03 (zone overlay at full farm scale), NFR-UX-01 (gamepad nav), NFR-UX-02 (i18n routing, 15 new keys), NFR-UX-03 (in-place overlay mode), NFR-MAINT-03 (ChestResolver injectable), NFR-ONBOARD-01 (JIT docs: RenderedWorld, world→screen coords, leftClickHeld, ClickableComponent nav chain, event lifecycle). No new PBT or tech stack decisions. Awaiting approval.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, NFR Requirements stage complete
+
+---
+
 ## U-10 Play-Test — Approved
 **Timestamp**: 2026-05-19T23:45:00Z
 **User Input**: "I approve and tested this unit, continue to the next section but pause before starting"
