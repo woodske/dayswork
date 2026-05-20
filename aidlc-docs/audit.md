@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13 NFR Design — Complete
+**Timestamp**: 2026-05-20T23:55:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design generated directly (no blocking user questions; the deferred TS-U13-04 draw/update choice is an internal pattern decision, resolved here). Resolved TS-U13-04 = **manual render hook with Y-depth sort** (worker Farmer kept out of all game-managed/serialized collections; reject location.characters registration; BR-WORKER-03 cosmetic fallback retained; final confirm = code-gen play-test). Patterns: retained U-10 five (Throttled-Tick, Once-Per-Shift Scan, Invoke-and-Poll, Skip-and-Continue, Core-Purity); new A Capability-Filtered Scan, B Priority-Grouped Work Queue, C Multi-Successor State Machine + external escalation counter, D Progress-Sampling Stuck Detection, E Hybrid 3-Step Escalation, F Farmer-as-Worker Rendering, G Manual Path-Follow Movement, H Inherent Invulnerability + Swing-Proximity Emote, I Save-Exclusion. Logical components: extended ShiftStateMachine + StuckDetector (Core); extended ShiftOrchestrator + new FarmhandWorker (Farmer), WorkerMovementDriver, ToolSwapAnimator, WorkerRenderer, HitReactionWatcher, ObjectTargetClassifier, WorkerAppearanceRandomizer (Mod). Extension compliance: PBT-03 + PBT-08 compliant; PBT-02/07/09 N/A; Security N/A. Generated nfr-design-patterns.md + logical-components.md + nfr-design-plan. Awaiting approval to proceed to Code Generation (Infrastructure Design SKIP).
+**Context**: CONSTRUCTION — U-13 Worker Features, NFR Design complete, awaiting approval
+
+---
+
+## U-13 NFR Requirements — Approved
+**Timestamp**: 2026-05-20T23:40:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Proceeding to NFR Design for U-13.
+**Context**: CONSTRUCTION — U-13 Worker Features, NFR Requirements → NFR Design
+
+---
+
 ## U-13 NFR Requirements — Complete
 **Timestamp**: 2026-05-20T23:35:00Z
 **User Input**: "continue"
