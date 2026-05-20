@@ -1,5 +1,29 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-10 Functional Design — Complete
+**Timestamp**: 2026-05-19T13:30:00Z
+**User Input**: FD-Q1: B, FD-Q2: nearest-first + all-tasks building pre-pass (updated from animal-only), FD-Q3: A (snapshot-only, missing tool = level 0), FD-Q4: A (orchestrator handles hay; corrected — no silo or silo full = hay not collected, not dropped), FD-Q5: A (elapsed game time)
+**AI Response**: Generated three functional design artifacts: business-logic-model.md (shift lifecycle, work list building, task execution loop, hours tracking, deposit run, exit/refund, scheduler stub, tool reader), domain-entities.md (ShiftPhase, ShiftIntent, ShiftStateMachine, WorkItem, ShiftContext, ItemBuffer, ToolSnapshot, ShiftRecord, ContractSchedulerEntry, FarmhandNpc, PathFindControllerAdapter, ToolLevelReader), business-rules.md (17 rules, plus FR-TASK-09 correction note). Plan checkboxes updated.
+**Context**: CONSTRUCTION — U-10 Minimum Worker Shift, Functional Design complete — awaiting approval
+
+---
+
+## Session Resumption — U-10 Start
+**Timestamp**: 2026-05-19T13:00:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Session resumed. U-09 complete. Starting U-10 — Minimum Worker Shift. Loading prior artifacts: requirements.md, unit-of-work.md, unit-of-work-story-map.md. Beginning Functional Design (EXECUTE — U-10 introduces ShiftStateMachine, ItemBuffer, FarmhandNpc, ShiftOrchestrator). Creating functional design plan.
+**Context**: CONSTRUCTION — U-10 Minimum Worker Shift, Functional Design starting
+
+---
+
+## U-09 Play-Test — Approved with known defect
+**Timestamp**: 2026-05-19T12:00:00Z
+**User Input**: "When I first open the bulletin board, the cursor is snapped onto hire and I can click it, however if I move the cursor away with the d pad, i cannot return to it. Let's mark this as a known defect and move on. I approve of these changes, but don't continue with ai-dlc"
+**AI Response**: Logged as task #2 (known defect: gamepad cannot navigate back to "Hire a Farmhand" button after moving D-pad away). U-09 play-test session approved. Post-play-test UI fixes applied during this session: SummaryMenu dynamic height (buttons no longer overlap text), rate calculation workaround (flat 1.0h multiplier, task #1 to fix HoursEstimator), TaskSelectionMenu Next button disabled when no tasks selected, gamepad double-fire fixed (removed Buttons.A from receiveGamePadButton in both menus), bulletin board cursor snaps to hire button on open. AI-DLC workflow paused at user request.
+**Context**: CONSTRUCTION — U-09 Minimum Hiring Flow, play-test complete
+
+---
+
 ## U-09 Code Generation — Complete
 **Timestamp**: 2026-05-19T04:45:00Z
 **User Input**: "approve and generate"
