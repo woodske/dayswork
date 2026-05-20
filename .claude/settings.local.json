@@ -26,7 +26,8 @@
       "Bash(powershell -command \"Get-ChildItem 'X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley' -Filter '*.dll' | Select-Object Name\")",
       "Bash(powershell -command '& { $refs = Get-ChildItem '\\\\''C:\\\\Users\\\\kwood\\\\.nuget\\\\packages\\\\pathoschild.stardew.modbuildconfig'\\\\'' -Recurse -Filter '\\\\''*.props'\\\\'' | Select-Object -First 1; if\\($refs\\) { Get-Content $refs.FullName } }')",
       "Bash(powershell -command '& { try { $asm = [System.Reflection.Assembly]::LoadFile\\('\\\\''X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\\\\Stardew Valley.dll'\\\\''\\); $types = $null; try { $types = $asm.GetTypes\\(\\) } catch [System.Reflection.ReflectionTypeLoadException] { $types = $_.Exception.Types | Where-Object { $_ -ne $null } }; $obj = $types | Where-Object { $_ -and $_.Name -eq '\\\\''Object'\\\\'' -and $_.Namespace -eq '\\\\''StardewValley'\\\\'' }; $obj.GetMethods\\(\\) | Select-Object Name | Sort-Object Name | Where-Object { $_.Name -match '\\\\''is|Is'\\\\'' } } catch { Write-Host $_.Exception.Message } }')",
-      "Bash(powershell -command \"& { Get-ChildItem 'C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\\\\Dayswork\\\\bin' -Recurse | Select-Object Name | Sort-Object Name }\")"
+      "Bash(powershell -command \"& { Get-ChildItem 'C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\\\\Dayswork\\\\bin' -Recurse | Select-Object Name | Sort-Object Name }\")",
+      "Bash(git commit *)"
     ]
   }
 }

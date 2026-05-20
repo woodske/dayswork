@@ -1,5 +1,29 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13 Functional Design — Complete (Full Farmer committed)
+**Timestamp**: 2026-05-20T23:10:00Z
+**User Input**: "let's do B and commit to the full farmer now since that would have been best from the beginning..." / "I'm thinking about future features... energy bar, giving the farmhand their own tools and food, maybe adding some dialogue. Would things like that be easier... if it was a Farmer rather than an NPC?" / "yes, let's go with B and fix it now"
+**AI Response**: Surfaced B's three consequences (manual movement driver replacing PathFindController; manual depth-sorted drawing; manual hit-detection for ouch emote since Farmers/villager-NPCs aren't weapon-damageable) and corrected the framing that A was a "partial Farmer." Answered the roadmap question: energy bar (Farmer.Stamina) and worker-owned tools+food (native Farmer inventory/tools/eating/buffs) are Farmer-native and very costly on an NPC; dialogue is the one NPC-easier feature but is additive, not foundational — net reinforces B. User confirmed B. Generated all three functional-design artifacts at `aidlc-docs/construction/u-13-worker-features/functional-design/` (business-logic-model.md, domain-entities.md, business-rules.md). Key design: worker re-founded on Farmer (DEV-01, revises FR-NPC-01); ShiftPhase gains Stuck+Recovering with multi-successor table; full FR-WORK-03 priority via TaskPriorityOrderer + nearest-first; full capability/skip rules via CapabilityEvaluator (incl. ResourceClump classification); StuckDetector + 3-step escalation; tool swings via FarmerSprite.animateOnce; inherent invulnerability + manual "!" emote. Scope: 7 outdoor task types; animals + building interiors (incl. greenhouse) deferred (TODO-05). Updated aidlc-state.md (current stage, TODO-05, DEV-01). Awaiting approval to proceed to NFR Requirements.
+**Context**: CONSTRUCTION — U-13 Worker Features, Functional Design complete (Step 6–7), awaiting approval
+
+---
+
+## U-13 Functional Design — Sprite Approach Verified, FD-Q5 Rewritten
+**Timestamp**: 2026-05-20T22:40:00Z
+**User Input**: "I've answered all but FD-Q5. Can we switch to a sprite that can use tool animations? I'd really like for the tool to visibly used as the player character uses it. What are the options? could we do a random player character sprite from the character creation menu options?" / "yes verify and write FD-Q5 around the farmer approach, let's try to knock that out."
+**AI Response**: Recorded answers: FD-Q1=A (defer animals + building interiors), FD-Q2=A (first-class Stuck/Recovering phases + multi-successor table, orchestrator owns escalation count), FD-Q3=A (tile-movement-or-action progress), FD-Q4=B (nearest reachable orthogonal neighbor for trellis), FD-Q6=A (exclamation emote, no interruption). FD-Q5 left open pending sprite discussion. Verified via Stardew Valley Wiki (Modding:Farmer sprite) + FarmerSprite.cs frame data: NPC sheets have no tool-use frames; Farmer sprites do (FarmerRenderer draws held tool with swing frames — heavy R12/R9/R7, watering can R10/R5/R8/R11, scythe R5/R6/R7); game already draws non-player Farmers (MP farmhands); FarmerSprite.animateOnce plays one-shot swings. Open risk: PathFindController targets NPC/Character, Farmer movement is normally input/network-driven. Rewrote FD-Q5 around the Farmer approach with 3 options: A=hybrid (invisible NPC keeps proven pathfinding + invulnerability hitbox, synced randomized Farmer drawn for visuals/tool swings — Recommended), B=full Farmer replacement, C=NPC + tool-icon fallback. Noted this revises FR-NPC-01 (placeholder sprite → randomized Farmer). Awaiting user's FD-Q5 sub-choice.
+**Context**: CONSTRUCTION — U-13 Worker Features, Functional Design (FD-Q5 sprite-approach verification + rewrite)
+
+---
+
+## U-13 Functional Design — Started (Session Resume)
+**Timestamp**: 2026-05-20T22:00:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resumed from U-12 approved state. Advancing to U-13 (Worker Features: Priority + Stuck + Tool Swap + Invulnerability). Per execution plan, U-13 EXECUTES Functional Design (new business logic: StuckDetector + extended state machine + full skip-rule integration). Loaded prior artifacts: unit-of-work.md (U-13 scope), unit-of-work-story-map.md (S-07/08/09/16/17), requirements.md (FR-WORK-03/10/11/12/13, FR-SKIP-01..05, FR-NPC-02, FR-TASK-09), component-methods.md (C-08/C-09/M-09/M-10/M-12 signatures), and existing code (ShiftStateMachine, ShiftOrchestrator, FarmhandNpc, CapabilityEvaluator, ToolSnapshot, ShiftContext). Created functional design plan with 6 embedded design questions at `aidlc-docs/construction/plans/u-13-worker-features-functional-design-plan.md`. Awaiting user answers to [Answer]: tags.
+**Context**: CONSTRUCTION — U-13 Worker Features, Functional Design (Step 1–4: context analysis + plan + questions)
+
+---
+
 ## U-12 Play-test — Bugs and TODOs
 **Timestamp**: 2026-05-20T20:00:00Z
 **User Input**: (screenshot + bug list)
@@ -7,6 +31,14 @@
   Fix now: (1) Task list text overflows menu — needs word-wrap + clamped width; (2) Manage Contracts button should be beside Hire button, not below; (3) Pause/Cancel/Edit buttons overlap task text — row layout needs text/button separation; (4) Recurring contracts broken — farmhand never shows up (investigating scheduler).
   TODOs: (A) Do not water dead crops + option to clear dead crops; (B) Zoom out in zone selection screen; (C) Multiple-contract priority rules (recurring + one-time conflict).
 **Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, play-test
+
+---
+
+## U-12 Approval
+**Timestamp**: 2026-05-20T21:15:00Z
+**User Input**: "I approve the changes, but do not proceed to the next step"
+**AI Response**: U-12 marked approved in aidlc-state.md. Workflow paused — awaiting user instruction to continue.
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, approved
 
 ---
 
