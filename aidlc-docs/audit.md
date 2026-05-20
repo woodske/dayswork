@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-10 NFR Requirements — Complete
+**Timestamp**: 2026-05-19T13:45:00Z
+**User Input**: "B, B" (N1: every 4 ticks; N2: invoke + poll for object removal)
+**AI Response**: Generated nfr-requirements.md (PERF-U10-01 throttle, PERF-U10-02 one-time sort, PERF-U10-03 invoke+poll, SAFE-U10-01/02/03, REL-U10-01/02/03, PBT-U10-01 through PBT-U10-06, MAINT-U10-01/02) and tech-stack-decisions.md (SMAPI events, PathFindController adapter, NPC subclass, task action invocation, no new NuGet packages). Awaiting approval.
+**Context**: CONSTRUCTION — U-10 Minimum Worker Shift, NFR Requirements complete — awaiting approval
+
+---
+
+## U-10 Functional Design — Approved
+**Timestamp**: 2026-05-19T13:35:00Z
+**User Input**: "continue"
+**AI Response**: Functional Design approved. Advancing to NFR Requirements for U-10.
+**Context**: CONSTRUCTION — U-10 Minimum Worker Shift, Functional Design approved → NFR Requirements
+
+---
+
 ## U-10 Functional Design — Complete
 **Timestamp**: 2026-05-19T13:30:00Z
 **User Input**: FD-Q1: B, FD-Q2: nearest-first + all-tasks building pre-pass (updated from animal-only), FD-Q3: A (snapshot-only, missing tool = level 0), FD-Q4: A (orchestrator handles hay; corrected — no silo or silo full = hay not collected, not dropped), FD-Q5: A (elapsed game time)
