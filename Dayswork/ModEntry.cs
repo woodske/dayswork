@@ -2,9 +2,14 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
 using Dayswork.Integration;
+using Dayswork.Orchestration;
 using Dayswork.UI;
+using Dayswork.Worker;
 using HarmonyLib;
+using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
+using StardewValley;
 
 namespace Dayswork;
 
@@ -31,12 +36,20 @@ public sealed class ModEntry : Mod
 
         // ── Mod singletons ───────────────────────────────────────────────────
         Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, hoursEst, config, store);
-        var persistAdapter = new ContractPersistenceAdapter(
+        var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
+        var toolReader      = new ToolLevelReader();
+        var orchestrator    = new ShiftOrchestrator(toolReader);
+        var scheduler       = new RecurringContractScheduler(store, orchestrator);
 
         // ── Event registrations ──────────────────────────────────────────────
-        helper.Events.GameLoop.SaveLoaded += persistAdapter.OnSaveLoaded;
-        helper.Events.GameLoop.Saving     += persistAdapter.OnSaving;
+        helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
+        helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
+        helper.Events.GameLoop.Saving       += orchestrator.OnSaving;   // must run before save writes
+        helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
+        helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;
+        helper.Events.GameLoop.TimeChanged  += orchestrator.OnTimeChanged;
+        helper.Events.Content.AssetRequested += OnAssetRequested;
 
         // ── Harmony patches ──────────────────────────────────────────────────
         new Harmony(this.ModManifest.UniqueID).PatchAll();
@@ -45,6 +58,16 @@ public sealed class ModEntry : Mod
         RegisterDebugCommands(helper, store);
 
         this.Monitor.Log("Dayswork loaded", LogLevel.Info);
+    }
+
+    private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
+    {
+        // Redirect the placeholder NPC portrait to Marnie's existing texture.
+        // Custom farmhand art is post-v1 (FR-NPC-01).
+        if (e.NameWithoutLocale.IsEquivalentTo($"Portraits/{FarmhandNpc.InternalName}"))
+            e.LoadFrom(
+                () => Game1.content.Load<Texture2D>(FarmhandNpc.PlaceholderPortraitPath),
+                AssetLoadPriority.Medium);
     }
 
     // TODO: REMOVE before release — see RegisterDebugCommands call above

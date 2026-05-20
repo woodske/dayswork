@@ -215,12 +215,30 @@ public sealed class ContractStoreTests
         Assert.Contains("Duplicate ContractId", _warnings[0]);
     }
 
-    // ── ListActiveForDate (stub) ────────────────────────────────────────────
+    // ── ListActiveForDate ──────────────────────────────────────────────────
 
     [Fact]
-    public void ListActiveForDate_ThrowsNotImplementedException()
+    public void ListActiveForDate_ReturnsActiveContractScheduledForTomorrow()
     {
-        Assert.Throws<NotImplementedException>(() =>
-            _store.ListActiveForDate(1, Season.Spring, 1));
+        // MakeContract uses HireDate = Spring 1 Yr1; next game day is Spring 2 Yr1.
+        var contract = MakeContract(ContractStatus.Active);
+        _store.Add(contract);
+
+        var result = _store.ListActiveForDate(2, Season.Spring, 1);
+
+        Assert.Single(result);
+        Assert.Equal(contract.Id, result[0].Id);
+    }
+
+    [Fact]
+    public void ListActiveForDate_ExcludesContractNotScheduledForDate()
+    {
+        var contract = MakeContract(ContractStatus.Active);
+        _store.Add(contract);
+
+        // Spring 3 is not the day after Spring 1 — should not be returned.
+        var result = _store.ListActiveForDate(3, Season.Spring, 1);
+
+        Assert.Empty(result);
     }
 }
