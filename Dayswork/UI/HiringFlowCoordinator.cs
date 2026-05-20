@@ -47,10 +47,20 @@ internal sealed class HiringFlowCoordinator
         ShowTaskSelection(draft);
     }
 
-    // Stub — full edit flow implemented in U-12
     public void OpenEditFlow(ContractId existing)
     {
-        ModEntry.ModMonitor.Log("[Dayswork] Edit flow not yet implemented.", LogLevel.Info);
+        var contract = _contractStore.Get(existing);
+        var draft = new ContractDraft { EditingId = existing, Schedule = contract.Schedule };
+        draft.EnabledTasks.UnionWith(contract.EnabledTasks);
+        draft.Zones.AddRange(contract.Zones);
+        foreach (var kvp in contract.TaskDestinations)
+            draft.Destinations[kvp.Key] = kvp.Value;
+        ShowTaskSelection(draft);
+    }
+
+    public void OpenManageFlow()
+    {
+        Game1.activeClickableMenu = new ContractListMenu(_contractStore, _helper);
     }
 
     private void ShowTaskSelection(ContractDraft draft)
@@ -65,9 +75,17 @@ internal sealed class HiringFlowCoordinator
     {
         Game1.activeClickableMenu = new ZoneAndChestMenu(
             draft, _chestResolver,
-            onAdvance:       d => ShowSummary(d),
+            onAdvance:       d => ShowSchedule(d),
             onBack:          d => ShowTaskSelection(d),
             onBeginZoneDraw: d => BeginZoneDraw(d));
+    }
+
+    private void ShowSchedule(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new ScheduleMenu(
+            draft,
+            onAdvance: d => ShowSummary(d),
+            onBack:    d => ShowZoneAndChest(d));
     }
 
     // ── Zone-draw session (Robin building-placement UX) ──────────────────────
@@ -106,16 +124,30 @@ internal sealed class HiringFlowCoordinator
 
     private void ConfirmContract(ContractDraft draft, int deposit, int rate)
     {
-        if (Game1.player.Money < deposit)
+        if (draft.EditingId.HasValue)
         {
-            Game1.addHUDMessage(new HUDMessage(
-                I18nHelper.Get("ui.error.cant_afford"),
-                HUDMessage.error_type));
-            return;
+            // Edit: update existing contract — no gold deduction (original deposit already paid)
+            var original = _contractStore.Get(draft.EditingId.Value);
+            var updated = BuildContract(draft, deposit, rate) with
+            {
+                Id       = draft.EditingId.Value,
+                Status   = original.Status,
+                HireDate = original.HireDate,
+            };
+            _contractStore.Update(draft.EditingId.Value, updated);
         }
-
-        Game1.player.Money -= deposit;
-        _contractStore.Add(BuildContract(draft, deposit, rate));
+        else
+        {
+            if (Game1.player.Money < deposit)
+            {
+                Game1.addHUDMessage(new HUDMessage(
+                    I18nHelper.Get("ui.error.cant_afford"),
+                    HUDMessage.error_type));
+                return;
+            }
+            Game1.player.Money -= deposit;
+            _contractStore.Add(BuildContract(draft, deposit, rate));
+        }
         CloseFlow();
     }
 

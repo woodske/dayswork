@@ -19,9 +19,10 @@ namespace Dayswork.Patches;
 [HarmonyPatch(typeof(Billboard))]
 internal static class BulletinBoardPatch
 {
-    // Persists across the three postfix calls for a single Billboard instance.
+    // Both buttons persist across the three postfix calls for a single Billboard instance.
     // Safe because only one Billboard is ever open at a time.
     private static ClickableComponent? _hireButton;
+    private static ClickableComponent? _manageButton;
 
     // ── Constructor postfix ──────────────────────────────────────────────────
     // Runs after Billboard(bool onlyViewDailyQuest) completes, so xPositionOnScreen /
@@ -34,34 +35,51 @@ internal static class BulletinBoardPatch
         // not the calendar (dailyQuest = false).
         if (!dailyQuest)
         {
-            _hireButton = null;
+            _hireButton   = null;
+            _manageButton = null;
             return;
         }
 
-        string label = I18nHelper.Get("bulletin.hire_a_farmhand");
-        int buttonWidth = (int)Game1.smallFont.MeasureString(label).X + 32; // 16px padding each side
-        int buttonHeight = 60;
+        const int ButtonHeight = 60;
+        const int ButtonGap    = 16;
+        int topY = __instance.yPositionOnScreen + 16;
+
+        string hireLabel   = I18nHelper.Get("bulletin.hire_a_farmhand");
+        string manageLabel = I18nHelper.Get("bulletin.manage_contracts");
+        int hireWidth   = (int)Game1.smallFont.MeasureString(hireLabel).X   + 32;
+        int manageWidth = (int)Game1.smallFont.MeasureString(manageLabel).X + 32;
+
+        // Place both buttons side-by-side, centered within the billboard panel.
+        int totalWidth = hireWidth + ButtonGap + manageWidth;
+        int startX     = __instance.xPositionOnScreen + (__instance.width - totalWidth) / 2;
 
         _hireButton = new ClickableComponent(
-            bounds: new Rectangle(
-                __instance.xPositionOnScreen + __instance.width / 2 - buttonWidth / 2,
-                __instance.yPositionOnScreen + 16,
-                buttonWidth,
-                buttonHeight),
+            bounds: new Rectangle(startX, topY, hireWidth, ButtonHeight),
             name: "DaysworkHire",
-            label: label)
+            label: hireLabel)
         {
             myID            = 999,
+            rightNeighborID = 998,
             upNeighborID    = -1,
             downNeighborID  = -1,
             leftNeighborID  = -1,
+        };
+
+        _manageButton = new ClickableComponent(
+            bounds: new Rectangle(startX + hireWidth + ButtonGap, topY, manageWidth, ButtonHeight),
+            name: "DaysworkManage",
+            label: manageLabel)
+        {
+            myID            = 998,
+            leftNeighborID  = 999,
+            upNeighborID    = -1,
+            downNeighborID  = -1,
             rightNeighborID = -1,
         };
 
-        // Register in the snap graph and snap the cursor here immediately so the
-        // player can press A without having to D-pad to the button first.
         __instance.allClickableComponents ??= new System.Collections.Generic.List<ClickableComponent>();
         __instance.allClickableComponents.Add(_hireButton);
+        __instance.allClickableComponents.Add(_manageButton);
         __instance.currentlySnappedComponent = _hireButton;
         __instance.snapCursorToCurrentSnappedComponent();
     }
@@ -77,23 +95,31 @@ internal static class BulletinBoardPatch
         if (MultiplayerGuard.IsMultiplayer()) return;
         if (_hireButton is null) return;
 
+        DrawBulletinButton(b, _hireButton);
+
+        if (_manageButton is not null)
+            DrawBulletinButton(b, _manageButton);
+
+        // Redraw cursor so it sits above our button content.
+        __instance.drawMouse(b);
+    }
+
+    private static void DrawBulletinButton(SpriteBatch b, ClickableComponent btn)
+    {
         IClickableMenu.drawTextureBox(
             b,
-            _hireButton.bounds.X,
-            _hireButton.bounds.Y,
-            _hireButton.bounds.Width,
-            _hireButton.bounds.Height,
+            btn.bounds.X,
+            btn.bounds.Y,
+            btn.bounds.Width,
+            btn.bounds.Height,
             Color.White);
 
         Utility.drawTextWithShadow(
             b,
-            _hireButton.label,
+            btn.label,
             Game1.smallFont,
-            new Vector2(_hireButton.bounds.X + 16, _hireButton.bounds.Y + 16),
+            new Vector2(btn.bounds.X + 16, btn.bounds.Y + 16),
             Game1.textColor);
-
-        // Redraw cursor so it sits above our button content.
-        __instance.drawMouse(b);
     }
 
     // ── ReceiveLeftClick postfix ─────────────────────────────────────────────
@@ -112,9 +138,15 @@ internal static class BulletinBoardPatch
             return;
         }
 
-        if (_hireButton is null) return;
-        if (!_hireButton.bounds.Contains(x, y)) return;
+        if (_hireButton is not null && _hireButton.bounds.Contains(x, y))
+        {
+            ModEntry.Coordinator.OpenHiringFlow();
+            return;
+        }
 
-        ModEntry.Coordinator.OpenHiringFlow();
+        if (_manageButton is not null && _manageButton.bounds.Contains(x, y))
+        {
+            ModEntry.Coordinator.OpenManageFlow();
+        }
     }
 }

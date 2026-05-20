@@ -25,19 +25,20 @@ internal sealed class RecurringContractScheduler
             return;
 
         var today = CurrentGameDate();
+        var contractsForToday = _store.ListActiveForDate(today.Day, today.Season, today.Year);
 
-        // Stub: one-time contracts only. Recurring lifecycle deferred to U-15.
-        var toFire = _store
-            .ListActiveForDate(today.Day, today.Season, today.Year)
-            .Where(c => c.Schedule == ContractSchedule.OneTime)
-            .ToList();
-
-        foreach (var contract in toFire)
+        // One-time: mark Executed before spawning so a reload on the same day cannot re-fire.
+        foreach (var contract in contractsForToday.Where(c => c.Schedule == ContractSchedule.OneTime))
         {
-            // Write-before-spawn deduplication guard (SAFE-U10-03).
-            // Status is set to Executed BEFORE spawning so a reload on the same day
-            // will not re-fire the contract.
             _store.Update(contract.Id, contract with { Status = ContractStatus.Executed });
+            _orchestrator.StartShift(contract);
+        }
+
+        // Recurring: fire shift but do NOT mark Executed — the contract remains Active
+        // so it fires again tomorrow. Full recurring lifecycle (daily deposit deduction,
+        // festival skip, can't-afford mail) ships in U-15.
+        foreach (var contract in contractsForToday.Where(c => c.Schedule == ContractSchedule.Recurring))
+        {
             _orchestrator.StartShift(contract);
         }
     }

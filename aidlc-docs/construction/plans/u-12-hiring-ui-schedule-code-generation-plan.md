@@ -97,7 +97,7 @@ internal ScheduleMenu(
     Action<ContractDraft> onBack)
 ```
 
-- [ ] Mark Step 1 complete in this plan [x]
+- [x] Mark Step 1 complete in this plan [x]
 
 ---
 
@@ -167,7 +167,7 @@ internal ScheduleMenu(
       CloseFlow();
   }
   ```
-- [ ] Mark Step 2 complete in this plan [x]
+- [x] Mark Step 2 complete in this plan [x]
 
 ---
 
@@ -189,7 +189,7 @@ internal ScheduleMenu(
       return;
   }
   ```
-- [ ] Mark Step 3 complete in this plan [x]
+- [x] Mark Step 3 complete in this plan [x]
 
 ---
 
@@ -200,7 +200,7 @@ internal ScheduleMenu(
 - [ ] Modify `Dayswork/ModEntry.cs`:
   - Add static property: `internal static ShiftOrchestrator Orchestrator { get; private set; } = null!;`
   - In `Entry()`, after `var orchestrator = new ShiftOrchestrator(toolReader);`, add: `Orchestrator = orchestrator;`
-- [ ] Mark Step 4 complete in this plan [x]
+- [x] Mark Step 4 complete in this plan [x]
 
 ---
 
@@ -249,7 +249,7 @@ Constructor signature:
 internal ContractListMenu(IContractStore store, IModHelper helper)
 ```
 
-- [ ] Mark Step 5 complete in this plan [x]
+- [x] Mark Step 5 complete in this plan [x]
 
 ---
 
@@ -278,7 +278,7 @@ internal ContractListMenu(IContractStore store, IModHelper helper)
   "ui.contract_list.schedule_one_time": "One-time",
   "ui.contract_list.schedule_recurring": "Recurring"
   ```
-- [ ] Mark Step 6 complete in this plan [x]
+- [x] Mark Step 6 complete in this plan [x]
 
 ---
 
@@ -306,7 +306,7 @@ public Property PauseResume_IsRoundTrip()
 
 Note: The existing `ContractStoreTests` (unit tests) already cover all Pause/Resume/Cancel state transitions with explicit xUnit facts. This FsCheck property adds confidence that the behavior holds for the full space of generated `Contract` instances.
 
-- [ ] Mark Step 7 complete in this plan [x]
+- [x] Mark Step 7 complete in this plan [x]
 
 ---
 
@@ -314,14 +314,14 @@ Note: The existing `ContractStoreTests` (unit tests) already cover all Pause/Res
 - [ ] Run `dotnet build` from workspace root
 - [ ] Fix any compilation errors
 - [ ] Confirm 0 errors, 0 warnings
-- [ ] Mark Step 8 complete in this plan [x]
+- [x] Mark Step 8 complete in this plan [x]
 
 ---
 
 ### Step 9: Code summary + state update
 - [ ] Create `aidlc-docs/construction/u-12-hiring-ui-schedule/code/code-summary.md`
 - [ ] Update `aidlc-docs/aidlc-state.md`: Current Stage → "U-12 — Code Generation complete, awaiting approval"
-- [ ] Mark Step 9 complete in this plan [x]
+- [x] Mark Step 9 complete in this plan [x]
 
 ---
 

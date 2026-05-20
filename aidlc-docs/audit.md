@@ -1,5 +1,49 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-12 Play-test — Bugs and TODOs
+**Timestamp**: 2026-05-20T20:00:00Z
+**User Input**: (screenshot + bug list)
+**AI Response**: Fixing 4 bugs immediately; logging 3 items as TODOs for future units.
+  Fix now: (1) Task list text overflows menu — needs word-wrap + clamped width; (2) Manage Contracts button should be beside Hire button, not below; (3) Pause/Cancel/Edit buttons overlap task text — row layout needs text/button separation; (4) Recurring contracts broken — farmhand never shows up (investigating scheduler).
+  TODOs: (A) Do not water dead crops + option to clear dead crops; (B) Zoom out in zone selection screen; (C) Multiple-contract priority rules (recurring + one-time conflict).
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, play-test
+
+---
+
+## U-12 Second Play-test — Button size + behavioral questions
+**Timestamp**: 2026-05-20T21:00:00Z
+**User Input**: "Make the pause/cancel/edit buttons bigger so the text doesn't overlap with the edge of the button. The farmhand does not go inside of the greenhouse. I have selected it and tasked it to water plants, but they are not watered. The farmhand does not go inside of the coop or barn (animal products still on ground). The farmhand does not pet animals that are outside or inside. I am not sure if the farmhand should be doing those things already, or if that's planned for later."
+**AI Response**: Investigated ShiftOrchestrator. Building traversal: BuildWorkList does detect indoor tiles (building pre-pass, line 422) but navigation always runs against the outdoor Farm map — indoor coordinates fail pathfinding and are skipped as unreachable. FeedAnimals/PetAnimals/CollectAnimalProducts have no InvokeTaskAction cases and no DetectTask detection. All are future scope (likely U-13 or new unit for buildings/animals). Button fix: increased BtnWidth from 90→112 (text + 32px box border padding) and BtnHeight from 40→48. Build: 0 errors.
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, play-test round 2
+
+---
+
+## U-12 Post-Play-test Bug Fixes — Build Verification
+**Timestamp**: 2026-05-20T20:30:00Z
+**User Input**: (session resumed after context compaction)
+**AI Response**: Ran `dotnet build`. Initial result: 5 errors in ContractListMenu.cs — (1-3) `ClickableComponent` is a plain class, not a C# record, so `with { }` expressions are invalid; replaced with explicit `new ClickableComponent(...)` calls copying all neighbor IDs. (4) `RowHeight` name does not exist in DrawRow() context; replaced with `row.RowY`. (5) `row.TaskSummary` renamed to `row.WrappedTaskText` in the updated ContractRow record. After fixes: `dotnet build` succeeded — 0 errors, 0 warnings. TODOs 02, 03, 04 added to aidlc-state.md.
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, bug fix build pass
+
+---
+
+---
+
+## U-12 Code Generation — Complete
+**Timestamp**: 2026-05-20T19:30:00Z
+**User Input**: (none — all 9 steps executed)
+**AI Response**: All 9 plan steps complete. Build: 0 errors, 0 warnings. Mod auto-deployed to Mods/Dayswork/. Code summary created at `aidlc-docs/construction/u-12-hiring-ui-schedule/code/code-summary.md`. Created: ScheduleMenu.cs (Screen 3: one-time/recurring toggle cards), ContractListMenu.cs (Pause/Resume/Cancel/Edit with cancel guard), ContractStoreStateTests.cs (5 FsCheck PBT-03 properties). Modified: ContractDraft.cs (EditingId), HiringFlowCoordinator.cs (inserted ScheduleMenu, OpenEditFlow, OpenManageFlow, edit-vs-add ConfirmContract), BulletinBoardPatch.cs (Manage Contracts button), ShiftOrchestrator.cs (ActiveContractId property), ModEntry.cs (Orchestrator static), i18n/default.json (19 new keys). Hiring flow now 4 screens: TaskSelection → ZoneAndChest → Schedule → Summary.
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, Code Generation complete
+
+---
+
+## U-12 Code Generation — Part 2 Executing
+**Timestamp**: 2026-05-20T19:05:00Z
+**User Input**: "approve and generate"
+**AI Response**: Plan approved. Executing all 9 steps.
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, Code Generation Part 2
+
+---
+
 ## U-12 Code Generation — Part 1 Plan Created, Awaiting Approval
 **Timestamp**: 2026-05-20T19:00:00Z
 **User Input**: (none — planning step)

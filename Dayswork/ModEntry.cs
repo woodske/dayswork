@@ -19,6 +19,7 @@ public sealed class ModEntry : Mod
     // invoke coordinator methods without constructor injection.
     internal static IMonitor ModMonitor { get; private set; } = null!;
     internal static HiringFlowCoordinator Coordinator { get; private set; } = null!;
+    internal static ShiftOrchestrator Orchestrator { get; private set; } = null!;
 
     public override void Entry(IModHelper helper)
     {
@@ -41,6 +42,7 @@ public sealed class ModEntry : Mod
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
         var orchestrator    = new ShiftOrchestrator(toolReader);
+        Orchestrator = orchestrator;
         var scheduler       = new RecurringContractScheduler(store, orchestrator);
 
         // ── Event registrations ──────────────────────────────────────────────

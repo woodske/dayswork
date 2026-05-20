@@ -33,6 +33,10 @@ internal sealed class ShiftOrchestrator
 
     // ── Public API ───────────────────────────────────────────────────────────
 
+    // Non-null while a shift is running; null between shifts.
+    // Used by ContractListMenu to guard Cancel during an active shift (FR-HIRE-15).
+    public ContractId? ActiveContractId => _ctx?.ContractId;
+
     public void StartShift(Contract contract)
     {
         if (_ctx is not null)

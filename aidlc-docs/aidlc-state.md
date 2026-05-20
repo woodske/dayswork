@@ -6,10 +6,13 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-12 Hiring UI: Schedule + Edit/Pause/Cancel — **Code Generation Part 1 (plan) complete, awaiting approval**
+- **Current Stage**: U-12 Hiring UI: Schedule + Edit/Pause/Cancel — **Code Generation complete, awaiting approval**
 
 ## Open TODOs
 - **TODO-01** [U-11 / tree drops]: Tree seeds were not observed in the shipping bin after felling trees. Suspected cause: the worker teleports between work tiles so fast that seeds spawned as debris may land after the farmhand has already moved on. Accepted for now. **Revisit after U-13 (Worker AI) slows the worker down to a realistic pace — confirm seeds appear then. If still missing, investigate CollectNewDebris snapshot timing.**
+- **TODO-02** [U-12 / dead crops]: Do not water dead crops; add optional task to clear dead crops. Defer to a future unit — requires distinguishing live vs. dead crop tiles and a new TaskKind (ClearDeadCrops).
+- **TODO-03** [U-12 / zone zoom]: Add zoom-out capability in the zone selection screen so players can see the full farm when selecting harvest/work zones. Defer to a future unit — requires viewport camera manipulation or a minimap overlay approach.
+- **TODO-04** [U-15 / multiple contracts]: Define priority rules for concurrent contracts (e.g., recurring + one-time conflict, multiple recurring contracts targeting the same tasks). Scheduled for U-15 (Recurring Contract Lifecycle) which already covers deposit deduction, festival skip, and can't-afford mail. Add priority/conflict resolution to that unit's scope.
 
 ## Workspace State
 - **Existing Code**: No

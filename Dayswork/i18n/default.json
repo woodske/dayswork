@@ -51,5 +51,27 @@
     "ui.zone_chest.draw_mode_hint": "Click and drag on the farm to draw a zone",
     "ui.zone_chest.building_select_hint": "Click a building to include it",
     "ui.zone_chest.session_hint": "Drag to draw a work zone     Click a building to include it",
-    "ui.zone_chest.scroll_hint": "Move the cursor to a screen edge to scroll the farm"
+    "ui.zone_chest.scroll_hint": "Move the cursor to a screen edge to scroll the farm",
+
+    "bulletin.manage_contracts": "Manage Contracts",
+
+    "ui.schedule.title": "Schedule",
+    "ui.schedule.one_time": "One-Time",
+    "ui.schedule.one_time_description": "Worker comes once, tomorrow morning",
+    "ui.schedule.recurring": "Recurring",
+    "ui.schedule.recurring_description": "Worker comes each morning automatically",
+    "ui.schedule.confirm_btn": "Next",
+    "ui.schedule.back_btn": "Back",
+
+    "ui.contract_list.title": "Active Contracts",
+    "ui.contract_list.no_contracts": "No active contracts",
+    "ui.contract_list.pause": "Pause",
+    "ui.contract_list.resume": "Resume",
+    "ui.contract_list.cancel": "Cancel",
+    "ui.contract_list.edit": "Edit",
+    "ui.contract_list.paused_label": "(Paused)",
+    "ui.contract_list.active_label": "(Active)",
+    "ui.contract_list.cancel_blocked": "Cannot cancel — shift already started",
+    "ui.contract_list.schedule_one_time": "One-time",
+    "ui.contract_list.schedule_recurring": "Recurring"
 }
