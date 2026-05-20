@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-11 NFR Design — Complete, Awaiting Approval
+**Timestamp**: 2026-05-20T00:20:00Z
+**User Input**: (none — all patterns fully determined from NFR requirements; no questions needed)
+**AI Response**: Generated nfr-design-patterns.md (6 patterns: Pre-Compute on State Change, Rectangle-Fill Overlay, Modal Draw Mode, Event Subscription Lifecycle, Constructor Injection, Gamepad Virtual Cursor Passthrough; resilience/scalability/security assessments) and logical-components.md (5 components: ZoneAndChestMenu, ZoneDrawOverlay, ChestResolver [new], HiringFlowCoordinator [extended], ModEntry [extended]; ASCII data-flow diagram; PBT compliance summary). Awaiting approval.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, NFR Design complete — awaiting approval
+
+---
+
+## U-11 NFR Design — Starting
+**Timestamp**: 2026-05-20T00:15:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Advancing to NFR Design for U-11.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, NFR Requirements approved → NFR Design
+
+---
+
 ## U-11 NFR Requirements — Complete, Awaiting Approval
 **Timestamp**: 2026-05-20T00:10:00Z
 **User Input**: "continue ai-dlc workflow"
