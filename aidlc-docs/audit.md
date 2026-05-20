@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-10 NFR Design — Complete
+**Timestamp**: 2026-05-19T14:00:00Z
+**User Input**: (none — all patterns fully determined from NFR requirements; no questions needed)
+**AI Response**: Generated nfr-design-patterns.md (6 patterns: Throttled-Tick, Once-Per-Shift Scan, Invoke-and-Poll, Skip-and-Continue, Deduplication Guard, Core-Purity Guard; resilience/scalability/security assessments) and logical-components.md (7 components with full responsibility map, ASCII data-flow diagrams for shift-start and shift-end, PBT compliance summary). Awaiting approval.
+**Context**: CONSTRUCTION — U-10 Minimum Worker Shift, NFR Design complete — awaiting approval
+
+---
+
+## U-10 NFR Requirements — Approved
+**Timestamp**: 2026-05-19T13:50:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Advancing to NFR Design for U-10.
+**Context**: CONSTRUCTION — U-10 Minimum Worker Shift, NFR Requirements approved → NFR Design
+
+---
+
 ## U-10 NFR Requirements — Complete
 **Timestamp**: 2026-05-19T13:45:00Z
 **User Input**: "B, B" (N1: every 4 ticks; N2: invoke + poll for object removal)
