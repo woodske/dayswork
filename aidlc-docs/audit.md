@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13 NFR Requirements — Complete
+**Timestamp**: 2026-05-20T23:35:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements generated directly (no blocking user questions — all NFRs determinable from the approved design + prior decisions, consistent with U-07/U-10). Applicable NFRs: PERF-01/02 (retained throttle + once-per-shift scan, now incl. capability classification; per-frame single Farmer draw bounded), SAFE-01/02/03/04 (no items lost on stuck early-end, integer refund, Farmer never serialized, only self-caused drops), reliability (bounded stuck escalation, reachable-teleport validation, classifier never throws), MAINT-03 (StuckDetector + extended state machine pure Core), UX-02 (no new i18n strings this unit). PBT (Partial mode, blocking): PBT-03 — 6 properties across extended ShiftStateMachine (terminal/legal-transition/Stuck-Recovering reachability) + StuckDetector (progress-reset/threshold-monotonicity/Reset); PBT-08 seed logging. PBT-02/07 N/A. Tech decisions: no new frameworks; Farmer+FarmerRenderer+FarmerSprite.animateOnce for visuals; reuse game pathfinding + manual Farmer movement (replaces PathFindControllerAdapter); worker draw/update integration (manual render hook vs location.characters) DEFERRED to NFR Design with manual-hook recommended; appearance randomized from character-creation ranges. Generated nfr-requirements.md + tech-stack-decisions.md and the nfr-requirements-plan. Awaiting approval to proceed to NFR Design.
+**Context**: CONSTRUCTION — U-13 Worker Features, NFR Requirements complete, awaiting approval
+
+---
+
+## U-13 Functional Design — Approved
+**Timestamp**: 2026-05-20T23:20:00Z
+**User Input**: "continue"
+**AI Response**: Functional Design approved. Marking stage complete; proceeding to NFR Requirements for U-13.
+**Context**: CONSTRUCTION — U-13 Worker Features, Functional Design → NFR Requirements
+
+---
+
 ## U-13 Functional Design — Complete (Full Farmer committed)
 **Timestamp**: 2026-05-20T23:10:00Z
 **User Input**: "let's do B and commit to the full farmer now since that would have been best from the beginning..." / "I'm thinking about future features... energy bar, giving the farmhand their own tools and food, maybe adding some dialogue. Would things like that be easier... if it was a Farmer rather than an NPC?" / "yes, let's go with B and fix it now"
