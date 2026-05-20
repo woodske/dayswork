@@ -281,29 +281,30 @@ internal sealed class ShiftOrchestrator
         if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not HoeDirt dirt || dirt.crop is null)
             return;
 
+        var before = new HashSet<Debris>(loc.debris);
         dirt.crop.harvest(tile.X, tile.Y, dirt, null);
-        CollectDebrisAt(tile, loc);
+        CollectNewDebris(before, loc);
     }
 
     private void InvokeCollectFruit(TileCoord tile, GameLocation loc)
     {
         var tileVec = new Vector2(tile.X, tile.Y);
         if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not FruitTree tree) return;
+        var before = new HashSet<Debris>(loc.debris);
         tree.shake(tileVec, false);
-        CollectDebrisAt(tile, loc);
+        CollectNewDebris(before, loc);
     }
 
     private void InvokeClearWeed(TileCoord tile, GameLocation loc)
     {
         var tileVec = new Vector2(tile.X, tile.Y);
         if (!loc.objects.TryGetValue(tileVec, out var obj) || !obj.IsWeeds()) return;
-        // performToolAction signals success but doesn't remove the object — the caller
-        // (normally Pickaxe/Scythe DoFunction) does the removal. We do it explicitly.
+        var before = new HashSet<Debris>(loc.debris);
         var scythe = new MeleeWeapon("66") { lastUser = Game1.player };
         obj.performToolAction(scythe);
         if (loc.objects.ContainsKey(tileVec))
             loc.removeObject(tileVec, false);
-        CollectDebrisAt(tile, loc);
+        CollectNewDebris(before, loc);
     }
 
     private void InvokeClearGrass(TileCoord tile, GameLocation loc)
@@ -321,11 +322,14 @@ internal sealed class ShiftOrchestrator
     {
         var tileVec = new Vector2(tile.X, tile.Y);
         if (!loc.objects.TryGetValue(tileVec, out var obj)) return;
+        var before  = new HashSet<Debris>(loc.debris);
         var pickaxe = new Pickaxe { UpgradeLevel = (int)_ctx!.ToolSnapshot.PickaxeLevel, lastUser = Game1.player };
-        obj.performToolAction(pickaxe);
+        if (!obj.performToolAction(pickaxe)) return;
         if (loc.objects.ContainsKey(tileVec))
             loc.removeObject(tileVec, false);
-        CollectDebrisAt(tile, loc);
+        // Fallback for when performToolAction can't create debris (obj.Location unset).
+        if (!CollectNewDebris(before, loc))
+            _ctx!.Buffer.Add("(O)390", 1);
     }
 
     private void InvokeCutTree(TileCoord tile, GameLocation loc)
@@ -336,43 +340,42 @@ internal sealed class ShiftOrchestrator
         // Standing tree (terrain feature).
         if (loc.terrainFeatures.TryGetValue(tileVec, out var tf) && tf is Tree tree)
         {
+            bool isMahogany = tree.treeType.Value == Tree.mahoganyTree;
+            var  before     = new HashSet<Debris>(loc.debris);
             tree.performToolAction(axe, 0, tileVec);
             if (loc.terrainFeatures.ContainsKey(tileVec))
                 loc.terrainFeatures.Remove(tileVec);
-            CollectDebrisAt(tile, loc);
+            // Snapshot diff captures all drops SV creates (wood, sap, seeds, mystery boxes, etc.)
+            // regardless of scatter distance. Fallback only fires when the backref is unset.
+            if (!CollectNewDebris(before, loc))
+                _ctx!.Buffer.Add(isMahogany ? "(O)709" : "(O)388", 8);
             return;
         }
 
         // Twig/branch log lying on the ground — same axe action, stored in objects not terrainFeatures.
         if (loc.objects.TryGetValue(tileVec, out var obj) && obj.Name == "Twig")
         {
+            var before = new HashSet<Debris>(loc.debris);
             obj.performToolAction(axe);
             if (loc.objects.ContainsKey(tileVec))
                 loc.removeObject(tileVec, false);
-            CollectDebrisAt(tile, loc);
+            CollectNewDebris(before, loc);
         }
     }
 
-    // Collect any debris items that appeared near the tile and move them to buffer.
-    private void CollectDebrisAt(TileCoord tile, GameLocation loc)
+    // Collect all debris items added to loc.debris since `before` was captured.
+    // Returns true if at least one item was collected.
+    private bool CollectNewDebris(HashSet<Debris> before, GameLocation loc)
     {
-        var tileCenter = new Vector2(tile.X * 64f + 32f, tile.Y * 64f + 32f);
-        var toRemove = new List<Debris>();
-        foreach (var debris in loc.debris)
+        bool collected = false;
+        foreach (var d in loc.debris.ToList())
         {
-            if (debris.Chunks.Count == 0) continue;
-            var chunk = debris.Chunks[0];
-            var dist  = Vector2.Distance(chunk.position.Value, tileCenter);
-            if (dist > 128f) continue; // only collect nearby drops
-
-            if (debris.item is not null)
-            {
-                _ctx!.Buffer.Add(debris.item.ItemId, debris.item.Stack);
-                toRemove.Add(debris);
-            }
-        }
-        foreach (var d in toRemove)
+            if (before.Contains(d) || d.item is null) continue;
+            _ctx!.Buffer.Add(d.item.ItemId, d.item.Stack);
             loc.debris.Remove(d);
+            collected = true;
+        }
+        return collected;
     }
 
     // ── Completion detection ──────────────────────────────────────────────────

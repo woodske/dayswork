@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-11 Full Hiring UI: Zones & Chests — starting
+- **Current Stage**: U-11 Full Hiring UI: Zones & Chests — Zone-draw bug fixed (Robin UX), awaiting play-test
 
 ## Workspace State
 - **Existing Code**: No

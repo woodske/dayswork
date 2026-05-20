@@ -1,5 +1,37 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-11 Zone-Draw UX Fix v2 — Camera Pan (no warp) — Complete
+**Timestamp**: 2026-05-20T13:00:00Z
+**User Input**: "you've teleported the player to the farm, but when we go to draw the zones, I cannot move the screen around the farm. Is there anything preventing us from doing it exactly like how Robin's buildings are placed? Where the player is not teleported and we can scroll across the map?"
+**AI Response**: Replaced the warp approach with the true CarpenterMenu pattern: NO warp. ZoneDrawMenu now swaps Game1.currentLocation to the farm, sets Game1.viewportFreeze = true and Game1.displayHUD = false, centers the viewport, and pans the camera each frame in update() (mouse screen-edge bands + gamepad right-stick, suppressed over corner buttons). Restores currentLocation/viewportFreeze/displayHUD in cleanupBeforeExit. readyToClose() => false so exit only via Done/Cancel. Modeless drawing: drag = zone, single-click on a building = toggle. CursorTile() uses getMouseX(false)+viewport (UI-scale-robust). HiringFlowCoordinator.BeginZoneDraw now opens ZoneDrawMenu directly (removed all Player.Warped session machinery). Added i18n keys session_hint, scroll_hint. Build: 0 errors, 0 warnings.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, play-test bug fix v2
+
+---
+
+## U-11 Zone-Draw Bug Fix — Complete (superseded by v2 above)
+**Timestamp**: 2026-05-20T12:00:00Z
+**User Input**: "draw zone doesn't take me to my farm" → "I want it to be like when you buy a farm building from Robin. The screen goes to your farm and lets you place the building on the farm, even though you are at Robin's house."
+**AI Response**: First attempt warped the player to the farm via Player.Warped, then opened ZoneDrawMenu. User reported the camera could not be scrolled — superseded by the camera-pan approach above.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, play-test bug fix
+
+---
+
+## U-11 Code Generation — Complete
+**Timestamp**: 2026-05-20T00:55:00Z
+**User Input**: (none — all 9 steps executed)
+**AI Response**: All 9 plan steps complete. Build: 0 errors, 0 warnings. Mod auto-deployed to Mods/Dayswork/. Code summary created at `aidlc-docs/construction/u-11-full-hiring-ui/code/code-summary.md`. Created: ChestEntry.cs (UI DTOs), ChestResolver.cs (M-20), ZoneDrawOverlay.cs (M-08), ZoneAndChestMenu.cs (M-05). Modified: HiringFlowCoordinator.cs (inserted ShowZoneAndChest, fixed back-nav from Summary), ModEntry.cs (wired ChestResolver singleton), i18n/default.json (19 new keys). Flow: TaskSelection → ZoneAndChest → Summary. No build errors on first attempt.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, Code Generation Stage Complete
+
+---
+
+## U-11 Code Generation — Part 2 Executing
+**Timestamp**: 2026-05-20T00:40:00Z
+**User Input**: "approve and generate"
+**AI Response**: Plan approved. Executing all 9 steps.
+**Context**: CONSTRUCTION — U-11 Full Hiring UI, Code Generation Part 2
+
+---
+
 ## U-11 Code Generation — Part 1 Plan Created, Awaiting Approval
 **Timestamp**: 2026-05-20T00:35:00Z
 **User Input**: (none — planning step)

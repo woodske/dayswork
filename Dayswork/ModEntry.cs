@@ -35,7 +35,8 @@ public sealed class ModEntry : Mod
         var serializer  = new SaveDataSerializer(logWarning);
 
         // ── Mod singletons ───────────────────────────────────────────────────
-        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, hoursEst, config, store);
+        var chestResolver = new ChestResolver(Helper);
+        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, hoursEst, config, store, chestResolver, Helper);
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();

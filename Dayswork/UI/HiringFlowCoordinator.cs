@@ -11,29 +11,34 @@ namespace Dayswork.UI;
 
 internal sealed class HiringFlowCoordinator
 {
-    // Whole-farm default used when no zones have been drawn (U-09 thin slice).
-    // Replaced by actual drawn zones in U-11.
+    // Whole-farm fallback used by BuildContract when no zones have been drawn.
     private static readonly Zone WholeFarmZone =
         new("Farm", new TileCoord(0, 0), new TileCoord(79, 63));
 
-    private readonly IRateCalculator _rateCalc;
+    private readonly IRateCalculator    _rateCalc;
     private readonly IDepositCalculator _depositCalc;
-    private readonly IHoursEstimator _hoursEst;
-    private readonly IConfigSnapshot _config;
-    private readonly IContractStore _contractStore;
+    private readonly IHoursEstimator    _hoursEst;
+    private readonly IConfigSnapshot    _config;
+    private readonly IContractStore     _contractStore;
+    private readonly ChestResolver      _chestResolver;
+    private readonly IModHelper         _helper;
 
     public HiringFlowCoordinator(
-        IRateCalculator rateCalc,
+        IRateCalculator    rateCalc,
         IDepositCalculator depositCalc,
-        IHoursEstimator hoursEst,
-        IConfigSnapshot config,
-        IContractStore contractStore)
+        IHoursEstimator    hoursEst,
+        IConfigSnapshot    config,
+        IContractStore     contractStore,
+        ChestResolver      chestResolver,
+        IModHelper         helper)
     {
-        _rateCalc     = rateCalc;
-        _depositCalc  = depositCalc;
-        _hoursEst     = hoursEst;
-        _config       = config;
+        _rateCalc      = rateCalc;
+        _depositCalc   = depositCalc;
+        _hoursEst      = hoursEst;
+        _config        = config;
         _contractStore = contractStore;
+        _chestResolver = chestResolver;
+        _helper        = helper;
     }
 
     public void OpenHiringFlow()
@@ -52,16 +57,51 @@ internal sealed class HiringFlowCoordinator
     {
         Game1.activeClickableMenu = new TaskSelectionMenu(
             draft, _rateCalc, _config,
-            onAdvance: d => ShowSummary(d),
+            onAdvance: d => ShowZoneAndChest(d),
             onCancel:  CloseFlow);
     }
+
+    private void ShowZoneAndChest(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new ZoneAndChestMenu(
+            draft, _chestResolver,
+            onAdvance:       d => ShowSummary(d),
+            onBack:          d => ShowTaskSelection(d),
+            onBeginZoneDraw: d => BeginZoneDraw(d));
+    }
+
+    // ── Zone-draw session (Robin building-placement UX) ──────────────────────
+
+    // Called when the player clicks "Draw Zone" / "Select Building" in ZoneAndChestMenu.
+    // Opens ZoneDrawMenu, which swaps the displayed location to the farm (no warp).
+    private void BeginZoneDraw(ContractDraft draft)
+    {
+        var buildingOutlines = _chestResolver.GetBuildingOutlines(Game1.getFarm());
+
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            draft,
+            buildingOutlines,
+            _helper,
+            onComplete: (zones, buildings) =>
+            {
+                draft.Zones.Clear();
+                draft.Zones.AddRange(zones);
+                foreach (var b in buildings)
+                    draft.Zones.Add(new Zone(b.LocationName,
+                        new TileCoord(0, 0), new TileCoord(999, 999)));
+                ShowZoneAndChest(draft);
+            },
+            onCancel: () => ShowZoneAndChest(draft));
+    }
+
+    // ── Summary / confirm ────────────────────────────────────────────────────
 
     private void ShowSummary(ContractDraft draft)
     {
         Game1.activeClickableMenu = new SummaryMenu(
             draft, _hoursEst, _depositCalc, _config, WholeFarmZone,
             onConfirm: (d, deposit, rate) => ConfirmContract(d, deposit, rate),
-            onBack:    d => ShowTaskSelection(d));
+            onBack:    d => ShowZoneAndChest(d));
     }
 
     private void ConfirmContract(ContractDraft draft, int deposit, int rate)
@@ -93,17 +133,17 @@ internal sealed class HiringFlowCoordinator
                 : new Dictionary<TaskKind, DestinationKey>();
 
         return new Contract(
-            Id:             ContractId.New(),
-            EnabledTasks:   draft.EnabledTasks.ToHashSet(),
-            Zones:          zones,
+            Id:               ContractId.New(),
+            EnabledTasks:     draft.EnabledTasks.ToHashSet(),
+            Zones:            zones,
             TaskDestinations: destinations,
-            Schedule:       draft.Schedule,
-            Status:         ContractStatus.Active,
-            HireDate:       new GameDate(
-                                Game1.Date.DayOfMonth,
-                                Enum.Parse<Dayswork.Core.Domain.Season>(Game1.currentSeason, ignoreCase: true),
-                                Game1.year),
-            DepositAmount:  deposit,
-            HourlyRate:     rate);
+            Schedule:         draft.Schedule,
+            Status:           ContractStatus.Active,
+            HireDate:         new GameDate(
+                                  Game1.Date.DayOfMonth,
+                                  Enum.Parse<Dayswork.Core.Domain.Season>(Game1.currentSeason, ignoreCase: true),
+                                  Game1.year),
+            DepositAmount:    deposit,
+            HourlyRate:       rate);
     }
 }

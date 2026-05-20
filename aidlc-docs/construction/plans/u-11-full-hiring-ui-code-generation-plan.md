@@ -50,7 +50,7 @@ Called automatically by SMAPI when `Game1.activeClickableMenu` is replaced. The 
 ## Steps
 
 ### Step 1 — UI DTOs: ChestEntry + BuildingOutline records
-- [ ] Create `Dayswork/UI/ChestEntry.cs`
+- [x] Create `Dayswork/UI/ChestEntry.cs`
 
 ```csharp
 using Dayswork.Core.Domain;
@@ -69,7 +69,7 @@ internal sealed record BuildingOutline(string LocationName, Rectangle TileBounds
 ---
 
 ### Step 2 — M-20: ChestResolver
-- [ ] Create `Dayswork/Integration/ChestResolver.cs`
+- [x] Create `Dayswork/Integration/ChestResolver.cs`
 
 Key implementation notes:
 - Constructor takes `IModHelper helper` (stored for future use; current methods are stateless queries against live `Game1` state).
@@ -83,7 +83,7 @@ Usings: `Dayswork.Core.Domain`, `Dayswork.UI`, `Microsoft.Xna.Framework`, `Stard
 ---
 
 ### Step 3 — M-08: ZoneDrawOverlay
-- [ ] Create `Dayswork/UI/ZoneDrawOverlay.cs`
+- [x] Create `Dayswork/UI/ZoneDrawOverlay.cs`
 
 Key implementation notes:
 - Constructor: `ZoneDrawOverlay(ZoneAndChestMenu menu, GraphicsDevice graphicsDevice)`. Creates a 1×1 white `Texture2D _pixelTexture` with `SetData(new[] { Color.White })`.
@@ -99,7 +99,7 @@ Usings: `Dayswork.Core.Domain`, `Microsoft.Xna.Framework`, `Microsoft.Xna.Framew
 ---
 
 ### Step 4 — M-05: ZoneAndChestMenu
-- [ ] Create `Dayswork/UI/ZoneAndChestMenu.cs`
+- [x] Create `Dayswork/UI/ZoneAndChestMenu.cs`
 
 This is the main new file. Key structure:
 
@@ -220,7 +220,7 @@ private static TileCoord ScreenToTile(int x, int y) =>
 ---
 
 ### Step 5 — Extend M-03: HiringFlowCoordinator
-- [ ] Modify `Dayswork/UI/HiringFlowCoordinator.cs`
+- [x] Modify `Dayswork/UI/HiringFlowCoordinator.cs`
 
 Changes:
 1. Add `private readonly ChestResolver _chestResolver;` field.
@@ -244,7 +244,7 @@ private void ShowZoneAndChest(ContractDraft draft)
 ---
 
 ### Step 6 — Extend M-01: ModEntry
-- [ ] Modify `Dayswork/ModEntry.cs`
+- [x] Modify `Dayswork/ModEntry.cs`
 
 Changes:
 1. Add `var chestResolver = new ChestResolver(Helper);` after the `store` / `serializer` lines.
@@ -254,7 +254,7 @@ Changes:
 ---
 
 ### Step 7 — i18n keys
-- [ ] Modify `Dayswork/i18n/default.json`
+- [x] Modify `Dayswork/i18n/default.json`
 
 Add after the `ui.error.cant_afford` entry:
 ```json
@@ -282,8 +282,8 @@ Add after the `ui.error.cant_afford` entry:
 ---
 
 ### Step 8 — dotnet build + fix errors
-- [ ] Run `dotnet build` from `C:\Users\kwood\Repos\dayswork`
-- [ ] Fix all errors (common expected issues listed below); re-run until 0 errors 0 warnings
+- [x] Run `dotnet build` from `C:\Users\kwood\Repos\dayswork`
+- [x] Fix all errors (common expected issues listed below); re-run until 0 errors 0 warnings
 
 **Common expected build issues**:
 - `ChestResolver` namespace/using missing in HiringFlowCoordinator → add `using Dayswork.Integration;` (already present in ModEntry; ensure coordinator has it)
@@ -299,9 +299,9 @@ Add after the `ui.error.cant_afford` entry:
 ---
 
 ### Step 9 — Code summary + state update
-- [ ] Create `aidlc-docs/construction/u-11-full-hiring-ui/code/code-summary.md` (see format in u-10 summary)
-- [ ] Update `aidlc-docs/aidlc-state.md` current stage to "U-11 Code Generation Complete"
-- [ ] Update `aidlc-docs/audit.md` with completion entry
+- [x] Create `aidlc-docs/construction/u-11-full-hiring-ui/code/code-summary.md` (see format in u-10 summary)
+- [x] Update `aidlc-docs/aidlc-state.md` current stage to "U-11 Code Generation Complete"
+- [x] Update `aidlc-docs/audit.md` with completion entry
 
 ---
 
@@ -309,8 +309,8 @@ Add after the `ui.error.cant_afford` entry:
 
 | Story | Step(s) | Status |
 |---|---|---|
-| S-03 (zone drawing + building selection + unreachable-tile silent skip) | Steps 2, 3, 4, 5 | [ ] |
-| S-04 (chest assignment + orphaned-chest fallback) | Steps 1, 2, 3, 4, 5 | [ ] |
+| S-03 (zone drawing + building selection + unreachable-tile silent skip) | Steps 2, 3, 4, 5 | [x] |
+| S-04 (chest assignment + orphaned-chest fallback) | Steps 1, 2, 3, 4, 5 | [x] |
 
 ## Definition of Done
 Hire a one-time contract: draw 2 zones, select a chest for Harvest Crops, leave Weeds on mail. Next morning the worker harvests crops within the drawn zones and deposits them in the designated chest; weed fiber arrives by mail next morning.
