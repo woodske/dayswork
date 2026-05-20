@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-12 Code Generation — Part 1 Plan Created, Awaiting Approval
+**Timestamp**: 2026-05-20T19:00:00Z
+**User Input**: (none — planning step)
+**AI Response**: Code Generation Part 1 plan created at `aidlc-docs/construction/plans/u-12-hiring-ui-schedule-code-generation-plan.md`. 9 steps: (1) ScheduleMenu.cs — new Screen 3 with one-time/recurring toggle buttons, gamepad nav; (2) ContractDraft.EditingId field + HiringFlowCoordinator — insert ScheduleMenu, implement OpenEditFlow (pre-fill draft from contract), add OpenManageFlow, update ConfirmContract for edit-vs-add; (3) BulletinBoardPatch — add "Manage Contracts" button with D-pad wiring; (4) ShiftOrchestrator.ActiveContractId computed property + ModEntry.Orchestrator static; (5) ContractListMenu.cs — shows Active+Paused contracts, Pause/Resume/Cancel/Edit actions, cancel guard via ActiveContractId; (6) i18n 19 new keys; (7) FsCheck PBT-03 round-trip invariant for Pause→Resume; (8) dotnet build; (9) code summary + state update. Key findings from code review: ContractStore.Pause/Resume/Cancel already implemented, ContractStoreTests already covers xUnit behaviors, ContractDtoV1.Status already serializes Paused state — no DTO schema change needed.
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, Code Generation Part 1 (gate: awaiting plan approval)
+
+---
+
+## U-12 NFR Design — Approved
+**Timestamp**: 2026-05-20T18:50:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design approved. Proceeding to Code Generation Part 1 (plan).
+**Context**: CONSTRUCTION — U-12 Hiring UI: Schedule, NFR Design approved
+
+---
+
 ## U-12 NFR Design — Complete
 **Timestamp**: 2026-05-20T18:45:00Z
 **User Input**: (none — NFR design executed from approved requirements)
