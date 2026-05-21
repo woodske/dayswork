@@ -1629,3 +1629,18 @@ I made a simple contract, only clear rocks with a small zone containing two rock
 **Context**: CONSTRUCTION — U-14 Output Pipeline, Functional Design artifacts complete
 
 ---
+## U-14 Output Pipeline — Functional Design Approval
+**Timestamp**: 2026-05-21T19:05:00Z
+**User Input**: "continue"
+**AI Response**: Treating "continue" as approval of U-14 Functional Design. Marking Functional Design complete and proceeding to the NFR Requirements stage for U-14.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Functional Design approved
+
+---
+## U-14 Output Pipeline — NFR Requirements Complete
+**Timestamp**: 2026-05-21T19:20:00Z
+**User Input**: (continuation from FD approval — no new input)
+**AI Response**: Executed NFR Requirements for U-14. Assessment: no blocking user questions (consistent with U-07/U-10/U-13) — all NFRs determinable from the approved FD + prior decisions. Applicable NFRs: SAFE-U14-01 conservation (primary, NFR-SAFE-01), SAFE-U14-02 integer refund (inherited), SAFE-U14-03 no custom mail save data (FD-Q4=A simplifies NFR-SAFE-03); PERF-U14-01/02/03 one-time shift-end planning + per-trip chest resolution (not per-frame); UX-U14-01 new i18n mail keys; REL-U14-01..05 graceful chest-full/missing fallbacks + one-letter guarantee + large-attachment + MFM acquisition handling; MAINT-U14-01..04 pure-Core planner + no new Harmony; COMPAT-U14-01 MFM required dependency. PBT (Partial): PBT-U14-01..06 (conservation, trip-count, no-empty/mail trips, resolution totality, shared generator PBT-07, seed logging PBT-08); PBT-02 N/A. Tech-stack decisions TS-U14-01..07 (no new frameworks; injected distance oracle; vendor MFM API stub via GetApi; no custom save data; HashSet mailReceived; ItemBuffer +SourceTask; MFM large-attachment/null-API deferred to NFR Design). Generated nfr-requirements.md + tech-stack-decisions.md under aidlc-docs/construction/u-14-output-pipeline/nfr-requirements/. Awaiting approval.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, NFR Requirements complete
+**Note**: FD approval recorded above ("continue" at 2026-05-21T19:05:00Z).
+
+---
