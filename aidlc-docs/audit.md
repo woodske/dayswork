@@ -1644,3 +1644,18 @@ I made a simple contract, only clear rocks with a small zone containing two rock
 **Note**: FD approval recorded above ("continue" at 2026-05-21T19:05:00Z).
 
 ---
+## U-14 Output Pipeline — NFR Requirements Approval
+**Timestamp**: 2026-05-21T19:30:00Z
+**User Input**: "continue"
+**AI Response**: Treating "continue" as approval of U-14 NFR Requirements. Marking NFR Requirements complete and proceeding to the NFR Design stage for U-14.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, NFR Requirements approved
+
+---
+## U-14 Output Pipeline — NFR Design Complete
+**Timestamp**: 2026-05-21T19:45:00Z
+**User Input**: (continuation from NFR Requirements approval — no new input)
+**AI Response**: Executed NFR Design for U-14. No blocking user questions (consistent with U-10/U-13/U-13B — NFR-design decisions resolved as engineering patterns). Defined patterns: L Collection-Time Task Tagging (FD-Q1); M Pure Deposit Planner with injected Manhattan distance oracle (FD-Q1/Q2/Q3); N Multi-Trip Deposit Loop via SetIntent with no new phase + new IntentDepositAtChest, zero-trip pass-through (BR-SM-01); O Overflow Accumulator + single-letter flush incl. sleep-interrupt no-bin-dump (FD-Q5/Q6); P Mail Adapter over MFM deliver-tomorrow + vanilla no-item warnings (FD-Q4/Q7, V9). Resolved the two NFR-Requirements deferrals: large attachment → one MFM call (one-letter rule wins, cap is a play-test finding); null MFM API → log+continue, items never pre-deleted. Generated nfr-design-patterns.md + logical-components.md under aidlc-docs/construction/u-14-output-pipeline/nfr-design/. Infrastructure Design SKIPPED per execution plan (no cloud/container/IaC). Awaiting approval; next stage Code Generation.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, NFR Design complete
+**Note**: NFR Requirements approval recorded above ("continue" at 2026-05-21T19:30:00Z).
+
+---
