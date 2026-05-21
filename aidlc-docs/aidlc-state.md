@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-13 Worker AI: Priority + Capability/Skip + Stuck + Invulnerability — **Code Generation COMPLETE. Awaiting play-test before proceeding to U-13B.**
+- **Current Stage**: U-13B Farmer Worker + Tool Visuals — **Functional Design COMPLETE, AWAITING APPROVAL.** All 6 questions answered **A**. Artifacts at [construction/u-13b-farmer-worker-tool-visuals/functional-design/](construction/u-13b-farmer-worker-tool-visuals/functional-design/) (business-logic-model, domain-entities, business-rules). Answers: FD-Q1=A (reuse PathFindController for path-compute-only, drive manually), FD-Q2=A (on-top draw, foreground over-draw accepted v1), FD-Q3=A (appearance seeded by contract ID), FD-Q4=A (full randomization), FD-Q5=A (no-tool face-and-pause), FD-Q6=A (instant swap). On approval → NFR Requirements for U-13B.
 - **Unit split (2026-05-21)**: U-13 split into **U-13 (Worker AI)** — priority/skip/capability/stuck/invulnerability on the existing NPC + real walking — and **U-13B (Farmer Worker + Tool Visuals)** — full-Farmer re-founding (FD-Q5=B) + tool-swap (S-07). U-13B runs **next**, immediately after U-13, then U-14 → U-15 → U-16. Rationale: isolate the high-uncertainty Farmer architecture change from the low-risk worker-AI logic. See [unit-of-work.md](inception/application-design/unit-of-work.md) U-13/U-13B entries.
 
 ## Open TODOs

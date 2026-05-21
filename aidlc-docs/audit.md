@@ -1,5 +1,29 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13B Functional Design — Complete (Awaiting Approval)
+**Timestamp**: 2026-05-21T05:20:00Z
+**User Input**: "finished answering"
+**AI Response**: Read all six [Answer]: tags — all **A** (recommended option each), clear letter choices, no ambiguity, mutually consistent (lowest-risk path + immersion-friendly appearance). No clarification file needed. Marked plan checklist FD-Q1–Q6 + artifact-generation steps [x]. Generated 3 functional-design artifacts at `aidlc-docs/construction/u-13b-farmer-worker-tool-visuals/functional-design/`: business-logic-model.md (entity re-founding, manual movement driver via PathFindController-path-reuse, RenderedWorld draw, contract-seeded appearance, ToolSwapAnimator, orchestrator/ModEntry seam list), domain-entities.md (Core WorkerTool map; Mod FarmhandWorker/WorkerAppearance/WorkerAppearanceRandomizer/WorkerMovementDriver/WorkerRenderer/ToolSwapAnimator; removed FarmhandNpc + PathFindControllerAdapter), business-rules.md (BR-WORKER-01..05, BR-APPEAR-01..03, BR-VIS-01..05, BR-INVULN-01/02 carried, BR-PRESERVE-01 regression guard, DEV-01 re-affirmed). Answers baked in: FD-Q1=A path-compute-reuse, FD-Q2=A on-top draw, FD-Q3=A contract-seeded appearance, FD-Q4=A full randomization, FD-Q5=A face-and-pause hand-pick, FD-Q6=A instant swap. Presenting REVIEW REQUIRED gate per functional-design.md Step 7.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Functional Design complete (Step 5–7), awaiting approval
+
+---
+
+## U-13B Functional Design — Started (Session Resume)
+**Timestamp**: 2026-05-21T05:00:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resumed from U-13 approved state. Advanced to U-13B (Farmer Worker + Tool Visuals) — the per-unit Construction loop's Functional Design stage (EXECUTE: new business logic — WorkerMovementDriver, WorkerRenderer, WorkerAppearanceRandomizer, ToolSwapAnimator, plus a new Core WorkerTool map). Loaded prior artifacts: session-continuity + common rules; functional-design.md stage rules; unit-of-work.md (U-13/U-13B entries, ownership matrix); U-13 FD plan (FD-Q5=B locked rationale + design implications); U-13 code-summary; existing code (FarmhandNpc, PathFindControllerAdapter, ShiftOrchestrator, ModEntry); S-07 story + FR-WORK-10/FR-NPC-01/02. Created functional design plan with 6 embedded design questions at `aidlc-docs/construction/plans/u-13b-farmer-worker-tool-visuals-functional-design-plan.md`. Locked (not re-asked): full Farmer (FD-Q5=B / DEV-01), Farmer kept out of location collections + never serialized, manual render hook, manual movement driver, FarmerSprite.animateOnce frame sets, tool→task mapping, randomized appearance. Open questions: FD-Q1 path computation (reuse PathFindController vs lower-level vs custom A*), FD-Q2 occlusion fidelity (on-top vs Harmony draw-pass), FD-Q3 appearance stability (deterministic-per-contract vs re-roll), FD-Q4 randomized-field scope, FD-Q5 no-tool task animation, FD-Q6 tool-swap timing. Carried the U-13 play-test "worker stands still in grass" issue forward as an explicit U-13B Definition-of-Done (reliable arrival). Awaiting user answers to [Answer]: tags.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Functional Design (Step 1–4: context analysis + plan + questions)
+
+---
+
+## U-13 Play-Test Approval
+**Timestamp**: 2026-05-21T04:00:00Z
+**User Input**: "The worker is just standing there now in a grass field. I'm just going to approve this for now, I really want to get the farmer type instead of the NPC type so we don't need to undo the work. I'm approving, but pause before the next step"
+**AI Response**: U-13 approved. Standing-in-grass issue noted — likely PathFindController stuck on first work item with no progress detection firing (or nav failing silently). Deferred: U-13B replaces the NPC movement system entirely (custom movement driver), so any NPC PathFindController quirks are moot after that. Proceeding to U-13B on user command.
+**Context**: CONSTRUCTION — U-13 play-test approval; U-13B queued
+
+---
+
 ## U-13 Post-Playtest Feedback Fixes — Complete
 **Timestamp**: 2026-05-21T03:30:00Z
 **User Input**: (Three feedback items) "TODO: allow player to cancel work for the day at any time, worker should stop and deposit immediately" / "Getting this message on a new day, but the worker still shows up: [Dayswork] Shift interrupted by save — removing worker and refunding deposit." / "The worker is prioritizing cutting grass. I've selected tasks cut tree, break rock, clear grass, clear weeds. The worker will cut grass and walk around rocks and logs to get to another piece of grass. They should be looking at the next closest task that they can do and fan out from their starting point."
