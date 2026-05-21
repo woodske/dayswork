@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13B NFR Requirements — Complete (Awaiting Approval)
+**Timestamp**: 2026-05-21T05:35:00Z
+**User Input**: "continue"
+**AI Response**: Functional Design approved (FD stage marked complete). Proceeded to NFR Requirements for U-13B. No blocking user questions — all NFRs determinable from the approved FD + prior project decisions, consistent with how U-07/U-10/U-13 NFR Requirements were handled; tech stack adds no new frameworks (Farmer rendering/movement use existing Stardew APIs; testing stays xUnit + FsCheck). The one open engineering choice — movement smoothness cadence (per-tick stepping vs render-side interpolation) — is recorded as a deferred NFR-Design pattern decision (mirrors how U-13 deferred its render-hook choice), not a product question. Generated nfr-requirements.md (PERF-U13B-01..04 incl. the deferred-from-U-13 per-frame Farmer draw + manual movement stepping; SAFE-U13B-01 Farmer-never-serialized; REL-U13B-01..03; MAINT-U13B-01..04 incl. Core purity of WorkerTool + i18n N/A; PBT obligations) and tech-stack-decisions.md (no new deps; WorkerTool is the only new Core type, unit-tested not PBT). Plan at construction/plans/. Presenting REVIEW REQUIRED gate per nfr-requirements.md Step 7.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, NFR Requirements complete, awaiting approval
+
+---
+
+## U-13B Functional Design — Approved
+**Timestamp**: 2026-05-21T05:30:00Z
+**User Input**: "continue"
+**AI Response**: Functional Design approved. Marking FD stage complete in aidlc-state.md; proceeding to NFR Requirements for U-13B.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Functional Design → NFR Requirements
+
+---
+
 ## U-13B Functional Design — Complete (Awaiting Approval)
 **Timestamp**: 2026-05-21T05:20:00Z
 **User Input**: "finished answering"
