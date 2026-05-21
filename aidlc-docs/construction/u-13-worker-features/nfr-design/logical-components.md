@@ -1,6 +1,8 @@
 # U-13 — Logical Components
 
-**Unit**: U-13 — Worker Features: Priority + Stuck + Tool Swap + Invulnerability
+> **SCOPE SPLIT (2026-05-21):** The Farmer components — `FarmhandWorker`, `WorkerMovementDriver`, `ToolSwapAnimator`, `WorkerRenderer`, `WorkerAppearanceRandomizer` — are **deferred to U-13B**. In U-13 the worker stays `FarmhandNpc` (NPC) with `PathFindControllerAdapter` upgraded to real walking. U-13 keeps: extended `ShiftStateMachine` + `StuckDetector` (Core), `ShiftOrchestrator` (priority/skip/stuck/invuln), `ObjectTargetClassifier`.
+
+**Unit**: U-13 — Worker AI: Priority + Capability/Skip + Stuck + Invulnerability *(Farmer components → U-13B)*
 
 ## Component Map
 

@@ -1,6 +1,8 @@
 # U-13 — NFR Design Patterns
 
-**Unit**: U-13 — Worker Features: Priority + Stuck + Tool Swap + Invulnerability
+> **SCOPE SPLIT (2026-05-21):** **Pattern F (Farmer-as-Worker Rendering)** and **Pattern G (Manual Path-Follow Movement)** are **deferred to U-13B**. In U-13, movement uses native `PathFindController` walking on the NPC (replacing U-10's teleport stub). Pattern H (invulnerability) still applies in U-13 via NPC `doEmote`. All other patterns (A–E, I) stay in U-13.
+
+**Unit**: U-13 — Worker AI: Priority + Capability/Skip + Stuck + Invulnerability *(Patterns F/G → U-13B)*
 
 ---
 

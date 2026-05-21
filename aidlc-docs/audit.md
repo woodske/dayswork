@@ -1,5 +1,29 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13/U-13B Split Decision + Code Generation Plan Rewrite
+**Timestamp**: 2026-05-21T00:30:00Z
+**User Input**: "should we split the transition to farmer work out into its own unit? or do you think it's ok to do all of this at once?" → "let's split, farmer unit comes next"
+**AI Response**: Split accepted. U-13 re-scoped to "Worker AI: Priority + Capability/Skip + Stuck + Invulnerability" — worker stays `NPC` + `PathFindController` walking; all behavior logic (S-08/09/16/17) ships here. U-13B created as "Farmer Worker + Tool Visuals" — full Farmer re-founding (FD-Q5=B), WorkerMovementDriver, ToolSwapAnimator, WorkerRenderer, WorkerAppearanceRandomizer, S-07. U-13B runs immediately after U-13 (before U-14). Rationale: isolates high-uncertainty Farmer architecture change from proven worker-AI patterns on a clean seam (S-07 is the sole Farmer-requiring story). Doc surgery performed: aidlc-state.md updated (stage, split note, DEV-01, TODO-05); all U-13 design artifacts bannered with scope-split notices; unit-of-work.md + story-map updated (U-13B entry added, S-07 moved); code-gen plan fully rewritten to 15 steps (U-13 only — no Farmer components). DEV-01 (FR-NPC-01 deviation) noted as landing in U-13B.
+**Context**: CONSTRUCTION — U-13 Worker Features, Code Generation Part 1 (plan rewritten post-split; awaiting approval)
+
+---
+
+## U-13 Code Generation — Part 1 Plan Created, Awaiting Approval
+**Timestamp**: 2026-05-21T00:15:00Z
+**User Input**: (none — planning step)
+**AI Response**: Created code generation plan at `aidlc-docs/construction/plans/u-13-worker-features-code-generation-plan.md`. 21 steps: (A) Core types — modify ShiftPhase (+Stuck/Recovering), ShiftIntent (+PlayEmote/TeleportToTile/TeleportHome), ShiftStateMachine (multi-successor table), WorkItem (NavTile/TaskTile split), ShiftContext (+RecoveryAttempts, +ToolMissingWarnings); create StuckDetector, WorkerTool map. (B) Core tests — extend ShiftStateMachineTests (PBT-U13-01/02/03), new StuckDetectorTests (PBT-U13-04/05/06). (C) Mod worker — WorkerAppearance(+Randomizer), re-found FarmhandNpc→FarmhandWorker (Farmer), WorkerMovementDriver (delete PathFindControllerAdapter), ToolSwapAnimator, ObjectTargetClassifier, WorkerRenderer. (D) ShiftOrchestrator major rewrite (priority+skip+stuck+toolswap+movement+draw+hit) + ModEntry (drop NPC asset redirect, add RenderedWorld). (E) build, test, code-summary, state/audit. Flagged Farmer re-founding (Steps 11–17) as highest play-test risk. Awaiting user approval before Part 2 generation.
+**Context**: CONSTRUCTION — U-13 Worker Features, Code Generation Part 1 (gate: awaiting plan approval)
+
+---
+
+## U-13 NFR Design — Approved
+**Timestamp**: 2026-05-21T00:05:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design approved. Infrastructure Design SKIPPED (SMAPI is the platform). Proceeding to Code Generation Part 1 (Planning) for U-13.
+**Context**: CONSTRUCTION — U-13 Worker Features, NFR Design → Code Generation
+
+---
+
 ## U-13 NFR Design — Complete
 **Timestamp**: 2026-05-20T23:55:00Z
 **User Input**: "continue"

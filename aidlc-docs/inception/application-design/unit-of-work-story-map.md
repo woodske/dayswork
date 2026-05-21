@@ -26,7 +26,7 @@ This document maps each of the 20 user stories in [stories.md](../user-stories/s
 
 | Story | Primary | Completing | State after primary unit |
 |---|---|---|---|
-| **S-07** Watch the farmhand arrive and work on day one | U-10 | U-13 | At U-10: arrival + path-find walk to first task tile + placeholder sprite. At U-13: visible tool-swap when changing task class. |
+| **S-07** Watch the farmhand arrive and work on day one | U-10 | U-13B | At U-10: arrival + walk (teleport stub) to first task tile + placeholder sprite. At U-13: real walking. At U-13B: Farmer worker with visible tool-swap when changing task class. |
 | **S-08** Execute tasks in priority order within a zone | U-10 | U-13 | At U-10: single task executes (one zone, one task type). At U-13: full 10-task priority queue + trellis-side harvest + not-ready-skip + grass→hay-on-ground when silo full. |
 | **S-09** Snapshot tool capabilities at spawn and skip what can't be done | U-10 | U-13 | At U-10: ToolLevelReader runs at 6am and snapshot is captured. At U-13: full capability matrix applied to skip rules (axe-level guards, pickaxe=0 guards, fruit-tree always-skip) plus tool-missing mail warning queued (mail itself delivered by U-14). |
 | **S-10** Deposit collected items at shift end | U-10 | U-14 | At U-10: single-trip deposit to shipping bin. At U-14: multi-trip deposit to assigned chests + 8pm-cap-still-deposits + chest-full fallback + chest-destroyed fallback + refund at exit. |
@@ -68,7 +68,7 @@ This document maps each of the 20 user stories in [stories.md](../user-stories/s
 | S-04 | ✅ U-11 (primary), U-14 (completes) |
 | S-05 | ✅ U-09 (primary), U-12 (completes) |
 | S-06 | ✅ U-09 |
-| S-07 | ✅ U-10 (primary), U-13 (completes) |
+| S-07 | ✅ U-10 (primary), U-13 (real walking), U-13B (completes — Farmer + tool-swap) |
 | S-08 | ✅ U-10 (primary), U-13 (completes) |
 | S-09 | ✅ U-10 (primary), U-13 (completes) |
 | S-10 | ✅ U-10 (primary), U-14 (completes) |
@@ -105,7 +105,8 @@ For developers picking up a unit, what stories does Construction need to satisfy
 | U-10 Minimum Worker Shift | S-07 (primary), S-08 (primary), S-09 (primary), S-10 (primary), S-19 (PBT for state machine + buffer) |
 | U-11 Hiring UI: Zones & Chests | S-03, S-04 (primary) |
 | U-12 Hiring UI: Schedule + Edit/Pause/Cancel | S-05 (completes), S-12 (primary) |
-| U-13 Worker Features: Priority + Stuck + Tool Swap + Invuln | S-07 (completes), S-08 (completes), S-09 (completes), S-16, S-17 |
+| U-13 Worker AI: Priority + Capability/Skip + Stuck + Invuln | S-08 (completes), S-09 (completes), S-16, S-17 |
+| U-13B Farmer Worker + Tool Visuals | S-07 (completes) |
 | U-14 Output: Multi-Destination Deposit + Overflow Mail | S-04 (completes), S-10 (completes), S-11 |
 | U-15 Recurring Lifecycle + Calendar | S-12 (completes), S-14, S-15 |
 | U-16 GMCM + i18n Polish | S-13, S-19 (lint completes), S-20 (lint completes) |

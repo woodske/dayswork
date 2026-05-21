@@ -1,6 +1,8 @@
 # U-13 — Domain Entities
 
-**Unit**: U-13 — Worker Features: Priority + Stuck + Tool Swap + Invulnerability
+> **SCOPE SPLIT (2026-05-21):** Entities for the Farmer re-founding — `WorkerAppearance`, the Farmer-backed worker (§3.2), `WorkerMovementDriver` (§3.3), `ToolSwapAnimator` (§3.4), `WorkerTool` (§2.1) — are **deferred to U-13B**. U-13 keeps the `NPC` worker. U-13's entities: extended `ShiftPhase`/`ShiftStateMachine`/`ShiftIntent` (§1.1–1.3), `WorkItem` nav/task split (§1.4), `StuckDetector` (§1.5), `ShiftContext` additions (§1.6), and the object→target classifier (§2.2).
+
+**Unit**: U-13 — Worker AI: Priority + Capability/Skip + Stuck + Invulnerability *(Farmer entities → U-13B)*
 
 Lists the new and modified types U-13 introduces. Core types (no Stardew references) live in `Dayswork.Core`; Mod types live in `Dayswork`.
 

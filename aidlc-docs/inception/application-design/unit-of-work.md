@@ -316,25 +316,50 @@ C:\Users\kwood\Repos\dayswork\
 
 ---
 
-#### U-13 — Worker Features: Priority + Stuck + Tool Swap + Invulnerability
+#### U-13 — Worker AI: Priority + Capability/Skip + Stuck + Invulnerability
 
-**Purpose**: Take U-10's "walks to one tile, does one task" worker and make it a real worker: full priority queue, stuck recovery escalation, visible tool-swap animation, and invulnerability with ouch emote.
+> **Split note (2026-05-21):** U-13 was split. The tool-swap visuals (S-07) and the full-Farmer re-founding (FD-Q5=B) were carved out into **U-13B — Farmer Worker + Tool Visuals**, which runs immediately after U-13. U-13 keeps the worker as the existing `NPC` and delivers all the *behavior* logic on that proven foundation; U-13B is the isolated, higher-risk visual/architecture upgrade.
 
-**Components owned**: C-09 StuckDetector, M-10 ToolSwapAnimator.
+**Purpose**: Take U-10's "walks to one tile, does one task (teleport stub)" worker and make it behave like a real worker: full priority queue, full capability/skip rules, real walking, stuck recovery escalation, and invulnerability with ouch emote.
 
-**Extends**: C-08 ShiftStateMachine (adds Stuck and Recovering states + transitions per FR-WORK-11/12), M-09 FarmhandNpc (overrides damage hooks for invulnerability per FR-NPC-02), M-12 ShiftOrchestrator (wires StuckDetector, TaskPriorityOrderer, CapabilityEvaluator, full skip-rule branches; wires ToolSwapAnimator into intent dispatch).
+**Components owned**: C-09 StuckDetector, ObjectTargetClassifier (Mod — maps game objects to AxeTarget/PickTarget).
+
+**Extends**: C-08 ShiftStateMachine (adds Stuck and Recovering states + transitions per FR-WORK-11/12), M-11 PathFindControllerAdapter (replaces the U-10 teleport stub with native `PathFindController` walking — required for stuck detection to be meaningful and to verify TODO-01), M-12 ShiftOrchestrator (wires StuckDetector, TaskPriorityOrderer, CapabilityEvaluator + ObjectTargetClassifier, full skip-rule branches, trellis adjacency, and the invulnerability hit-detection emote). M-09 FarmhandNpc remains an `NPC` here (re-founded as a `Farmer` in U-13B).
 
 **Code organization**:
 - `Dayswork.Core/Shifts/StuckDetector.cs`, `IStuckDetector.cs`
-- `Dayswork/Worker/ToolSwapAnimator.cs`
+- `Dayswork/Worker/ObjectTargetClassifier.cs`
 
 **Test files**:
-- PBT-03 invariants on extended state machine: still never leaves Done; Stuck → Recovering → (Working | Exiting) only; can never enter Stuck from Done
-- StuckDetector unit test: counter resets on progress; fires after threshold; reset behavior after teleport
+- PBT-03 invariants on extended state machine: still never leaves Done; Stuck → Recovering → (Working | Depositing) only; can never enter Stuck from Done
+- StuckDetector PBT/unit tests: counter resets on progress; fires after threshold; reset behavior after teleport
 
-**Stories implemented**: S-07 (tool-swap visuals — completes the story), S-08 (full priority order across all 10 tasks + trellis-side harvest + not-ready-skip + grass→hay-on-ground), S-09 (full capability snapshot with all skip rules and tool-missing warning queued), S-16 (3-step hybrid stuck escalation: emote → teleport to next tile → teleport home end shift), S-17 (invulnerable + ouch emote).
+**Stories implemented**: S-08 (full priority order + trellis-side harvest + not-ready-skip), S-09 (full capability snapshot with all skip rules and tool-missing warning queued), S-16 (3-step hybrid stuck escalation: emote → teleport to next tile → teleport home end shift), S-17 (invulnerable + ouch emote). *(S-07 tool-swap moved to U-13B.)*
 
-**Definition of Done**: Worker now runs a multi-task zone end-to-end in priority order, swaps tools visibly between task classes, survives sword swings, and recovers from fence-trap with the 3-step escalation. Tool-missing case queues the warning mail (mail dispatcher itself lands in U-14).
+**Definition of Done**: Worker now walks (no longer teleports) and runs a multi-task zone end-to-end in priority order, applies all capability/skip rules, survives sword swings (ouch emote), and recovers from fence-trap with the 3-step escalation. Tool-missing case queues the warning (mail dispatcher itself lands in U-14). TODO-01 (tree-seed drops) re-checked now that the worker walks at a realistic pace.
+
+---
+
+#### U-13B — Farmer Worker + Tool Visuals
+
+> Created by the 2026-05-21 split of U-13. Runs immediately after U-13. This is the isolated, higher-uncertainty architectural change so that a play-test problem here does not entangle the (already-validated) worker-AI logic.
+
+**Purpose**: Re-found the worker on `StardewValley.Farmer` so it visibly uses tools the way the player does, and add the tool-swap animation. Replaces U-13's NPC + native pathfinding with a Farmer + custom movement/rendering.
+
+**Pre-decided design (carried from U-13's design stage — feed these into U-13B's Functional Design rather than re-deciding)**:
+- **FD-Q5=B** — full Farmer (not a hybrid NPC+Farmer). Revises FR-NPC-01 (see DEV-01).
+- Manual **render hook** with Y-depth sort; worker `Farmer` kept out of `location.characters`/`location.farmers` and never serialized (BR-WORKER-01/03). Rejected alternative: registering in `location.characters`.
+- **Manual movement** driver (compute route via game pathfinding, step `Farmer.Position` + walk anim) replacing the NPC `PathFindController` from U-13 (BR-WORKER-02).
+- Tool swings via `FarmerSprite.animateOnce` (verified frames: heavy R12/R9/R7, watering can R10/R5/R8/R11, scythe R5/R6/R7); held tool drawn by `FarmerRenderer`.
+- Randomized appearance from character-creation field ranges.
+
+**Components owned**: M-10 ToolSwapAnimator, `WorkerTool` map (Core), FarmhandWorker (Farmer — supersedes the U-10/U-13 FarmhandNpc), WorkerMovementDriver (supersedes M-11 PathFindControllerAdapter), WorkerRenderer, WorkerAppearance(+Randomizer).
+
+**Extends**: M-09 FarmhandNpc (re-founded on Farmer), M-12 ShiftOrchestrator (swap worker entity + movement driver, wire ToolSwapAnimator + render hook), M-01 ModEntry (drop NPC portrait asset redirect, add `Display.RenderedWorld`).
+
+**Stories implemented**: S-07 (tool-swap visuals — completes the story).
+
+**Definition of Done**: The worker is a randomized Farmer that walks, draws with correct depth sorting, and visibly swings the right tool (axe/can/scythe/pickaxe) as it works — all U-13 behavior preserved.
 
 ---
 
@@ -415,6 +440,12 @@ C:\Users\kwood\Repos\dayswork\
 | C-07 TaskPriorityOrderer | U-07 | — |
 | C-08 ShiftStateMachine | U-10 | U-13, U-14 |
 | C-09 StuckDetector | U-13 | — |
+| ObjectTargetClassifier (Mod, post-design addition) | U-13 | — |
+| WorkerTool map (Core, post-design addition) | U-13B | — |
+| FarmhandWorker (Farmer, supersedes M-09 NPC, post-design addition) | U-13B | — |
+| WorkerMovementDriver (supersedes M-11, post-design addition) | U-13B | — |
+| WorkerRenderer (post-design addition) | U-13B | — |
+| WorkerAppearanceRandomizer (post-design addition) | U-13B | — |
 | C-10 ItemBuffer | U-10 | — |
 | C-11 DepositPlanner | U-14 | — |
 | C-12 ContractStore | U-06 | U-12 (Pause/Resume methods) |
@@ -429,10 +460,10 @@ C:\Users\kwood\Repos\dayswork\
 | M-06 ScheduleMenu | U-12 | — |
 | M-07 SummaryMenu | U-09 | — |
 | M-08 ZoneDrawOverlay | U-11 | — |
-| M-09 FarmhandNpc | U-10 | U-13 (invulnerability) |
-| M-10 ToolSwapAnimator | U-13 | — |
-| M-11 PathFindControllerAdapter | U-10 | — |
-| M-12 ShiftOrchestrator | U-10 | U-13, U-14, U-15 |
+| M-09 FarmhandNpc | U-10 | U-13 (invulnerability via hit-detection), U-13B (re-founded on Farmer) |
+| M-10 ToolSwapAnimator | U-13B | — |
+| M-11 PathFindControllerAdapter | U-10 | U-13 (real walking), U-13B (superseded by WorkerMovementDriver) |
+| M-12 ShiftOrchestrator | U-10 | U-13, U-13B, U-14, U-15 |
 | M-13 RecurringContractScheduler | U-10 (stub) | U-15 (full lifecycle) |
 | M-14 CalendarHandlers | U-15 | — |
 | M-15 ContractPersistenceAdapter | U-09 | — |
@@ -443,7 +474,7 @@ C:\Users\kwood\Repos\dayswork\
 | M-20 ChestResolver | U-11 | — |
 | M-21 I18nHelper | U-08 | — |
 
-**Verification**: 35 unique components, each owned by exactly one unit. ✓
+**Verification**: 35 original design components, each owned by exactly one unit. ✓ Plus 6 post-design implementation components introduced by the FD-Q5=B full-Farmer decision and the U-13/U-13B split (ObjectTargetClassifier, WorkerTool map, FarmhandWorker, WorkerMovementDriver, WorkerRenderer, WorkerAppearanceRandomizer), each owned by exactly one of U-13 / U-13B.
 
 ---
 

@@ -1,7 +1,9 @@
 # U-13 — Business Logic Model
 
-**Unit**: U-13 — Worker Features: Priority + Stuck + Tool Swap + Invulnerability
-**Stories**: S-07 (completes), S-08 (completes), S-09 (completes), S-16, S-17
+> **SCOPE SPLIT (2026-05-21):** U-13 was split into **U-13 (Worker AI)** and **U-13B (Farmer Worker + Tool Visuals)**. Sections below covering the **full-Farmer re-founding (FD-Q5=B, §1), tool-swap (§4), manual movement, and rendering** are **deferred to U-13B** — retained here for reference and migrated to U-13B's design stage. U-13 keeps the worker as an `NPC` (with real `PathFindController` walking replacing U-10's teleport stub) and ships the behavior logic: priority queue (§2), capability/skip (§3), stuck escalation (§5), invulnerability (§6). S-07 moves to U-13B.
+
+**Unit**: U-13 — Worker AI: Priority + Capability/Skip + Stuck + Invulnerability *(was: Priority + Stuck + Tool Swap + Invulnerability; Farmer/tool-swap → U-13B)*
+**Stories**: S-08 (completes), S-09 (completes), S-16, S-17 *(S-07 → U-13B)*
 **Design answers**: FD-Q1=A (defer animals + buildings), FD-Q2=A (first-class Stuck/Recovering phases), FD-Q3=A (tile-or-action progress), FD-Q4=B (nearest reachable orthogonal neighbor), FD-Q5=B (full Farmer), FD-Q6=A ("!" emote, no interruption)
 
 This unit turns U-10's thin worker ("walks to one tile, does one task, distance-ordered, recolored-villager sprite") into a real worker: full FR-WORK-03 priority queue, full capability/skip rules, stuck recovery, visible player-style tool use, and invulnerability. The single biggest change is FD-Q5=B — **the worker is re-founded on `Farmer` instead of `NPC`.**

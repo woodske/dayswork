@@ -6,7 +6,8 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-13 Worker Features: Priority + Stuck + Tool Swap + Invulnerability — **NFR Design complete; awaiting approval to proceed to Code Generation (Infrastructure Design SKIP).**
+- **Current Stage**: U-13 Worker AI: Priority + Capability/Skip + Stuck + Invulnerability — **Re-scoped after split; Code Generation Part 1 (plan) rewritten; awaiting plan approval before Part 2 generation.**
+- **Unit split (2026-05-21)**: U-13 split into **U-13 (Worker AI)** — priority/skip/capability/stuck/invulnerability on the existing NPC + real walking — and **U-13B (Farmer Worker + Tool Visuals)** — full-Farmer re-founding (FD-Q5=B) + tool-swap (S-07). U-13B runs **next**, immediately after U-13, then U-14 → U-15 → U-16. Rationale: isolate the high-uncertainty Farmer architecture change from the low-risk worker-AI logic. See [unit-of-work.md](inception/application-design/unit-of-work.md) U-13/U-13B entries.
 
 ## Open TODOs
 - **TODO-01** [U-11 / tree drops]: Tree seeds were not observed in the shipping bin after felling trees. Suspected cause: the worker teleports between work tiles so fast that seeds spawned as debris may land after the farmhand has already moved on. Accepted for now. **Revisit after U-13 (Worker AI) slows the worker down to a realistic pace — confirm seeds appear then. If still missing, investigate CollectNewDebris snapshot timing.**
@@ -16,7 +17,7 @@
 - **TODO-05** [U-13 / animals + buildings]: Animal tasks (Feed animals, Pet animals, Collect animal products) and **all building-interior work — including the greenhouse** — are deferred out of U-13 per FD-Q1=A. Requires building-door warp navigation (FR-WORK-09) plus the three animal task actions. Needs its own unit (e.g., "Animals & Buildings"). The FR-WORK-03 priority order already reserves slots for the animal tasks; only detection/invocation/navigation are missing.
 
 ## Decisions / Deviations
-- **DEV-01** [U-13 / FR-NPC-01]: Worker re-founded on `Farmer` (randomized character-creation appearance) instead of the recolored-NPC placeholder, to deliver authentic player-style tool animations (FR-WORK-10/S-07) and to make the post-V1 roadmap (energy bar, worker-owned tools, food/buffs — all Farmer-native) tractable. Trade-off accepted: U-13 rebuilds movement (custom path-follower, not PathFindController), depth-sorted drawing, and manual hit-detection for the ouch emote. Dialogue becomes additive custom work later. Recorded in U-13 functional-design business-rules.md.
+- **DEV-01** [U-13B / FR-NPC-01]: Worker re-founded on `Farmer` (randomized character-creation appearance) instead of the recolored-NPC placeholder, to deliver authentic player-style tool animations (FR-WORK-10/S-07) and to make the post-V1 roadmap (energy bar, worker-owned tools, food/buffs — all Farmer-native) tractable. **Now lands in U-13B** (split out of U-13 on 2026-05-21). Trade-off accepted: U-13B rebuilds movement (custom path-follower, not PathFindController), depth-sorted drawing, and manual hit-detection for the ouch emote. Dialogue becomes additive custom work later. Pre-decided design captured in [unit-of-work.md](inception/application-design/unit-of-work.md) U-13B entry; full design formalizes in U-13B's Functional Design stage.
 
 ## Workspace State
 - **Existing Code**: No

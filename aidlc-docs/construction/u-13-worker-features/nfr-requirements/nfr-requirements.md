@@ -1,6 +1,8 @@
 # U-13 — NFR Requirements
 
-**Unit**: U-13 — Worker Features: Priority + Stuck + Tool Swap + Invulnerability
+> **SCOPE SPLIT (2026-05-21):** Farmer-specific NFRs — **PERF-U13-03** (per-frame Farmer draw) and **PERF-U13-04** (manual movement stepping) — are **deferred to U-13B**. SAFE-U13-03 (never-serialize) applies to both (U-13's NPC is already removed on save). All other U-13 NFRs (priority/skip scan, stuck, invulnerability, Core purity, PBT) stay in U-13.
+
+**Unit**: U-13 — Worker AI: Priority + Capability/Skip + Stuck + Invulnerability *(Farmer NFRs → U-13B)*
 
 Inherits U-10's worker NFRs; adds requirements for the full-Farmer rendering/movement, stuck escalation, and capability integration.
 

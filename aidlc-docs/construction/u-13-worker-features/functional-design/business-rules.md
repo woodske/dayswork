@@ -1,6 +1,8 @@
 # U-13 — Business Rules
 
-**Unit**: U-13 — Worker Features: Priority + Stuck + Tool Swap + Invulnerability
+> **SCOPE SPLIT (2026-05-21):** The Farmer/visual rules — **BR-VIS-01..03** (tool-swap), **BR-WORKER-01..04** (Farmer worker, manual movement, depth-sorted draw), and **DEV-01** (FR-NPC-01 → Farmer) — are **deferred to U-13B**. U-13 keeps the `NPC` worker (with real `PathFindController` walking) and enforces the priority/skip/capability/stuck/state-machine/invulnerability rules below. *Exception:* **BR-INVULN-01/02** still apply in U-13 — a plain villager `NPC` is also undamageable by the player, so invulnerability + the swing-detected "!" emote ship in U-13.
+
+**Unit**: U-13 — Worker AI: Priority + Capability/Skip + Stuck + Invulnerability *(Farmer/visual rules → U-13B)*
 
 Rules use U-13-scoped IDs to avoid collision with the global BR sequence. Each rule cites its source requirement.
 
