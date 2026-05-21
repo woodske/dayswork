@@ -1659,3 +1659,14 @@ I made a simple contract, only clear rocks with a small zone containing two rock
 **Note**: NFR Requirements approval recorded above ("continue" at 2026-05-21T19:30:00Z).
 
 ---
+## U-14 Output Pipeline — NFR Design Approval
+**Timestamp**: 2026-05-21T19:55:00Z
+**User Input**: "continue"
+**AI Response**: Treating "continue" as approval of U-14 NFR Design. Infrastructure Design is SKIPPED (no cloud/IaC). Proceeding to Code Generation — Part 1 (Planning): building the code generation plan for user approval before writing any code.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, NFR Design approved; entering Code Generation planning
+
+---
+## U-14 Output Pipeline — Code Generation Plan (Part 1) Presented for Approval
+**Timestamp**: 2026-05-21T20:10:00Z
+**AI Response**: Created the U-14 code generation plan (16 steps) at construction/plans/u-14-output-pipeline-code-generation-plan.md — single source of truth for Part 2. Steps: A) Core (extend ItemBuffer with SourceTask, deposit/overflow domain types, pure DepositPlanner, IntentDepositAtChest, ShiftContext +TaskDestinations/+Overflow, planner PBTs + shared generator); B) Mod mail (vendor MFM API stub, MailDispatcher); C) orchestrator multi-trip deposit + mail flush + tagged buffering + OnSaving mail-not-dump, ModEntry wiring + MFM GetApi; D) manifest MFM dependency + i18n mail keys; E) build/test (full 184 regression must stay green), code-summary, state/audit. Story traceability S-04/S-10/S-11/S-19. Awaiting explicit approval before any code is written.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation Part 1 (Planning) — approval prompt
