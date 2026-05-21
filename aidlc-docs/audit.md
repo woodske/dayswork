@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13B NFR Design — Complete (Awaiting Approval)
+**Timestamp**: 2026-05-21T05:50:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Proceeded to NFR Design for U-13B; Infrastructure Design SKIPPED (SMAPI is the platform). No blocking user questions (consistent with U-13 resolving TS-U13-04 in NFR Design). Resolved **TS-U13B-01 = per-tick `Farmer.Position` stepping (~60 Hz) for a smooth walk, while work-dispatch/stuck/hit logic stays on the every-4th-tick throttle**; render-side interpolation rejected as unnecessary once position steps per tick. Patterns: owned F (Farmer-as-Worker Rendering — manual RenderedWorld hook, on-top draw per FD-Q2=A, BR-WORKER-03 fallback, no Harmony patch) and G (Manual Path-Follow Movement — A* path-compute-only per FD-Q1=A + per-tick stepping; direct fix for the U-13 'stands still' bug); added J (Contract-Seeded Appearance, FD-Q3/Q4=A, range-clamped) and K (Pure WorkerTool map + Mod-side ToolSwapAnimator; instant swap FD-Q6=A, hand-pick beat FD-Q5=A); carried H (invulnerability, entity now Farmer) and I (save-exclusion). Logical components: new FarmhandWorker/WorkerMovementDriver/WorkerRenderer/WorkerAppearance(+Randomizer)/ToolSwapAnimator (Mod) + WorkerTool (Core); removed FarmhandNpc + PathFindControllerAdapter; ShiftOrchestrator seams re-pointed (logic unchanged, BR-PRESERVE-01); ModEntry adds RenderedWorld, drops portrait redirect. Extension compliance: PBT-03 met by exhaustive table test (no new property), PBT-08 honored, PBT-02/07/09 N/A; Security N/A. Generated nfr-design-patterns.md + logical-components.md + plan. Presenting REVIEW REQUIRED gate per nfr-design.md Step 7.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, NFR Design complete, awaiting approval
+
+---
+
+## U-13B NFR Requirements — Approved
+**Timestamp**: 2026-05-21T05:45:00Z
+**User Input**: "continue"
+**AI Response**: NFR Requirements approved. Marking stage complete; proceeding to NFR Design for U-13B (Infrastructure Design SKIP — SMAPI is the platform).
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, NFR Requirements → NFR Design
+
+---
+
 ## U-13B NFR Requirements — Complete (Awaiting Approval)
 **Timestamp**: 2026-05-21T05:35:00Z
 **User Input**: "continue"
