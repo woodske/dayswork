@@ -1607,3 +1607,25 @@ I made a simple contract, only clear rocks with a small zone containing two rock
 **Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, final exit walk review change complete
 
 ---
+
+## U-13B Code Generation — Approval
+**Timestamp**: 2026-05-21T18:07:11Z
+**User Input**: "I approve these changes, make sure to note the decisions made about farmer vs npc"
+**AI Response**: Recorded U-13B approval and expanded the Farmer-vs-NPC decision notes in `aidlc-state.md` and the U-13B code summary. Decision captured: Farmer-backed worker was implemented and play-tested, then rejected due to standalone `Farmer` rendering depth, movement/body-pose, and vanilla tool-callback/null-reference risks. Accepted approach is an NPC-backed worker in `farm.characters`, with explicit Dayswork task execution and callback-free world tool-swing visuals.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, code generation approved
+
+---
+## U-14 Output Pipeline — Functional Design Start
+**Timestamp**: 2026-05-21T18:30:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: U-13B is approved and complete. Resuming the CONSTRUCTION per-unit loop at U-14 — Output Pipeline (Multi-Destination Deposit + Overflow Mail). Loaded prior artifacts: unit-of-work.md (U-14 entry), stories S-04/S-10/S-11, requirements FR-OUT-01..07 / FR-WORK-05..07 / FR-PAY-05 / NFR-SAFE-01..03, components C-11 DepositPlanner + M-16 MailDispatcher, design-verification V9 (MFM mail-attachment decision), and the current code (ItemBuffer is destination-blind, ShiftStateMachine single-trip Depositing, ShiftOrchestrator shipping-bin-only deposit, ChestResolver.ResolveChest, ShiftContext lacks TaskDestinations). Starting Functional Design: created the FD plan with 7 design questions for user input.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Functional Design stage start
+
+---
+## U-14 Output Pipeline — Functional Design Answers + Artifacts
+**Timestamp**: 2026-05-21T18:55:00Z
+**User Input**: "they've been answered"
+**AI Response**: Read FD answers — all seven are A (the recommended options): Q1=A buffer tags items with TaskKind + planner resolves via TaskDestinations; Q2=A unassigned output → mail; Q3=A nearest-neighbor trip ordering; Q4=A queue MFM deliver-tomorrow letter at shift end; Q5=A sleep-mid-deposit mails entire leftover buffer (no shipping-bin dump); Q6=A one letter listing each applicable reason; Q7=A one combined tool-missing vanilla warning letter. Answers are mutually consistent — no clarification file needed. Generated the three functional-design artifacts: business-logic-model.md, domain-entities.md, business-rules.md under aidlc-docs/construction/u-14-output-pipeline/functional-design/. Updated FD plan checklist. Awaiting approval.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Functional Design artifacts complete
+
+---

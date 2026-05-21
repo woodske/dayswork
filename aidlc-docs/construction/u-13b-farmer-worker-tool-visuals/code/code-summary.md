@@ -10,6 +10,12 @@ After play-testing the Farmer-backed worker, the implementation has pivoted back
 
 The visual animation target is now Stardew-Squad-style NPC task animation rather than vanilla Farmer tool animation. `ToolSwapAnimator` plays a small callback-free two-frame NPC work beat by facing direction, spawns a matching world tool-swing sprite, then returns the NPC to the matching idle frame. This avoids the Farmer callback/null-ref/body-corruption path entirely.
 
+## Farmer vs NPC Decision
+
+The Farmer-backed approach was implemented far enough to learn from it, then rejected after play-test. It promised "free" vanilla tool visuals, but in practice standalone `Farmer` instances carried too much player-specific behavior: draw depth did not match normal world characters, body/tool frames were easy to corrupt, lateral movement looked wrong, and vanilla tool animation callbacks assumed real player state and produced crashes/null references.
+
+The accepted architecture is an NPC worker in `farm.characters`. Dayswork owns the actual task effects explicitly, while visuals are layered on top with callback-free NPC work beats and temporary world tool-swing sprites. This keeps rendering, collision/depth, and save cleanup closer to normal Stardew NPC behavior without depending on hidden `Farmer` internals.
+
 ## Created / Restored
 
 | File | Purpose |
