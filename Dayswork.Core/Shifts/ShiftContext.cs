@@ -21,6 +21,14 @@ public sealed class ShiftContext
     // Set when work list exhausts or 8pm fires — before Depositing begins.
     public int? ShiftEndTime { get; set; }
 
+    // Counts how many teleport-and-resume recoveries have been attempted this shift (Pattern E).
+    // Owned by the orchestrator layer; held here so it travels with the shift context.
+    public int RecoveryAttempts { get; set; }
+
+    // Task kinds skipped entirely because the player's tool level was too low (BR-TOOL-02).
+    // Populated during BuildWorkList; read by U-14 to send the warning mail.
+    public HashSet<TaskKind> ToolMissingWarnings { get; } = new();
+
     public ShiftContext(
         ContractId contractId,
         IReadOnlyList<Zone> zones,

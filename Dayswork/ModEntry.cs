@@ -41,7 +41,7 @@ public sealed class ModEntry : Mod
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
-        var orchestrator    = new ShiftOrchestrator(toolReader);
+        var orchestrator    = new ShiftOrchestrator(toolReader, config);
         Orchestrator = orchestrator;
         var scheduler       = new RecurringContractScheduler(store, orchestrator);
 
@@ -96,5 +96,10 @@ public sealed class ModEntry : Mod
                         LogLevel.Info);
                 }
             });
+
+        helper.ConsoleCommands.Add(
+            "dayswork_end_shift",
+            "Ends the current worker shift immediately. Worker deposits buffered items and exits. Partial refund applies.",
+            (_, _) => Orchestrator.EndShiftEarly());
     }
 }

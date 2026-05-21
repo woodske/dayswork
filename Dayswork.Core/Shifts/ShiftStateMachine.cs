@@ -5,27 +5,32 @@ public sealed class ShiftStateMachine : IShiftStateMachine
     public ShiftPhase Phase { get; private set; } = ShiftPhase.WaitingForSpawn;
     public ShiftIntent? CurrentIntent { get; private set; }
 
-    // Legal successors: each phase maps to the single phase that may follow it.
-    // Done has no successor — any transition out of Done is illegal.
-    private static readonly Dictionary<ShiftPhase, ShiftPhase> _successors = new()
+    // Legal successors: each phase maps to the set of phases that may follow it.
+    // Done maps to the empty set — any transition out of Done is illegal.
+    private static readonly Dictionary<ShiftPhase, HashSet<ShiftPhase>> _successors = new()
     {
-        [ShiftPhase.WaitingForSpawn] = ShiftPhase.Working,
-        [ShiftPhase.Working]         = ShiftPhase.Depositing,
-        [ShiftPhase.Depositing]      = ShiftPhase.Exiting,
-        [ShiftPhase.Exiting]         = ShiftPhase.Done,
+        [ShiftPhase.WaitingForSpawn] = new() { ShiftPhase.Working },
+        [ShiftPhase.Working]         = new() { ShiftPhase.Depositing, ShiftPhase.Stuck },
+        [ShiftPhase.Stuck]           = new() { ShiftPhase.Recovering },
+        [ShiftPhase.Recovering]      = new() { ShiftPhase.Working, ShiftPhase.Depositing },
+        [ShiftPhase.Depositing]      = new() { ShiftPhase.Exiting },
+        [ShiftPhase.Exiting]         = new() { ShiftPhase.Done },
+        [ShiftPhase.Done]            = new() { },
     };
 
     // Phases that must carry a non-null intent.
     private static readonly HashSet<ShiftPhase> _activePhases = new()
     {
         ShiftPhase.Working,
+        ShiftPhase.Stuck,
+        ShiftPhase.Recovering,
         ShiftPhase.Depositing,
         ShiftPhase.Exiting,
     };
 
     public void Transition(ShiftPhase newPhase, ShiftIntent? intent = null)
     {
-        if (!_successors.TryGetValue(Phase, out var legal) || newPhase != legal)
+        if (!_successors.TryGetValue(Phase, out var legalSet) || !legalSet.Contains(newPhase))
             throw new InvalidOperationException(
                 $"Illegal shift transition: {Phase} → {newPhase}.");
 

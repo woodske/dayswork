@@ -35,59 +35,59 @@
 ### A. Core types
 
 **Step 1 — Modify `Dayswork.Core/Shifts/ShiftPhase.cs`**
-[ ] Add `Stuck` and `Recovering` (between `Working` and `Depositing`). *S-16.*
+[x] Add `Stuck` and `Recovering` (between `Working` and `Depositing`). *S-16.*
 
 **Step 2 — Modify `Dayswork.Core/Shifts/ShiftIntent.cs`**
-[ ] Add `IntentPlayEmote(int EmoteId)`, `IntentTeleportToTile(TileCoord Destination)`, `IntentTeleportHome`. *S-16.*
+[x] Add `IntentPlayEmote(int EmoteId)`, `IntentTeleportToTile(TileCoord Destination)`, `IntentTeleportHome`. *S-16.*
 
 **Step 3 — Modify `Dayswork.Core/Shifts/ShiftStateMachine.cs`**
-[ ] `_successors` → `Dictionary<ShiftPhase, HashSet<ShiftPhase>>` per BR-SM-01 (`Working→{Depositing,Stuck}`, `Stuck→{Recovering}`, `Recovering→{Working,Depositing}`, rest single). Add `Stuck`,`Recovering` to `_activePhases`. Keep terminal-`Done` + intent guards. *S-16, S-19.*
+[x] `_successors` → `Dictionary<ShiftPhase, HashSet<ShiftPhase>>` per BR-SM-01 (`Working→{Depositing,Stuck}`, `Stuck→{Recovering}`, `Recovering→{Working,Depositing}`, rest single). Add `Stuck`,`Recovering` to `_activePhases`. Keep terminal-`Done` + intent guards. *S-16, S-19.*
 
 **Step 4 — Modify `Dayswork.Core/Shifts/WorkItem.cs`**
-[ ] `WorkItem(TileCoord NavTile, TileCoord TaskTile, TaskKind Task)` (trellis nav vs action tile). *S-08.*
+[x] `WorkItem(TileCoord NavTile, TileCoord TaskTile, TaskKind Task)` (trellis nav vs action tile). *S-08.*
 
 **Step 5 — Modify `Dayswork.Core/Shifts/ShiftContext.cs`**
-[ ] Add `int RecoveryAttempts { get; set; }` and `HashSet<TaskKind> ToolMissingWarnings { get; } = new();`. *S-16, S-09.*
+[x] Add `int RecoveryAttempts { get; set; }` and `HashSet<TaskKind> ToolMissingWarnings { get; } = new();`. *S-16, S-09.*
 
 **Step 6 — Create `Dayswork.Core/Shifts/IStuckDetector.cs` + `StuckDetector.cs`**
-[ ] `RecordTick(bool madeProgress, int minutes)`, `ShouldFireStuck()`, `Reset()`; ctor takes threshold. Pure Core. *S-16, S-19.*
+[x] `RecordTick(bool madeProgress, int minutes)`, `ShouldFireStuck()`, `Reset()`; ctor takes threshold. Pure Core. *S-16, S-19.*
 
 ### B. Core tests (PBT)
 
 **Step 7 — Modify `Dayswork.Tests/Shifts/ShiftStateMachineTests.cs`**
-[ ] Add **PBT-U13-01** (no transition from Done), **PBT-U13-02** (only legal successors incl. Stuck/Recovering edges; non-successors throw), **PBT-U13-03** (Stuck only from Working; Recovering only from Stuck; neither from Done). U-02 seed-logging. *S-19.*
+[x] Add **PBT-U13-01** (no transition from Done), **PBT-U13-02** (only legal successors incl. Stuck/Recovering edges; non-successors throw), **PBT-U13-03** (Stuck only from Working; Recovering only from Stuck; neither from Done). U-02 seed-logging. *S-19.*
 
 **Step 8 — Create `Dayswork.Tests/Shifts/StuckDetectorTests.cs`**
-[ ] **PBT-U13-04** (progress → not stuck), **PBT-U13-05** (no-progress threshold monotonicity), **PBT-U13-06** (`Reset()` clears). *S-19.*
+[x] **PBT-U13-04** (progress → not stuck), **PBT-U13-05** (no-progress threshold monotonicity), **PBT-U13-06** (`Reset()` clears). *S-19.*
 
 ### C. Mod logic
 
 **Step 9 — Modify `Dayswork/Worker/PathFindControllerAdapter.cs` — real walking**
-[ ] Replace the U-10 `warpCharacter` teleport stub with native `StardewValley.PathFindController` walking: `StartNavigation` assigns `npc.controller = new PathFindController(npc, location, targetTile, finalFacing)`; `HasArrived` = controller finished/null path consumed; `NavigationFailed` = no path produced (Skip-and-Continue). *S-16 (makes stuck meaningful), TODO-01 re-check.*
+[x] Replace the U-10 `warpCharacter` teleport stub with native `StardewValley.PathFindController` walking: `StartNavigation` assigns `npc.controller = new PathFindController(npc, location, targetTile, finalFacing)`; `HasArrived` = controller finished/null path consumed; `NavigationFailed` = no path produced (Skip-and-Continue). *S-16 (makes stuck meaningful), TODO-01 re-check.*
 
 **Step 10 — Create `Dayswork/Worker/ObjectTargetClassifier.cs`**
-[ ] Map `Tree`/`FruitTree`/`ResourceClump`/`Object` → `AxeTarget`/`PickTarget`; null (→ skip) for unmapped classes (REL-U13-04). *S-09.*
+[x] Map `Tree`/`FruitTree`/`ResourceClump`/`Object` → `AxeTarget`/`PickTarget`; null (→ skip) for unmapped classes (REL-U13-04). *S-09.*
 
 **Step 11 — Modify `Dayswork/Orchestration/ShiftOrchestrator.cs` (major)**
-[ ] Update `WorkItem.Tile` refs → `NavTile`/`TaskTile`.
-[ ] `BuildWorkList`: remove building pre-pass (BR-PRIO-03); apply `ObjectTargetClassifier` + `CapabilityEvaluator` skip rules (FR-SKIP-01/02/03); expand `DetectTask` to classify `ResourceClump`/ore; trellis → nearest reachable orthogonal `NavTile`, else skip (FR-SKIP-04); not-ready crops skip (FR-SKIP-05); group by `TaskPriorityOrderer` then nearest-first (BR-PRIO-01); record `ToolMissingWarnings` (BR-TOOL-02).
-[ ] Per sampled tick: compute `madeProgress` (FD-Q3=A) → `StuckDetector.RecordTick`; on `ShouldFireStuck` run the 3-step escalation with `RecoveryAttempts` (Patterns D/E); handle `IntentPlayEmote` / `IntentTeleportToTile` / `IntentTeleportHome`.
-[ ] Invulnerability: hit-detection helper (player melee swing within range → `npc.doEmote("!")`, debounced, no state change) — S-17, FD-Q6=A. (NPC villagers are inherently undamageable, so this is the whole story.)
+[x] Update `WorkItem.Tile` refs → `NavTile`/`TaskTile`.
+[x] `BuildWorkList`: remove building pre-pass (BR-PRIO-03); apply `ObjectTargetClassifier` + `CapabilityEvaluator` skip rules (FR-SKIP-01/02/03); expand `DetectTask` to classify `ResourceClump`/ore; trellis → nearest reachable orthogonal `NavTile`, else skip (FR-SKIP-04); not-ready crops skip (FR-SKIP-05); group by `TaskPriorityOrderer` then nearest-first (BR-PRIO-01); record `ToolMissingWarnings` (BR-TOOL-02).
+[x] Per sampled tick: compute `madeProgress` (FD-Q3=A) → `StuckDetector.RecordTick`; on `ShouldFireStuck` run the 3-step escalation with `RecoveryAttempts` (Patterns D/E); handle `IntentPlayEmote` / `IntentTeleportToTile` / `IntentTeleportHome`.
+[x] Invulnerability: hit-detection helper (player melee swing within range → `npc.doEmote("!")`, debounced, no state change) — S-17, FD-Q6=A. (NPC villagers are inherently undamageable, so this is the whole story.)
 *S-08, S-09, S-16, S-17.*
 
 ### D. Build, test, docs
 
 **Step 12 — `dotnet build`**
-[ ] 0 errors, 0 warnings; mod auto-deploys to `Mods/Dayswork/`.
+[x] 0 errors, 0 warnings; mod auto-deploys to `Mods/Dayswork/`.
 
 **Step 13 — `dotnet test`**
-[ ] New U-13 PBTs + full regression all green.
+[x] New U-13 PBTs + full regression all green.
 
 **Step 14 — Create `aidlc-docs/construction/u-13-worker-features/code/code-summary.md`**
-[ ] Files created/modified; play-test checklist (real walking pace, priority order, skip rules, stuck recovery, invuln emote, **TODO-01 tree-seed re-check**).
+[x] Files created/modified; play-test checklist (real walking pace, priority order, skip rules, stuck recovery, invuln emote, **TODO-01 tree-seed re-check**).
 
 **Step 15 — Update `aidlc-state.md` + `audit.md`**
-[ ] Mark U-13 Code Generation complete; append audit entry.
+[x] Mark U-13 Code Generation complete; append audit entry.
 
 ---
 

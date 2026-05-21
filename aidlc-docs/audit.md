@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13 Post-Playtest Feedback Fixes — Complete
+**Timestamp**: 2026-05-21T03:30:00Z
+**User Input**: (Three feedback items) "TODO: allow player to cancel work for the day at any time, worker should stop and deposit immediately" / "Getting this message on a new day, but the worker still shows up: [Dayswork] Shift interrupted by save — removing worker and refunding deposit." / "The worker is prioritizing cutting grass. I've selected tasks cut tree, break rock, clear grass, clear weeds. The worker will cut grass and walk around rocks and logs to get to another piece of grass. They should be looking at the next closest task that they can do and fan out from their starting point."
+**AI Response**: Applied three fixes to ShiftOrchestrator + ModEntry. (1) Feature: Added `EndShiftEarly()` public method — checks phase, bridges Stuck→Recovering if needed, sets ShiftEndTime, calls BeginDeposit. Registered `dayswork_end_shift` console command in RegisterDebugCommands. (2) Bug fix: OnSaving now checks `_ctx.ShiftEndTime.HasValue` — if set (normal end-of-day, player slept while worker was depositing/exiting), flush buffer + ComputeRefund with no warning; if null (genuine mid-day save), warn + full refund. (3) Terrain-clearing sort: BuildWorkList splits rawItems into priorityItems (Water/Harvest/Fruit — keep FR-WORK-03 priority order) and clearingItems (Weeds/Grass/Rocks/Trees — merged pool). Added `GreedyNearestNeighbour(List<WorkItem>, TileCoord)` static method implementing O(n²) greedy nearest-neighbor sort. Terrain-clearing tasks are now sorted by proximity from current position, eliminating the walk-past-nearby-rocks-to-find-more-grass behaviour. Build: 0 errors / 0 warnings. Tests: 173 passed / 1 skipped / 0 failed.
+**Context**: CONSTRUCTION — U-13 Worker Features, post-code-generation feedback fixes
+
+---
+
+## U-13 Code Generation — Complete
+**Timestamp**: 2026-05-21T02:00:00Z
+**User Input**: "approve and generate"
+**AI Response**: Executed all 15 steps. Build: 0 errors / 0 warnings (fixed PathFindController namespace → StardewValley.Pathfinding; ResourceClump.tile → .Tile; Object.IsStone() → .IsBreakableStone(); C# 10 collection expression). Tests: 173 passed / 1 skipped / 0 failed including PBT-U13-01..07. Files: created IStuckDetector.cs, StuckDetector.cs, ObjectTargetClassifier.cs, StuckDetectorTests.cs, code-summary.md; modified ShiftPhase (Stuck/Recovering), ShiftIntent (3 new intents), ShiftStateMachine (multi-successor HashSet), WorkItem (NavTile/TaskTile split), ShiftContext (RecoveryAttempts/ToolMissingWarnings), ShiftStateMachineTests (PBT-U13-01..03 + legal-edges table), PathFindControllerAdapter (real walking via PathFindController), ShiftOrchestrator (major: priority+skip+stuck+escalation+invuln), ModEntry (config param). Play-test checklist in code-summary.md: walking pace, priority order, trellis crops, capability skip, emote IDs (TODO: verify EmoteQuestion=8, EmoteExclamation=2), stuck escalation, TODO-01 tree-seed re-check.
+**Context**: CONSTRUCTION — U-13 Worker Features, Code Generation complete
+
+---
+
 ## U-13/U-13B Split Decision + Code Generation Plan Rewrite
 **Timestamp**: 2026-05-21T00:30:00Z
 **User Input**: "should we split the transition to farmer work out into its own unit? or do you think it's ok to do all of this at once?" → "let's split, farmer unit comes next"

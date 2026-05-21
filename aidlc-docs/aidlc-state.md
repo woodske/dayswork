@@ -6,7 +6,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-05-18
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: U-13 Worker AI: Priority + Capability/Skip + Stuck + Invulnerability — **Re-scoped after split; Code Generation Part 1 (plan) rewritten; awaiting plan approval before Part 2 generation.**
+- **Current Stage**: U-13 Worker AI: Priority + Capability/Skip + Stuck + Invulnerability — **Code Generation COMPLETE. Awaiting play-test before proceeding to U-13B.**
 - **Unit split (2026-05-21)**: U-13 split into **U-13 (Worker AI)** — priority/skip/capability/stuck/invulnerability on the existing NPC + real walking — and **U-13B (Farmer Worker + Tool Visuals)** — full-Farmer re-founding (FD-Q5=B) + tool-swap (S-07). U-13B runs **next**, immediately after U-13, then U-14 → U-15 → U-16. Rationale: isolate the high-uncertainty Farmer architecture change from the low-risk worker-AI logic. See [unit-of-work.md](inception/application-design/unit-of-work.md) U-13/U-13B entries.
 
 ## Open TODOs
