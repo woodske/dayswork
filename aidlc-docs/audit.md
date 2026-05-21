@@ -1,5 +1,21 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-13B Code Generation — Part 1 Plan Created, Awaiting Approval
+**Timestamp**: 2026-05-21T06:05:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design approved (stage marked complete). Created Code Generation Part 1 plan at `aidlc-docs/construction/plans/u-13b-farmer-worker-tool-visuals-code-generation-plan.md` — **14 steps**: (A) Core — Step 1 create `WorkerTool` (Domain enum + ForTask map), Step 2 exhaustive WorkerToolTests; (B) Appearance — Step 3 WorkerAppearance record, Step 4 WorkerAppearanceRandomizer (ContractId-seeded, range-clamped); (C) Entity — Step 5 create FarmhandWorker (Farmer) + delete FarmhandNpc [RISK]; (D) Step 6 create WorkerMovementDriver (PathFindController path-compute-only + per-tick Position stepping) + delete PathFindControllerAdapter [RISK], Step 7 WorkerRenderer (RenderedWorld draw) [RISK], Step 8 ToolSwapAnimator (M-10; instant swap, animateOnce frame sets, hand-pick beat); (E) Step 9 ShiftOrchestrator seam re-point (behaviour unchanged, BR-PRESERVE-01; per-tick movement Update before throttle; warpCharacter→Position set), Step 10 ModEntry (add Display.RenderedWorld, drop NPC portrait redirect); (F) Step 11 build, Step 12 test (WorkerTool + 173 regression), Step 13 code-summary + play-test checklist (esp. U-13 'stands still' re-check), Step 14 state/audit. Highest-risk steps 5–7 (standalone Farmer create/drive/draw) isolated + play-test-flagged. Story S-07 completes. Awaiting user approval before Part 2 generation.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation Part 1 (gate: awaiting plan approval)
+
+---
+
+## U-13B NFR Design — Approved
+**Timestamp**: 2026-05-21T06:00:00Z
+**User Input**: "continue"
+**AI Response**: NFR Design approved. Marking stage complete; proceeding to Code Generation Part 1 (Planning) for U-13B.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, NFR Design → Code Generation
+
+---
+
 ## U-13B NFR Design — Complete (Awaiting Approval)
 **Timestamp**: 2026-05-21T05:50:00Z
 **User Input**: "continue"
