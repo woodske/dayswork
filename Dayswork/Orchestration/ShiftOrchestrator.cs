@@ -17,6 +17,7 @@ internal sealed class ShiftOrchestrator
 {
     // Farm entrance tile — worker spawns and exits here.
     private static readonly TileCoord FarmEntrance   = new(71, 14);
+    private static readonly Vector2 FarmExitPastEntrancePixel = new(FarmEntrance.X * 64f, (FarmEntrance.Y + 2) * 64f);
     // Shipping bin tile on Standard Farm.
     private static readonly TileCoord ShippingBinTile = new(71, 13);
 
@@ -28,19 +29,30 @@ internal sealed class ShiftOrchestrator
     // Melee proximity range for hit-detection (Manhattan distance in tiles).
     private const float HitRangeTiles = 2.0f;
 
+    // Brief morning hold so the player sees the worker enter from the farm entrance.
+    private const int MorningEntranceHoldTicks = 120;
+
+    // Vanilla tree debris can spawn after the tree-fall animation, not on the axe-hit tick.
+    private const int DelayedTreeDebrisSweepTicks = 240;
+    private const int DelayedTreeDebrisSweepRadiusTiles = 6;
+
     private readonly ToolLevelReader      _toolReader;
+    private readonly ToolSwapAnimator     _toolAnimator;
     private readonly ICapabilityEvaluator _capability      = new CapabilityEvaluator();
     private readonly ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
     private readonly IConfigSnapshot      _config;
-    private readonly PathFindControllerAdapter _nav = new();
+    private readonly WorkerMovementDriver _nav = new();
 
     private ShiftContext? _ctx;
     private FarmhandNpc?  _farmhand;
     private int           _tickCount;
+    private int           _morningEntranceHoldTicks;
+    private bool          _exitWalkStarted;
 
     // Per-WorkItem state — the nav tile and task tile are tracked separately (trellis crops).
     private bool      _actionPending;
     private TaskKind  _pendingTask;
+    private TileCoord _pendingNavTile;
     private TileCoord _pendingTaskTile;
 
     // Stuck detection. Replaced after first teleport recovery to switch threshold.
@@ -55,11 +67,17 @@ internal sealed class ShiftOrchestrator
     // Hit-reaction debounce — one emote per player swing.
     private bool _playerWasSwinging;
 
-    public ShiftOrchestrator(ToolLevelReader toolReader, IConfigSnapshot config)
+    private readonly List<PendingDebrisSweep> _pendingDebrisSweeps = new();
+
+    public ShiftOrchestrator(
+        ToolLevelReader toolReader,
+        IConfigSnapshot config,
+        ToolSwapAnimator toolAnimator)
     {
-        _toolReader = toolReader;
-        _config     = config;
-        _stuck      = new StuckDetector(config.StuckInitialWaitMinutes);
+        _toolReader   = toolReader;
+        _config       = config;
+        _toolAnimator = toolAnimator;
+        _stuck        = new StuckDetector(config.StuckInitialWaitMinutes);
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -121,6 +139,7 @@ internal sealed class ShiftOrchestrator
         var spawnPos = new Vector2(FarmEntrance.X, FarmEntrance.Y) * 64f;
         _farmhand = new FarmhandNpc(spawnPos);
         farm.addCharacter(_farmhand);
+        _toolAnimator.SetWorker(_farmhand);
 
         // Reset shift-level state.
         _stuck              = new StuckDetector(_config.StuckInitialWaitMinutes);
@@ -128,6 +147,9 @@ internal sealed class ShiftOrchestrator
         _lastTilePos         = _farmhand.TilePoint;
         _playerWasSwinging   = false;
         _actionPending       = false;
+        _exitWalkStarted     = false;
+        _morningEntranceHoldTicks = MorningEntranceHoldTicks;
+        _pendingDebrisSweeps.Clear();
 
         var firstItem = workList[0];
         var remaining = workList.Skip(1);
@@ -147,7 +169,9 @@ internal sealed class ShiftOrchestrator
             _ctx.ToolMissingWarnings.Add(kind);
 
         _pendingTask     = firstItem.Task;
+        _pendingNavTile  = firstItem.NavTile;
         _pendingTaskTile = firstItem.TaskTile;
+        _toolAnimator.OnTaskChanged(firstItem.Task, firstItem.Task);
         _ctx.StateMachine.Transition(ShiftPhase.Working, new IntentMoveToTile(firstItem.NavTile));
         _nav.StartNavigation(firstItem.NavTile, farm, _farmhand);
     }
@@ -157,6 +181,16 @@ internal sealed class ShiftOrchestrator
     public void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
         if (_ctx is null || _ctx.StateMachine.Phase == ShiftPhase.Done) return;
+        if (!Game1.shouldTimePass(false)) return;
+        if (_morningEntranceHoldTicks > 0 && _ctx.StateMachine.Phase == ShiftPhase.Working)
+        {
+            _morningEntranceHoldTicks--;
+            return;
+        }
+
+        _toolAnimator.Update(Game1.currentGameTime);
+        _nav.Update();
+        ProcessPendingDebrisSweeps();
         if (++_tickCount % 4 != 0) return; // PERF-U13-01 throttle
 
         var farm  = Game1.getFarm();
@@ -208,10 +242,10 @@ internal sealed class ShiftOrchestrator
         if (_farmhand is null) return;
 
         var farm = Game1.getFarm();
-        farm.characters.Remove(_farmhand);
 
         if (_ctx is not null)
         {
+            FlushPendingDebrisSweeps();
             if (_ctx.ShiftEndTime.HasValue)
             {
                 // Shift ended normally (8pm cap / work-complete / stuck step 3 / EndShiftEarly).
@@ -239,8 +273,7 @@ internal sealed class ShiftOrchestrator
             }
         }
 
-        _farmhand = null;
-        _nav.Clear();
+        ClearWorker();
         _ctx = null;
     }
 
@@ -339,8 +372,10 @@ internal sealed class ShiftOrchestrator
 
     private void HandleTeleportToTile(IntentTeleportToTile intent, Farm farm)
     {
-        // Instant warp to recovery tile, then resume working.
-        Game1.warpCharacter(_farmhand!, farm, new Vector2(intent.Destination.X, intent.Destination.Y));
+        // Instant reposition to recovery tile, then resume working.
+        _farmhand!.Position = new Vector2(intent.Destination.X, intent.Destination.Y) * 64f;
+        _farmhand.currentLocation = farm;
+        _nav.Clear();
 
         // Switch to post-teleport threshold and reset detector.
         _stuck = new StuckDetector(_config.StuckPostTeleportWaitMinutes);
@@ -349,13 +384,16 @@ internal sealed class ShiftOrchestrator
         _ctx!.RecoveryAttempts++;
 
         // Recovering → Working: continue from the teleport tile.
-        _actionPending   = false;
-        // The next work item drives the real nav; re-queue with nav adapter.
+        _actionPending = false;
+        // The next work item drives the real nav; re-queue with the movement driver.
         if (_ctx.WorkList.Count > 0)
         {
             var next = _ctx.WorkList.Dequeue();
+            var previousTask = _pendingTask;
             _pendingTask     = next.Task;
+            _pendingNavTile  = next.NavTile;
             _pendingTaskTile = next.TaskTile;
+            _toolAnimator.OnTaskChanged(previousTask, next.Task);
             _ctx.StateMachine.Transition(ShiftPhase.Working, new IntentMoveToTile(next.NavTile));
             _nav.StartNavigation(next.NavTile, farm, _farmhand);
         }
@@ -370,8 +408,10 @@ internal sealed class ShiftOrchestrator
 
     private void HandleTeleportHome(Farm farm)
     {
-        // Step 3: warp home and end shift via normal Depositing path (SAFE-U13-01).
-        Game1.warpCharacter(_farmhand!, farm, new Vector2(FarmEntrance.X, FarmEntrance.Y));
+        // Step 3: reposition home and end shift via normal Depositing path (SAFE-U13-01).
+        _farmhand!.Position = new Vector2(FarmEntrance.X, FarmEntrance.Y) * 64f;
+        _farmhand.currentLocation = farm;
+        _nav.Clear();
         _ctx!.ShiftEndTime = Game1.timeOfDay;
         // Recovering → Depositing (valid successor per BR-SM-01).
         BeginDeposit();
@@ -403,13 +443,18 @@ internal sealed class ShiftOrchestrator
     {
         if (_nav.NavigationFailed)
         {
-            ModEntry.ModMonitor.Log("[Dayswork] Tile unreachable — skipping.", LogLevel.Trace);
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][nav] failed task={_pendingTask} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_pendingTaskTile.X},{_pendingTaskTile.Y}); skipping.",
+                LogLevel.Warn);
             AdvanceWorkList(farm);
             return;
         }
 
         if (_nav.HasArrived)
         {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][nav] arrived task={_pendingTask} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_pendingTaskTile.X},{_pendingTaskTile.Y}) worker=({_farmhand!.TilePoint.X},{_farmhand.TilePoint.Y}) fallback={_nav.UsedDirectFallback}.",
+                LogLevel.Debug);
             _ctx!.StateMachine.SetIntent(new IntentPerformTaskAt(_pendingTaskTile, _pendingTask));
             _actionPending = false;
         }
@@ -419,16 +464,30 @@ internal sealed class ShiftOrchestrator
     {
         if (!_actionPending)
         {
+            _toolAnimator.StopSwing();
+            _toolAnimator.PlaySwing(intent.Task, FacingToward(_farmhand!.TilePoint, intent.Tile, _farmhand.FacingDirection));
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][action] invoke task={intent.Task} taskTile=({intent.Tile.X},{intent.Tile.Y}) worker=({_farmhand.TilePoint.X},{_farmhand.TilePoint.Y}).",
+                LogLevel.Debug);
             InvokeTaskAction(intent.Tile, intent.Task, farm);
             _actionPending = true;
             return;
         }
 
+        if (_toolAnimator.IsSwinging)
+            return;
+
         if (IsTaskComplete(intent.Tile, intent.Task, farm))
         {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][action] complete task={intent.Task} taskTile=({intent.Tile.X},{intent.Tile.Y}).",
+                LogLevel.Debug);
             _actionPending = false;
             AdvanceWorkList(farm);
+            return;
         }
+
+        _actionPending = false;
     }
 
     // ── Deposit / exit handlers ───────────────────────────────────────────────
@@ -445,28 +504,36 @@ internal sealed class ShiftOrchestrator
                     farm.getShippingBin(Game1.player).Add(obj);
             }
             _ctx.StateMachine.Transition(ShiftPhase.Exiting, new IntentExitFarm());
+            _exitWalkStarted = false;
             _nav.StartNavigation(FarmEntrance, farm, _farmhand!);
         }
     }
 
     private void HandleExit(Farm farm)
     {
-        if (_nav.NavigationFailed || _nav.HasArrived)
+        if (!_nav.NavigationFailed && !_nav.HasArrived)
+            return;
+
+        if (!_exitWalkStarted)
         {
-            var refund = _ctx!.ComputeRefund();
-            if (refund > 0)
-                Game1.player.Money += refund;
-
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork] Shift complete. Hours: {((_ctx.ShiftEndTime ?? Game1.timeOfDay) - _ctx.ShiftStartTime) / 60}. Refund: {refund}g.",
-                LogLevel.Info);
-
-            farm.characters.Remove(_farmhand);
-            _farmhand = null;
-            _nav.Clear();
-            _ctx.StateMachine.Transition(ShiftPhase.Done);
-            _ctx = null;
+            _exitWalkStarted = true;
+            _toolAnimator.StopSwing();
+            ModEntry.ModMonitor.Log("[Dayswork][exit] worker leaving through farm entrance.", LogLevel.Debug);
+            _nav.StartForcedPixelRoute(farm, _farmhand!, FarmExitPastEntrancePixel);
+            return;
         }
+
+        var refund = _ctx!.ComputeRefund();
+        if (refund > 0)
+            Game1.player.Money += refund;
+
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork] Shift complete. Hours: {((_ctx.ShiftEndTime ?? Game1.timeOfDay) - _ctx.ShiftStartTime) / 60}. Refund: {refund}g.",
+            LogLevel.Info);
+
+        ClearWorker();
+        _ctx.StateMachine.Transition(ShiftPhase.Done);
+        _ctx = null;
     }
 
     // ── Work list helpers ─────────────────────────────────────────────────────
@@ -483,8 +550,12 @@ internal sealed class ShiftOrchestrator
         }
 
         var next = _ctx.WorkList.Dequeue();
+        var previousTask = _pendingTask;
         _pendingTask     = next.Task;
+        _pendingNavTile  = next.NavTile;
         _pendingTaskTile = next.TaskTile;
+        _toolAnimator.StopSwing();
+        _toolAnimator.OnTaskChanged(previousTask, next.Task);
         _ctx.StateMachine.SetIntent(new IntentMoveToTile(next.NavTile));
         _nav.StartNavigation(next.NavTile, farm, _farmhand!);
     }
@@ -493,12 +564,44 @@ internal sealed class ShiftOrchestrator
     {
         var farm = Game1.getFarm();
         // Valid from Working, Stuck, Recovering (all have Depositing as a successor).
+        _morningEntranceHoldTicks = 0;
+        FlushPendingDebrisSweeps();
         _ctx!.StateMachine.Transition(ShiftPhase.Depositing, new IntentDepositInShippingBin());
         _nav.StartNavigation(ShippingBinTile, farm, _farmhand!);
     }
 
+    private void ClearWorker()
+    {
+        if (_farmhand is not null)
+        {
+            _farmhand.controller = null;
+            Game1.getFarm().characters.Remove(_farmhand);
+        }
+
+        _toolAnimator.SetWorker(null);
+        _farmhand = null;
+        _morningEntranceHoldTicks = 0;
+        _exitWalkStarted = false;
+        _pendingDebrisSweeps.Clear();
+        _nav.Clear();
+    }
+
+    private static int FacingToward(Point from, TileCoord to, int fallback)
+    {
+        var dx = to.X - from.X;
+        var dy = to.Y - from.Y;
+
+        if (dx == 0 && dy == 0)
+            return fallback;
+
+        if (Math.Abs(dx) > Math.Abs(dy))
+            return dx > 0 ? 1 : 3;
+
+        return dy > 0 ? 2 : 0;
+    }
+
     private static bool IsTileReachable(TileCoord tile, Farm farm) =>
-        farm.isTilePassable(new xTile.Dimensions.Location(tile.X, tile.Y), Game1.viewport);
+        WorkerMovementDriver.IsTilePassableForWorker(new Point(tile.X, tile.Y), farm);
 
     // ── Task invocation (Invoke-and-Poll) ─────────────────────────────────────
 
@@ -566,12 +669,28 @@ internal sealed class ShiftOrchestrator
     private void InvokeClearRock(TileCoord tile, GameLocation loc)
     {
         var tileVec = new Vector2(tile.X, tile.Y);
-        if (!loc.objects.TryGetValue(tileVec, out var obj)) return;
-        var before  = new HashSet<Debris>(loc.debris);
         var pickaxe = new Pickaxe { UpgradeLevel = (int)_ctx!.ToolSnapshot.PickaxeLevel, lastUser = Game1.player };
-        if (!obj.performToolAction(pickaxe)) return;
+
+        if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is { } clump)
+        {
+            var beforeClump = new HashSet<Debris>(loc.debris);
+            clump.performToolAction(pickaxe, 0, clump.Tile);
+            loc.resourceClumps.Remove(clump);
+            if (!CollectNewDebris(beforeClump, loc))
+                _ctx.Buffer.Add("(O)390", 10);
+            return;
+        }
+
+        if (!loc.objects.TryGetValue(tileVec, out var obj)) return;
+        if (ObjectTargetClassifier.ClassifyPick(tileVec, loc) is null) return;
+
+        var before  = new HashSet<Debris>(loc.debris);
+        var actionRemoved = obj.performToolAction(pickaxe);
         if (loc.objects.ContainsKey(tileVec))
             loc.removeObject(tileVec, false);
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][action] clear rock at ({tile.X},{tile.Y}) performToolAction={actionRemoved} removed={!loc.objects.ContainsKey(tileVec)}.",
+            LogLevel.Debug);
         if (!CollectNewDebris(before, loc))
             _ctx!.Buffer.Add("(O)390", 1);
     }
@@ -584,12 +703,34 @@ internal sealed class ShiftOrchestrator
         if (loc.terrainFeatures.TryGetValue(tileVec, out var tf) && tf is Tree tree)
         {
             bool isMahogany = tree.treeType.Value == Tree.mahoganyTree;
+            bool wasStump   = tree.stump.Value;
             var  before     = new HashSet<Debris>(loc.debris);
-            tree.performToolAction(axe, 0, tileVec);
-            if (loc.terrainFeatures.ContainsKey(tileVec))
+            var  removeTree = tree.performToolAction(axe, 0, tileVec);
+            if (removeTree && loc.terrainFeatures.ContainsKey(tileVec))
                 loc.terrainFeatures.Remove(tileVec);
-            if (!CollectNewDebris(before, loc))
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][action] cut tree at ({tile.X},{tile.Y}) remove={removeTree} health={tree.health.Value:0.##} stump={tree.stump.Value}.",
+                LogLevel.Debug);
+            var collected = CollectNewDebris(before, loc);
+            if (removeTree && !collected)
                 _ctx!.Buffer.Add(isMahogany ? "(O)709" : "(O)388", 8);
+            if (!wasStump && !removeTree)
+                QueueDelayedDebrisSweep(loc, tileVec, before);
+            return;
+        }
+
+        if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is { } clump)
+        {
+            var before = new HashSet<Debris>(loc.debris);
+            clump.performToolAction(axe, 0, clump.Tile);
+            loc.resourceClumps.Remove(clump);
+
+            if (!CollectNewDebris(before, loc))
+            {
+                var fallbackQty = clump.parentSheetIndex.Value == ResourceClump.hollowLogIndex ? 8 : 2;
+                _ctx!.Buffer.Add("(O)709", fallbackQty);
+            }
+
             return;
         }
 
@@ -603,17 +744,96 @@ internal sealed class ShiftOrchestrator
         }
     }
 
-    private bool CollectNewDebris(HashSet<Debris> before, GameLocation loc)
+    private bool CollectNewDebris(
+        HashSet<Debris> before,
+        GameLocation loc,
+        Vector2? origin = null,
+        int radiusTiles = int.MaxValue)
     {
         bool collected = false;
         foreach (var d in loc.debris.ToList())
         {
-            if (before.Contains(d) || d.item is null) continue;
-            _ctx!.Buffer.Add(d.item.ItemId, d.item.Stack);
+            if (before.Contains(d) ||
+                (origin.HasValue && !IsDebrisNear(d, origin.Value, radiusTiles)) ||
+                !TryGetDebrisItem(d, out var itemId, out var stack))
+                continue;
+
+            _ctx!.Buffer.Add(itemId, stack);
             loc.debris.Remove(d);
             collected = true;
         }
         return collected;
+    }
+
+    private static bool TryGetDebrisItem(Debris debris, out string itemId, out int stack)
+    {
+        if (debris.item is not null)
+        {
+            itemId = debris.item.ItemId;
+            stack  = Math.Max(1, debris.item.Stack);
+            return true;
+        }
+
+        stack = Math.Max(1, debris.Chunks?.Count ?? 1);
+        itemId = debris.chunkType.Value switch
+        {
+            Debris.woodDebris => "(O)388",
+            Debris.bigWoodDebris => "(O)709",
+            Debris.stoneDebris or Debris.bigStoneDebris => "(O)390",
+            Debris.coalDebris => "(O)382",
+            Debris.copperDebris => "(O)378",
+            Debris.ironDebris => "(O)380",
+            Debris.goldDebris => "(O)384",
+            Debris.iridiumDebris => "(O)386",
+            _ => "",
+        };
+
+        return itemId.Length > 0;
+    }
+
+    private void QueueDelayedDebrisSweep(GameLocation loc, Vector2 tileVec, HashSet<Debris> baseline)
+    {
+        var origin = new Vector2(tileVec.X * 64f + 32f, tileVec.Y * 64f + 32f);
+        _pendingDebrisSweeps.Add(new PendingDebrisSweep(
+            loc,
+            origin,
+            baseline,
+            DelayedTreeDebrisSweepTicks,
+            DelayedTreeDebrisSweepRadiusTiles));
+    }
+
+    private void ProcessPendingDebrisSweeps()
+    {
+        for (var i = _pendingDebrisSweeps.Count - 1; i >= 0; i--)
+        {
+            var sweep = _pendingDebrisSweeps[i];
+            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.Origin, sweep.RadiusTiles);
+            sweep.TicksRemaining--;
+            if (sweep.TicksRemaining <= 0)
+                _pendingDebrisSweeps.RemoveAt(i);
+        }
+    }
+
+    private void FlushPendingDebrisSweeps()
+    {
+        foreach (var sweep in _pendingDebrisSweeps)
+            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.Origin, sweep.RadiusTiles);
+
+        _pendingDebrisSweeps.Clear();
+    }
+
+    private static bool IsDebrisNear(Debris debris, Vector2 origin, int radiusTiles)
+    {
+        var radiusPixels = radiusTiles * 64f;
+        var radiusSq = radiusPixels * radiusPixels;
+
+        foreach (var chunk in debris.Chunks)
+        {
+            if (Vector2.DistanceSquared(chunk.position.Value, origin) <= radiusSq)
+                return true;
+        }
+
+        return debris.Chunks.Count == 0;
     }
 
     // ── Completion detection ──────────────────────────────────────────────────
@@ -636,10 +856,16 @@ internal sealed class ShiftOrchestrator
                 tf3 is not FruitTree ft || ft.fruit.Count == 0,
 
             TaskKind.ClearWeeds or TaskKind.ClearRocks =>
-                !loc.objects.ContainsKey(tileVec),
+                !loc.objects.ContainsKey(tileVec) &&
+                ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is null,
 
-            TaskKind.ClearGrass or TaskKind.CutTrees =>
+            TaskKind.ClearGrass =>
                 !loc.terrainFeatures.ContainsKey(tileVec),
+
+            TaskKind.CutTrees =>
+                !loc.terrainFeatures.ContainsKey(tileVec) &&
+                (!loc.objects.TryGetValue(tileVec, out var obj) || obj.Name != "Twig") &&
+                ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is null,
 
             _ => true,
         };
@@ -648,8 +874,8 @@ internal sealed class ShiftOrchestrator
     // ── Work list construction (Patterns A + B) ───────────────────────────────
 
     /// <summary>
-    /// Scans the contract zones, applies capability and skip rules, groups by priority,
-    /// sorts nearest-first within each group.
+    /// Scans the contract zones, applies capability and skip rules, then greedily routes
+    /// to the nearest next outdoor task. Animal/building work is still deferred.
     /// </summary>
     private List<WorkItem> BuildWorkList(
         Contract contract,
@@ -663,17 +889,27 @@ internal sealed class ShiftOrchestrator
         // at end to determine BR-TOOL-02 warnings.
         var capSkippedKinds = new HashSet<TaskKind>();
         var anyItemForKind  = new HashSet<TaskKind>();
+        var seenWorkItems   = new HashSet<(TaskKind Task, TileCoord Tile)>();
 
         var rawItems = new List<(WorkItem item, TaskKind task)>();
+        var detectedByKind = new Dictionary<TaskKind, int>();
+        var acceptedByKind = new Dictionary<TaskKind, int>();
+        var scannedTiles = 0;
+        var capabilitySkippedTiles = 0;
+        var duplicateTiles = 0;
+        var noNavigationTiles = 0;
+        var farmZones = 0;
 
         // BR-PRIO-03: no building pre-pass in U-13. Animals + building interiors deferred (TODO-05).
         foreach (var zone in contract.Zones)
         {
             if (zone.LocationName != "Farm") continue;
+            farmZones++;
 
             for (var x = zone.TopLeft.X; x <= zone.BottomRight.X; x++)
             for (var y = zone.TopLeft.Y; y <= zone.BottomRight.Y; y++)
             {
+                scannedTiles++;
                 var tileVec  = new Vector2(x, y);
                 var taskTile = new TileCoord(x, y);
 
@@ -681,26 +917,34 @@ internal sealed class ShiftOrchestrator
                     out bool capabilitySkipped, out TaskKind? skippedKind);
 
                 if (capabilitySkipped && skippedKind.HasValue)
+                {
+                    capabilitySkippedTiles++;
                     capSkippedKinds.Add(skippedKind.Value);
+                    ModEntry.ModMonitor.Log($"[Dayswork][scan] capability skip {skippedKind.Value} at ({x},{y}).", LogLevel.Trace);
+                }
 
                 if (task is null) continue;
 
+                Increment(detectedByKind, task.Value);
+                taskTile = CanonicalTaskTile(task.Value, tileVec, farm);
+                if (!seenWorkItems.Add((task.Value, taskTile)))
+                {
+                    duplicateTiles++;
+                    continue;
+                }
+
+                var navTile = FindNavigationTile(taskTile, task.Value, tileVec, farm);
+                if (navTile is null)
+                {
+                    noNavigationTiles++;
+                    ModEntry.ModMonitor.Log($"[Dayswork][scan] no stand tile for {task.Value} at task ({taskTile.X},{taskTile.Y}) from scan ({x},{y}).", LogLevel.Trace);
+                    continue;
+                }
+
                 anyItemForKind.Add(task.Value);
-
-                // FR-SKIP-04 / FD-Q4=B: trellis crops need a reachable orthogonal nav tile.
-                TileCoord navTile;
-                if (IsTrellisCrop(tileVec, farm))
-                {
-                    var neighbour = FindOrthogonalNeighbour(taskTile, farm);
-                    if (neighbour is null) continue; // no reachable neighbour — skip tile
-                    navTile = neighbour.Value;
-                }
-                else
-                {
-                    navTile = taskTile;
-                }
-
-                rawItems.Add((new WorkItem(navTile, taskTile, task.Value), task.Value));
+                Increment(acceptedByKind, task.Value);
+                rawItems.Add((new WorkItem(navTile.Value, taskTile, task.Value), task.Value));
+                ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: nav=({navTile.Value.X},{navTile.Value.Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
             }
         }
 
@@ -710,49 +954,12 @@ internal sealed class ShiftOrchestrator
             if (!anyItemForKind.Contains(kind))
                 toolMissingWarnings.Add(kind);
 
-        // Pattern B (revised): Priority-grouped for crop/fruit tasks; greedy nearest-neighbour
-        // for terrain-clearing tasks (weeds/grass/rocks/trees).
-        //
-        // Rationale for split: watering before harvesting matters (FR-WORK-03 ordering is
-        // important there). But terrain-clearing tasks are interchangeable — grouping all grass
-        // before all rocks causes the worker to walk past rocks and logs to find more grass tiles.
-        // Greedy nearest-neighbour across the merged clearing pool eliminates this backtracking.
+        LogWorkScanSummary(contract, enabled, farmZones, scannedTiles, rawItems.Count,
+            detectedByKind, acceptedByKind, capabilitySkippedTiles, noNavigationTiles, duplicateTiles);
 
-        var clearingKinds = new HashSet<TaskKind>
-        {
-            TaskKind.ClearWeeds,
-            TaskKind.ClearGrass,
-            TaskKind.ClearRocks,
-            TaskKind.CutTrees,
-        };
-
-        var priorityItems  = rawItems.Where(r => !clearingKinds.Contains(r.task)).ToList();
-        var clearingItems  = rawItems.Where(r =>  clearingKinds.Contains(r.task))
-                                     .Select(r => r.item).ToList();
-
-        var result      = new List<WorkItem>();
-        var groupOrigin = FarmEntrance;
-
-        // Priority-grouped section (Water → Harvest → CollectFruit).
-        var orderedKinds = _priorityOrderer.Order(priorityItems.Select(r => r.task).Distinct());
-        foreach (var kind in orderedKinds)
-        {
-            var group = priorityItems
-                .Where(r => r.task == kind)
-                .Select(r => r.item)
-                .OrderBy(w => Math.Abs(w.NavTile.X - groupOrigin.X) + Math.Abs(w.NavTile.Y - groupOrigin.Y))
-                .ToList();
-
-            if (group.Count > 0)
-                groupOrigin = group[^1].NavTile;
-
-            result.AddRange(group);
-        }
-
-        // Terrain-clearing section: greedy nearest-neighbour across all clearing tasks merged.
-        result.AddRange(GreedyNearestNeighbour(clearingItems, groupOrigin));
-
-        return result;
+        // User play-test feedback: outdoor tasks should route by nearest next item, not
+        // by task kind. Animal tasks will regain first-priority handling in their future unit.
+        return GreedyNearestNeighbour(rawItems.Select(r => r.item).ToList(), FarmEntrance);
     }
 
     /// <summary>
@@ -795,9 +1002,6 @@ internal sealed class ShiftOrchestrator
                 enabled.Contains(TaskKind.CollectFruit))
                 return TaskKind.CollectFruit;
 
-            if (tf is Grass && enabled.Contains(TaskKind.ClearGrass))
-                return TaskKind.ClearGrass;
-
             if (tf is Tree && enabled.Contains(TaskKind.CutTrees))
             {
                 // Capability gate — FR-SKIP-01/03.
@@ -811,6 +1015,20 @@ internal sealed class ShiftOrchestrator
                 }
                 return TaskKind.CutTrees;
             }
+        }
+
+        if (enabled.Contains(TaskKind.CutTrees) &&
+            ObjectTargetClassifier.ClassifyAxe(tileVec, loc) is { } clumpAxeTarget &&
+            clumpAxeTarget != AxeTarget.FruitTree)
+        {
+            if (!_capability.CanChop(snapshot, clumpAxeTarget))
+            {
+                capabilitySkipped = true;
+                skippedKind       = TaskKind.CutTrees;
+                return null;
+            }
+
+            return TaskKind.CutTrees;
         }
 
         // ── Placed objects ────────────────────────────────────────────────────
@@ -856,6 +1074,11 @@ internal sealed class ShiftOrchestrator
             }
         }
 
+        if (loc.terrainFeatures.TryGetValue(tileVec, out var grassFeature) &&
+            grassFeature is Grass &&
+            enabled.Contains(TaskKind.ClearGrass))
+            return TaskKind.ClearGrass;
+
         return null;
     }
 
@@ -867,6 +1090,63 @@ internal sealed class ShiftOrchestrator
         if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not HoeDirt dirt)
             return false;
         return dirt.crop?.raisedSeeds.Value == true;
+    }
+
+    private static TileCoord CanonicalTaskTile(TaskKind task, Vector2 tileVec, Farm farm)
+    {
+        if (task is TaskKind.CutTrees or TaskKind.ClearRocks &&
+            ObjectTargetClassifier.FindResourceClumpAt(tileVec, farm) is { } clump)
+            return new TileCoord((int)clump.Tile.X, (int)clump.Tile.Y);
+
+        return new TileCoord((int)tileVec.X, (int)tileVec.Y);
+    }
+
+    private static TileCoord? FindNavigationTile(TileCoord taskTile, TaskKind task, Vector2 tileVec, Farm farm)
+    {
+        if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, farm) is { } clump)
+            return FindOrthogonalNeighbour(clump, farm);
+
+        if (!RequiresAdjacentNavigation(task) &&
+            !IsTrellisCrop(tileVec, farm) &&
+            IsTileReachable(taskTile, farm))
+            return taskTile;
+
+        return FindOrthogonalNeighbour(taskTile, farm);
+    }
+
+    private static bool RequiresAdjacentNavigation(TaskKind task) =>
+        task is TaskKind.CollectFruit
+             or TaskKind.CutTrees
+             or TaskKind.ClearRocks
+             or TaskKind.ClearWeeds;
+
+    private static void Increment(Dictionary<TaskKind, int> counts, TaskKind kind) =>
+        counts[kind] = counts.TryGetValue(kind, out var existing) ? existing + 1 : 1;
+
+    private static string FormatCounts(Dictionary<TaskKind, int> counts) =>
+        counts.Count == 0
+            ? "none"
+            : string.Join(", ", counts.OrderBy(kvp => kvp.Key).Select(kvp => $"{kvp.Key}={kvp.Value}"));
+
+    private static void LogWorkScanSummary(
+        Contract contract,
+        IReadOnlySet<TaskKind> enabled,
+        int farmZones,
+        int scannedTiles,
+        int acceptedItems,
+        Dictionary<TaskKind, int> detectedByKind,
+        Dictionary<TaskKind, int> acceptedByKind,
+        int capabilitySkippedTiles,
+        int noNavigationTiles,
+        int duplicateTiles)
+    {
+        var message =
+            $"[Dayswork][scan] contract={contract.Id} farmZones={farmZones} scannedTiles={scannedTiles} " +
+            $"enabled={string.Join(",", enabled.OrderBy(t => t))} detected=[{FormatCounts(detectedByKind)}] " +
+            $"accepted=[{FormatCounts(acceptedByKind)}] acceptedItems={acceptedItems} " +
+            $"capabilitySkipped={capabilitySkippedTiles} noStandTile={noNavigationTiles} duplicateClumpTiles={duplicateTiles}";
+
+        ModEntry.ModMonitor.Log(message, acceptedItems == 0 ? LogLevel.Info : LogLevel.Debug);
     }
 
     private static TileCoord? FindOrthogonalNeighbour(TileCoord tile, Farm farm)
@@ -881,15 +1161,44 @@ internal sealed class ShiftOrchestrator
 
         foreach (var c in candidates)
         {
-            if (farm.isTilePassable(new xTile.Dimensions.Location(c.X, c.Y), Game1.viewport))
+            if (WorkerMovementDriver.IsTilePassableForWorker(new Point(c.X, c.Y), farm))
                 return c;
         }
         return null;
     }
 
+    private static TileCoord? FindOrthogonalNeighbour(ResourceClump clump, Farm farm)
+    {
+        var minX = (int)clump.Tile.X;
+        var minY = (int)clump.Tile.Y;
+        var maxX = minX + clump.width.Value - 1;
+        var maxY = minY + clump.height.Value - 1;
+
+        var candidates = new List<TileCoord>();
+        for (var x = minX; x <= maxX; x++)
+        {
+            candidates.Add(new TileCoord(x, minY - 1));
+            candidates.Add(new TileCoord(x, maxY + 1));
+        }
+
+        for (var y = minY; y <= maxY; y++)
+        {
+            candidates.Add(new TileCoord(minX - 1, y));
+            candidates.Add(new TileCoord(maxX + 1, y));
+        }
+
+        foreach (var c in candidates.Distinct())
+        {
+            if (WorkerMovementDriver.IsTilePassableForWorker(new Point(c.X, c.Y), farm))
+                return c;
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Greedy nearest-neighbour sort: starting from <paramref name="origin"/>, repeatedly
-    /// picks the closest remaining item (Manhattan distance on NavTile) and appends it.
+    /// picks the closest remaining item (Manhattan distance to TaskTile) and appends it.
     /// O(n²) — acceptable for farm-scale work lists (typically &lt;400 tiles).
     /// </summary>
     private static List<WorkItem> GreedyNearestNeighbour(List<WorkItem> items, TileCoord origin)
@@ -907,8 +1216,8 @@ internal sealed class ShiftOrchestrator
 
             for (int i = 0; i < remaining.Count; i++)
             {
-                int dist = Math.Abs(remaining[i].NavTile.X - current.X)
-                         + Math.Abs(remaining[i].NavTile.Y - current.Y);
+                int dist = Math.Abs(remaining[i].TaskTile.X - current.X)
+                         + Math.Abs(remaining[i].TaskTile.Y - current.Y);
                 if (dist < bestDist)
                 {
                     bestDist = dist;
@@ -923,5 +1232,28 @@ internal sealed class ShiftOrchestrator
         }
 
         return sorted;
+    }
+
+    private sealed class PendingDebrisSweep
+    {
+        public PendingDebrisSweep(
+            GameLocation location,
+            Vector2 origin,
+            HashSet<Debris> baseline,
+            int ticksRemaining,
+            int radiusTiles)
+        {
+            Location = location;
+            Origin = origin;
+            Baseline = baseline;
+            TicksRemaining = ticksRemaining;
+            RadiusTiles = radiusTiles;
+        }
+
+        public GameLocation Location { get; }
+        public Vector2 Origin { get; }
+        public HashSet<Debris> Baseline { get; }
+        public int TicksRemaining { get; set; }
+        public int RadiusTiles { get; }
     }
 }

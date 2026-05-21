@@ -24,15 +24,34 @@ internal static class ObjectTargetClassifier
     /// </summary>
     public static AxeTarget? ClassifyAxe(Vector2 tileVec, GameLocation loc)
     {
-        if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf))
-            return null;
+        if (FindResourceClumpAt(tileVec, loc) is { } clump)
+            return ClassifyAxeClump(clump.parentSheetIndex.Value);
 
-        return tf switch
+        return loc.terrainFeatures.TryGetValue(tileVec, out var tf)
+            ? tf switch
+            {
+                Tree tree => ClassifyTree(tree),
+                FruitTree => AxeTarget.FruitTree,   // CapabilityMatrix returns false → skipped
+                _         => null,
+            }
+            : null;
+    }
+
+    public static ResourceClump? FindResourceClumpAt(Vector2 tileVec, GameLocation loc)
+    {
+        foreach (var clump in loc.resourceClumps)
         {
-            Tree tree => ClassifyTree(tree),
-            FruitTree => AxeTarget.FruitTree,   // CapabilityMatrix returns false → skipped
-            _         => null,
-        };
+            var minX = (int)clump.Tile.X;
+            var minY = (int)clump.Tile.Y;
+            var maxX = minX + clump.width.Value;
+            var maxY = minY + clump.height.Value;
+
+            if ((int)tileVec.X >= minX && (int)tileVec.X < maxX &&
+                (int)tileVec.Y >= minY && (int)tileVec.Y < maxY)
+                return clump;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -44,11 +63,8 @@ internal static class ObjectTargetClassifier
     public static PickTarget? ClassifyPick(Vector2 tileVec, GameLocation loc)
     {
         // ResourceClumps: large boulders and meteorites.
-        foreach (var clump in loc.resourceClumps)
-        {
-            if ((int)clump.Tile.X == (int)tileVec.X && (int)clump.Tile.Y == (int)tileVec.Y)
-                return ClassifyClump(clump.parentSheetIndex.Value);
-        }
+        if (FindResourceClumpAt(tileVec, loc) is { } clump)
+            return ClassifyPickClump(clump.parentSheetIndex.Value);
 
         // Standard objects: stones, ore nodes (parentSheetIndex encodes hardness).
         if (loc.objects.TryGetValue(tileVec, out var obj))
@@ -78,16 +94,28 @@ internal static class ObjectTargetClassifier
         return AxeTarget.StandingTree;
     }
 
+    private static AxeTarget? ClassifyAxeClump(int parentSheetIndex) => parentSheetIndex switch
+    {
+        ResourceClump.stumpIndex     => AxeTarget.LargeStump,
+        ResourceClump.hollowLogIndex => AxeTarget.LargeLog,
+        _                            => null,
+    };
+
     /// <summary>
     /// Maps ResourceClump parentSheetIndex to PickTarget.
-    /// Sheet indices from SDV source: 600/602 = large boulders, 622 = meteorite.
+    /// Sheet indices from SDV source: 672/148/752/754/756/758 = boulders/large rocks, 622 = meteorite.
     /// Returns null for unrecognised clumps (e.g. forest logs mapped to AxeTarget elsewhere).
     /// </summary>
-    private static PickTarget? ClassifyClump(int parentSheetIndex) => parentSheetIndex switch
+    private static PickTarget? ClassifyPickClump(int parentSheetIndex) => parentSheetIndex switch
     {
-        600 or 602 => PickTarget.LargeBoulder,  // large boulders (Steel+)
-        622        => PickTarget.Meteorite,      // meteorite (Gold+)
-        _          => null,                      // unknown clump type — skip
+        ResourceClump.boulderIndex
+            or ResourceClump.quarryBoulderIndex
+            or ResourceClump.mineRock1Index
+            or ResourceClump.mineRock2Index
+            or ResourceClump.mineRock3Index
+            or ResourceClump.mineRock4Index => PickTarget.LargeBoulder,
+        ResourceClump.meteoriteIndex => PickTarget.Meteorite,
+        _                            => null,
     };
 
     /// <summary>

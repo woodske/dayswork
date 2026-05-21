@@ -1195,3 +1195,415 @@ Generated 3 artifacts: domain-entities.md, business-logic-model.md, business-rul
 **Context**: CONSTRUCTION — U-07 Capability & Priority Core, Code Generation complete; awaiting approval to proceed to U-08
 
 ---
+
+## Session Resumption — Continue AI-DLC Workflow
+**Timestamp**: 2026-05-21T03:59:09Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resuming existing AI-DLC project from aidlc-state.md. Current stage: U-13B Farmer Worker + Tool Visuals — Code Generation Part 1 complete, awaiting approval. Loading required common rules, extension configuration, previous artifacts, and code generation plan.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation resume
+
+---
+
+## U-13B Code Generation — Plan Approved, Part 2 Starting
+**Timestamp**: 2026-05-21T04:05:01Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Treating the continuation request as explicit approval of the U-13B Code Generation Part 1 plan, consistent with prior construction-stage approvals. Beginning Part 2 generation from Step 1 of aidlc-docs/construction/plans/u-13b-farmer-worker-tool-visuals-code-generation-plan.md.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation Part 2
+
+---
+
+## User Approval — Forward Workflow Writes
+**Timestamp**: 2026-05-21T04:06:18Z
+**User Input**: "yes, I approve everything going forward"
+**AI Response**: User approved continuing U-13B Code Generation Part 2 and future required workflow/code writes for this approved plan. Continuing plan execution with required checkbox and audit updates.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation Part 2
+
+---
+
+## User Status Check
+**Timestamp**: 2026-05-21T04:09:09Z
+**User Input**: "are you stuck?"
+**AI Response**: Not stuck. Reported that the prior blocker was the read-only write barrier, confirmed Steps 1–3 are complete, and continued U-13B Code Generation with Step 4 next.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation Part 2
+
+---
+
+## U-13B Code Generation — Complete
+**Timestamp**: 2026-05-21T04:18:42Z
+**User Input**: "yes, I approve everything going forward"
+**AI Response**: Completed all 14 U-13B Code Generation plan steps and marked each checkbox complete. Created WorkerTool + tests, WorkerAppearance(+Randomizer), FarmhandWorker, WorkerMovementDriver, WorkerRenderer, ToolSwapAnimator; modified ShiftOrchestrator and ModEntry; deleted FarmhandNpc and PathFindControllerAdapter; created code-summary.md; updated aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deployed to Mods/Dayswork; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo. Extension compliance: Security Baseline N/A/disabled; PBT Partial compliant (PBT-03 satisfied by exhaustive finite map table test; PBT-02/07 N/A; PBT-08/09 retained). Awaiting user review/approval to continue to U-14.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation complete
+
+---
+
+## U-13B Code Generation — Review Feedback
+**Timestamp**: 2026-05-21T04:25:46Z
+**User Input**: "Feedback:
+* The worker does not pause when the menu is open. When the time in game stops, the worker should stop too.
+* The tool the worker is using does not show visually
+* The worker keep their arms above their head like they're about to do an animation while they're moving.
+* TODO: the worker is visible in front of the world objects, the worker should be visually identical to the farmer in terms of actions and interacting, passing through, and passing by object."
+**AI Response**: Treating feedback as requested changes for U-13B Code Generation. Will patch menu/time pause behavior and tool/arm animation handling, and record the foreground-depth/world-object interaction issue as an explicit follow-up TODO because it requires a deeper render/passability integration beyond the current RenderedWorld hook.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation review changes
+
+---
+
+## U-13B Code Generation — Review Changes Applied
+**Timestamp**: 2026-05-21T04:28:11Z
+**User Input**: "Feedback:
+* The worker does not pause when the menu is open. When the time in game stops, the worker should stop too.
+* The tool the worker is using does not show visually
+* The worker keep their arms above their head like they're about to do an animation while they're moving.
+* TODO: the worker is visible in front of the world objects, the worker should be visually identical to the farmer in terms of actions and interacting, passing through, and passing by object."
+**AI Response**: Applied review changes: gated worker movement/tool animation/decision logic behind Game1.shouldTimePass(false); added per-tick tool-swing state to ToolSwapAnimator; cleared tool-use sprite state before navigation to avoid raised-arm walking; recorded foreground depth/world-object interaction as TODO-06 in aidlc-state.md and code-summary.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation review changes complete
+
+---
+
+## U-13B Code Generation — SMAPI Runtime Error Feedback
+**Timestamp**: 2026-05-21T04:30:55Z
+**User Input**: "[Dayswork] This mod failed in the GameLoop.UpdateTicked event. Technical details:
+ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection. (Parameter 'index')
+   at StardewValley.AnimatedSprite.animateOnce(GameTime time) in D:\GitlabRunner\builds\Gq5qA5P4\0\ConcernedApe\stardewvalley\Farmer\Farmer\AnimatedSprite.cs:line 467
+   at Dayswork.Worker.FarmhandWorker.TickToolVisual(GameTime time) in C:\Users\kwood\Repos\dayswork\Dayswork\Worker\FarmhandWorker.cs:line 89
+   at Dayswork.Worker.ToolSwapAnimator.Update(GameTime time) in C:\Users\kwood\Repos\dayswork\Dayswork\Worker\ToolSwapAnimator.cs:line 39
+   at Dayswork.Orchestration.ShiftOrchestrator.OnUpdateTicked(Object sender, UpdateTickedEventArgs e) in C:\Users\kwood\Repos\dayswork\Dayswork\Orchestration\ShiftOrchestrator.cs:line 175
+   at StardewModdingAPI.Framework.Events.ManagedEvent1.Raise(TEventArgs args) in /home/runner/work/SMAPI/SMAPI/src/SMAPI/Framework/Events/ManagedEvent.cs:line 101
+[Dayswork] This mod failed in the GameLoop.UpdateTicked event. Technical details:
+ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection. (Parameter 'index')
+   at StardewValley.AnimatedSprite.animateOnce(GameTime time) in D:\GitlabRunner\builds\Gq5qA5P4\0\ConcernedApe\stardewvalley\Farmer\Farmer\AnimatedSprite.cs:line 467
+   at Dayswork.Worker.FarmhandWorker.TickToolVisual(GameTime time) in C:\Users\kwood\Repos\dayswork\Dayswork\Worker\FarmhandWorker.cs:line 89
+   at Dayswork.Worker.ToolSwapAnimator.Update(GameTime time) in C:\Users\kwood\Repos\dayswork\Dayswork\Worker\ToolSwapAnimator.cs:line 39
+   at Dayswork.Orchestration.ShiftOrchestrator.OnUpdateTicked(Object sender, UpdateTickedEventArgs e) in C:\Users\kwood\Repos\dayswork\Dayswork\Orchestration\ShiftOrchestrator.cs:line 175
+   at StardewModdingAPI.Framework.Events.ManagedEvent1.Raise(TEventArgs args) in /home/runner/work/SMAPI/SMAPI/src/SMAPI/Framework/Events/ManagedEvent.cs:line 101
+
+I'm getting repeated error messages in SMAPI"
+**AI Response**: Runtime feedback identified an unsafe per-tick call to FarmerSprite.animateOnce(GameTime) after Stardew's animation list was exhausted/cleared. Patching TickToolVisual/ToolSwapAnimator.Update to guard the animation list and stop the tool visual cleanly.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, runtime bug fix
+
+---
+
+## U-13B Runtime Bug Fix — FarmerSprite animateOnce Guard
+**Timestamp**: 2026-05-21T04:31:42Z
+**User Input**: "I'm getting repeated error messages in SMAPI"
+**AI Response**: Fixed repeated UpdateTicked ArgumentOutOfRangeException by guarding FarmhandWorker.TickToolVisual before calling FarmerSprite.animateOnce(GameTime), clearing tool visual state when Stardew's animation list is empty/exhausted, and stopping ToolSwapAnimator's per-tick visual loop when TickToolVisual returns false. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, runtime bug fix complete
+
+---
+
+## U-13B Runtime Bug Feedback — Tool Callback NullReference
+**Timestamp**: 2026-05-21T04:34:08Z
+**User Input**: "every time the worker uses a tool I get this error message in SMAPI
+
+[Dayswork] This mod failed in the GameLoop.UpdateTicked event. Technical details:
+NullReferenceException: Object reference not set to an instance of an object.
+   at StardewValley.Farmer.showToolSwipeEffect(Farmer who) in D:\GitlabRunner\builds\Gq5qA5P4\0\ConcernedApe\stardewvalley\Farmer\Farmer\Farmer.cs:line 6487
+   at StardewValley.AnimatedSprite.animateOnce(GameTime time) in D:\GitlabRunner\builds\Gq5qA5P4\0\ConcernedApe\stardewvalley\Farmer\Farmer\AnimatedSprite.cs:line 467
+   at Dayswork.Worker.FarmhandWorker.TickToolVisual(GameTime time) in C:\Users\kwood\Repos\dayswork\Dayswork\Worker\FarmhandWorker.cs:line 98
+   at Dayswork.Worker.ToolSwapAnimator.Update(GameTime time) in C:\Users\kwood\Repos\dayswork\Dayswork\Worker\ToolSwapAnimator.cs:line 39
+   at Dayswork.Orchestration.ShiftOrchestrator.OnUpdateTicked(Object sender, UpdateTickedEventArgs e) in C:\Users\kwood\Repos\dayswork\Dayswork\Orchestration\ShiftOrchestrator.cs:line 175
+   at StardewModdingAPI.Framework.Events.ManagedEvent1.Raise(TEventArgs args) in /home/runner/work/SMAPI/SMAPI/src/SMAPI/Framework/Events/ManagedEvent.cs:line 101
+[Dayswork] This mod failed in the GameLoop.UpdateTicked event. Technical details:
+NullReferenceException: Object reference not set to an instance of an object.
+   at StardewValley.Farmer.useTool(Farmer who) in D:\GitlabRunner\builds\Gq5qA5P4\0\ConcernedApe\stardewvalley\Farmer\Farmer\Farmer.cs:line 6556
+   at StardewValley.AnimatedSprite.animateOnce(GameTime time) in D:\GitlabRunner\builds\Gq5qA5P4\0\ConcernedApe\stardewvalley\Farmer\Farmer\AnimatedSprite.cs:line 467
+   at Dayswork.Worker.FarmhandWorker.TickToolVisual(GameTime time) in C:\Users\kwood\Repos\dayswork\Dayswork\Worker\FarmhandWorker.cs:line 98
+   at Dayswork.Worker.ToolSwapAnimator.Update(GameTime time) in C:\Users\kwood\Repos\dayswork\Dayswork\Worker\ToolSwapAnimator.cs:line 39
+   at Dayswork.Orchestration.ShiftOrchestrator.OnUpdateTicked(Object sender, UpdateTickedEventArgs e) in C:\Users\kwood\Repos\dayswork\Dayswork\Orchestration\ShiftOrchestrator.cs:line 175
+   at StardewModdingAPI.Framework.Events.ManagedEvent1.Raise(TEventArgs args) in /home/runner/work/SMAPI/SMAPI/src/SMAPI/Framework/Events/ManagedEvent.cs:line 101"
+**AI Response**: Runtime feedback identified that callback-driven FarmerSprite.animateOnce invokes Stardew's Farmer.useTool/showToolSwipeEffect callbacks, which are unsafe for the standalone worker Farmer. Switching tool visuals to a callback-free manual pose cycle.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, runtime tool callback fix
+
+---
+
+## U-13B Runtime Bug Fix — Remove Callback-Driven Tool Animation
+**Timestamp**: 2026-05-21T04:35:11Z
+**User Input**: "every time the worker uses a tool I get this error message in SMAPI"
+**AI Response**: Fixed repeated UpdateTicked NullReferenceException by removing callback-driven FarmerSprite.animateOnce(GameTime) ticking for the standalone worker. ToolSwapAnimator now manually cycles callback-free FarmerSprite tool pose frames through FarmhandWorker.ShowToolPose, preventing Stardew's Farmer.useTool/showToolSwipeEffect callbacks from running on the worker. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, runtime tool callback fix complete
+
+---
+
+## U-13B Code Generation — Review Feedback
+**Timestamp**: 2026-05-21T04:39:01Z
+**User Input**: "Feedback:
+* The worker is firing off multiple swipes of the scythe when cutting the grass, I'm getting a blurred look.
+* The worker is prioritizing grass over trees/stone/weeds. They should perform the task for which ever thing is closest to them, with the expection of animal tasks which will be covered later."
+**AI Response**: Treating feedback as requested changes for U-13B/U-13 behavior. Will stop tool visuals when each task completes or navigation starts to prevent overlapping scythe swipe poses, and will update outdoor non-animal work ordering to nearest-next across eligible tasks rather than task-kind priority for grass/trees/stone/weeds.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, code generation review changes
+
+---
+
+## U-13B Code Generation — Review Feedback Complete
+**Timestamp**: 2026-05-21T04:42:57Z
+**User Input**: "Feedback:
+* The worker is firing off multiple swipes of the scythe when cutting the grass, I'm getting a blurred look.
+* The worker is prioritizing grass over trees/stone/weeds. They should perform the task for which ever thing is closest to them, with the expection of animal tasks which will be covered later."
+**AI Response**: Applied review changes: ToolSwapAnimator exposes active swing state, and ShiftOrchestrator now waits for the manual tool-swing visual to finish before advancing to the next work item, preventing dense grass from rapid-firing overlapping-looking scythe poses. Outdoor non-animal work-list construction now routes greedily to the nearest next detected task rather than using fixed task-kind priority among grass/weeds/rocks/trees/crops; animal tasks remain deferred as the future exception. Updated code-summary.md and aidlc-state.md DEV-02. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, code generation review changes complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T04:48:44Z
+**User Input**: "Feedback:
+* The worker no longer has tool blur, but when they perform a task, their legs disappear briefly and two brown lines appear from their feet to the head
+* When the worker moves laterally left (my left facing the screen), they raise an arm and are faced towards me. The farmer should turn and move forward instead of sliding
+* The worker is still prioritizing grass over all other tasks"
+**AI Response**: Treating feedback as requested U-13B review changes. Investigating manual FarmerSprite tool-pose frames, lateral walking frame selection, and the nearest-task work-list comparator because current symptoms indicate unsafe raw sprite rows and distance ordering still based on navigation tile rather than the task object tile.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T04:53:58Z
+**User Input**: "Feedback:
+* The worker no longer has tool blur, but when they perform a task, their legs disappear briefly and two brown lines appear from their feet to the head
+* When the worker moves laterally left (my left facing the screen), they raise an arm and are faced towards me. The farmer should turn and move forward instead of sliding
+* The worker is still prioritizing grass over all other tasks"
+**AI Response**: Applied review changes: manual tool poses now use Stardew's actual Farmer tool frame triplets with arm offset and left-facing flip rather than raw FarmerSprite.tool* row constants; lateral movement now animates with FarmerSprite.walk* start frames instead of numeric facing directions; work-list routing measures nearest distance to task tiles and DetectTask checks placed objects/resource clumps before grass so grass cannot mask rocks/weeds/twigs on the same tile. Updated code-summary.md and DEV-02 in aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T05:00:21Z
+**User Input**: "Feedback:
+* I shortened the work area, the worker still prioritized grass, only cut some of it, then left. There were trees, rocks, weeds, and grass that the worker skipped.
+"
+**AI Response**: Treating feedback as requested U-13B review changes. Investigation found that only trellis crops receive an adjacent navigation tile; trees, rocks, weeds, and some blocked grass/crop tiles still use the task tile itself as NavTile. Blocked task tiles can cause navigation failure and silent queue advancement, making the worker appear to prioritize reachable grass and then leave. Patching work-list construction to choose a passable orthogonal stand tile for obstructing or otherwise non-passable targets.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T05:09:10Z
+**User Input**: "now the worker isn't even showing up, I made the tile selection even smaller with just a few pieces of grass, weeds, stone, and logs and I get the smapi message with 0 hours worked. If you need, you can add smapi debug logging to help figure out what's going on"
+**AI Response**: Treating feedback as requested U-13B review changes. Adding targeted SMAPI scan diagnostics around work-list construction and investigating resource-clump classification/invocation because a no-spawn/0-hours result indicates the shift is probably emptying before FarmhandWorker creation.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T05:13:36Z
+**User Input**: "now the worker isn't even showing up, I made the tile selection even smaller with just a few pieces of grass, weeds, stone, and logs and I get the smapi message with 0 hours worked. If you need, you can add smapi debug logging to help figure out what's going on"
+**AI Response**: Applied review changes: added SMAPI work-scan diagnostics for enabled tasks, selected farm zones, scanned tiles, detected/accepted task counts, capability skips, missing stand tiles, and duplicate clump tiles. Fixed resource-clump classification using Stardew constants: stumps/logs now map to AxeTarget LargeStump/LargeLog, boulders/meteorites/mine rocks map to PickTarget, and duplicate clump tiles canonicalize to the clump origin. Added clump removal in InvokeCutTree and InvokeClearRock and updated completion checks so clumps cannot complete without being removed. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes complete
+
+---
+
+## U-13B Code Generation — Clump Navigation Hardening
+**Timestamp**: 2026-05-21T05:14:49Z
+**User Input**: "now the worker isn't even showing up, I made the tile selection even smaller with just a few pieces of grass, weeds, stone, and logs and I get the smapi message with 0 hours worked. If you need, you can add smapi debug logging to help figure out what's going on"
+**AI Response**: Hardened resource-clump stand-tile resolution after the initial fix: clump navigation now searches the passable perimeter around the whole clump footprint instead of only N/E/S/W around the clump's top-left tile. Verification repeated: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T05:19:16Z
+**User Input**: "[Dayswork] Dayswork loaded
+[SMAPI] Mods loaded and ready!
+[SMAPI] Found MSI Afterburner installed, which may conflict with SMAPI. If you experience errors or crashes, try disabling that software or adding an exception for SMAPI and Stardew Valley.
+Setting breakpad minidump AppID = 413150
+SteamInternal_SetMinidumpSteamID:  Caching Steam ID:  76561198010206352 [API loaded no]
+[SMAPI] Type 'help' for help, or 'help <cmd>' for a command's usage
+[Dayswork] [Dayswork][scan] contract=26aa90e8-ee86-4881-a00c-bbf8a981ad4e farmZones=1 scannedTiles=30 enabled=ClearRocks detected=[ClearRocks=2] accepted=[ClearRocks=2] acceptedItems=2 capabilitySkipped=0 noStandTile=0 duplicateClumpTiles=0
+[Dayswork] [Dayswork] Shift complete. Hours: 0. Refund: 70g.
+
+I made a simple contract, only clear rocks with a small zone containing two rocks. They were not removed."
+**AI Response**: Treating feedback as requested U-13B review changes. Scan diagnostics show the selected zone and ClearRocks detection are working, with 2 accepted work items. The remaining failure is downstream: navigation may be failing/skipping accepted items before action, or InvokeClearRock may be relying on Stardew performToolAction without deterministically removing the object. Adding visible navigation/action diagnostics and making rock removal deterministic.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T05:02:29Z
+**User Input**: "Feedback:
+* I shortened the work area, the worker still prioritized grass, only cut some of it, then left. There were trees, rocks, weeds, and grass that the worker skipped.
+"
+**AI Response**: Applied review changes: work-list construction now resolves a usable NavTile for every WorkItem. Trees, rocks, weeds, and fruit trees force an orthogonal stand tile; walkable tasks use the task tile with an orthogonal fallback if the task tile is not passable. Items with no usable stand tile are skipped before counting as valid work. Updated WorkItem documentation, code-summary.md, and DEV-02 in aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T05:22:49Z
+**User Input**: "[Dayswork] Dayswork loaded
+[SMAPI] Mods loaded and ready!
+[SMAPI] Found MSI Afterburner installed, which may conflict with SMAPI. If you experience errors or crashes, try disabling that software or adding an exception for SMAPI and Stardew Valley.
+Setting breakpad minidump AppID = 413150
+SteamInternal_SetMinidumpSteamID:  Caching Steam ID:  76561198010206352 [API loaded no]
+[SMAPI] Type 'help' for help, or 'help <cmd>' for a command's usage
+[Dayswork] [Dayswork][scan] contract=26aa90e8-ee86-4881-a00c-bbf8a981ad4e farmZones=1 scannedTiles=30 enabled=ClearRocks detected=[ClearRocks=2] accepted=[ClearRocks=2] acceptedItems=2 capabilitySkipped=0 noStandTile=0 duplicateClumpTiles=0
+[Dayswork] [Dayswork] Shift complete. Hours: 0. Refund: 70g.
+
+I made a simple contract, only clear rocks with a small zone containing two rocks. They were not removed."
+**AI Response**: Applied review changes: added per-work-item `[Dayswork][nav]` and `[Dayswork][action]` diagnostics for accepted work items, added a direct movement fallback when PathFindController returns no path to an otherwise passable destination, and made regular stone removal deterministic so ClearRocks no longer depends on Stardew's simulated `performToolAction` return value before removing the object. Updated code-summary.md and aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes complete
+
+---
+
+## U-13B Code Generation — Rock Removal Guard Addendum
+**Timestamp**: 2026-05-21T05:24:22Z
+**User Input**: "[No new user input — addendum to the immediately preceding ClearRocks play-test feedback.]"
+**AI Response**: Tightened the deterministic ClearRocks fix by revalidating the tile with ObjectTargetClassifier.ClassifyPick immediately before object removal, so the worker only removes an object if it is still a pickaxe-clearing target. Re-ran verification after the guard: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, defensive guard after review fix
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T05:31:41Z
+**User Input**: "Feedback:
+* The worker is clearing what they're supposed to now so that is good
+* The worker is already starting the work when the main farmer wakes up. They should be walking into the farm from the entrance instead of already working when the farmer wakes up.
+* The worker was teleporting to adjacent tiles after some tasks like cutting trees
+* The tools movements don't match the worker's movement. Are they actually equipped with the tool or is it an overlay? i want to make it as close to the actual farmer as possible"
+**AI Response**: Treating feedback as requested U-13B review changes. Investigation target: add a visible entrance walk before the first work item, replace the direct no-path fallback that can teleport after tasks with a walking fallback, and make the manual callback-free tool poses more faithful to the worker Farmer's actual equipped CurrentTool. Clarified that the current implementation already equips real worker-owned Farmer tools; the mismatch is in the manual pose driver, not an overlay icon.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T05:36:56Z
+**User Input**: "Feedback:
+* The worker is clearing what they're supposed to now so that is good
+* The worker is already starting the work when the main farmer wakes up. They should be walking into the farm from the entrance instead of already working when the farmer wakes up.
+* The worker was teleporting to adjacent tiles after some tasks like cutting trees
+* The tools movements don't match the worker's movement. Are they actually equipped with the tool or is it an overlay? i want to make it as close to the actual farmer as possible"
+**AI Response**: Applied review changes: added a short morning entrance hold before movement/action updates so the worker remains visible at the farm entrance before starting work; replaced the direct no-path Position assignment with a passable tile-by-tile walking fallback so recovery navigation cannot teleport to adjacent tiles; changed ToolSwapAnimator to use tool-specific FarmerSprite frame groups for the real equipped worker Farmer tools (heavy tool frames for axe/pickaxe, watering frames for watering can, sword-swipe frames for scythe). Clarification: the tool is not an overlay icon; FarmhandWorker equips worker-owned Tool instances through Farmer.CurrentTool, and Farmer.draw renders the held tool. Updated code-summary.md and aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T05:40:31Z
+**User Input**: "the tool swing looks better, but the double brown line issue is back . The worker is also cutting trees down in one hit, but I'm not sure if that should be handled here or downstream."
+**AI Response**: Treating feedback as requested U-13B review changes. The double brown line regression likely comes from using raw FarmerSprite tool constants in the manual callback-free pose path; reverting heavy/watering tool poses to the previously verified safe body-frame triplets while preserving the improved directional swing. Tree one-hit behavior is behavioral task pacing rather than just visual, but it is exposed by the current tool/action loop and should be captured now as either a scoped fix or an explicit follow-up decision rather than left ambiguous.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T05:43:27Z
+**User Input**: "the tool swing looks better, but the double brown line issue is back . The worker is also cutting trees down in one hit, but I'm not sure if that should be handled here or downstream."
+**AI Response**: Applied review changes: removed raw `FarmerSprite.tool*` / `swordswipe*` constants from the manual callback-free pose path and restored the play-tested safe body-frame triplets so the worker body should not corrupt into double brown lines during tool poses. Also handled the tree one-hit behavior here because it was caused by the current action loop: `InvokeCutTree` no longer forcibly removes `Tree` terrain features after every axe action, and the task-action loop now repeats swings while a target remains incomplete, letting vanilla tree health/removal determine when the tree is actually gone. Updated code-summary.md and aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deploy; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, play-test review changes complete
+
+---
+
+## U-13B Code Generation — Architectural Review Change
+**Timestamp**: 2026-05-21T16:36:53Z
+**User Input**: "OK, let's go back to the NPC"
+**AI Response**: Treating the request as U-13B review feedback that rejects the Farmer-backed worker architecture. Plan: restore an NPC-backed worker actor added to the normal farm character list, remove the manual Farmer renderer/body-pose path, preserve the accepted U-13/U-13B scan/routing/action fixes, and replace Farmer tool-pose animation with a small NPC task animation inspired by the Stardew Squad reference analysis.
+**Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, review change to pivot back to NPC actor
+
+---
+
+## U-13B Code Generation — Architectural Review Change Complete
+**Timestamp**: 2026-05-21T16:42:31Z
+**User Input**: "OK, let's go back to the NPC"
+**AI Response**: Applied the NPC pivot review change. Restored `FarmhandNpc` as the active worker actor and added it to the normal farm character list; removed the active Farmer-only wrapper, character-creation appearance, manual renderer, and Farmer body-pose path; retargeted `WorkerMovementDriver` to move the NPC while preserving direct walking fallback; retargeted `ToolSwapAnimator` to a callback-free two-frame NPC work animation inspired by the Stardew Squad pattern; restored the NPC portrait redirect in `ModEntry`; preserved pause gating, morning entrance hold, nearest-task routing, resource-clump handling, diagnostics, deterministic rock removal, and repeated tree action behavior. Updated the U-13B plan addendum, code summary, and aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deployed to `Mods/Dayswork`; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, NPC pivot review change complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T16:53:28Z
+**User Input**: "Looks good with the transition back. The NPC is not using visible tools."
+**AI Response**: Treating feedback as a U-13B review change. Plan: keep the NPC-backed actor and normal farm-character rendering, then add a small visible tool overlay during task animations so axe/pickaxe/watering-can/scythe tasks show the expected tool without invoking vanilla Farmer tool callbacks.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, play-test review change
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T16:55:53Z
+**User Input**: "Looks good with the transition back. The NPC is not using visible tools."
+**AI Response**: Added visible NPC tools during active task beats. `ToolSwapAnimator` now keeps a visual-only tool instance for the current task, draws it near the NPC through a tool-only `Display.RenderedWorld` hook, and uses the shift's captured `ToolSnapshot` for axe, pickaxe, and watering-can upgrade level. Scythe appears for grass/weeds. The NPC remains the worker actor and task effects still use explicit invoke-and-poll code; no vanilla Farmer tool callbacks are invoked. Updated the U-13B plan addendum, code summary, and aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deployed to `Mods/Dayswork`; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, visible NPC tool review change complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T16:59:32Z
+**User Input**: "The npc is just showing the icon, not the swing. Take a look at stardew squad and see how they're animating the tools"
+**AI Response**: Inspected The Stardew Squad's local DLL and content config for task animation behavior. Findings: humanoid task body animation uses NPC two-frame action/idle beats from config, while the tool motion is separate world `TemporaryAnimatedSprite` work spawned from vanilla sheets. Mining/lumbering/watering use `Game1.toolSpriteSheet` with direction-specific source rectangles, offsets, flips, rotations, delays, and layer depths; swipe-style actions use `TileSheets\\animations`. Plan: replace Dayswork's static menu-icon overlay with direction-specific world temporary sprites while keeping the NPC actor and explicit task effects.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, Stardew Squad reference analysis
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T17:02:33Z
+**User Input**: "The npc is just showing the icon, not the swing. Take a look at stardew squad and see how they're animating the tools"
+**AI Response**: Replaced the static NPC tool icon with Stardew-Squad-style world tool swings. `ToolSwapAnimator` now spawns `TemporaryAnimatedSprite`s from `Game1.toolSpriteSheet` for axe, pickaxe, and watering-can task beats, using direction-specific frames, offsets, flips, rotations, delay timing, and layer depth. Scythe work now spawns a vanilla swipe from `TileSheets\\animations`. Removed the tool-only `RenderedWorld` icon hook; the NPC remains the actor and task effects still use explicit invoke-and-poll code. Updated the U-13B plan addendum, code summary, and aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deployed to `Mods/Dayswork`; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, visible tool swing review change complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T17:07:05Z
+**User Input**: "that looks much better. Two things:
+* the NPC is walking through buildings instead of around
+* there are pieces of wood still on the ground after the tree is chopped, some of the materials are being misseed"
+**AI Response**: Treating feedback as U-13B review changes. Investigation target: tighten worker navigation passability so manual fallback routes respect farm building footprints instead of walking through them, and improve tree debris/material collection so dropped wood pieces are collected rather than left on the ground or missed by the buffer.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, play-test review change
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T17:10:05Z
+**User Input**: "that looks much better. Two things:
+* the NPC is walking through buildings instead of around
+* there are pieces of wood still on the ground after the tree is chopped, some of the materials are being misseed"
+**AI Response**: Applied review fixes. `WorkerMovementDriver` now validates copied `PathFindController` waypoints against worker passability and replaces the old straight-line fallback with a four-way BFS fallback over worker-passable tiles. Worker passability now rejects farm building footprints, and `ShiftOrchestrator` uses the same stricter check for reachable work/stand tiles. `CollectNewDebris` now maps Stardew material chunk debris (`woodDebris`, `bigWoodDebris`, `stoneDebris`, ore/coal debris) into buffered item IDs instead of skipping debris with null `item`, so worker-created wood chunks should be removed from the ground and shipped. Updated the U-13B plan addendum, code summary, and aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deployed to `Mods/Dayswork`; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, building routing and material debris review change complete
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T17:15:49Z
+**User Input**: "We're still missign some materials after felling trees. This happens when the main tree falls and it turns into a stump. There's some tree falling animation, the tree breaks apart, then the materials show up and it's usually a few tiles away from where the tree was. I'm not sure if that delay of materials being present is the issue."
+**AI Response**: Treating feedback as U-13B review changes. Investigation target: tree-fall debris timing. Current collection happens immediately after `Tree.performToolAction`, but vanilla tree-fall wood can spawn later after the falling/breaking animation and away from the original tile. Plan: add a short delayed debris sweep around the tree tile after non-stump tree hits so late material chunks are picked up without freezing worker movement.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, play-test review change
+
+---
+
+## Status Check
+**Timestamp**: 2026-05-21T17:37:05Z
+**User Input**: "are you stuck?"
+**AI Response**: Responded that work was not stuck; confirmed the timing theory and continued implementing the delayed debris sweep.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, status update during review change
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T17:38:47Z
+**User Input**: "We're still missign some materials after felling trees. This happens when the main tree falls and it turns into a stump. There's some tree falling animation, the tree breaks apart, then the materials show up and it's usually a few tiles away from where the tree was. I'm not sure if that delay of materials being present is the issue."
+**AI Response**: Added delayed tree-fall debris collection. Non-stump tree chop actions now queue a pending debris sweep with the pre-hit debris baseline. The sweep runs for 240 ticks within 6 tiles of the tree origin, collecting newly spawned material debris that appears after the fall/break animation and removing it from the ground. Pending sweeps run only while game time passes and are flushed before deposit/save. Updated the U-13B plan addendum, code summary, and aidlc-state.md. Verification: dotnet build succeeded with 0 errors / 0 warnings and auto-deployed to `Mods/Dayswork`; dotnet test passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, delayed tree debris review change complete
+
+---
+
+## Implementation Scope Question
+**Timestamp**: 2026-05-21T17:45:10Z
+**User Input**: "Should the NPC at this point be able to deposit things into chests? I haven't tested just not sure if that will be done later. Same with petting animals and collecting animals products."
+**AI Response**: Answering from current implementation scope: chest deposit is not expected to be wired yet in the active worker loop; current deposit sends buffered items to the shipping bin. Animal tasks are intentionally deferred and tracked as a future Animals & Buildings unit/TODO, including petting animals and collecting animal products.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, scope clarification
+
+---
+
+## U-13B Code Generation — Play-Test Feedback
+**Timestamp**: 2026-05-21T17:48:15Z
+**User Input**: "OK last change request for this unit, I'd like to see the NPC leave the farm from the entrance rather than teleport away after depositing"
+**AI Response**: Treating feedback as the final U-13B review change. Plan: keep the existing shipping-bin deposit and entrance navigation, then add a short visible exit walk beyond the farm entrance before removing the NPC and applying the existing shift-complete cleanup.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, play-test review change
+
+---
+
+## U-13B Code Generation — Play-Test Feedback Complete
+**Timestamp**: 2026-05-21T17:50:30Z
+**User Input**: "OK last change request for this unit, I'd like to see the NPC leave the farm from the entrance rather than teleport away after depositing"
+**AI Response**: Added a visible final exit walk. `ShiftOrchestrator` now waits for entrance navigation to finish, starts a short forced pixel route past the farm entrance, and only then applies refund/shift-complete cleanup and removes the NPC. `WorkerMovementDriver` now stores pixel waypoints and supports this visual-only forced route while retaining normal pathfinding/BFS behavior for work navigation. Updated the U-13B plan addendum, code summary, and aidlc-state.md. Verification: `dotnet build` succeeded with 0 errors / 0 warnings and auto-deployed to `Mods/Dayswork`; `dotnet test` passed 184 tests with 1 expected skipped PBT-08 smoke demo.
+**Context**: CONSTRUCTION — U-13B Worker Actor + Task Visuals, final exit walk review change complete
+
+---

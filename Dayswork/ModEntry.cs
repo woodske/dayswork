@@ -41,7 +41,11 @@ public sealed class ModEntry : Mod
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
-        var orchestrator    = new ShiftOrchestrator(toolReader, config);
+        var toolAnimator    = new ToolSwapAnimator();
+        var orchestrator    = new ShiftOrchestrator(
+            toolReader,
+            config,
+            toolAnimator);
         Orchestrator = orchestrator;
         var scheduler       = new RecurringContractScheduler(store, orchestrator);
 
