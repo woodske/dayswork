@@ -1882,3 +1882,11 @@ From the logs:
 **User Input**: "continue"
 **AI Response**: Recorded U-15 Functional Design approval (all three artifacts + deviations DEV-U15-01..05 + open sub-decision BR-CAL-03). Marked FD plan complete and FD stage approved in aidlc-state.md. Proceeding to U-15 NFR Requirements. Per established precedent (U-07/U-10/U-13/U-14), NFR Requirements has no blocking user questions for this unit — NFRs are determinable from the approved FD + prior project decisions; the one open item (save-time fast-forward latency) is an NFR-Design/Code-Generation engineering detail, not a product preference. Creating the NFR plan (assessment) and generating nfr-requirements.md + tech-stack-decisions.md directly.
 **Context**: CONSTRUCTION — U-15 NFR Requirements (no blocking questions per precedent)
+
+---
+
+## U-15 Recurring Lifecycle — NFR Requirements APPROVED; NFR Design Started
+**Timestamp**: 2026-05-22T01:25:00Z
+**User Input**: "continue"
+**AI Response**: Recorded U-15 NFR Requirements approval (nfr-requirements.md + tech-stack-decisions.md). Proceeding to U-15 NFR Design. Per established precedent (U-10/U-13/U-13B/U-14 NFR Design resolved engineering items as documented patterns, not user questions), NFR Design has no blocking questions; the deferred items (fast-forward per-frame work, MFM money attachment) are pattern choices. Creating NFR Design plan (assessment) + generating nfr-design-patterns.md and logical-components.md. U-15 introduces Patterns Q–U continuing the A–P sequence.
+**Context**: CONSTRUCTION — U-15 NFR Design (no blocking questions per precedent)
