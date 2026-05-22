@@ -1834,3 +1834,43 @@ From the logs:
 **User Input**: (continuation from rock output / empty mail feedback — no new input)
 **AI Response**: Confirmed tree output is fixed from user playtest. Inspected Stardew Object.performToolAction IL for standard rock breakage and found the removed rock path creates radial visual chunk debris with no explicit collectible item id, so Dayswork's no-foreign-material filter rejected it. Added a narrow fallback only for actual removed standard Stone objects: when ClearRocks removes a standard Stone and no item-bearing debris was collected, buffer exactly 1 (O)390 Stone. The code still refuses unlabeled visual chunkType material inference, so copper/wood/ore cannot be created from color-only debris. Added mail debug logs for queued/registering letters and attachment counts, and changed MFM registration to always supply a dynamicItems callback, including no-attachment warning letters, to diagnose/reduce the empty-mail report. Updated U-14 plan/state/summary through Steps 35-37. Verification: dotnet build Dayswork.sln 0 errors / 0 warnings and auto-deployed to X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork; dotnet test Dayswork.sln 190 passed / 1 expected skip. In-game verification pending user playtest.
 **Context**: CONSTRUCTION — U-14 Output Pipeline, rock collection and mail diagnostic fix complete; awaiting user playtesting
+
+---
+
+## U-14 Output Pipeline — Code Generation APPROVED
+**Timestamp**: 2026-05-21T23:55:00Z
+**User Input**: "continue ai-dlc workflow. U-14 code is approved."
+**AI Response**: Recorded U-14 Code Generation approval. U-14 (Output Pipeline: multi-destination deposit + overflow mail) is complete. Advancing the per-unit Construction loop to the next unit, U-15 — Recurring Lifecycle + Calendar Handlers (stories S-12 completes, S-14, S-15). Starting U-15 Functional Design (EXECUTE per execution plan).
+**Context**: CONSTRUCTION — U-14 Code Generation approval gate; transition to U-15
+
+---
+
+## U-15 Recurring Lifecycle — Functional Design Started
+**Timestamp**: 2026-05-21T23:56:00Z
+**User Input**: (continuation — no new input)
+**AI Response**: Began U-15 Functional Design. Reviewed unit definition (unit-of-work.md U-15), story map (S-12/S-14/S-15), Service S-C (sleep fast-forward) and S-D (recurring daily lifecycle), requirements FR-PAY-03/04/06/07/08, FR-DAY-01/02, FR-TOOL-03, FR-HIRE-15, the existing RecurringContractScheduler one-time stub, ShiftOrchestrator.OnSaving U-14 mid-shift stub, and TODO-04 (concurrent-contract priority). CalendarHandlers (M-14) confirmed not yet created. Created functional-design plan with checklist and design questions FD-Q1..FD-Q8 at aidlc-docs/construction/plans/u-15-recurring-lifecycle-functional-design-plan.md; awaiting user answers.
+**Context**: CONSTRUCTION — U-15 Functional Design, plan + questions created
+
+---
+
+## U-15 Recurring Lifecycle — FD-Q9 Added (Refund Delivery / Immersion)
+**Timestamp**: 2026-05-22T00:05:00Z
+**User Input**: "before I finish answering, is it possible to add something to the mail same day? I'm thinking of mailing the deposit back instead of auto refunding it. seems more immersive." / "yes add that to the plan"
+**AI Response**: Explained Stardew mail is a next-morning mechanism (same-day mailbox injection is possible but fights the framework and is moot for the sleep case). Mailing the refund as gold-bearing mail is feasible and more immersive but deviates from FR-PAY-05 ("refund added directly to gold at exit") and touches the already-built U-10/U-14 exit-refund path on every shift, with a one-day cash-flow lag; it also simplifies the FD-Q2 sleep fast-forward (queue a letter instead of mutating gold at save). Added FD-Q9 (direct gold vs. mailed gold for normal-exit-only vs. all refund cases, plus an MFM money-attachment fallback sub-note) and updated the checklist to FD-Q1–Q9. Awaiting user answers.
+**Context**: CONSTRUCTION — U-15 Functional Design, FD-Q9 added per user immersion idea
+
+---
+
+## U-15 Recurring Lifecycle — FD Answers Received; Clarifications Raised
+**Timestamp**: 2026-05-22T00:30:00Z
+**User Input**: "i've answered the questions" — FD answers in plan: Q1=A; Q2=A; Q3=C ("don't skip festival days"); Q4=B ("even on rainy days, the worker might need to water plants in a building"); Q5=A; Q6=C ("deduct the day's deposit at 6am, spawn worker, exits, and mail refund"); Q7=A; Q8=C ("Missing tools doesn't matter. The NPC worker defaults to the lowest tier of tool if it's missing from the player farmer."); Q9=C ("we are not skipping festival days though"); Q9 sub-note=blank.
+**AI Response**: Collected and analyzed answers. Clear: Q1/Q2/Q5/Q7=A, Q4=B (rate-only; note building-interior watering is deferred per TODO-05), Q6=C + Q9=C consistent (deduct-then-mail refund). Flagged three items needing clarification before generating artifacts: (1) Q3=C deviates FR-DAY-01 + S-14 festival-skip and has a Stardew time-freeze/player-warp wrinkle; (2) Q8=C reverses FR-TOOL-03 + U-13 skip-on-missing-tool + U-13/U-14 tool-missing warning mail (need substitution semantics, owned-tool tier gating, and fate of now-dead warning path); (3) Q9 sub-note blank (MFM money-attachment fallback). Created u-15-recurring-lifecycle-functional-design-clarification-questions.md with Clarifications 1a, 2a/2b/2c, 3. Awaiting answers; not generating artifacts yet.
+**Context**: CONSTRUCTION — U-15 Functional Design, clarification round before artifact generation
+
+---
+
+## U-15 Recurring Lifecycle — Clarifications Answered; FD Artifacts Generated
+**Timestamp**: 2026-05-22T00:55:00Z
+**User Input**: "done" — clarification answers: 1a=C ("skip festival days, but send a letter"); 2a=A; 2b=A; 2c=A; 3=A.
+**AI Response**: Confirmed all answers reconcile (1a=C supersedes Q3=C → festivals are skipped + courtesy letter; Q9=C one-time-festival refund now applies and is mailed). Generated the three U-15 functional-design artifacts at aidlc-docs/construction/u-15-recurring-lifecycle/functional-design/: business-logic-model.md (6 flows), domain-entities.md (CalendarHandlers, MailDispatcher changes, removed tool-missing path, letter inventory, new i18n keys), business-rules.md (BR rules + DEV-U15-01..05 + PBT obligations). Recorded deviations DEV-U15-01 (single active contract, resolves TODO-04), DEV-U15-02 (festival skip + letter), DEV-U15-03 (missing tool → lowest tier, warning path removed), DEV-U15-04 (refunds mailed), DEV-U15-05 (rain Water-Crops not force-skipped). Surfaced open sub-decision BR-CAL-03 (one-time-on-festival Executed+refund vs. roll to next day) for approval. Updated FD plan checklist and aidlc-state.md. Presenting completion message; awaiting Request Changes / Continue.
+**Context**: CONSTRUCTION — U-15 Functional Design complete, awaiting approval
