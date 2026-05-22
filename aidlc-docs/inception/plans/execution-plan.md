@@ -25,7 +25,7 @@
 
 ### Top three architectural risks to manage
 1. **Coupling pure logic to game runtime** — would make NFR-MAINT-01/03 unsatisfiable and the PBT obligations in S-19 unimplementable. Mitigated by executing Application Design + NFR Design with explicit separation.
-2. **Worker shift orchestration sprawling across event handlers** — leads to bugs in calendar edge cases (sleep fast-forward, festivals, stuck recovery). Mitigated by designing the shift orchestrator as an explicit state machine in Functional Design.
+2. **Worker shift orchestration sprawling across event handlers** — leads to bugs in calendar edge cases (sleep handling, festivals, stuck recovery). Mitigated by designing the shift orchestrator as an explicit state machine in Functional Design.
 3. **Harmony patch conflicts** — Stardew's modding ecosystem has many Harmony users; sloppy patches break compat. Mitigated by isolating patches in a single namespace (NFR-MAINT-04) and documented in code-generation planning.
 
 ---

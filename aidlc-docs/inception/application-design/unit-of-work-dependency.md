@@ -1,6 +1,6 @@
 # Unit of Work Dependency — Dayswork
 
-This document specifies the construction order for the 16 units defined in [unit-of-work.md](unit-of-work.md). Per the approved plan, **each unit completes its full Construction loop (Functional Design → NFR Requirements → NFR Design → Code Generation) before the next unit's loop begins.**
+This document specifies the construction order for the 17 units defined in [unit-of-work.md](unit-of-work.md). Per the approved plan, **each unit completes its full Construction loop (Functional Design → NFR Requirements → NFR Design → Code Generation) before the next unit's loop begins.**
 
 The graph here is a strict DAG: every arrow `A → B` means "unit B's Construction loop cannot start until unit A's loop is complete." There are no back-edges.
 
@@ -25,7 +25,8 @@ flowchart TD
     U13[U-13 Worker Features: Priority + Stuck + Tool Swap + Invuln]
     U14[U-14 Output: Multi-Destination Deposit + Overflow Mail]
     U15[U-15 Recurring Lifecycle + Calendar]
-    U16[U-16 GMCM + i18n Polish]
+    U16[U-16 Animals &amp; Buildings]
+    U17[U-17 GMCM + i18n Polish]
 
     U01 --> U02
     U01 --> U08
@@ -62,8 +63,13 @@ flowchart TD
     U10 --> U15
     U13 --> U15
 
-    U03 --> U16
+    U11 --> U16
+    U13 --> U16
+    U14 --> U16
     U15 --> U16
+
+    U03 --> U17
+    U16 --> U17
 
     classDef foundation fill:#C8E6C9,stroke:#2E7D32,stroke-width:2px,color:#000
     classDef thinSlice fill:#FFE082,stroke:#F57F17,stroke-width:2px,color:#000
@@ -71,7 +77,7 @@ flowchart TD
 
     class U01,U02,U03,U04,U05,U06,U07 foundation
     class U08,U09,U10 thinSlice
-    class U11,U12,U13,U14,U15,U16 deepening
+    class U11,U12,U13,U14,U15,U16,U17 deepening
 ```
 
 **Color legend**: green = Foundation phase, amber = Thin vertical slice phase, blue = Deepening phase.
@@ -100,8 +106,9 @@ For accessibility and as a parser-independent reference.
 | U-12 Hiring UI: Schedule + Edit/Pause/Cancel | U-09 (extends HiringFlowCoordinator) |
 | U-13 Worker Features: Priority + Stuck + Tool Swap + Invuln | U-07 (CapabilityEvaluator + TaskPriorityOrderer become fully active), U-10 (extends ShiftStateMachine, FarmhandNpc, ShiftOrchestrator) |
 | U-14 Output: Multi-Destination Deposit + Overflow Mail | U-10 (extends ShiftStateMachine Depositing state and ShiftOrchestrator intent dispatch), U-13 (deposit pipeline now sits on top of the full task-priority + capability work) |
-| U-15 Recurring Lifecycle + Calendar | U-10 (extends RecurringContractScheduler stub and ShiftOrchestrator for sleep fast-forward), U-13 (full worker behavior must exist before subjecting it to a 7-day recurring loop) |
-| U-16 GMCM + i18n Polish | U-03 (GMCM exposes every IConfigSnapshot field), U-15 (last functional unit; lint pass runs against the whole assembly and proves S-20 holds end-to-end) |
+| U-15 Recurring Lifecycle + Calendar | U-10 (extends RecurringContractScheduler stub and ShiftOrchestrator for sleep-stop settlement), U-13 (full outdoor worker behavior must exist before subjecting it to a 7-day recurring loop) |
+| U-16 Animals & Buildings | U-11 (building selection/chest assignment data exists), U-13 (worker movement/task loop deepened), U-14 (output pipeline can route animal products and indoor harvests), U-15 (current lifecycle stable before adding building/animal complexity) |
+| U-17 GMCM + i18n Polish | U-03 (GMCM exposes every IConfigSnapshot field), U-16 (last functional unit; lint pass runs against the whole assembly and proves S-20 holds end-to-end) |
 
 **Inbound dependencies** (what later units this unit unblocks):
 
@@ -109,7 +116,7 @@ For accessibility and as a parser-independent reference.
 |---|---|
 | U-01 | U-02, U-08 |
 | U-02 | U-03, U-04 |
-| U-03 | U-05, U-06, U-07, U-16 |
+| U-03 | U-05, U-06, U-07, U-17 |
 | U-04 | U-06, U-11 |
 | U-05 | U-09, U-10 |
 | U-06 | U-09, U-10 |
@@ -117,12 +124,13 @@ For accessibility and as a parser-independent reference.
 | U-08 | U-09 |
 | U-09 | U-10, U-11, U-12 |
 | U-10 | U-13, U-14, U-15 |
-| U-11 | (none — terminal in deepening phase) |
+| U-11 | U-16 |
 | U-12 | (none — terminal in deepening phase) |
-| U-13 | U-14, U-15 |
-| U-14 | (none — terminal in deepening phase) |
+| U-13 | U-14, U-15, U-16 |
+| U-14 | U-16 |
 | U-15 | U-16 |
-| U-16 | (none — final unit) |
+| U-16 | U-17 |
+| U-17 | (none — final unit) |
 
 ---
 
@@ -151,7 +159,8 @@ Deepening (each unit takes the thin slice and adds depth)
  13. U-13 Worker Features: Priority + Stuck + Tool Swap + Invulnerability
  14. U-14 Output: Multi-Destination Deposit + Overflow Mail
  15. U-15 Recurring Lifecycle + Calendar
- 16. U-16 GMCM + i18n Polish            ← v1 RELEASE CANDIDATE
+ 16. U-16 Animals & Buildings
+ 17. U-17 GMCM + i18n Polish            ← v1 RELEASE CANDIDATE
 ```
 
 **Note on U-11/U-12 ordering**: U-11 (Zones & Chests) and U-12 (Schedule + Edit/Pause/Cancel) are not interdependent and could swap places. U-11 is sequenced first because it unblocks the chest-assignment data that U-14 will eventually exercise (chests must be assignable before the mail-fallback path is interesting to test). U-12 could be deferred to immediately before U-15 if a different prioritization emerged — for example, if the developer wanted to defer the contract-management UI in favor of building worker depth earlier.
@@ -200,7 +209,7 @@ sequenceDiagram
 5. **Code Generation** — plan-then-approve, then generate code; user approves
 6. Loop advances to the next unit
 
-After U-16 completes, the **Build and Test** stage runs once across all 16 units' output (per [execution-plan.md](../plans/execution-plan.md)).
+After U-17 completes, the **Build and Test** stage runs once across all 17 units' output (per [execution-plan.md](../plans/execution-plan.md)).
 
 ---
 
@@ -209,16 +218,16 @@ After U-16 completes, the **Build and Test** stage runs once across all 16 units
 | Risk | Mitigation in the unit sequence |
 |---|---|
 | Integration issues found late (pure dependency-first risk) | U-10 forces an end-to-end happy path early — the system is observably "alive" after only 10 units, surfacing wiring problems before the deepening phase. |
-| Throwaway work from demo-first stub-and-replace | The U-10 stubs (whole-farm default zone, shipping-bin default destination, basic state machine, one-time-only scheduler) are clearly bounded extensions in U-11/U-13/U-14/U-15. Each stub site is documented in [unit-of-work.md](unit-of-work.md) under "Extends". |
+| Throwaway work from demo-first stub-and-replace | The U-10 stubs (whole-farm default zone, shipping-bin default destination, basic state machine, one-time-only scheduler) are clearly bounded extensions in U-11/U-13/U-14/U-15/U-16. Each stub site is documented in [unit-of-work.md](unit-of-work.md) under "Extends". |
 | Test debt accumulating because tests are bundled per-unit | U-02 stands up the test framework once. PBT obligations PBT-02/PBT-03 are concentrated in Core foundation units (U-04, U-05, U-06, U-10) where they're the primary value. Mod units add only light tests because their value comes from manual play-testing. |
-| Composition root (ModEntry) becoming a god-object as it grows across 9 units | The growth is mechanical — each Mod-unit's "Extends M-01" entry adds one or two `new X(...)` statements and one or two event subscriptions. The sequence in `Entry()` is documented in [services.md](services.md) Service S-A; deviations from that order are a code-review red flag. |
+| Composition root (ModEntry) becoming a god-object as it grows across 10 units | The growth is mechanical — each Mod-unit's "Extends M-01" entry adds one or two `new X(...)` statements and one or two event subscriptions. The sequence in `Entry()` is documented in [services.md](services.md) Service S-A; deviations from that order are a code-review red flag. |
 | `ShiftStateMachine` (C-08) and `ShiftOrchestrator` (M-12) extended across U-10, U-13, U-14 | Per-unit Functional Design will explicitly enumerate the state-machine states being added (U-13 adds Stuck, Recovering; U-14 expands Depositing's intent set). Each PBT in U-10 continues to pass at U-13 and U-14 — regression catches accidental breakage. |
 
 ---
 
 ## Coverage checks
 
-- ✅ **All 35 components owned by exactly one unit** (see ownership matrix in [unit-of-work.md](unit-of-work.md))
+- ✅ **All 35 original components owned by exactly one unit** (see ownership matrix in [unit-of-work.md](unit-of-work.md)); post-design U-16 components are owned by U-16
 - ✅ **All 20 stories covered by at least one delivering unit** (see [unit-of-work-story-map.md](unit-of-work-story-map.md))
 - ✅ **No cycles in the dependency DAG** (every edge points from lower-numbered to higher-numbered unit)
-- ✅ **Linear topological ordering exists** (the 1→16 sequence in "Construction loop execution order" above respects every edge)
+- ✅ **Linear topological ordering exists** (the 1→17 sequence in "Construction loop execution order" above respects every edge)

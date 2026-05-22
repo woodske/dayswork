@@ -23,7 +23,7 @@
 - **U-05 Pricing Core** — every calculator depends on `IConfigSnapshot`
 - **U-10 Worker Shift** — `ShiftStateMachine` reads `HardCapTime`
 - **U-13 Worker Features** — `StuckDetector` reads `Stuck*WaitMinutes`
-- **U-16 GMCM + Polish** — `GMCMRegistrar` exposes every IConfigSnapshot property
+- **U-17 GMCM + Polish** — `GMCMRegistrar` exposes every IConfigSnapshot property
 
 ### Per-unit stage decisions
 | Stage | Decision | Rationale |

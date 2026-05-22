@@ -2,6 +2,7 @@
 
 **Unit**: U-15 — Recurring Lifecycle + Calendar Handlers
 **Stage**: CONSTRUCTION — Code Generation (Part 2 complete)
+**Approval**: APPROVED 2026-05-22
 **Stories**: S-12 (completes), S-14 (full), S-15 (full), S-19 (PBT)
 **Decisions**: FD-Q1=A, Q2=A superseded by DEV-U15-09 sleep-stop behavior, Q3→Clar-1a=C, Q4=B, Q5=A, Q6=C, Q7=A, Q8=C(+Clar-2), Q9=C(+Clar-3). Patterns Q–U. Deviations DEV-U15-01..09.
 

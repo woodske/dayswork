@@ -2001,3 +2001,19 @@ From the logs:
 **Context**: CONSTRUCTION — backlog/status question
 
 ---
+
+## U-15 Code Approval and Unit Creation Request
+**Timestamp**: 2026-05-22T15:50:03Z
+**User Input**: "Create a unit of work for this and mark U-15 code as approved, then wait."
+**AI Response**: Beginning documentation-only workflow update. Will mark U-15 Recurring Lifecycle + Calendar Handlers Code Generation as approved, insert a dedicated Animals & Buildings unit before GMCM/i18n polish, update unit-of-work/story/dependency artifacts plus AI-DLC state/audit, and then stop without proceeding into the new unit.
+**Context**: CONSTRUCTION — U-15 approval plus Units Generation artifact update
+
+---
+
+## U-15 Code Approval and Unit Creation Complete
+**Timestamp**: 2026-05-22T15:56:41Z
+**User Input**: (continuation — no new input)
+**AI Response**: Marked U-15 Recurring Lifecycle + Calendar Handlers Code Generation as approved on 2026-05-22. Inserted U-16 Animals & Buildings as the next unit of work to address building entry, indoor work scanning, and animal task execution. Renumbered GMCM + i18n Polish to U-17 and updated aidlc-state.md, unit-of-work.md, unit-of-work-story-map.md, unit-of-work-dependency.md, U-15 code summary, U-15 code generation plan, and related U-03 references. Stopped before starting U-16 Functional Design as requested.
+**Context**: CONSTRUCTION — U-15 approval recorded; U-16 Animals & Buildings queued; awaiting user direction
+
+---

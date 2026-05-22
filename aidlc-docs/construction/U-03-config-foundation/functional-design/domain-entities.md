@@ -64,7 +64,7 @@ public interface IConfigSnapshot
 
 - **U-05 calculators** (`IRateCalculator`, `IDepositCalculator`, `IRefundCalculator`, `IHoursEstimator`) take `IConfigSnapshot` in their constructors — they don't need to know about the concrete record.
 - **Tests construct minimal fakes**: a test that exercises only `BaseRate` and `TaskIncrements` can build a dictionary-backed `IConfigSnapshot` fake without instantiating the full record.
-- **U-16 GMCM** may produce alternative `IConfigSnapshot` implementations during the GMCM "edit then save" flow (e.g., a backing-mutable wrapper). Consumers stay unchanged.
+- **U-17 GMCM** may produce alternative `IConfigSnapshot` implementations during the GMCM "edit then save" flow (e.g., a backing-mutable wrapper). Consumers stay unchanged.
 
 ---
 

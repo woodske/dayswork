@@ -28,13 +28,13 @@ C:\Users\kwood\Repos\dayswork\
 │   ├── Capabilities\, Shifts\   ← U-07 (priority orderer + capability matrix)
 │   ├── Shifts\                  ← state machine introduced in U-10, extended in U-13/U-14
 │   └── Inventory\               ← U-10 (buffer), U-14 (deposit planner)
-├── Dayswork\                    ← Mod units (U-08..U-16) land here
+├── Dayswork\                    ← Mod units (U-08..U-17) land here
 │   ├── ModEntry.cs              ← scaffolded in U-01, composition root grows each unit
 │   ├── Patches\                 ← U-08 (bulletin board)
 │   ├── UI\                      ← U-09 (TaskSelection, Summary), U-11 (Zone/Chest + overlay), U-12 (Schedule + board mgmt)
 │   ├── Worker\                  ← U-10 (Npc, path adapter), U-13 (tool swap animator)
 │   ├── Orchestration\           ← U-10 (shift orch + sched stub), U-15 (full sched + calendar)
-│   ├── Integration\             ← U-08 (i18n, mp guard), U-09 (persistence adapter), U-10 (tool reader), U-11 (chest resolver), U-14 (mail), U-16 (gmcm)
+│   ├── Integration\             ← U-08 (i18n, mp guard), U-09 (persistence adapter), U-10 (tool reader), U-11 (chest resolver), U-14 (mail), U-17 (gmcm)
 │   ├── i18n\default.json        ← created in U-08; grows every UI-introducing unit
 │   └── manifest.json            ← created in U-01
 └── Dayswork.Tests\              ← created in U-02; every unit drops its test files here
@@ -44,13 +44,13 @@ C:\Users\kwood\Repos\dayswork\
 
 **Test placement rule** (from U3 answer): U-02 establishes the test project, FsCheck integration, the shared FsCheck generator namespace, and the seed-logging convention. Every subsequent Core-owning unit drops test files alongside the existing infrastructure rather than re-inventing it. Mod-owning units add light integration tests only where the surface area is testable without launching Stardew.
 
-**Manifest.json grows over time**: U-01 creates the skeleton. U-08 adds `i18n` content. U-14 adds the MFM `Dependencies` entry. U-16 adds the GMCM optional `OptionalDependencies` entry.
+**Manifest.json grows over time**: U-01 creates the skeleton. U-08 adds `i18n` content. U-14 adds the MFM `Dependencies` entry. U-17 adds the GMCM optional `OptionalDependencies` entry.
 
 **ModEntry composition root grows over time**: U-01 starts as a stub with one log line. Each subsequent Mod unit adds its singleton constructions and SMAPI event wirings in the order documented in [services.md](services.md) Service S-A.
 
 ---
 
-## The 16 units
+## The 17 units
 
 ### Foundation phase (units that have no dependencies on later Mod work)
 
@@ -389,24 +389,45 @@ C:\Users\kwood\Repos\dayswork\
 
 #### U-15 — Recurring Lifecycle + Calendar Handlers
 
-**Purpose**: Promote the U-10 one-time scheduler stub into the full daily lifecycle. Add festival/rain/sleep handling. After this unit, a recurring contract just *runs* day after day.
+**Purpose**: Promote the U-10 one-time scheduler stub into the full daily lifecycle. Add festival/rain/sleep-stop handling. After this unit, a recurring contract just *runs* day after day.
 
 **Components owned**: M-14 CalendarHandlers.
 
-**Extends**: M-13 RecurringContractScheduler (full — daily deposit deduction; festival skip; can't-afford → cannot-afford mail; tool-missing warning queue per Service S-D step 9), M-12 ShiftOrchestrator (adds sleep fast-forward entry point per Service S-C "Sleep fast-forward sequence"), `i18n/default.json` (festival-skip log message, cannot-afford mail body).
+**Extends**: M-13 RecurringContractScheduler (full — daily deposit deduction; festival skip; can't-afford → cannot-afford mail), M-12 ShiftOrchestrator (adds sleep-stop settlement entry point), `i18n/default.json` (festival-skip log message, cannot-afford mail body).
 
 **Code organization**:
 - `Dayswork/Orchestration/CalendarHandlers.cs` (subscribes to `GameLoop.Saving` and exposes `IsFestivalToday()` / `IsRainyToday()` to other services)
 
 **Test files**: Largely play-tested — these are SMAPI-event-driven flows. Whatever calendar predicates can be reduced to Core helpers should be PBT-tested in `Dayswork.Core/`.
 
-**Stories implemented**: S-12 (recurring behavioral parts: deposit-deduction-each-morning + cancel-after-6am-blocked + can't-afford-mail), S-14 (festivals + rain rate-exclusion + empty-zone full-refund), S-15 (sleep fast-forward atomically applies refund and mail to today's state).
+**Stories implemented**: S-12 (recurring behavioral parts: deposit-deduction-each-morning + cancel-after-6am-blocked + can't-afford-mail), S-14 (festivals + rain rate-exclusion + empty-zone full-refund), S-15 (sleep stops the worker and atomically applies refund/mail to today's state).
 
-**Definition of Done**: Save a recurring contract on day 1; play 7 in-game days including one festival and one rainy day. The mod handles each correctly: skips festivals silently; charges no Water Crops surcharge on rain days; fully refunds the empty-zone day; sleep-confirms cleanly when the worker hasn't finished.
+**Definition of Done**: Save a recurring contract on day 1; play 7 in-game days including one festival and one rainy day. The mod handles each correctly: sends same-day festival/cannot-afford notices, charges no Water Crops surcharge on rain days, fully refunds the empty-zone day, and stops/settles the worker cleanly when the farmer sleeps before work is done.
 
 ---
 
-#### U-16 — GMCM + i18n Lint + Polish
+#### U-16 — Animals & Buildings
+
+**Purpose**: Close TODO-05 by making selected buildings real work areas instead of selection placeholders. The worker can enter barns/coops/greenhouse/building interiors, perform supported indoor tile tasks, and execute the three animal tasks.
+
+**Components owned**: BuildingWorkNavigator (Mod, post-design addition), IndoorWorkScanner (Mod, post-design addition), AnimalTaskHandler (Mod, post-design addition).
+
+**Extends**: M-12 ShiftOrchestrator (building-door warp navigation, indoor location context, animal task detection/invocation), WorkerMovementDriver (door approach + warp handoff), C-07 TaskPriorityOrderer (animal priority slots become executable), M-20 ChestResolver / C-11 DepositPlanner integration (animal-product and greenhouse/building output routing), `i18n/default.json` (animal/building logs or mail/body lines if needed).
+
+**Code organization**:
+- `Dayswork/Orchestration/BuildingWorkNavigator.cs`
+- `Dayswork/Orchestration/IndoorWorkScanner.cs`
+- `Dayswork/Orchestration/AnimalTaskHandler.cs`
+
+**Test files**: Prefer Core/unit tests for any pure mapping or planning helpers (for example building-work ordering and animal-product routing invariants). SMAPI/Stardew animal interaction and building-warp behavior are primarily play-tested.
+
+**Stories implemented**: S-08 (completes animal task execution in priority order), S-03/S-04 deepening (selected buildings now produce real work, and building-interior output routing is exercised), plus FR-WORK-09 and FR-TASK-03/04 runtime behavior.
+
+**Definition of Done**: A selected barn/coop contract feeds animals, pets animals, collects animal products to the configured destination, and exits without losing items. A selected greenhouse/building interior runs supported tile tasks. The worker reaches building doors, transitions inside, resumes pathing indoors, and handles missing/invalid interiors gracefully.
+
+---
+
+#### U-17 — GMCM + i18n Lint + Polish
 
 **Purpose**: Final unit. Expose every configurable value to GMCM so the player can tune the mod; run the hardcoded-string lint pass to confirm S-20 actually holds.
 
@@ -452,7 +473,7 @@ C:\Users\kwood\Repos\dayswork\
 | C-13 SaveDataSerializer | U-06 | — |
 | C-14 ConfigSnapshot | U-03 | — |
 | C-15 ConfigDefaults | U-03 | — |
-| M-01 ModEntry | U-01 | U-08, U-09, U-10, U-11, U-13, U-14, U-15, U-16 (composition root grows each unit) |
+| M-01 ModEntry | U-01 | U-08, U-09, U-10, U-11, U-13, U-14, U-15, U-16, U-17 (composition root grows each unit) |
 | M-02 BulletinBoardPatch | U-08 | U-12 (contract-list rendering) |
 | M-03 HiringFlowCoordinator | U-09 | U-11, U-12 |
 | M-04 TaskSelectionMenu | U-09 | — |
@@ -463,18 +484,21 @@ C:\Users\kwood\Repos\dayswork\
 | M-09 FarmhandNpc | U-10 | U-13 (invulnerability via hit-detection), U-13B (re-founded on Farmer) |
 | M-10 ToolSwapAnimator | U-13B | — |
 | M-11 PathFindControllerAdapter | U-10 | U-13 (real walking), U-13B (superseded by WorkerMovementDriver) |
-| M-12 ShiftOrchestrator | U-10 | U-13, U-13B, U-14, U-15 |
+| M-12 ShiftOrchestrator | U-10 | U-13, U-13B, U-14, U-15, U-16 |
 | M-13 RecurringContractScheduler | U-10 (stub) | U-15 (full lifecycle) |
 | M-14 CalendarHandlers | U-15 | — |
 | M-15 ContractPersistenceAdapter | U-09 | — |
 | M-16 MailDispatcher | U-14 | — |
-| M-17 GMCMRegistrar | U-16 | — |
+| M-17 GMCMRegistrar | U-17 | — |
 | M-18 MultiplayerGuard | U-08 | — |
 | M-19 ToolLevelReader | U-10 | — |
 | M-20 ChestResolver | U-11 | — |
 | M-21 I18nHelper | U-08 | — |
+| BuildingWorkNavigator (Mod, post-design addition) | U-16 | — |
+| IndoorWorkScanner (Mod, post-design addition) | U-16 | — |
+| AnimalTaskHandler (Mod, post-design addition) | U-16 | — |
 
-**Verification**: 35 original design components, each owned by exactly one unit. ✓ Plus 6 post-design implementation components introduced by the FD-Q5=B full-Farmer decision and the U-13/U-13B split (ObjectTargetClassifier, WorkerTool map, FarmhandWorker, WorkerMovementDriver, WorkerRenderer, WorkerAppearanceRandomizer), each owned by exactly one of U-13 / U-13B.
+**Verification**: 35 original design components, each owned by exactly one unit. ✓ Plus 9 post-design implementation components introduced by the FD-Q5=B full-Farmer decision, the U-13/U-13B split, and the U-16 Animals & Buildings insertion (ObjectTargetClassifier, WorkerTool map, FarmhandWorker, WorkerMovementDriver, WorkerRenderer, WorkerAppearanceRandomizer, BuildingWorkNavigator, IndoorWorkScanner, AnimalTaskHandler), each owned by exactly one unit.
 
 ---
 
@@ -483,10 +507,10 @@ C:\Users\kwood\Repos\dayswork\
 - **Every story covered**: see [unit-of-work-story-map.md](unit-of-work-story-map.md) for the 20-story coverage matrix. ✓
 - **Every component owned exactly once**: see the matrix above. ✓
 - **No forward dependencies**: see [unit-of-work-dependency.md](unit-of-work-dependency.md). Every unit's dependencies point to earlier units only. ✓
-- **Foundation-first respected (U1 = C, U4 = C)**: U-01 through U-07 are foundation; U-08 through U-10 form the thin end-to-end vertical slice; U-11 through U-16 deepen the slice. ✓
+- **Foundation-first respected (U1 = C, U4 = C)**: U-01 through U-07 are foundation; U-08 through U-10 form the thin end-to-end vertical slice; U-11 through U-17 deepen the slice. ✓
 - **Test infra early (U3 = B)**: U-02 ships immediately after the project scaffold; all later units add tests to the established framework rather than re-bootstrapping. ✓
 - **Scaffold first (U5 = A)**: U-01 ships a loadable empty mod before any other work. ✓
-- **Granularity ~16 (U2 = B)**: exactly 16 units. ✓
+- **Granularity ~16 (U2 = B)**: 17 units after the playtest-driven Animals & Buildings insertion. ✓
 
 ---
 
@@ -494,8 +518,8 @@ C:\Users\kwood\Repos\dayswork\
 
 Per the approved execution plan in [execution-plan.md](../plans/execution-plan.md), each unit goes through:
 
-1. **Functional Design** (Construction stage) — only if the unit introduces new business logic. Likely EXECUTE for U-03..U-07, U-10, U-13, U-14, U-15; likely SKIP for U-01, U-02, U-08, U-09, U-11, U-12, U-16 (where the design is largely UI-rendering or SMAPI-event wiring with little new logic).
-2. **NFR Requirements** — pull the relevant NFRs from [requirements.md](../requirements/requirements.md) per unit (e.g., U-05's NFR-SAFE-02 integer rounding; U-10's NFR-SAFE-01 no-items-lost; U-14's NFR-SAFE-01 + NFR-SAFE-03 graceful chest-missing fallback; U-16's NFR-MAINT-02 i18n).
+1. **Functional Design** (Construction stage) — only if the unit introduces new business logic. Likely EXECUTE for U-03..U-07, U-10, U-13, U-14, U-15, U-16; likely SKIP for U-01, U-02, U-08, U-09, U-11, U-12, U-17 (where the design is largely UI-rendering or SMAPI-event wiring with little new logic).
+2. **NFR Requirements** — pull the relevant NFRs from [requirements.md](../requirements/requirements.md) per unit (e.g., U-05's NFR-SAFE-02 integer rounding; U-10's NFR-SAFE-01 no-items-lost; U-14's NFR-SAFE-01 + NFR-SAFE-03 graceful chest-missing fallback; U-16's building/animal pathing safety; U-17's NFR-MAINT-02 i18n).
 3. **NFR Design** — design patterns for those NFRs.
 4. **Infrastructure Design** — SKIPPED for every unit (no cloud/IaC; SMAPI is the platform).
 5. **Code Generation** — always EXECUTE. Plan-and-approve cycle per unit.

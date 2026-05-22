@@ -3,6 +3,7 @@
 **Unit**: U-15 — Recurring Lifecycle + Calendar Handlers
 **Stories**: S-12 (completes — daily deposit deduction + can't-afford → cannot-afford mail), S-14 (full — festival skip+letter, rainy-day Water-Crops rate exclusion, empty-zone full refund), S-15 (full — early-sleep sleep-stop settlement), S-19 (PBT obligations)
 **Phase**: CONSTRUCTION — Code Generation (Part 1: Planning)
+**Approval**: Code Generation APPROVED 2026-05-22
 
 > This plan is the single source of truth for U-15 Code Generation. Generation (Part 2) executes these steps in order **after approval**.
 
