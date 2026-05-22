@@ -2017,3 +2017,19 @@ From the logs:
 **Context**: CONSTRUCTION — U-15 approval recorded; U-16 Animals & Buildings queued; awaiting user direction
 
 ---
+
+## U-16 Animals & Buildings — Functional Design Started
+**Timestamp**: 2026-05-22T17:05:00Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resumed the AI-DLC per-unit Construction loop at U-16 Animals & Buildings (Functional Design). Loaded session-continuity, functional-design rule details, and prior artifacts (unit-of-work, story map, requirements, source-spec) plus the live extension-point code (ShiftOrchestrator, WorkerMovementDriver, ShiftContext, Zone, ChestResolver, DepositPlanner, TaskKind, TaskPriorityOrderer, ShiftIntent, WorkItem). Confirmed the central finding that the orchestrator is single-location and the work model has no location dimension. Wrote the U-16 Functional Design Plan with a checklist, context summary, and 9 embedded design questions (FD-Q1 cross-location work model; FD-Q2 location visit order; FD-Q3 collect-animal-products scope; FD-Q4 feed-animals mechanic; FD-Q5 inside-only vs outdoor grazing animals; FD-Q6 indoor tile-task scope; FD-Q7 building-nav failure handling; FD-Q8 cross-location deposit; FD-Q9 deposit/hours estimate scope) at aidlc-docs/construction/plans/u-16-animals-buildings-functional-design-plan.md. Updated aidlc-state.md Current Stage to U-16 Functional Design IN PROGRESS. Stopped to await the user's answers to FD-Q1–Q9.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Functional Design (Step 4 complete; awaiting answers)
+
+---
+
+## U-16 Animals & Buildings — Functional Design Answers + Artifacts
+**Timestamp**: 2026-05-22T17:40:00Z
+**User Input**: (answered FD-Q1–Q9 inline in the plan file) "FD-Q1=A; FD-Q2=A; FD-Q3=B; FD-Q4=A, but note that each animal building has a hay hopper that automatically moves hay from the silo so the worker does not need to go to the silo directly. The farmer will still need a silo for the worker to extract hay from the hopper.; FD-Q5=B; FD-Q6=A; FD-Q7=A; FD-Q8=B; FD-Q9=A" — then "finished answering questions".
+**AI Response**: Collected all 9 answers (no vague responses). Designed three cross-answer reconciliations: (1) FD-Q1+FD-Q5 — animal pet/collect work items attach to the animal's current location-batch (inside→building batch, grazing→outdoor-farm batch) while feeding stays building-bound; (2) FD-Q3+DEV-U15-03 — the worker milks/shears regardless of whether the player owns a milk pail/shears (un-tiered tools, worker tool-independence), captured as DEV-U16-01 and explicitly surfaced for approval; (3) FD-Q4 hopper refinement — feed from the in-building hopper (auto-supplied by silo), no silo walk, captured as DEV-U16-03. Generated the three functional-design artifacts at aidlc-docs/construction/u-16-animals-buildings/functional-design/: business-logic-model.md (multi-location batch layer over the existing per-item working loop: BuildShiftPlan → ordered WorkBatch list → enter/animal-work/tile-work/exit per batch → multi-location deposit run), domain-entities.md (new WorkBatch/BatchKind/AnimalWorkItem/AnimalRef/AnimalProductKind, BuildingWorkNavigator/IndoorWorkScanner/AnimalTaskHandler, door-warp + animal intents; WorkItem gains LocationName; no new state-machine phase), and business-rules.md (BR-LOC/NAV/ANIM/FEED/PROD/IND/DEP/SET/SAFE/I18N rules + DEV-U16-01..04 + PBT obligations). Updated the U-16 FD plan checklist and aidlc-state.md Current Stage to "Functional Design artifacts generated; AWAITING APPROVAL". Presenting the standardized 2-option completion message; next stage on approval is NFR Requirements.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Functional Design (artifacts generated; awaiting approval)
+
+---
