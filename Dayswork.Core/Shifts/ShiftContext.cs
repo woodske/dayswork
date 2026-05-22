@@ -8,6 +8,7 @@ public sealed class ShiftContext
     public ContractId ContractId { get; }
     public IReadOnlyList<Zone> Zones { get; }
     public IReadOnlySet<TaskKind> EnabledTasks { get; }
+    public IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations { get; }
     public int DepositAmount { get; }
     public int HourlyRate { get; }
     public ToolSnapshot ToolSnapshot { get; }
@@ -29,24 +30,31 @@ public sealed class ShiftContext
     // Populated during BuildWorkList; read by U-14 to send the warning mail.
     public HashSet<TaskKind> ToolMissingWarnings { get; } = new();
 
+    // The single sink for everything undeliverable this shift (Pattern O / FD-Q5/Q6=A):
+    // seeded with mail-bound items at planning, appended on chest-full/missing and on
+    // sleep-interruption, flushed to one overflow letter at exit.
+    public List<OverflowItem> Overflow { get; } = new();
+
     public ShiftContext(
         ContractId contractId,
         IReadOnlyList<Zone> zones,
         IReadOnlySet<TaskKind> enabledTasks,
+        IReadOnlyDictionary<TaskKind, DestinationKey> taskDestinations,
         int depositAmount,
         int hourlyRate,
         ToolSnapshot toolSnapshot,
         IEnumerable<WorkItem> workList,
         int shiftStartTime)
     {
-        ContractId    = contractId;
-        Zones         = zones;
-        EnabledTasks  = enabledTasks;
-        DepositAmount = depositAmount;
-        HourlyRate    = hourlyRate;
-        ToolSnapshot  = toolSnapshot;
-        WorkList      = new Queue<WorkItem>(workList);
-        ShiftStartTime = shiftStartTime;
+        ContractId       = contractId;
+        Zones            = zones;
+        EnabledTasks     = enabledTasks;
+        TaskDestinations = taskDestinations;
+        DepositAmount    = depositAmount;
+        HourlyRate       = hourlyRate;
+        ToolSnapshot     = toolSnapshot;
+        WorkList         = new Queue<WorkItem>(workList);
+        ShiftStartTime   = shiftStartTime;
     }
 
     public int ComputeRefund()

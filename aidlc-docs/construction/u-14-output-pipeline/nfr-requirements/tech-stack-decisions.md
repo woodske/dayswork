@@ -5,13 +5,13 @@
 ---
 
 ## TS-U14-01 — No new test/runtime frameworks
-Testing stays on **xUnit** + **FsCheck** (NFR-MAINT-01/02). `DepositPlanner` is plain Core C#. The only new external integration is the Mail Framework Mod (MFM) **API**, not a NuGet package — its interface stub is vendored (see TS-U14-03).
+Testing stays on **xUnit** + **FsCheck** (NFR-MAINT-01/02). `DepositPlanner` is plain Core C#. The only new external integration is the Mail Framework Mod (MFM) **API**, not a NuGet package — integration is through a runtime adapter (see TS-U14-03).
 
 ## TS-U14-02 — Distance oracle injected into the pure planner (NFR-MAINT-03)
 `DepositPlanner` takes a `Func<TileCoord,TileCoord,int>` distance oracle rather than referencing any Stardew pathfinding type. v1 supplies **Manhattan distance**, consistent with U-13's existing nearest-task work routing (DEV-02). This keeps the planner pure Core and PBT-testable, and lets a future version swap in true path-distance without changing the planner. *(BR-OUT-04)*
 
-## TS-U14-03 — MFM integration: vendor the API stub, acquire via `GetApi` (V9)
-Following the GMCM pattern, U-14 vendors MFM's public API interface (e.g., `IMailFrameworkModApi`) into the `Dayswork` project and acquires the live API once at startup via `Helper.ModRegistry.GetApi<...>("DIGUS.MailFrameworkMod")`. The exact UniqueID, interface shape, and minimum version are **confirmed at Code Generation** by inspecting the published MFM API. Item-bearing overflow mail uses MFM's multi-attachment letter; no-item warning mail uses vanilla `Game1.addMailForTomorrow(mailId)`. *(BR-DEP-01, BR-MAIL-01/05)*
+## TS-U14-03 — MFM integration: runtime adapter over installed API (V9)
+Code generation initially tried the GMCM-style copied interface pattern, then corrected it after inspecting the installed MFM 1.20.0 DLL. MFM exposes `RegisterLetter(ILetter, Func<ILetter,bool>, Action<ILetter>, Func<ILetter,List<Item>>)`, so Dayswork now acquires the raw API object with `Helper.ModRegistry.GetApi("DIGUS.MailFrameworkMod")` on `GameLoop.GameLaunched` and uses `MailFrameworkModApiAdapter` to create MFM `Letter`/`ApiLetter` objects by reflection. Item-bearing overflow mail and no-item warning mail both use MFM letters. *(BR-DEP-01, BR-MAIL-01/05, DEV-U14-03)*
 
 ## TS-U14-04 — No custom mail save data (FD-Q4=A)
 Overflow and warning letters are queued **for tomorrow** at shift end and persisted by Stardew/MFM, not by Dayswork. No new save DTO, no `ContractStore`-style structure, no SaveDataSerializer change. This is a deliberate simplification that removes a whole NFR-SAFE-03 round-trip surface. *(SAFE-U14-03)*

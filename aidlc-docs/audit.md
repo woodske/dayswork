@@ -1670,3 +1670,167 @@ I made a simple contract, only clear rocks with a small zone containing two rock
 **Timestamp**: 2026-05-21T20:10:00Z
 **AI Response**: Created the U-14 code generation plan (16 steps) at construction/plans/u-14-output-pipeline-code-generation-plan.md — single source of truth for Part 2. Steps: A) Core (extend ItemBuffer with SourceTask, deposit/overflow domain types, pure DepositPlanner, IntentDepositAtChest, ShiftContext +TaskDestinations/+Overflow, planner PBTs + shared generator); B) Mod mail (vendor MFM API stub, MailDispatcher); C) orchestrator multi-trip deposit + mail flush + tagged buffering + OnSaving mail-not-dump, ModEntry wiring + MFM GetApi; D) manifest MFM dependency + i18n mail keys; E) build/test (full 184 regression must stay green), code-summary, state/audit. Story traceability S-04/S-10/S-11/S-19. Awaiting explicit approval before any code is written.
 **Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation Part 1 (Planning) — approval prompt
+
+## U-14 Output Pipeline — Code Generation Plan Approved
+**Timestamp**: 2026-05-21T20:15:00Z
+**User Input**: "approve"
+**AI Response**: Plan approved. Marking Code Generation Part 1 (Planning) complete and beginning Part 2 (Generation) — executing the 16 steps in order, updating plan checkboxes as each completes.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation Part 1 approved; entering Part 2
+
+---
+
+## U-14 Output Pipeline — Code Generation Complete (Part 2)
+**Timestamp**: 2026-05-21T20:55:00Z
+**User Input**: (continuation from plan approval — no new input)
+**AI Response**: Executed all 16 code-generation steps. Created: BufferedItem, DepositPlan types, IDepositPlanner/DepositPlanner (Core), IMailFrameworkModApi stub, IMailDispatcher/MailDispatcher (Mod), DepositInputGen + DepositPlannerTests (Tests). Modified: IItemBuffer/ItemBuffer (+SourceTask), ShiftIntent (+IntentDepositAtChest), ShiftContext (+TaskDestinations/+Overflow), ShiftOrchestrator (tagged buffering + planner-driven multi-trip deposit loop + chest resolve/full/missing→overflow + mail flush at exit + OnSaving mails leftovers), ModEntry (planner+dispatcher+MFM GetApi wiring), manifest.json (MFM required dependency), i18n/default.json (mail keys), ItemBufferGen/ItemBufferTests (signature update). Verification: dotnet build 0 errors / 0 warnings, auto-deployed to Mods/Dayswork; dotnet test 190 passed / 1 expected skip (184 prior + 6 new planner tests, full regression green). Deviations recorded: DEV-U14-01 (tool-missing warning via MFM text-only, not vanilla), DEV-U14-02 (OnSaving mid-work mails items for SAFE-01), DEV-U14-03 (MFM API is a vendored stub requiring in-game confirmation; MailDispatcher falls back so no items lost). Stories S-04/S-10/S-11/S-19 implemented. Awaiting code-generation approval.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation Part 2 complete
+
+---
+
+## U-14 Output Pipeline — Play-Test Fix (GameLaunched API timing)
+**Timestamp**: 2026-05-21T21:10:00Z
+**User Input**: "[Dayswork] Tried to access a mod-provided API before all mods were initialized. got this warning on SMAPI startup"
+**AI Response**: Fixed — MFM API was being fetched via Helper.ModRegistry.GetApi inside Entry(), which SMAPI disallows (mod APIs must be fetched after all mods initialize). MailDispatcher now constructs without the API in Entry() and exposes SetApi(...); ModEntry injects the MFM API from a GameLoop.GameLaunched handler. Verification: dotnet build 0 errors / 0 warnings, auto-deployed; dotnet test 190 passed / 1 expected skip.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation play-test fix
+
+---
+
+## U-14 Output Pipeline — Code Generation Review Request
+**Timestamp**: 2026-05-21T21:28:25Z
+**User Input**: "I'm using the ai-dlc workflow and am in the middle of the code generation portion. The mod mail framework has been best guessed, but I have the mod installed here: X:\Steam\steamapps\common\Stardew Valley\Mods\MailFrameworkMod
+
+Review the current code. See if any changes need to be made to the mailing functionality given the MailFrameworkMod code. Let me know when you're done and await my playtesting."
+**AI Response**: Resuming U-14 Code Generation review. Loading common ai-dlc rules, enabled extensions, current state, code-generation plan, current Dayswork mailing implementation, and the installed MailFrameworkMod source/API to verify whether mailing functionality needs adjustment. Security Baseline extension is disabled in aidlc-state.md and will be skipped for this review; Property-Based Testing partial enforcement remains enabled.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation review against installed MailFrameworkMod
+
+---
+
+## U-14 Output Pipeline — MFM Review Fix Complete
+**Timestamp**: 2026-05-21T21:35:24Z
+**User Input**: (continuation from MFM review request — no new input)
+**AI Response**: Inspected installed Mail Framework Mod at X:\Steam\steamapps\common\Stardew Valley\Mods\MailFrameworkMod. Confirmed manifest UniqueID DIGUS.MailFrameworkMod and version 1.20.0. Reflected MailFrameworkMod.dll and confirmed actual API RegisterLetter(ILetter, Func<ILetter,bool>, Action<ILetter>, Func<ILetter,List<Item>>), plus public Letter and ApiLetter types. Replaced guessed IMailFrameworkModApi stub with MailFrameworkModApiAdapter using reflection, updated MailDispatcher to wrap the raw API object and register letters with deliver-after-queued-day condition, updated ModEntry to call the non-generic GetApi("DIGUS.MailFrameworkMod") on GameLaunched, and set manifest MinimumVersion to 1.20.0. Updated U-14 code-generation plan with review-change Steps 17-19, updated code summary and aidlc-state. Verification: dotnet build Dayswork.sln 0 errors / 0 warnings and auto-deployed to Mods/Dayswork; dotnet test Dayswork.sln 190 passed / 1 expected skip; reflection smoke check created the adapter and reached MFM RegisterLetter, failing only with expected NotImplementedException "Can't add a letter before the game is launched." Extension compliance: Security Baseline skipped because disabled in aidlc-state.md; PBT partial compliant/N/A for adapter change, existing FsCheck tests pass.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation review fix complete; awaiting user playtesting
+
+---
+
+## U-14 Output Pipeline — Final Verification After Raw API Tightening
+**Timestamp**: 2026-05-21T21:43:37Z
+**User Input**: (continuation from MFM review request — no new input)
+**AI Response**: Tightened ModEntry to call SMAPI's non-generic raw API method Helper.ModRegistry.GetApi("DIGUS.MailFrameworkMod") instead of GetApi<object>(), then synced ai-dlc docs. Final verification: dotnet build Dayswork.sln succeeded with 0 errors / 0 warnings and auto-deployed to X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork; dotnet test Dayswork.sln passed with 190 passed / 1 expected skip.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, final mailing review verification; awaiting user playtesting
+
+---
+
+## U-14 Output Pipeline — Playtest Feedback: MFM Repeat Mail and Empty Attachments
+**Timestamp**: 2026-05-21T21:52:34Z
+**User Input**: "Feedback:
+* The mails are not deleted. The worker sends the materials in the mail and I can collect them, but they're sent again the next day in addition to the previous day's work. It keeps growing
+* I'm getting mail with empty boxes
+<image>[attached screenshot of Dayswork mail showing text and an empty attachment box]</image>"
+**AI Response**: Investigating MFM runtime letter lifecycle and attachment rendering. Goal: make Dayswork overflow/warning letters one-shot after collection/read and avoid empty reward boxes for text-only or invalid-attachment letters.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation playtest fix
+
+---
+
+## U-14 Output Pipeline — Playtest Mail Fix Complete
+**Timestamp**: 2026-05-21T21:57:29Z
+**User Input**: (continuation from playtest feedback — no new input)
+**AI Response**: Inspected MFM IL for MailRepository, MailController, and MailFrameworkModApi.RegisterLetter. Confirmed API letters stay in MFM's repository until removed and callbacks run when the letter menu closes. Updated MailFrameworkModApiAdapter so each Dayswork runtime letter registers a callback that removes that letter from MFM's repository after read/close, delivery condition also checks player.mailReceived to prevent redelivery, and item attachments are supplied via MFM dynamicItems with fresh clones instead of static attachment objects. Updated U-14 plan/state/summary. Verification: dotnet build Dayswork.sln 0 errors / 0 warnings and auto-deployed to X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork; dotnet test Dayswork.sln 190 passed / 1 expected skip. In-game verification pending user playtest.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, repeated mail and empty attachment box fix complete; awaiting user playtesting
+
+---
+
+## U-14 Output Pipeline — Playtest Feedback: Unexpected Materials
+**Timestamp**: 2026-05-21T22:20:54Z
+**User Input**: "Something strange is happening, the worker had a small work area (just a few trees/rocks/grass) and they deposited a bunch of material including copper ore which isn't available in the area I selected. The worker must be adding additional materials. The only materials that should be on the worker should come from the actual environment, we should never create material.
+<image>[attached screenshot of a chest containing 100 fiber, 888 wood, 4 copper ore, and 5 green item stacks]</image>"
+**AI Response**: Investigating as a code-generation playtest blocker. Trace every path where items enter the worker buffer or MFM attachments and patch so Dayswork only transports actual collected environment drops and never creates synthetic materials.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation playtest fix
+
+---
+
+## U-14 Output Pipeline — Unexpected Materials Fix Complete
+**Timestamp**: 2026-05-21T22:24:37Z
+**User Input**: (continuation from unexpected materials feedback — no new input)
+**AI Response**: Inspected ShiftOrchestrator item-ingress paths and found two unsafe behaviours: synthetic fallback material grants for tool actions, and broad debris collection that could capture drops unrelated to the current task tile. Removed fallback material creation for rocks, trees, clumps, and twigs; constrained immediate debris collection to the tile the worker just acted on; changed concrete debris item IDs to use QualifiedItemId; and made no-position debris fail the near-tile check instead of being collected. Updated U-14 plan/state/summary. Verification: dotnet build Dayswork.sln 0 errors / 0 warnings and auto-deployed to X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork; dotnet test Dayswork.sln 190 passed / 1 expected skip. In-game verification pending user playtest.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, unexpected-materials fix complete; awaiting user playtesting
+
+---
+
+## U-14 Output Pipeline — Playtest Feedback: Material Inflation Persists
+**Timestamp**: 2026-05-21T22:36:53Z
+**User Input**: "it is not fixed, the worker is still depositing copper and way too much wood
+<image>[attached screenshot of a chest containing copper ore and oversized material stacks]</image>"
+**AI Response**: Reopening the U-14 playtest blocker. The first fix removed obvious synthetic fallback grants, so the remaining issue is likely incorrect interpretation of Stardew debris objects. Investigating Debris semantics and patching the worker buffer so material quantities and identities are derived from real game item drops only.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation playtest fix
+
+---
+
+## U-14 Output Pipeline — Debris Semantics Fix Complete
+**Timestamp**: 2026-05-21T22:40:59Z
+**User Input**: (continuation from material inflation feedback — no new input)
+**AI Response**: Reflected/decompiled Stardew Debris.collect and Debris.InitializeResource. Confirmed vanilla resource debris awards one item per debris object using explicit Debris.itemId, while Debris.Chunks are visual particles and not item quantity. Updated ShiftOrchestrator.TryGetDebrisItem to stop mapping chunkType values to materials and stop using Chunks.Count as stack size; it now accepts only real debris.item stacks or explicit debris.itemId drops with quantity 1. Added a Debug debris-collection log for future diagnosis. Updated U-14 plan/state/summary through Steps 26-28. Verification: dotnet build Dayswork.sln 0 errors / 0 warnings and auto-deployed to X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork; dotnet test Dayswork.sln 190 passed / 1 expected skip. In-game verification pending user playtest.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, debris-semantics fix complete; awaiting user playtesting
+
+---
+
+## U-14 Output Pipeline — Playtest Feedback: Tree Wood Under-Collected
+**Timestamp**: 2026-05-21T23:00:46Z
+**User Input**: "I don't think all of the wood is being collected. I set the worker to cut down one tree and they only deposited 8 wood. 
+
+In Stardew Valley, cutting down a fully grown, standard tree yields 12 to 16 wood. Chopping down the remaining stump yields an additional 5 to 9 wood.
+
+I suspect we are only getting the stump wood"
+**AI Response**: Reopening the U-14 playtest blocker for tree output. Investigating Dayswork's tree invocation/completion loop and Stardew Tree debris behavior to ensure a CutTrees task clears both the trunk and stump phases and captures all real wood debris produced by the selected tree.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation playtest fix
+
+---
+
+## U-14 Output Pipeline — Tree Wood Collection Fix Complete
+**Timestamp**: 2026-05-21T23:03:11Z
+**User Input**: (continuation from tree wood under-collection feedback — no new input)
+**AI Response**: Reviewed Dayswork's tree action/deposit lifecycle and found the likely cause of stump-only output: trunk-fall wood is collected by a delayed debris sweep, but BeginDeposit flushed and cleared pending sweeps immediately after the stump was removed, before the falling-tree debris existed. Added a pre-deposit wait: if pending debris sweeps exist, the worker pauses deposit planning until they complete, then builds the deposit plan with the collected trunk and stump drops. Updated U-14 plan/state/summary through Steps 29-31. Verification: dotnet build Dayswork.sln 0 errors / 0 warnings and auto-deployed to X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork; dotnet test Dayswork.sln 190 passed / 1 expected skip. In-game verification pending user playtest.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, tree wood collection fix complete; awaiting user playtesting
+
+---
+
+## U-14 Output Pipeline — Playtest Feedback: Tree Wood Still Under-Collected
+**Timestamp**: 2026-05-21T23:06:34Z
+**User Input**: "i'm still only seeing 8 wood from a tree cutting"
+**AI Response**: Reopening the tree lifecycle bug. The delayed-sweep wait did not fix the symptom, so the next likely cause is that Dayswork may be manually removing the Tree terrain feature before Stardew's falling-tree animation/tick code creates trunk wood. Inspecting vanilla Tree.performToolAction/tickUpdate behavior and patching Dayswork to preserve trunk-drop generation.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation playtest fix
+
+---
+
+## U-14 Output Pipeline — Resource Chunk Quantity Fix Complete
+**Timestamp**: 2026-05-21T23:09:58Z
+**User Input**: (continuation from tree wood still under-collected feedback — no new input)
+**AI Response**: Inspected vanilla Tree.performToolAction/performTreeFall and Debris.collect/updateChunks. Confirmed explicit DebrisType.RESOURCE debris is collected one chunk at a time in vanilla, so the previous quantity-1 handling under-counted tree wood. Updated ShiftOrchestrator.TryGetDebrisItem to use Chunks.Count only when Stardew supplies an explicit debris.itemId and the debris type is RESOURCE; Dayswork still refuses unlabeled chunkType material inference, so color/type-only debris cannot create foreign materials. Updated U-14 plan/state/summary through Steps 32-34. Verification: dotnet build Dayswork.sln 0 errors / 0 warnings and auto-deployed to X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork (rerun with approved dotnet build permission after sandboxed NuGet config read failed); dotnet test Dayswork.sln 190 passed / 1 expected skip. In-game verification pending user playtest.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, resource chunk quantity fix complete; awaiting user playtesting
+
+---
+
+## U-14 Output Pipeline — Playtest Feedback: Rocks Not Collected and Empty Mail
+**Timestamp**: 2026-05-21T23:31:36Z
+**User Input**: "I collected 17 this time, it appears to be fixed.
+
+The worker does not appear to be collecting rocks. I'm still getting an empty mail from the worker, maybe it's related to not collecting the rock?
+
+From the logs:
+[Dayswork] [Dayswork][nav] arrived task=ClearRocks nav=(32,36) task=(32,37) worker=(32,36) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=ClearRocks taskTile=(32,37) worker=(32,36).
+[Dayswork] [Dayswork][action] clear rock at (32,37) performToolAction=True removed=True.
+[Dayswork] [Dayswork][action] complete task=ClearRocks taskTile=(32,37).
+[Dayswork] [Dayswork][nav] arrived task=ClearGrass nav=(32,38) task=(32,38) worker=(32,38) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=ClearGrass taskTile=(32,38) worker=(32,38).
+[Dayswork] [Dayswork][action] complete task=ClearGrass taskTile=(32,38)."
+**AI Response**: Reopening U-14 playtest blockers for rock output and empty mail. Tree output appears fixed. Investigating Stardew rock drop semantics, Dayswork rock debris capture, and mail dispatch safeguards for zero-attachment letters.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, Code Generation playtest fix
+
+---
+
+## U-14 Output Pipeline — Rock Collection and Empty-Mail Diagnostic Fix Complete
+**Timestamp**: 2026-05-21T23:36:02Z
+**User Input**: (continuation from rock output / empty mail feedback — no new input)
+**AI Response**: Confirmed tree output is fixed from user playtest. Inspected Stardew Object.performToolAction IL for standard rock breakage and found the removed rock path creates radial visual chunk debris with no explicit collectible item id, so Dayswork's no-foreign-material filter rejected it. Added a narrow fallback only for actual removed standard Stone objects: when ClearRocks removes a standard Stone and no item-bearing debris was collected, buffer exactly 1 (O)390 Stone. The code still refuses unlabeled visual chunkType material inference, so copper/wood/ore cannot be created from color-only debris. Added mail debug logs for queued/registering letters and attachment counts, and changed MFM registration to always supply a dynamicItems callback, including no-attachment warning letters, to diagnose/reduce the empty-mail report. Updated U-14 plan/state/summary through Steps 35-37. Verification: dotnet build Dayswork.sln 0 errors / 0 warnings and auto-deployed to X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork; dotnet test Dayswork.sln 190 passed / 1 expected skip. In-game verification pending user playtest.
+**Context**: CONSTRUCTION — U-14 Output Pipeline, rock collection and mail diagnostic fix complete; awaiting user playtesting

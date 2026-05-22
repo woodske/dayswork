@@ -1,6 +1,7 @@
 using Dayswork.Core.Capabilities;
 using Dayswork.Core.Config;
 using Dayswork.Core.Domain;
+using Dayswork.Core.Inventory;
 using Dayswork.Core.Shifts;
 using Dayswork.Integration;
 using Dayswork.Worker;
@@ -8,6 +9,7 @@ using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Objects;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 
@@ -33,6 +35,7 @@ internal sealed class ShiftOrchestrator
     private const int MorningEntranceHoldTicks = 120;
 
     // Vanilla tree debris can spawn after the tree-fall animation, not on the axe-hit tick.
+    private const int ImmediateDebrisSweepRadiusTiles = 3;
     private const int DelayedTreeDebrisSweepTicks = 240;
     private const int DelayedTreeDebrisSweepRadiusTiles = 6;
 
@@ -42,6 +45,9 @@ internal sealed class ShiftOrchestrator
     private readonly ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
     private readonly IConfigSnapshot      _config;
     private readonly WorkerMovementDriver _nav = new();
+    private readonly ChestResolver        _chestResolver;
+    private readonly IDepositPlanner      _depositPlanner;
+    private readonly IMailDispatcher      _mailDispatcher;
 
     private ShiftContext? _ctx;
     private FarmhandNpc?  _farmhand;
@@ -49,11 +55,16 @@ internal sealed class ShiftOrchestrator
     private int           _morningEntranceHoldTicks;
     private bool          _exitWalkStarted;
 
+    // Multi-trip deposit loop state (Pattern N): the ordered remaining trips and the in-flight one.
+    private readonly Queue<DepositTrip> _depositTrips = new();
+    private DepositTrip? _currentTrip;
+
     // Per-WorkItem state — the nav tile and task tile are tracked separately (trellis crops).
     private bool      _actionPending;
     private TaskKind  _pendingTask;
     private TileCoord _pendingNavTile;
     private TileCoord _pendingTaskTile;
+    private bool      _waitingForDebrisBeforeDeposit;
 
     // Stuck detection. Replaced after first teleport recovery to switch threshold.
     private IStuckDetector _stuck;
@@ -72,13 +83,22 @@ internal sealed class ShiftOrchestrator
     public ShiftOrchestrator(
         ToolLevelReader toolReader,
         IConfigSnapshot config,
-        ToolSwapAnimator toolAnimator)
+        ToolSwapAnimator toolAnimator,
+        ChestResolver chestResolver,
+        IDepositPlanner depositPlanner,
+        IMailDispatcher mailDispatcher)
     {
-        _toolReader   = toolReader;
-        _config       = config;
-        _toolAnimator = toolAnimator;
-        _stuck        = new StuckDetector(config.StuckInitialWaitMinutes);
+        _toolReader     = toolReader;
+        _config         = config;
+        _toolAnimator   = toolAnimator;
+        _chestResolver  = chestResolver;
+        _depositPlanner = depositPlanner;
+        _mailDispatcher = mailDispatcher;
+        _stuck          = new StuckDetector(config.StuckInitialWaitMinutes);
     }
+
+    private static int Manhattan(TileCoord a, TileCoord b) =>
+        Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
 
     // ── Public API ───────────────────────────────────────────────────────────
 
@@ -147,6 +167,7 @@ internal sealed class ShiftOrchestrator
         _lastTilePos         = _farmhand.TilePoint;
         _playerWasSwinging   = false;
         _actionPending       = false;
+        _waitingForDebrisBeforeDeposit = false;
         _exitWalkStarted     = false;
         _morningEntranceHoldTicks = MorningEntranceHoldTicks;
         _pendingDebrisSweeps.Clear();
@@ -155,14 +176,15 @@ internal sealed class ShiftOrchestrator
         var remaining = workList.Skip(1);
 
         _ctx = new ShiftContext(
-            contractId:     contract.Id,
-            zones:          contract.Zones,
-            enabledTasks:   contract.EnabledTasks,
-            depositAmount:  contract.DepositAmount,
-            hourlyRate:     contract.HourlyRate,
-            toolSnapshot:   snapshot,
-            workList:       remaining,
-            shiftStartTime: Game1.timeOfDay);
+            contractId:       contract.Id,
+            zones:            contract.Zones,
+            enabledTasks:     contract.EnabledTasks,
+            taskDestinations: contract.TaskDestinations,
+            depositAmount:    contract.DepositAmount,
+            hourlyRate:       contract.HourlyRate,
+            toolSnapshot:     snapshot,
+            workList:         remaining,
+            shiftStartTime:   Game1.timeOfDay);
 
         // Populate tool-missing warnings collected during BuildWorkList.
         foreach (var kind in toolMissingWarnings)
@@ -191,6 +213,15 @@ internal sealed class ShiftOrchestrator
         _toolAnimator.Update(Game1.currentGameTime);
         _nav.Update();
         ProcessPendingDebrisSweeps();
+        if (_waitingForDebrisBeforeDeposit)
+        {
+            if (_pendingDebrisSweeps.Count == 0)
+            {
+                _waitingForDebrisBeforeDeposit = false;
+                BeginDeposit();
+            }
+            return;
+        }
         if (++_tickCount % 4 != 0) return; // PERF-U13-01 throttle
 
         var farm  = Game1.getFarm();
@@ -229,6 +260,7 @@ internal sealed class ShiftOrchestrator
                 HandleTeleportHome(farm);
                 break;
             case IntentDepositInShippingBin:
+            case IntentDepositAtChest:
                 HandleDeposit(farm);
                 break;
             case IntentExitFarm:
@@ -248,26 +280,24 @@ internal sealed class ShiftOrchestrator
             FlushPendingDebrisSweeps();
             if (_ctx.ShiftEndTime.HasValue)
             {
-                // Shift ended normally (8pm cap / work-complete / stuck step 3 / EndShiftEarly).
-                // The worker was just mid-cleanup (walking to bin or exit) when the player slept.
-                // Flush any buffered items that haven't reached the bin yet, then give the correct
-                // partial refund. No warning — this is expected end-of-day behaviour.
-                var items = _ctx.Buffer.TakeAll();
-                foreach (var (itemId, qty) in items)
-                {
-                    var obj = ItemRegistry.Create(itemId, qty);
-                    if (obj is not null)
-                        farm.getShippingBin(Game1.player).Add(obj);
-                }
+                // Shift ended normally (8pm cap / work-complete / stuck step 3 / EndShiftEarly) and the
+                // worker was mid-cleanup (walking to a chest/bin or exit) when the player slept.
+                // Mail every still-undelivered item next morning (FD-Q5=A / BR-INT-01) — NO shipping-bin
+                // dump, so per-task routing intent is respected — then give the partial refund.
+                AppendUndeliveredToOverflow();
+                FlushShiftMail();
                 var refund = _ctx.ComputeRefund();
                 if (refund > 0)
                     Game1.player.Money += refund;
             }
             else
             {
-                // Genuine mid-shift interruption (player saved mid-day without sleeping).
-                // Worker didn't finish — refund the full deposit.
-                ModEntry.ModMonitor.Log("[Dayswork] Shift interrupted by save — removing worker and refunding deposit.", LogLevel.Warn);
+                // Player slept while the worker was still mid-work (proper sleep fast-forward is U-15).
+                // Refund the full deposit, but still mail any items collected so far so nothing is lost
+                // (NFR-SAFE-01 / SAFE-U14-01).
+                ModEntry.ModMonitor.Log("[Dayswork] Shift interrupted by save mid-work — mailing collected items and refunding deposit.", LogLevel.Warn);
+                AppendUndeliveredToOverflow();
+                FlushShiftMail();
                 if (_ctx.DepositAmount > 0)
                     Game1.player.Money += _ctx.DepositAmount;
             }
@@ -494,19 +524,88 @@ internal sealed class ShiftOrchestrator
 
     private void HandleDeposit(Farm farm)
     {
-        if (_nav.NavigationFailed || _nav.HasArrived)
+        if (!_nav.NavigationFailed && !_nav.HasArrived)
+            return;
+
+        // Execute the trip we just walked to (chest liveness resolved here, on arrival).
+        if (_currentTrip is not null)
+            ExecuteTrip(_currentTrip, farm);
+        _currentTrip = null;
+
+        // Walk the next trip, or exit once the queue is empty (Pattern N).
+        if (_depositTrips.Count > 0)
         {
-            var items = _ctx!.Buffer.TakeAll();
-            foreach (var (itemId, qty) in items)
-            {
-                var obj = ItemRegistry.Create(itemId, qty);
-                if (obj is not null)
-                    farm.getShippingBin(Game1.player).Add(obj);
-            }
-            _ctx.StateMachine.Transition(ShiftPhase.Exiting, new IntentExitFarm());
-            _exitWalkStarted = false;
-            _nav.StartNavigation(FarmEntrance, farm, _farmhand!);
+            var next = _depositTrips.Dequeue();
+            _currentTrip = next;
+            _ctx!.StateMachine.SetIntent(ToDepositIntent(next));
+            _nav.StartNavigation(next.Tile, farm, _farmhand!);
+            return;
         }
+
+        BeginExit(farm);
+    }
+
+    private void ExecuteTrip(DepositTrip trip, Farm farm)
+    {
+        if (trip.Destination is ChestDestination chestDest)
+        {
+            var chest = _chestResolver.ResolveChest(chestDest.Ref);
+            if (chest is null)
+            {
+                // Chest moved/destroyed (FR-OUT-03): everything for it mails (ChestMissing).
+                foreach (var stack in trip.Items)
+                    _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][deposit] chest missing at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) → mail.",
+                    LogLevel.Debug);
+                return;
+            }
+
+            foreach (var stack in trip.Items)
+                DepositIntoChest(chest, stack);
+        }
+        else
+        {
+            // Shipping bin — infinite capacity, never overflows (FR-OUT-06).
+            var bin = farm.getShippingBin(Game1.player);
+            foreach (var stack in trip.Items)
+            {
+                var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
+                if (item is not null)
+                    bin.Add(item);
+            }
+        }
+    }
+
+    private void DepositIntoChest(Chest chest, ItemStack stack)
+    {
+        var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
+        if (item is null)
+            return;
+
+        // addItem returns the remainder that did not fit (null if all fit).
+        var leftover = chest.addItem(item);
+        if (leftover is not null && leftover.Stack > 0)
+        {
+            // Chest full (FR-OUT-02): mail the remainder (ChestFull).
+            _ctx!.Overflow.Add(new OverflowItem(
+                new ItemStack(stack.QualifiedItemId, leftover.Stack), OverflowReason.ChestFull));
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][deposit] chest full; {leftover.Stack}x {stack.QualifiedItemId} → mail.",
+                LogLevel.Debug);
+        }
+    }
+
+    private static ShiftIntent ToDepositIntent(DepositTrip trip) =>
+        trip.Destination is ChestDestination cd
+            ? new IntentDepositAtChest(cd.Ref)
+            : new IntentDepositInShippingBin();
+
+    private void BeginExit(Farm farm)
+    {
+        _ctx!.StateMachine.Transition(ShiftPhase.Exiting, new IntentExitFarm());
+        _exitWalkStarted = false;
+        _nav.StartNavigation(FarmEntrance, farm, _farmhand!);
     }
 
     private void HandleExit(Farm farm)
@@ -530,6 +629,9 @@ internal sealed class ShiftOrchestrator
         ModEntry.ModMonitor.Log(
             $"[Dayswork] Shift complete. Hours: {((_ctx.ShiftEndTime ?? Game1.timeOfDay) - _ctx.ShiftStartTime) / 60}. Refund: {refund}g.",
             LogLevel.Info);
+
+        // One overflow letter (all undeliverable items) + one tool-missing warning, next morning (Pattern O).
+        FlushShiftMail();
 
         ClearWorker();
         _ctx.StateMachine.Transition(ShiftPhase.Done);
@@ -565,9 +667,106 @@ internal sealed class ShiftOrchestrator
         var farm = Game1.getFarm();
         // Valid from Working, Stuck, Recovering (all have Depositing as a successor).
         _morningEntranceHoldTicks = 0;
+        if (_pendingDebrisSweeps.Count > 0)
+        {
+            _waitingForDebrisBeforeDeposit = true;
+            _actionPending = true;
+            _toolAnimator.StopSwing();
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][debris] waiting for {_pendingDebrisSweeps.Count} pending debris sweep(s) before deposit.",
+                LogLevel.Debug);
+            return;
+        }
+
         FlushPendingDebrisSweeps();
-        _ctx!.StateMachine.Transition(ShiftPhase.Depositing, new IntentDepositInShippingBin());
-        _nav.StartNavigation(ShippingBinTile, farm, _farmhand!);
+
+        // Plan the deposit run from the task-tagged buffer (Pattern M).
+        var workerTile = _farmhand is not null
+            ? new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y)
+            : FarmEntrance;
+        var plan = _depositPlanner.Plan(
+            _ctx!.Buffer.Snapshot(),
+            _ctx.TaskDestinations,
+            ShippingBinTile,
+            workerTile,
+            Manhattan);
+
+        // Items resolved straight to mail are seeded into the overflow set (Pattern O / FD-Q2=A).
+        foreach (var stack in plan.PreMailedOverflow)
+            _ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NoChestAssigned));
+
+        // The buffer is now consumed into the plan; clear it so nothing is double-counted.
+        _ctx.Buffer.TakeAll();
+
+        _depositTrips.Clear();
+        foreach (var trip in plan.Trips)
+            _depositTrips.Enqueue(trip);
+        _currentTrip = null;
+
+        // Enter Depositing. With no walkable trips, pass straight through to Exiting (Pattern N).
+        if (_depositTrips.Count == 0)
+        {
+            _ctx.StateMachine.Transition(ShiftPhase.Depositing, new IntentDepositInShippingBin());
+            BeginExit(farm);
+            return;
+        }
+
+        var first = _depositTrips.Dequeue();
+        _currentTrip = first;
+        _ctx.StateMachine.Transition(ShiftPhase.Depositing, ToDepositIntent(first));
+        _nav.StartNavigation(first.Tile, farm, _farmhand!);
+    }
+
+    // ── Overflow / mail helpers (Pattern O) ───────────────────────────────────
+
+    private void FlushShiftMail()
+    {
+        if (_ctx is null) return;
+
+        if (_ctx.Overflow.Count > 0)
+        {
+            var items   = ConsolidateOverflow(_ctx.Overflow);
+            var reasons = _ctx.Overflow.Select(o => o.Reason).ToHashSet();
+            _mailDispatcher.QueueOverflowMail(items, reasons);
+            _ctx.Overflow.Clear();
+        }
+
+        if (_ctx.ToolMissingWarnings.Count > 0)
+        {
+            _mailDispatcher.QueueToolMissingWarning(_ctx.ToolMissingWarnings);
+            _ctx.ToolMissingWarnings.Clear();
+        }
+    }
+
+    private static IReadOnlyList<ItemStack> ConsolidateOverflow(IEnumerable<OverflowItem> overflow)
+    {
+        var totals = new Dictionary<string, int>();
+        foreach (var o in overflow)
+            totals[o.Stack.QualifiedItemId] =
+                totals.TryGetValue(o.Stack.QualifiedItemId, out var e) ? e + o.Stack.Quantity : o.Stack.Quantity;
+        return totals.Select(kv => new ItemStack(kv.Key, kv.Value)).ToList();
+    }
+
+    // Moves everything still undelivered (buffer + in-flight trip + queued trips) into the overflow
+    // set as NotDelivered, so a save mid-cleanup loses nothing (FD-Q5=A / BR-INT-01).
+    private void AppendUndeliveredToOverflow()
+    {
+        if (_ctx is null) return;
+
+        foreach (var b in _ctx.Buffer.TakeAll())
+            _ctx.Overflow.Add(new OverflowItem(
+                new ItemStack(b.QualifiedItemId, b.Quantity), OverflowReason.NotDelivered));
+
+        if (_currentTrip is not null)
+        {
+            foreach (var s in _currentTrip.Items)
+                _ctx.Overflow.Add(new OverflowItem(s, OverflowReason.NotDelivered));
+            _currentTrip = null;
+        }
+
+        while (_depositTrips.Count > 0)
+            foreach (var s in _depositTrips.Dequeue().Items)
+                _ctx.Overflow.Add(new OverflowItem(s, OverflowReason.NotDelivered));
     }
 
     private void ClearWorker()
@@ -581,8 +780,11 @@ internal sealed class ShiftOrchestrator
         _toolAnimator.SetWorker(null);
         _farmhand = null;
         _morningEntranceHoldTicks = 0;
+        _waitingForDebrisBeforeDeposit = false;
         _exitWalkStarted = false;
         _pendingDebrisSweeps.Clear();
+        _depositTrips.Clear();
+        _currentTrip = null;
         _nav.Clear();
     }
 
@@ -632,7 +834,7 @@ internal sealed class ShiftOrchestrator
             return;
         var before = new HashSet<Debris>(loc.debris);
         dirt.crop.harvest(tile.X, tile.Y, dirt, null);
-        CollectNewDebris(before, loc);
+        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
     }
 
     private void InvokeCollectFruit(TileCoord tile, GameLocation loc)
@@ -641,7 +843,7 @@ internal sealed class ShiftOrchestrator
         if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not FruitTree tree) return;
         var before = new HashSet<Debris>(loc.debris);
         tree.shake(tileVec, false);
-        CollectNewDebris(before, loc);
+        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
     }
 
     private void InvokeClearWeed(TileCoord tile, GameLocation loc)
@@ -653,7 +855,7 @@ internal sealed class ShiftOrchestrator
         obj.performToolAction(scythe);
         if (loc.objects.ContainsKey(tileVec))
             loc.removeObject(tileVec, false);
-        CollectNewDebris(before, loc);
+        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
     }
 
     private void InvokeClearGrass(TileCoord tile, GameLocation loc)
@@ -676,8 +878,7 @@ internal sealed class ShiftOrchestrator
             var beforeClump = new HashSet<Debris>(loc.debris);
             clump.performToolAction(pickaxe, 0, clump.Tile);
             loc.resourceClumps.Remove(clump);
-            if (!CollectNewDebris(beforeClump, loc))
-                _ctx.Buffer.Add("(O)390", 10);
+            CollectNewDebrisAtTile(beforeClump, loc, _pendingTask, clump.Tile);
             return;
         }
 
@@ -688,11 +889,18 @@ internal sealed class ShiftOrchestrator
         var actionRemoved = obj.performToolAction(pickaxe);
         if (loc.objects.ContainsKey(tileVec))
             loc.removeObject(tileVec, false);
+        var removed = !loc.objects.ContainsKey(tileVec);
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][action] clear rock at ({tile.X},{tile.Y}) performToolAction={actionRemoved} removed={!loc.objects.ContainsKey(tileVec)}.",
+            $"[Dayswork][action] clear rock at ({tile.X},{tile.Y}) performToolAction={actionRemoved} removed={removed}.",
             LogLevel.Debug);
-        if (!CollectNewDebris(before, loc))
-            _ctx!.Buffer.Add("(O)390", 1);
+        var collectedDebris = CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
+        if (!collectedDebris && removed && TryGetRemovedStandardStoneDrop(obj, out var itemId, out var stack))
+        {
+            _ctx.Buffer.Add(itemId, stack, _pendingTask);
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][debris] collected {stack}x {itemId} from removed standard stone object task={_pendingTask}.",
+                LogLevel.Debug);
+        }
     }
 
     private void InvokeCutTree(TileCoord tile, GameLocation loc)
@@ -702,7 +910,6 @@ internal sealed class ShiftOrchestrator
 
         if (loc.terrainFeatures.TryGetValue(tileVec, out var tf) && tf is Tree tree)
         {
-            bool isMahogany = tree.treeType.Value == Tree.mahoganyTree;
             bool wasStump   = tree.stump.Value;
             var  before     = new HashSet<Debris>(loc.debris);
             var  removeTree = tree.performToolAction(axe, 0, tileVec);
@@ -711,11 +918,9 @@ internal sealed class ShiftOrchestrator
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][action] cut tree at ({tile.X},{tile.Y}) remove={removeTree} health={tree.health.Value:0.##} stump={tree.stump.Value}.",
                 LogLevel.Debug);
-            var collected = CollectNewDebris(before, loc);
-            if (removeTree && !collected)
-                _ctx!.Buffer.Add(isMahogany ? "(O)709" : "(O)388", 8);
+            CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
             if (!wasStump && !removeTree)
-                QueueDelayedDebrisSweep(loc, tileVec, before);
+                QueueDelayedDebrisSweep(loc, tileVec, before, _pendingTask);
             return;
         }
 
@@ -724,13 +929,7 @@ internal sealed class ShiftOrchestrator
             var before = new HashSet<Debris>(loc.debris);
             clump.performToolAction(axe, 0, clump.Tile);
             loc.resourceClumps.Remove(clump);
-
-            if (!CollectNewDebris(before, loc))
-            {
-                var fallbackQty = clump.parentSheetIndex.Value == ResourceClump.hollowLogIndex ? 8 : 2;
-                _ctx!.Buffer.Add("(O)709", fallbackQty);
-            }
-
+            CollectNewDebrisAtTile(before, loc, _pendingTask, clump.Tile);
             return;
         }
 
@@ -740,13 +939,26 @@ internal sealed class ShiftOrchestrator
             obj.performToolAction(axe);
             if (loc.objects.ContainsKey(tileVec))
                 loc.removeObject(tileVec, false);
-            CollectNewDebris(before, loc);
+            CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
         }
     }
+
+    private bool CollectNewDebrisAtTile(
+        HashSet<Debris> before,
+        GameLocation loc,
+        TaskKind sourceTask,
+        Vector2 tileVec) =>
+        CollectNewDebris(
+            before,
+            loc,
+            sourceTask,
+            new Vector2(tileVec.X * 64f + 32f, tileVec.Y * 64f + 32f),
+            ImmediateDebrisSweepRadiusTiles);
 
     private bool CollectNewDebris(
         HashSet<Debris> before,
         GameLocation loc,
+        TaskKind sourceTask,
         Vector2? origin = null,
         int radiusTiles = int.MaxValue)
     {
@@ -758,7 +970,10 @@ internal sealed class ShiftOrchestrator
                 !TryGetDebrisItem(d, out var itemId, out var stack))
                 continue;
 
-            _ctx!.Buffer.Add(itemId, stack);
+            _ctx!.Buffer.Add(itemId, stack, sourceTask);
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][debris] collected {stack}x {itemId} from game debris task={sourceTask} chunks={d.Chunks.Count} debrisType={d.debrisType.Value} chunkType={d.chunkType.Value}.",
+                LogLevel.Debug);
             loc.debris.Remove(d);
             collected = true;
         }
@@ -769,29 +984,41 @@ internal sealed class ShiftOrchestrator
     {
         if (debris.item is not null)
         {
-            itemId = debris.item.ItemId;
+            itemId = debris.item.QualifiedItemId;
             stack  = Math.Max(1, debris.item.Stack);
             return true;
         }
 
-        stack = Math.Max(1, debris.Chunks?.Count ?? 1);
-        itemId = debris.chunkType.Value switch
+        var debrisItemId = debris.itemId.Value;
+        if (!string.IsNullOrWhiteSpace(debrisItemId))
         {
-            Debris.woodDebris => "(O)388",
-            Debris.bigWoodDebris => "(O)709",
-            Debris.stoneDebris or Debris.bigStoneDebris => "(O)390",
-            Debris.coalDebris => "(O)382",
-            Debris.copperDebris => "(O)378",
-            Debris.ironDebris => "(O)380",
-            Debris.goldDebris => "(O)384",
-            Debris.iridiumDebris => "(O)386",
-            _ => "",
-        };
+            itemId = debrisItemId;
+            stack = debris.debrisType.Value == Debris.DebrisType.RESOURCE
+                ? Math.Max(1, debris.Chunks.Count)
+                : 1;
+            return true;
+        }
 
-        return itemId.Length > 0;
+        itemId = "";
+        stack = 0;
+        return false;
     }
 
-    private void QueueDelayedDebrisSweep(GameLocation loc, Vector2 tileVec, HashSet<Debris> baseline)
+    private static bool TryGetRemovedStandardStoneDrop(StardewValley.Object obj, out string itemId, out int stack)
+    {
+        if (obj.QualifiedItemId == "(O)390" || obj.ItemId == "390" || obj.Name == "Stone")
+        {
+            itemId = "(O)390";
+            stack = 1;
+            return true;
+        }
+
+        itemId = "";
+        stack = 0;
+        return false;
+    }
+
+    private void QueueDelayedDebrisSweep(GameLocation loc, Vector2 tileVec, HashSet<Debris> baseline, TaskKind sourceTask)
     {
         var origin = new Vector2(tileVec.X * 64f + 32f, tileVec.Y * 64f + 32f);
         _pendingDebrisSweeps.Add(new PendingDebrisSweep(
@@ -799,7 +1026,8 @@ internal sealed class ShiftOrchestrator
             origin,
             baseline,
             DelayedTreeDebrisSweepTicks,
-            DelayedTreeDebrisSweepRadiusTiles));
+            DelayedTreeDebrisSweepRadiusTiles,
+            sourceTask));
     }
 
     private void ProcessPendingDebrisSweeps()
@@ -807,7 +1035,7 @@ internal sealed class ShiftOrchestrator
         for (var i = _pendingDebrisSweeps.Count - 1; i >= 0; i--)
         {
             var sweep = _pendingDebrisSweeps[i];
-            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.Origin, sweep.RadiusTiles);
+            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles);
             sweep.TicksRemaining--;
             if (sweep.TicksRemaining <= 0)
                 _pendingDebrisSweeps.RemoveAt(i);
@@ -817,7 +1045,7 @@ internal sealed class ShiftOrchestrator
     private void FlushPendingDebrisSweeps()
     {
         foreach (var sweep in _pendingDebrisSweeps)
-            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.Origin, sweep.RadiusTiles);
+            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles);
 
         _pendingDebrisSweeps.Clear();
     }
@@ -833,7 +1061,7 @@ internal sealed class ShiftOrchestrator
                 return true;
         }
 
-        return debris.Chunks.Count == 0;
+        return false;
     }
 
     // ── Completion detection ──────────────────────────────────────────────────
@@ -1241,13 +1469,15 @@ internal sealed class ShiftOrchestrator
             Vector2 origin,
             HashSet<Debris> baseline,
             int ticksRemaining,
-            int radiusTiles)
+            int radiusTiles,
+            TaskKind sourceTask)
         {
             Location = location;
             Origin = origin;
             Baseline = baseline;
             TicksRemaining = ticksRemaining;
             RadiusTiles = radiusTiles;
+            SourceTask = sourceTask;
         }
 
         public GameLocation Location { get; }
@@ -1255,5 +1485,6 @@ internal sealed class ShiftOrchestrator
         public HashSet<Debris> Baseline { get; }
         public int TicksRemaining { get; set; }
         public int RadiusTiles { get; }
+        public TaskKind SourceTask { get; }
     }
 }

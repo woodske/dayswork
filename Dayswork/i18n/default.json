@@ -73,5 +73,13 @@
     "ui.contract_list.active_label": "(Active)",
     "ui.contract_list.cancel_blocked": "Cannot cancel — shift already started",
     "ui.contract_list.schedule_one_time": "One-time",
-    "ui.contract_list.schedule_recurring": "Recurring"
+    "ui.contract_list.schedule_recurring": "Recurring",
+
+    "mail.sender": "Your farmhand",
+    "mail.overflow.intro": "Hi! I couldn't deliver everything to its chest today, so I've sent it along here.",
+    "mail.overflow.chest_full": "Some chests were full.",
+    "mail.overflow.chest_missing": "Some chests I was told to use are no longer there.",
+    "mail.overflow.no_chest_assigned": "Some tasks didn't have a chest assigned.",
+    "mail.overflow.not_delivered": "I ran out of time to finish delivering everything.",
+    "mail.warning.tool_missing": "I couldn't do some of the work because your tools aren't upgraded enough: {{tasks}}."
 }

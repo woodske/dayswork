@@ -1,3 +1,4 @@
+using Dayswork.Core.Domain;
 using Dayswork.Core.Inventory;
 using Dayswork.Tests.Generators;
 using FsCheck;
@@ -33,11 +34,11 @@ public sealed class ItemBufferTests
         {
             var buffer = new ItemBuffer();
             foreach (var (id, qty) in items)
-                buffer.Add(id, qty);
+                buffer.Add(id, qty, TaskKind.ClearWeeds);
 
             var taken        = buffer.TakeAll();
             var addedTotal   = items.Sum(x => x.quantity);
-            var takenTotal   = taken.Sum(x => x.quantity);
+            var takenTotal   = taken.Sum(x => x.Quantity);
 
             return (addedTotal == takenTotal)
                 .Label($"added={addedTotal} taken={takenTotal}");

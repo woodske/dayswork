@@ -1,3 +1,4 @@
+using Dayswork.Core.Domain;
 using Dayswork.Core.Inventory;
 using FsCheck;
 
@@ -28,7 +29,7 @@ public static class ItemBufferGen
             {
                 var buf = new ItemBuffer();
                 foreach (var (id, qty) in items)
-                    buf.Add(id, qty);
+                    buf.Add(id, qty, TaskKind.ClearWeeds);
                 return (buf, items);
             });
 }

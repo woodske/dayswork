@@ -6,5 +6,11 @@
   "UniqueID": "Bindicle.Dayswork",
   "MinimumApiVersion": "4.0.0",
   "EntryDll": "Dayswork.dll",
+  "Dependencies": [
+    {
+      "UniqueID": "DIGUS.MailFrameworkMod",
+      "MinimumVersion": "1.20.0"
+    }
+  ],
   "UpdateKeys": []
 }

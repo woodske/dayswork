@@ -36,7 +36,8 @@
       "Bash(powershell -Command \"Get-Content 'C:\\\\Users\\\\kwood\\\\stardewvalley.targets' -ErrorAction SilentlyContinue | Select-Object -First 5\")",
       "Bash(dotnet msbuild *)",
       "Bash(powershell -Command 'Add-Type -Path '\\\\''X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\\\\Stardew Valley.dll'\\\\'' -ErrorAction SilentlyContinue; [System.AppDomain]::CurrentDomain.GetAssemblies\\(\\) | Where-Object { $_.GetName\\(\\).Name -eq '\\\\''Stardew Valley'\\\\'' } | ForEach-Object { $_.GetTypes\\(\\) | Where-Object { $_.Name -like '\\\\''*PathFind*'\\\\'' -or $_.Name -like '\\\\''*pathfind*'\\\\'' } } | Select-Object FullName')",
-      "Bash(ls \"X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\\\\\" | head -30)"
+      "Bash(ls \"X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\\\\\" | head -30)",
+      "Bash(ls -la \"X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\\\\Mods\\\\MailFrameworkMod\" 2>&1)"
     ]
   }
 }

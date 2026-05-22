@@ -1,4 +1,5 @@
 using Dayswork.Core.Config;
+using Dayswork.Core.Inventory;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
 using Dayswork.Integration;
@@ -42,14 +43,26 @@ public sealed class ModEntry : Mod
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
         var toolAnimator    = new ToolSwapAnimator();
+        var depositPlanner  = new DepositPlanner();
+        // MFM is a required dependency (manifest). Mod-provided APIs must be fetched after all mods
+        // initialize (GameLaunched), NOT in Entry() — so construct the dispatcher now and inject the
+        // API on GameLaunched below. If it's ever null, MailDispatcher logs and falls back so no
+        // items are lost (REL-U14-05).
+        var mailDispatcher  = new MailDispatcher();
         var orchestrator    = new ShiftOrchestrator(
             toolReader,
             config,
-            toolAnimator);
+            toolAnimator,
+            chestResolver,
+            depositPlanner,
+            mailDispatcher);
         Orchestrator = orchestrator;
         var scheduler       = new RecurringContractScheduler(store, orchestrator);
 
         // ── Event registrations ──────────────────────────────────────────────
+        // Fetch the MFM API after all mods are initialised (never in Entry()).
+        helper.Events.GameLoop.GameLaunched += (_, _) =>
+            mailDispatcher.SetApi(helper.ModRegistry.GetApi("DIGUS.MailFrameworkMod"));
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
         helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
         helper.Events.GameLoop.Saving       += orchestrator.OnSaving;   // must run before save writes

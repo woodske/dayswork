@@ -80,6 +80,9 @@ internal sealed class ToolSwapAnimator
         {
             case WorkerTool.Pickaxe:
                 SpawnHeavyToolSwing(facingDirection, toolSpriteSheetY: 80);
+                // The rock clear path calls Object.performToolAction directly rather than
+                // Pickaxe.DoFunction, so the vanilla hit sound never fires — emit it here.
+                _worker.currentLocation.playSound("hammer", _worker.Tile);
                 break;
             case WorkerTool.Axe:
                 SpawnHeavyToolSwing(facingDirection, toolSpriteSheetY: 144);
