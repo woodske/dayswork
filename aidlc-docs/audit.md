@@ -1890,3 +1890,19 @@ From the logs:
 **User Input**: "continue"
 **AI Response**: Recorded U-15 NFR Requirements approval (nfr-requirements.md + tech-stack-decisions.md). Proceeding to U-15 NFR Design. Per established precedent (U-10/U-13/U-13B/U-14 NFR Design resolved engineering items as documented patterns, not user questions), NFR Design has no blocking questions; the deferred items (fast-forward per-frame work, MFM money attachment) are pattern choices. Creating NFR Design plan (assessment) + generating nfr-design-patterns.md and logical-components.md. U-15 introduces Patterns Q–U continuing the A–P sequence.
 **Context**: CONSTRUCTION — U-15 NFR Design (no blocking questions per precedent)
+
+---
+
+## U-15 Recurring Lifecycle — NFR Design APPROVED; Infra Design SKIPPED; Code Generation Part 1 Plan Created
+**Timestamp**: 2026-05-22T01:45:00Z
+**User Input**: "continue"
+**AI Response**: Recorded U-15 NFR Design approval (nfr-design-patterns.md Patterns Q–U + logical-components.md). Infrastructure Design SKIPPED (no cloud/container/IaC; SMAPI is the platform). Began Code Generation Part 1 (Planning). Inspected the live code to ground the plan: confirmed `ToolLevelReader.FindLevel` already returns `ToolLevel.Basic` for missing tools (Clar-2a already satisfied — verify only); the current tool-missing warning fires on insufficient *tier* (not absence), populated in `BuildWorkList` via capSkippedKinds/anyItemForKind and dispatched in `FlushShiftMail` — so DEV-U15-03 is mainly a *removal* keeping the tier gate; refund is credited at three sites (`HandleExit` + two `OnSaving` branches) to be routed through mailed settlement. Wrote 16-step plan at u-15-recurring-lifecycle-code-generation-plan.md. Logging approval prompt; awaiting explicit approval before Part 2 generation.
+**Context**: CONSTRUCTION — U-15 Code Generation Part 1 (plan created, awaiting approval)
+
+---
+
+## U-15 Recurring Lifecycle — Code Generation Plan Approval Prompt
+**Timestamp**: 2026-05-22T01:46:00Z
+**User Input**: (none yet — prompt being presented)
+**AI Response**: Presented the U-15 code-generation plan summary (16 steps across CalendarHandlers, the full recurring lifecycle, fast-forward + mailed refund, tool-warning removal, mail dispatcher + MFM money, ModEntry rewiring, i18n, tests, build/test/docs). Asked the user to Request Changes or approve to begin Part 2 generation. Plan at construction/plans/u-15-recurring-lifecycle-code-generation-plan.md.
+**Context**: CONSTRUCTION — U-15 Code Generation Part 1, approval gate
