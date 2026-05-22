@@ -1874,3 +1874,11 @@ From the logs:
 **User Input**: "done" — clarification answers: 1a=C ("skip festival days, but send a letter"); 2a=A; 2b=A; 2c=A; 3=A.
 **AI Response**: Confirmed all answers reconcile (1a=C supersedes Q3=C → festivals are skipped + courtesy letter; Q9=C one-time-festival refund now applies and is mailed). Generated the three U-15 functional-design artifacts at aidlc-docs/construction/u-15-recurring-lifecycle/functional-design/: business-logic-model.md (6 flows), domain-entities.md (CalendarHandlers, MailDispatcher changes, removed tool-missing path, letter inventory, new i18n keys), business-rules.md (BR rules + DEV-U15-01..05 + PBT obligations). Recorded deviations DEV-U15-01 (single active contract, resolves TODO-04), DEV-U15-02 (festival skip + letter), DEV-U15-03 (missing tool → lowest tier, warning path removed), DEV-U15-04 (refunds mailed), DEV-U15-05 (rain Water-Crops not force-skipped). Surfaced open sub-decision BR-CAL-03 (one-time-on-festival Executed+refund vs. roll to next day) for approval. Updated FD plan checklist and aidlc-state.md. Presenting completion message; awaiting Request Changes / Continue.
 **Context**: CONSTRUCTION — U-15 Functional Design complete, awaiting approval
+
+---
+
+## U-15 Recurring Lifecycle — Functional Design APPROVED; NFR Requirements Started
+**Timestamp**: 2026-05-22T01:10:00Z
+**User Input**: "continue"
+**AI Response**: Recorded U-15 Functional Design approval (all three artifacts + deviations DEV-U15-01..05 + open sub-decision BR-CAL-03). Marked FD plan complete and FD stage approved in aidlc-state.md. Proceeding to U-15 NFR Requirements. Per established precedent (U-07/U-10/U-13/U-14), NFR Requirements has no blocking user questions for this unit — NFRs are determinable from the approved FD + prior project decisions; the one open item (save-time fast-forward latency) is an NFR-Design/Code-Generation engineering detail, not a product preference. Creating the NFR plan (assessment) and generating nfr-requirements.md + tech-stack-decisions.md directly.
+**Context**: CONSTRUCTION — U-15 NFR Requirements (no blocking questions per precedent)
