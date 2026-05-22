@@ -2042,6 +2042,14 @@ From the logs:
 
 ---
 
+## U-16 Animals & Buildings — NFR Design APPROVED; Code Generation Started
+**Timestamp**: 2026-05-22T19:45:00Z
+**User Input**: "continue"
+**AI Response**: Recorded U-16 NFR Design approval (nfr-design-patterns.md and logical-components.md stand as approved; all three NFR-DES answers were the recommended A options). Marked NFR Design stage complete in aidlc-state.md. Advanced the per-unit Construction loop to Code Generation (Part 1 — Planning). Loading code-generation rule details and the FD artifacts (domain-entities, business-logic-model, business-rules) plus the live extension-point source to write an explicit, checkbox-tracked code generation plan. Will present the plan for approval before any code is generated (Part 2).
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation (Part 1 planning in progress)
+
+---
+
 ## U-16 Animals & Buildings — NFR Design Answers + Artifacts
 **Timestamp**: 2026-05-22T19:25:00Z
 **User Input**: (answered NFR-DES-Q1=A, NFR-DES-Q2=A, NFR-DES-Q3=A inline) "done"
@@ -2063,5 +2071,13 @@ From the logs:
 **User Input**: (answered NFR-Q1=A, NFR-Q2=A, NFR-Q3=A inline) + "I've answered the question, one clarification: since we scan the farm once, does that mean if the animal moves then the worker will miss petting it?"
 **AI Response**: Answered the clarification: scanning once fixes which animals need care by stable identity (AnimalRef.Id), NOT their positions; tile positions are frozen (fine) but animal approach tiles are resolved and re-resolved live while approaching, and eligibility ("still needs petting / still has product") is re-validated live — so a moving animal is pursued, an animal that left its building is caught in the later outdoor batch, and an animal is only skipped if unreachable within the stuck window (NFR-Q3=A). Strengthened the FD wording to make this explicit: business-logic-model.md Flow 4 gained a "Live targeting" note and Flow 4b was updated; domain-entities.md AnimalWorkItem note updated. Generated the two NFR artifacts at aidlc-docs/construction/u-16-animals-buildings/nfr-requirements/: nfr-requirements.md (SAFE-U16-01..05 incl. worker-never-serialized-into-a-building; PERF-U16-01..04 lazy once-per-location scan + bounded warps; REL-U16-01..05 incl. live animal targeting + stuck-skip; UX-U16-01 full vanilla animal-care gains; MAINT/COMPAT; PBT-U16-01..06) and tech-stack-decisions.md (TS-U16-01..10: no new deps; orchestration helpers behind seams; manual warp handoff; vanilla animal interactions for full gains; tool-independent milk/shear; lazy DetectTask interior scan; StuckDetector reuse; location-aware ClearWorker; no new save/pricing; multi-location deposit loop extension). Updated the NFR plan checklist and aidlc-state.md Current Stage to "NFR Requirements artifacts generated; AWAITING APPROVAL". Presenting the standardized 2-option completion message; next stage on approval is NFR Design.
 **Context**: CONSTRUCTION — U-16 Animals & Buildings NFR Requirements (artifacts generated; awaiting approval)
+
+---
+
+## U-16 Animals & Buildings — Code Generation Plan Approval / Resume
+**Timestamp**: 2026-05-22T17:31:09Z
+**User Input**: "continue ai-dlc workflow. My other agent stopped right after creating the code generation plan."
+**AI Response**: Resumed the AI-DLC workflow from saved state. Loaded common rules, session-continuity guidance, content-validation rules, question-format rules, extension opt-in prompts, enabled Property-Based Testing rules, the Code Generation rule details, aidlc-state.md, audit.md, and the U-16 code generation plan. Treated the user's continue request as approval to move from Code Generation Part 1 (Planning) into Part 2 (Generation), updated aidlc-state.md accordingly, and began executing the plan step-by-step with checkbox tracking.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation (Part 2 generation started)
 
 ---
