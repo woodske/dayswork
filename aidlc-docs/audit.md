@@ -2042,6 +2042,22 @@ From the logs:
 
 ---
 
+## U-16 Animals & Buildings — NFR Design Answers + Artifacts
+**Timestamp**: 2026-05-22T19:25:00Z
+**User Input**: (answered NFR-DES-Q1=A, NFR-DES-Q2=A, NFR-DES-Q3=A inline) "done"
+**AI Response**: All three answers are A (all recommended options). No ambiguities to resolve. Generated two NFR Design artifacts at aidlc-docs/construction/u-16-animals-buildings/nfr-design/: nfr-design-patterns.md (PAT-U16-01 Skip-and-Continue; PAT-U16-02 Bounded Give-Up via StuckDetector; PAT-U16-03 Lazy-Load Interior Scan; PAT-U16-04 Identity-Stable Scan/Live Execution; PAT-U16-05 Seam Wrapping; PAT-U16-06 Location-Aware Cleanup; PAT-U16-07 Bounded Warp Budget; PBT compliance table) and logical-components.md (LC-U16-01 BuildingWorkNavigator — door tile lookup, approach, warp handoff, skip-on-Warn-failure, exit, deposit-time warp; LC-U16-02 IndoorWorkScanner — stateless, returns WorkBatch to caller; LC-U16-03 AnimalTaskHandler — Feed/Pet/Collect with live re-targeting, StuckDetector reuse, vanilla interaction for full gains; LC-U16-04 ShiftOrchestrator extended — BuildShiftPlan, batch execution loop, extended deposit run, location-aware ClearWorker; LC-U16-05 Core pure types — WorkBatch, BatchKind, AnimalWorkItem, AnimalRef, AnimalProductKind, WorkItem.LocationName; LC-U16-06 ModEntry wiring). Updated plan checklist and aidlc-state.md. Presenting standardized 2-option completion message; next stage on approval is Code Generation.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings NFR Design (artifacts generated; awaiting approval)
+
+---
+
+## U-16 Animals & Buildings — NFR Requirements APPROVED; NFR Design Started
+**Timestamp**: 2026-05-22T19:10:00Z
+**User Input**: "continue"
+**AI Response**: Recorded U-16 NFR Requirements approval (nfr-requirements.md and tech-stack-decisions.md stand as approved). Advanced the per-unit Construction loop to NFR Design. Loading nfr-design rule details and beginning plan generation with questions on resilience patterns, logical-component integration, and error-handling approach. Writing the U-16 NFR Design Plan at aidlc-docs/construction/plans/u-16-animals-buildings-nfr-design-plan.md. Stopping to await user answers to NFR-DES-Q1–Q3.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings NFR Design (plan stored; awaiting answers)
+
+---
+
 ## U-16 Animals & Buildings — NFR Answers + Clarification + Artifacts
 **Timestamp**: 2026-05-22T18:40:00Z
 **User Input**: (answered NFR-Q1=A, NFR-Q2=A, NFR-Q3=A inline) + "I've answered the question, one clarification: since we scan the farm once, does that mean if the animal moves then the worker will miss petting it?"
