@@ -17,7 +17,6 @@ internal sealed class HiringFlowCoordinator
 
     private readonly IRateCalculator    _rateCalc;
     private readonly IDepositCalculator _depositCalc;
-    private readonly IHoursEstimator    _hoursEst;
     private readonly IConfigSnapshot    _config;
     private readonly IContractStore     _contractStore;
     private readonly ChestResolver      _chestResolver;
@@ -26,7 +25,6 @@ internal sealed class HiringFlowCoordinator
     public HiringFlowCoordinator(
         IRateCalculator    rateCalc,
         IDepositCalculator depositCalc,
-        IHoursEstimator    hoursEst,
         IConfigSnapshot    config,
         IContractStore     contractStore,
         ChestResolver      chestResolver,
@@ -34,7 +32,6 @@ internal sealed class HiringFlowCoordinator
     {
         _rateCalc      = rateCalc;
         _depositCalc   = depositCalc;
-        _hoursEst      = hoursEst;
         _config        = config;
         _contractStore = contractStore;
         _chestResolver = chestResolver;
@@ -43,6 +40,16 @@ internal sealed class HiringFlowCoordinator
 
     public void OpenHiringFlow()
     {
+        // DEV-U15-01 / BR-CTR-01: v1 supports one active contract at a time. Refuse a new hire while an
+        // Active or Paused contract exists (the player edits/cancels the existing one instead).
+        if (_contractStore.List().Any(c => c.Status is ContractStatus.Active or ContractStatus.Paused))
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("ui.error.one_contract"),
+                HUDMessage.error_type));
+            return;
+        }
+
         var draft = new ContractDraft();
         ShowTaskSelection(draft);
     }
@@ -117,7 +124,7 @@ internal sealed class HiringFlowCoordinator
     private void ShowSummary(ContractDraft draft)
     {
         Game1.activeClickableMenu = new SummaryMenu(
-            draft, _hoursEst, _depositCalc, _config, WholeFarmZone,
+            draft, _depositCalc, _config, WholeFarmZone,
             onConfirm: (d, deposit, rate) => ConfirmContract(d, deposit, rate),
             onBack:    d => ShowZoneAndChest(d));
     }

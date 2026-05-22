@@ -6,15 +6,11 @@
 **AI Response**: NFR Design approved (stage marked complete). Created Code Generation Part 1 plan at `aidlc-docs/construction/plans/u-13b-farmer-worker-tool-visuals-code-generation-plan.md` — **14 steps**: (A) Core — Step 1 create `WorkerTool` (Domain enum + ForTask map), Step 2 exhaustive WorkerToolTests; (B) Appearance — Step 3 WorkerAppearance record, Step 4 WorkerAppearanceRandomizer (ContractId-seeded, range-clamped); (C) Entity — Step 5 create FarmhandWorker (Farmer) + delete FarmhandNpc [RISK]; (D) Step 6 create WorkerMovementDriver (PathFindController path-compute-only + per-tick Position stepping) + delete PathFindControllerAdapter [RISK], Step 7 WorkerRenderer (RenderedWorld draw) [RISK], Step 8 ToolSwapAnimator (M-10; instant swap, animateOnce frame sets, hand-pick beat); (E) Step 9 ShiftOrchestrator seam re-point (behaviour unchanged, BR-PRESERVE-01; per-tick movement Update before throttle; warpCharacter→Position set), Step 10 ModEntry (add Display.RenderedWorld, drop NPC portrait redirect); (F) Step 11 build, Step 12 test (WorkerTool + 173 regression), Step 13 code-summary + play-test checklist (esp. U-13 'stands still' re-check), Step 14 state/audit. Highest-risk steps 5–7 (standalone Farmer create/drive/draw) isolated + play-test-flagged. Story S-07 completes. Awaiting user approval before Part 2 generation.
 **Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, Code Generation Part 1 (gate: awaiting plan approval)
 
----
-
 ## U-13B NFR Design — Approved
 **Timestamp**: 2026-05-21T06:00:00Z
 **User Input**: "continue"
 **AI Response**: NFR Design approved. Marking stage complete; proceeding to Code Generation Part 1 (Planning) for U-13B.
 **Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, NFR Design → Code Generation
-
----
 
 ## U-13B NFR Design — Complete (Awaiting Approval)
 **Timestamp**: 2026-05-21T05:50:00Z
@@ -22,15 +18,11 @@
 **AI Response**: NFR Requirements approved. Proceeded to NFR Design for U-13B; Infrastructure Design SKIPPED (SMAPI is the platform). No blocking user questions (consistent with U-13 resolving TS-U13-04 in NFR Design). Resolved **TS-U13B-01 = per-tick `Farmer.Position` stepping (~60 Hz) for a smooth walk, while work-dispatch/stuck/hit logic stays on the every-4th-tick throttle**; render-side interpolation rejected as unnecessary once position steps per tick. Patterns: owned F (Farmer-as-Worker Rendering — manual RenderedWorld hook, on-top draw per FD-Q2=A, BR-WORKER-03 fallback, no Harmony patch) and G (Manual Path-Follow Movement — A* path-compute-only per FD-Q1=A + per-tick stepping; direct fix for the U-13 'stands still' bug); added J (Contract-Seeded Appearance, FD-Q3/Q4=A, range-clamped) and K (Pure WorkerTool map + Mod-side ToolSwapAnimator; instant swap FD-Q6=A, hand-pick beat FD-Q5=A); carried H (invulnerability, entity now Farmer) and I (save-exclusion). Logical components: new FarmhandWorker/WorkerMovementDriver/WorkerRenderer/WorkerAppearance(+Randomizer)/ToolSwapAnimator (Mod) + WorkerTool (Core); removed FarmhandNpc + PathFindControllerAdapter; ShiftOrchestrator seams re-pointed (logic unchanged, BR-PRESERVE-01); ModEntry adds RenderedWorld, drops portrait redirect. Extension compliance: PBT-03 met by exhaustive table test (no new property), PBT-08 honored, PBT-02/07/09 N/A; Security N/A. Generated nfr-design-patterns.md + logical-components.md + plan. Presenting REVIEW REQUIRED gate per nfr-design.md Step 7.
 **Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, NFR Design complete, awaiting approval
 
----
-
 ## U-13B NFR Requirements — Approved
 **Timestamp**: 2026-05-21T05:45:00Z
 **User Input**: "continue"
 **AI Response**: NFR Requirements approved. Marking stage complete; proceeding to NFR Design for U-13B (Infrastructure Design SKIP — SMAPI is the platform).
 **Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, NFR Requirements → NFR Design
-
----
 
 ## U-13B NFR Requirements — Complete (Awaiting Approval)
 **Timestamp**: 2026-05-21T05:35:00Z
@@ -1906,3 +1898,106 @@ From the logs:
 **User Input**: (none yet — prompt being presented)
 **AI Response**: Presented the U-15 code-generation plan summary (16 steps across CalendarHandlers, the full recurring lifecycle, fast-forward + mailed refund, tool-warning removal, mail dispatcher + MFM money, ModEntry rewiring, i18n, tests, build/test/docs). Asked the user to Request Changes or approve to begin Part 2 generation. Plan at construction/plans/u-15-recurring-lifecycle-code-generation-plan.md.
 **Context**: CONSTRUCTION — U-15 Code Generation Part 1, approval gate
+
+---
+
+## U-15 Recurring Lifecycle — Code Generation Plan APPROVED; Part 2 Generation Started
+**Timestamp**: 2026-05-22T01:50:00Z
+**User Input**: "approve"
+**AI Response**: Code-generation plan approved. Marked Part 1 (Planning) complete. Beginning Part 2 (Generation), executing the 16 steps in order: CalendarHandlers → full recurring lifecycle + hire guard → orchestrator deposit threading/fast-forward/mailed refund → tool-warning removal → mail dispatcher + MFM money → ModEntry rewiring → i18n → tests → build/test/docs. Will mark plan checkboxes [x] as each step completes and verify with dotnet build + dotnet test.
+**Context**: CONSTRUCTION — U-15 Code Generation Part 2 (generation in progress)
+
+---
+
+## U-15 Recurring Lifecycle — Code Generation Part 2 COMPLETE
+**Timestamp**: 2026-05-22T02:40:00Z
+**User Input**: (continuation — no new input)
+**AI Response**: Executed all 16 plan steps. Created CalendarHandlers (festival/rain predicates + Saving hook), FastForwardBudget (pure Core time-budget math) + tests. Modified RecurringContractScheduler (full guard chain: festival skip+letter, rain-aware rate, affordability gate, deduct+start), ShiftOrchestrator (StartShift(contract,dayDeposit,dayRate) + empty-zone mailed refund; OnSaving→FastForwardAndSettle time-budgeted headless + synchronous deposit; mailed refunds via SettleShiftMail; tool-missing bookkeeping removed), ShiftContext (removed ToolMissingWarnings), IMailDispatcher/MailDispatcher (QueueSettlement/QueueCannotAffordNotice/QueueFestivalNotice; removed tool-missing), MailFrameworkModApiAdapter (moneyReward credit-on-collection), HiringFlowCoordinator (single-active-contract guard), ModEntry (CalendarHandlers wiring + Saving reorder), i18n (added settlement/cannot-afford/festival/one-contract keys, removed tool_missing). Verification: dotnet build 0 errors/0 warnings auto-deployed to Mods/Dayswork; dotnet test 197 passed / 1 expected skip (7 new FastForwardBudget tests, no regressions). Found during generation: ToolLevelReader already mapped missing→Basic so Clar-2a needed no change; DEV-U15-03 was mainly removal of the tier-warning path. Code summary at construction/u-15-recurring-lifecycle/code/code-summary.md. Presenting completion message; awaiting Request Changes / Continue (in-game playtest pending).
+**Context**: CONSTRUCTION — U-15 Code Generation complete, awaiting approval/playtest
+
+---
+
+## U-15 Recurring Lifecycle — Playtest Feedback Received
+**Timestamp**: 2026-05-22T03:24:49Z
+**User Input**: "Continue ai-dlc workflow. I am in the middle of playtesting U-15. I have some feedback:
+
+* The mail indicating that the worker isn't working the festival arrives a day late"
+**AI Response**: Resuming U-15 Code Generation playtest-fix workflow. Will inspect the U-15 calendar/festival mail scheduling path, update the code-generation plan with a playtest-fix step, implement the timing fix, run build/tests, update documentation/state/audit, and return the U-15 stage to playtest/approval.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest feedback
+
+---
+
+## U-15 Recurring Lifecycle — Playtest Fix Complete
+**Timestamp**: 2026-05-22T03:32:06Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed Step 17 playtest fix. Root cause: MFM adapter delivered letters only when `Game1.Date.TotalDays > queuedOnDay`, so festival/cannot-afford notices queued during `DayStarted` arrived the following day. Implemented explicit mail timing: settlement/refund/overflow letters use `DeliveryTiming.Tomorrow`; morning no-worker notices (`QueueFestivalNotice`, `QueueCannotAffordNotice`) use `DeliveryTiming.Today`, register with today's earliest delivery day, and add the MFM letter id to `Game1.mailbox` so the letter is readable the same day. Updated IMailDispatcher comments, MailDispatcher, MailFrameworkModApiAdapter, RecurringContractScheduler comments, U-15 functional-design/NFR/code-summary docs, code-generation plan checkbox Step 17, and aidlc-state.md. Verification: `dotnet test Dayswork.sln` passed 197 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`. PBT compliance remains unchanged: PBT-02 N/A, PBT-03 compliant via existing FastForwardBudget/RefundCalculator coverage, PBT-07 compliant/reuse, PBT-08 compliant, PBT-09 N/A; Security Baseline disabled/N/A.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest fix complete, awaiting continued playtest/approval
+
+---
+
+## U-15 Recurring Lifecycle — Playtest Feedback Received
+**Timestamp**: 2026-05-22T03:42:01Z
+**User Input**: "Feedback:
+* Contract grows larger every day, see logs
+
+[Dayswork] [Dayswork] Recurring contract 555d9b6a-8df3-4d9f-8baf-5d15351fee64 unaffordable today (need 36755660g, have 924197g) — skipped; notice mailed."
+**AI Response**: Resuming U-15 Code Generation playtest-fix workflow. Will trace recurring deposit calculation and contract persistence, add a playtest-fix plan step, implement the fix, run build/tests, update documentation/state/audit, and return U-15 to playtesting/approval.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest feedback
+
+---
+
+## U-15 Recurring Lifecycle — Playtest Fix Complete
+**Timestamp**: 2026-05-22T03:50:11Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed Step 18 playtest fix. Root cause: U-15 recurring day-start used raw `HoursEstimator` over saved contract zones, while the hire summary intentionally used a flat 1.0-hour estimate because raw tile estimates are currently too large. Selected building zones are saved as placeholder zones `(0,0)..(999,999)`, which caused recurring deposits to explode (matching the reported 36,755,660g log). Added `Dayswork.Core/Pricing/DepositHoursPolicy.cs`, changed `SummaryMenu` and `RecurringContractScheduler` to use the shared flat preview-hours policy, removed now-unused `IHoursEstimator` wiring from `HiringFlowCoordinator`/scheduler construction, and added `DepositHoursPolicyTests` including a placeholder-zone regression and PBT shape-independence property. Updated U-15 plan Step 18, functional design/NFR/code summary, and aidlc-state.md. Verification: `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`; `dotnet test Dayswork.sln` passed 199 / 1 expected skip. PBT compliance: PBT-03 compliant via new invariant property, PBT-07 compliant (domain generators), PBT-08 compliant (FsCheck seed/shrinking), PBT-02/PBT-09 N/A for this fix; Security Baseline disabled/N/A.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest fix complete, awaiting continued playtest/approval
+
+---
+
+## U-15 Recurring Lifecycle — Playtest Feedback Received
+**Timestamp**: 2026-05-22T03:54:08Z
+**User Input**: "I'm still getting some mail that has no item attached, but has an item slot that's empty. These should never be mailed."
+**AI Response**: Resuming U-15 Code Generation playtest-fix workflow. Will inspect the MFM adapter/dispatcher path for no-attachment letters, add a playtest-fix plan step, implement the fix so text-only/refund-only mail does not render empty item slots, run build/tests, update documentation/state/audit, and return U-15 to playtesting/approval.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest feedback
+
+---
+
+## U-15 Recurring Lifecycle — Playtest Fix Complete
+**Timestamp**: 2026-05-22T03:58:07Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed Step 19 playtest fix. Root cause: the MFM adapter still supplied a `dynamicItems` delegate for every letter, including text-only and refund-only letters with zero item attachments; MFM could render that as an empty item slot. Changed `MailFrameworkModApiAdapter.RegisterLetter` to pass no `dynamicItems` provider when attachments are empty, while preserving cloned `dynamicItems` for item-bearing settlement mail. Also changed `MailDispatcher.QueueSettlement` to suppress a settlement letter if all requested item attachments fail to materialize and no refund gold remains. Updated U-15 plan Step 19, functional design/NFR/code summary, and aidlc-state.md. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; normal deploy build compiled but failed at auto-deploy because Stardew/SMAPI had `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork\Dayswork.Core.dll` locked; `dotnet test Dayswork.sln` passed 199 / 1 expected skip. PBT compliance unchanged: PBT-02 N/A, PBT-03 compliant via existing properties, PBT-07 compliant, PBT-08 compliant, PBT-09 N/A; Security Baseline disabled/N/A.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest fix complete, awaiting continued playtest/deploy
+
+---
+
+## U-15 Recurring Lifecycle — Post-Fix Consistency Check
+**Timestamp**: 2026-05-22T04:00:25Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed final consistency sweep after Step 19. Removed a stale aidlc-state.md note from the prior U-14 diagnostic pass that said no-attachment letters always supplied MFM `dynamicItems`; updated it to state that the former diagnostic behavior is superseded by DEV-U15-08. Confirmed no remaining stale references to the 18-step plan or the old no-attachment dynamicItems behavior in the U-15 state/plan/docs.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest fix documentation consistency
+
+---
+
+## U-15 Recurring Lifecycle — Playtest Feedback Received
+**Timestamp**: 2026-05-22T04:05:47Z
+**User Input**: "The worker is not working after sleeping. I think for v1, let's just have the worker stop when the farmer goes to sleep. I think that will be easiest."
+**AI Response**: Resuming U-15 Code Generation playtest-fix workflow. Will replace the sleep fast-forward behavior with a v1 hard-stop behavior on save/sleep, update plan/docs/state, run build/tests, and return U-15 to playtesting.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest feedback
+
+---
+
+## U-15 Recurring Lifecycle — Playtest Fix Complete
+**Timestamp**: 2026-05-22T04:17:13Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed Step 20 playtest fix. Replaced the U-15 sleep fast-forward path with v1 sleep-stop settlement: `CalendarHandlers.OnSavingHook` now calls `ShiftOrchestrator.StopForSleepAndSettle()`, which stops an active shift at the sleep time, performs no remaining headless tasks, moves collected-but-undelivered items to settlement mail, mails any unearned refund, clears the worker, and leaves remaining world tasks undone. Removed the superseded `FastForwardBudget` helper/tests. Added `ShiftContextTests`; during verification, those tests exposed that `ShiftContext.ComputeRefund()` was treating Stardew HHMM timestamps as raw minutes, so it now converts HHMM to minutes before whole-hour billing. Updated U-15 plan Step 20, functional design, NFR docs, code summary, and aidlc-state.md. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 194 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`. PBT compliance: PBT-02 N/A, PBT-03 compliant via existing refund/deposit-hours properties plus example sleep-stop refund tests, PBT-07 compliant/reuse, PBT-08 compliant, PBT-09 N/A; Security Baseline disabled/N/A.
+**Context**: CONSTRUCTION — U-15 Code Generation playtest fix complete, awaiting continued playtest/approval
+
+---
+
+## U-15 Recurring Lifecycle — User Question
+**Timestamp**: 2026-05-22T04:19:28Z
+**User Input**: "question: do we have work lined up to fix the worker not going into buildings and performing animal tasks?"
+**AI Response**: Reviewed aidlc-state and inception/construction artifacts for animals/buildings scope. Confirmed the gap is explicitly logged as TODO-05 and requirements exist for building-door warp navigation plus animal tasks, but it is not currently an active approved unit in the immediate U-15/U-16 sequence.
+**Context**: CONSTRUCTION — backlog/status question
+
+---

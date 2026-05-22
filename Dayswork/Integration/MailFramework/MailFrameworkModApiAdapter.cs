@@ -77,19 +77,21 @@ internal sealed class MailFrameworkModApiAdapter
             ?? throw MissingMember(MailRepositoryTypeName, "RemoveLetter");
     }
 
-    internal void RegisterLetter(string id, string title, string text, List<Item> attachments, int queuedOnDay)
+    internal void RegisterLetter(string id, string title, string text, List<Item> attachments, int earliestDeliveryDay, int moneyReward = 0)
     {
         var letter = _letterTextOnlyCtor.Invoke(new object?[] { id, text, null, null, 0 });
         _titleField.SetValue(letter, title);
 
         var apiLetter = _apiLetterCtor.Invoke(new[] { letter });
-        var condition = CreateDeliverAfterDayCondition(id, queuedOnDay);
-        var callback = CreateRemoveAfterReadCallback(id);
-        var dynamicItems = CreateDynamicItemsFactory(attachments);
+        var condition = CreateDeliveryCondition(id, earliestDeliveryDay);
+        var callback = CreateRemoveAfterReadCallback(id, moneyReward);
+        var dynamicItems = attachments.Count > 0
+            ? CreateDynamicItemsFactory(attachments)
+            : null;
         _registerLetter.Invoke(_api, new object?[] { apiLetter, condition, callback, dynamicItems });
     }
 
-    private Delegate CreateDeliverAfterDayCondition(string id, int queuedOnDay)
+    private Delegate CreateDeliveryCondition(string id, int earliestDeliveryDay)
     {
         var conditionType = _registerLetter.GetParameters()[1].ParameterType;
         var letterParameter = Expression.Parameter(_apiLetterInterfaceType, "letter");
@@ -97,19 +99,21 @@ internal sealed class MailFrameworkModApiAdapter
             nameof(IsReadyToDeliver),
             BindingFlags.NonPublic | BindingFlags.Static)!;
 
-        var body = Expression.Call(method, Expression.Constant(id), Expression.Constant(queuedOnDay));
+        var body = Expression.Call(method, Expression.Constant(id), Expression.Constant(earliestDeliveryDay));
         return Expression.Lambda(conditionType, body, letterParameter).Compile();
     }
 
-    private Delegate CreateRemoveAfterReadCallback(string id)
+    private Delegate CreateRemoveAfterReadCallback(string id, int moneyReward)
     {
         var callbackType = _registerLetter.GetParameters()[2].ParameterType;
         var letterParameter = Expression.Parameter(_apiLetterInterfaceType, "letter");
         var method = typeof(MailFrameworkModApiAdapter).GetMethod(
-            nameof(RemoveRegisteredLetter),
+            nameof(OnLetterRead),
             BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-        var body = Expression.Call(Expression.Constant(this), method, Expression.Constant(id));
+        var body = Expression.Call(
+            Expression.Constant(this), method,
+            Expression.Constant(id), Expression.Constant(moneyReward));
         return Expression.Lambda(callbackType, body, letterParameter).Compile();
     }
 
@@ -125,9 +129,9 @@ internal sealed class MailFrameworkModApiAdapter
         return Expression.Lambda(dynamicItemsType, body, letterParameter).Compile();
     }
 
-    private static bool IsReadyToDeliver(string id, int queuedOnDay)
+    private static bool IsReadyToDeliver(string id, int earliestDeliveryDay)
     {
-        if (Game1.player is null || Game1.Date.TotalDays <= queuedOnDay)
+        if (Game1.player is null || Game1.Date.TotalDays < earliestDeliveryDay)
             return false;
 
         // MFM's API letters remain in its repository until removed. This extra guard makes the
@@ -135,11 +139,17 @@ internal sealed class MailFrameworkModApiAdapter
         return !Game1.player.mailReceived.Contains(id);
     }
 
-    private void RemoveRegisteredLetter(string id)
+    // Runs when the player reads/closes the letter. Removes it from MFM's repository (one-shot) and,
+    // if the letter carries a refund, credits the gold on collection — the approved fallback for
+    // mailed refunds when MFM has no native money attachment (Clar-3=A / BR-REF-04).
+    private void OnLetterRead(string id, int moneyReward)
     {
         var letter = _findLetter.Invoke(null, new object[] { id });
         if (letter is not null)
             _removeLetter.Invoke(null, new[] { letter });
+
+        if (moneyReward > 0 && Game1.player is not null)
+            Game1.player.Money += moneyReward;
     }
 
     private static List<Item> CloneAttachments(List<Item> attachments)

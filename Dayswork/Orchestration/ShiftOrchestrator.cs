@@ -136,7 +136,7 @@ internal sealed class ShiftOrchestrator
         BeginDeposit();
     }
 
-    public void StartShift(Contract contract)
+    public void StartShift(Contract contract, int dayDeposit, int dayRate)
     {
         if (_ctx is not null)
         {
@@ -148,11 +148,15 @@ internal sealed class ShiftOrchestrator
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
 
         // Build work list before creating ShiftContext so we can pass it in.
-        var workList = BuildWorkList(contract, farm, snapshot, out var toolMissingWarnings);
+        var workList = BuildWorkList(contract, farm, snapshot);
 
         if (workList.Count == 0)
         {
-            ModEntry.ModMonitor.Log("[Dayswork] No applicable work found for today's contract — skipping shift.", LogLevel.Info);
+            // Empty zone (FR-PAY-06 / FD-Q6=C): the deposit is already paid (at hire for one-time, at
+            // 6am for recurring), so refund it in full by mail next morning — no worker spawns.
+            ModEntry.ModMonitor.Log("[Dayswork] No applicable work found for today's contract — refunding deposit by mail.", LogLevel.Info);
+            if (dayDeposit > 0)
+                _mailDispatcher.QueueSettlement(Array.Empty<ItemStack>(), new HashSet<OverflowReason>(), dayDeposit);
             return;
         }
 
@@ -180,15 +184,11 @@ internal sealed class ShiftOrchestrator
             zones:            contract.Zones,
             enabledTasks:     contract.EnabledTasks,
             taskDestinations: contract.TaskDestinations,
-            depositAmount:    contract.DepositAmount,
-            hourlyRate:       contract.HourlyRate,
+            depositAmount:    dayDeposit,
+            hourlyRate:       dayRate,
             toolSnapshot:     snapshot,
             workList:         remaining,
             shiftStartTime:   Game1.timeOfDay);
-
-        // Populate tool-missing warnings collected during BuildWorkList.
-        foreach (var kind in toolMissingWarnings)
-            _ctx.ToolMissingWarnings.Add(kind);
 
         _pendingTask     = firstItem.Task;
         _pendingNavTile  = firstItem.NavTile;
@@ -269,39 +269,33 @@ internal sealed class ShiftOrchestrator
         }
     }
 
-    public void OnSaving(object? sender, SavingEventArgs e)
+    // Called by CalendarHandlers.OnSavingHook when the player sleeps. v1 treats sleep as a hard stop:
+    // no remaining tasks run headlessly, but collected/undelivered items and any refund are settled before
+    // contracts persist and the day rolls over.
+    public void StopForSleepAndSettle()
     {
-        if (_farmhand is null) return;
-
-        var farm = Game1.getFarm();
-
-        if (_ctx is not null)
+        if (_ctx is null)
         {
-            FlushPendingDebrisSweeps();
-            if (_ctx.ShiftEndTime.HasValue)
-            {
-                // Shift ended normally (8pm cap / work-complete / stuck step 3 / EndShiftEarly) and the
-                // worker was mid-cleanup (walking to a chest/bin or exit) when the player slept.
-                // Mail every still-undelivered item next morning (FD-Q5=A / BR-INT-01) — NO shipping-bin
-                // dump, so per-task routing intent is respected — then give the partial refund.
-                AppendUndeliveredToOverflow();
-                FlushShiftMail();
-                var refund = _ctx.ComputeRefund();
-                if (refund > 0)
-                    Game1.player.Money += refund;
-            }
-            else
-            {
-                // Player slept while the worker was still mid-work (proper sleep fast-forward is U-15).
-                // Refund the full deposit, but still mail any items collected so far so nothing is lost
-                // (NFR-SAFE-01 / SAFE-U14-01).
-                ModEntry.ModMonitor.Log("[Dayswork] Shift interrupted by save mid-work — mailing collected items and refunding deposit.", LogLevel.Warn);
-                AppendUndeliveredToOverflow();
-                FlushShiftMail();
-                if (_ctx.DepositAmount > 0)
-                    Game1.player.Money += _ctx.DepositAmount;
-            }
+            ClearWorker();
+            return;
         }
+
+        FlushPendingDebrisSweeps();
+
+        if (!_ctx.ShiftEndTime.HasValue)
+        {
+            _ctx.ShiftEndTime = Game1.timeOfDay;
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Player slept during active shift; stopping worker at {_ctx.ShiftEndTime}.",
+                LogLevel.Info);
+        }
+
+        // Mail every collected-but-undelivered item next morning; do not run remaining tasks or dump to bin.
+        AppendUndeliveredToOverflow();
+
+        // Refund is mailed next morning (DEV-U15-04), combined with any overflow into one settlement letter.
+        var refund = _ctx.ComputeRefund();
+        SettleShiftMail(refund);
 
         ClearWorker();
         _ctx = null;
@@ -623,15 +617,13 @@ internal sealed class ShiftOrchestrator
         }
 
         var refund = _ctx!.ComputeRefund();
-        if (refund > 0)
-            Game1.player.Money += refund;
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork] Shift complete. Hours: {((_ctx.ShiftEndTime ?? Game1.timeOfDay) - _ctx.ShiftStartTime) / 60}. Refund: {refund}g.",
+            $"[Dayswork] Shift complete. Hours: {((_ctx.ShiftEndTime ?? Game1.timeOfDay) - _ctx.ShiftStartTime) / 60}. Refund (mailed): {refund}g.",
             LogLevel.Info);
 
-        // One overflow letter (all undeliverable items) + one tool-missing warning, next morning (Pattern O).
-        FlushShiftMail();
+        // One settlement letter next morning: any overflow items + the refund gold (Pattern U / DEV-U15-04).
+        SettleShiftMail(refund);
 
         ClearWorker();
         _ctx.StateMachine.Transition(ShiftPhase.Done);
@@ -719,23 +711,19 @@ internal sealed class ShiftOrchestrator
 
     // ── Overflow / mail helpers (Pattern O) ───────────────────────────────────
 
-    private void FlushShiftMail()
+    // One settlement letter per shift: overflow items (if any) + refund gold (if > 0). Sends nothing
+    // when there is neither (Pattern U / BR-REF-03).
+    private void SettleShiftMail(int refundGold)
     {
         if (_ctx is null) return;
 
-        if (_ctx.Overflow.Count > 0)
-        {
-            var items   = ConsolidateOverflow(_ctx.Overflow);
-            var reasons = _ctx.Overflow.Select(o => o.Reason).ToHashSet();
-            _mailDispatcher.QueueOverflowMail(items, reasons);
-            _ctx.Overflow.Clear();
-        }
+        IReadOnlyList<ItemStack> items = _ctx.Overflow.Count > 0
+            ? ConsolidateOverflow(_ctx.Overflow)
+            : Array.Empty<ItemStack>();
+        var reasons = _ctx.Overflow.Select(o => o.Reason).ToHashSet();
 
-        if (_ctx.ToolMissingWarnings.Count > 0)
-        {
-            _mailDispatcher.QueueToolMissingWarning(_ctx.ToolMissingWarnings);
-            _ctx.ToolMissingWarnings.Clear();
-        }
+        _mailDispatcher.QueueSettlement(items, reasons, refundGold);
+        _ctx.Overflow.Clear();
     }
 
     private static IReadOnlyList<ItemStack> ConsolidateOverflow(IEnumerable<OverflowItem> overflow)
@@ -1108,16 +1096,12 @@ internal sealed class ShiftOrchestrator
     private List<WorkItem> BuildWorkList(
         Contract contract,
         Farm farm,
-        ToolSnapshot snapshot,
-        out HashSet<TaskKind> toolMissingWarnings)
+        ToolSnapshot snapshot)
     {
-        toolMissingWarnings = new HashSet<TaskKind>();
         var enabled = contract.EnabledTasks;
-        // Track which task kinds had at least one skippable tile; intersected with "entire type absent"
-        // at end to determine BR-TOOL-02 warnings.
-        var capSkippedKinds = new HashSet<TaskKind>();
-        var anyItemForKind  = new HashSet<TaskKind>();
-        var seenWorkItems   = new HashSet<(TaskKind Task, TileCoord Tile)>();
+        // A tile out of the player's tool tier is silently skipped (DEV-U15-03 keeps the tier gate but
+        // drops the tool-missing warning that U-13/U-14 sent).
+        var seenWorkItems = new HashSet<(TaskKind Task, TileCoord Tile)>();
 
         var rawItems = new List<(WorkItem item, TaskKind task)>();
         var detectedByKind = new Dictionary<TaskKind, int>();
@@ -1147,7 +1131,6 @@ internal sealed class ShiftOrchestrator
                 if (capabilitySkipped && skippedKind.HasValue)
                 {
                     capabilitySkippedTiles++;
-                    capSkippedKinds.Add(skippedKind.Value);
                     ModEntry.ModMonitor.Log($"[Dayswork][scan] capability skip {skippedKind.Value} at ({x},{y}).", LogLevel.Trace);
                 }
 
@@ -1169,18 +1152,11 @@ internal sealed class ShiftOrchestrator
                     continue;
                 }
 
-                anyItemForKind.Add(task.Value);
                 Increment(acceptedByKind, task.Value);
                 rawItems.Add((new WorkItem(navTile.Value, taskTile, task.Value), task.Value));
                 ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: nav=({navTile.Value.X},{navTile.Value.Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
             }
         }
-
-        // BR-TOOL-02: a task kind is "missing tool" only if every tile was capability-skipped
-        // (i.e. the kind appears in capSkipped but produced no items).
-        foreach (var kind in capSkippedKinds)
-            if (!anyItemForKind.Contains(kind))
-                toolMissingWarnings.Add(kind);
 
         LogWorkScanSummary(contract, enabled, farmZones, scannedTiles, rawItems.Count,
             detectedByKind, acceptedByKind, capabilitySkippedTiles, noNavigationTiles, duplicateTiles);

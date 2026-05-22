@@ -29,6 +29,7 @@
     "ui.summary.back_btn": "Back",
 
     "ui.error.cant_afford": "You can't afford this contract.",
+    "ui.error.one_contract": "You already have a farmhand contract. Edit or cancel it from Manage Contracts before hiring another.",
 
     "ui.zone_chest.title": "Zone & Output",
     "ui.zone_chest.draw_zone_btn": "Draw Zone",
@@ -81,5 +82,9 @@
     "mail.overflow.chest_missing": "Some chests I was told to use are no longer there.",
     "mail.overflow.no_chest_assigned": "Some tasks didn't have a chest assigned.",
     "mail.overflow.not_delivered": "I ran out of time to finish delivering everything.",
-    "mail.warning.tool_missing": "I couldn't do some of the work because your tools aren't upgraded enough: {{tasks}}."
+    "mail.settlement.refund_line": "I've also returned your unused deposit of {{refund}}g.",
+    "mail.cannot_afford.body": "I came by this morning, but you couldn't cover today's deposit (short by {{shortfall}}g), so I took the day off. I'll try again tomorrow.",
+    "mail.festival.body": "There's a festival in town today, so I'm taking the day off. See you tomorrow!",
+    "mail.festival.refund_body": "There's a festival in town today, so I won't be working. I've returned your deposit of {{refund}}g.",
+    "log.festival.skipped": "Festival today — the farmhand is taking the day off."
 }

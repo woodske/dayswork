@@ -35,7 +35,6 @@ internal sealed class SummaryMenu : IClickableMenu
 
     public SummaryMenu(
         ContractDraft draft,
-        IHoursEstimator hoursEst,
         IDepositCalculator depositCalc,
         IConfigSnapshot config,
         Zone wholeFarmFallback,
@@ -49,9 +48,10 @@ internal sealed class SummaryMenu : IClickableMenu
 
         // Compute all display values once here (NFR-PERF-01, NFR-PERF-02)
 
-        // TODO task #1: HoursEstimator currently produces real-time hours (far too large).
-        // Flat 1.0 in-game hour used until HoursEstimator is fixed.
-        _estimatedHours = 1.0;
+        _estimatedHours = DepositHoursPolicy.EstimateBillableHours(
+            draft.Zones.Count > 0 ? draft.Zones : new[] { wholeFarmFallback },
+            draft.EnabledTasks.Count,
+            config);
         // isRaining: false at hire time; rain branch applies at shift start
         _rate = new Core.Pricing.RateCalculator().Calculate(draft.EnabledTasks, config, isRaining: false);
 

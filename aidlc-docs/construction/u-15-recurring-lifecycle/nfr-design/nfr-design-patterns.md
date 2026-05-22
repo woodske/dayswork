@@ -9,7 +9,7 @@ U-15 changes only the **calendar / scheduler / at-save / refund-delivery seams**
 ## Retained unchanged (from U-10/U-13/U-13B/U-14)
 
 - **Throttled-Tick** (÷4), **Manual Path-Follow Movement** (G), **Farmer-as-Worker Rendering** (F), **Save-Exclusion Guard** (I), **Stuck Detection + 3-Step Escalation** (D/E), **Invulnerability + Swing Emote** (H), **Pure Tool Map + Mod Swing** (K), **Once-Per-Shift Scan**, **Invoke-and-Poll** task effects, **Core-Purity Guard**.
-- **Collection-Time Task Tagging** (L), **Pure Deposit Planner** (M), **Multi-Trip Deposit Loop** (N) — all reused as-is by the fast-forward (Pattern S) and the normal shift end.
+- **Collection-Time Task Tagging** (L), **Pure Deposit Planner** (M), **Multi-Trip Deposit Loop** (N) — reused as-is by the normal shift end. Sleep-stop settlement (Pattern S) mails already-collected undelivered items rather than running a sleep-time deposit plan.
 - The refund **math** (integer-clamped, deposit-run unbilled) is unchanged; only its *delivery* moves to mail (Pattern U).
 
 The **Overflow Accumulator** (O) and **Mail Adapter over MFM** (P) are extended by Pattern U (refund gold folded into the single settlement letter), not replaced.
@@ -32,7 +32,7 @@ The **Overflow Accumulator** (O) and **Mail Adapter over MFM** (P) are extended 
 2. **Festival gate** (Pattern Q) → if festival: skip the shift; recurring = no deposit + text-only festival letter (stays Active); one-time = mark Executed + mailed refund letter (Pattern U). Return.
 3. **Config lock** → snapshot the live `IConfigSnapshot` (FR-PAY-08).
 4. **Rain-aware rate** → `RateCalculator` with `IsRainyToday()` (surcharge excluded; task kept — DEV-U15-05).
-5. **Estimate + deposit** → `HoursEstimator` → `DepositCalculator`.
+5. **Estimate + deposit** → `DepositHoursPolicy` (current flat 1.0-hour preview policy) → `DepositCalculator`.
 6. **Affordability gate** → if `gold < deposit`: queue cannot-afford notice (Pattern U), skip, stay Active, retry tomorrow (each unaffordable day mails again — FD-Q5=A). Return.
 7. **Deduct + start** → deduct gold, `ShiftOrchestrator.StartShift(contract)`.
 
@@ -40,16 +40,16 @@ Each gate either short-circuits with a queued letter or falls through; no gate a
 
 ---
 
-## Pattern S — Ordered At-Save Settlement Hook + Time-Budgeted Headless Fast-Forward
-**Satisfies**: FD-Q2=A, FD-Q7=A, BR-FF-01..05, REL-U15-02, PERF-U15-03, SAFE-U15-01/05, FR-DAY-02
+## Pattern S — Ordered At-Save Sleep-Stop Settlement Hook
+**Satisfies**: FD-Q7=A, DEV-U15-09, BR-FF-01..05, REL-U15-02, SAFE-U15-01/05, FR-DAY-02
 
-**Ownership & ordering (FD-Q7=A).** `CalendarHandlers.OnSavingHook` is the sole driver of the sleep settlement. `ShiftOrchestrator` no longer subscribes to `GameLoop.Saving`; it exposes `FastForwardAndSettle()`. ModEntry registers the `Saving` handlers in a guaranteed order: **`CalendarHandlers.OnSavingHook` (fast-forward + settle) → `ContractPersistenceAdapter.OnSaving` (persist)**, so settlement lands in today's state before the contract segment is written and before day-rollover (atomicity, BR-FF-02 / REL-U15-02).
+**Ownership & ordering (FD-Q7=A).** `CalendarHandlers.OnSavingHook` is the sole driver of the sleep settlement. `ShiftOrchestrator` no longer subscribes to `GameLoop.Saving`; it exposes `StopForSleepAndSettle()`. ModEntry registers the `Saving` handlers in a guaranteed order: **`CalendarHandlers.OnSavingHook` (stop + settle) → `ContractPersistenceAdapter.OnSaving` (persist)**, so settlement lands in today's state before the contract segment is written and before day-rollover (atomicity, BR-FF-02 / REL-U15-02).
 
 **Branch by phase.** No shift in flight → no-op. Otherwise:
-- **(a) Mid-work (`ShiftEndTime` unset).** *Time-budgeted headless fast-forward*: reusing the **same** task-detection + invoke pipeline as the live shift (Patterns N's task effects), minus walking/animation, perform remaining tasks in normal order, charging each action's estimated in-game-minutes against the window from `timeOfDay` to the 8pm cap. Stop at window-exhaustion or task-exhaustion. Then run the existing deposit plan (Patterns M/N) against the **live** chests/bin, compute the refund, and settle via Pattern U. Only self-caused drops are collected (SAFE-U15-05).
+- **(a) Mid-work (`ShiftEndTime` unset).** *Hard stop for v1*: flush pending debris from already-performed actions, set `ShiftEndTime` to the sleep time, perform no remaining task actions, run no sleep-time deposit plan, move already-collected undelivered items to settlement mail, compute the refund, and settle via Pattern U. Remaining world tasks stay in the world.
 - **(b) Already-finished (`ShiftEndTime` set).** The U-14 interruption path: remaining buffer → Overflow (`NotDelivered`), no bin dump; settle via Pattern U.
 
-**Bounded one-time cost (PERF-U15-03).** The loop runs once during the sleep fade, bounded by zone task count and the time budget. v1 imposes **no artificial per-frame cap** — a pathological large-zone hitch is a code-gen play-test finding (mirrors U-14 REL-U14-04), not a silent truncation, since the product rule is atomic settlement.
+**Bounded one-time cost.** The save hook no longer mutates remaining work tiles or runs the deposit planner, so sleep settlement is bounded by collected buffer/trip contents rather than by the remaining zone size.
 
 ---
 
@@ -63,11 +63,12 @@ The single behavioural change: `ToolLevelReader.ReadCurrent()` maps a tool the p
 ## Pattern U — Mailed Settlement (one letter: items + refund gold) with money-attachment fallback
 **Satisfies**: FD-Q9=C, Clar-3=A, BR-REF-01..05, BR-CAL-03, BR-AFF-01, DEV-U15-04, REL-U15-04, UX-U15-02/03, SAFE-U15-01/02/03
 
-Refund delivery moves from "credit gold at exit" to "gold-bearing mail next morning" for **all** refund cases (normal exit, fast-forward, empty-zone, one-time-festival). The deposit still leaves gold immediately (FR-PAY-03); only the return lags one day (UX-U15-02).
+Refund delivery moves from "credit gold at exit" to "gold-bearing mail next morning" for shift-settlement refund cases (normal exit, sleep-stop, empty-zone). The deposit still leaves gold immediately (FR-PAY-03); only the return lags one day (UX-U15-02). Playtest corrected the no-worker mail timing: a one-time-festival refund rides the same-day festival notice, because a festival-day "not working today" letter is stale if it waits until tomorrow.
 
 - **Settlement letter (≤1 per shift).** `IntentApplyRefund` no longer mutates gold; it hands the refund amount to a settlement step that **extends Pattern O's flush**: overflow items (with U-14 reason-line body) and refund gold are combined into a single letter. Neither overflow nor a positive refund → no letter (UX-U15-03 / BR-REF-03).
 - **Money attachment + fallback (REL-U15-04).** Preferred: attach gold via the existing `MailFrameworkModApiAdapter` (Pattern P). If MFM 1.20.0's letter API can't carry money (confirmed against the installed DLL at code-gen, as for `RegisterLetter`/DEV-U14-03), fallback to a text-only "here's your change" letter whose collection callback credits `Game1.player.Money`. Items always use MFM's multi-attachment path.
-- **Pre-/no-shift letters.** The cannot-afford notice (text-only) and festival notice (text-only for recurring; refund-gold-bearing for a refunded one-time) reuse the same dispatcher/fallback. All ride the platform/MFM deliver-tomorrow queue — no Dayswork mail save data (SAFE-U15-03).
+- **Pre-/no-shift letters.** The cannot-afford notice (text-only) and festival notice (text-only for recurring; refund-gold-bearing for a refunded one-time) reuse the same dispatcher/fallback but are delivered same-day. The dispatcher registers them with MFM and adds the letter id to today's mailbox so they are readable during the skipped day. Settlement mail still rides the platform/MFM deliver-tomorrow queue — no Dayswork mail save data (SAFE-U15-03).
+- **No empty item slots.** The MFM adapter supplies `dynamicItems` only when the letter has real item attachments. Text-only and refund-only letters are registered without an item provider, and empty settlement letters are suppressed.
 
 ---
 
@@ -75,17 +76,19 @@ Refund delivery moves from "credit gold at exit" to "gold-bearing mail next morn
 
 | Failure / edge scenario | Handling | Pattern |
 |---|---|---|
-| Festival day | Skip shift; recurring no-deposit + text letter; one-time Executed + mailed refund | Q / R / U |
+| Festival day | Skip shift; recurring no-deposit + same-day text letter; one-time Executed + same-day mailed refund | Q / R / U |
 | Rainy day | Surcharge excluded from rate; Water Crops task kept (outdoor naturally skipped) | Q / R |
-| Cannot afford daily deposit | Skip; cannot-afford letter; stay Active; retry + mail each day | R / U |
+| Cannot afford daily deposit | Skip; same-day cannot-afford letter; stay Active; retry + mail each day | R / U |
+| Saved building placeholder zones | Recurring day-start ignores raw zone area for deposit-hours estimation, matching the hire preview | R |
+| Empty MFM attachment slot | No-attachment letters register without `dynamicItems`; empty settlement letters are suppressed | U |
 | Empty zone | Deduct → run → exit → mailed full refund (net zero) | R / U |
 | Calendar/weather data unavailable | Safe default (non-festival/non-rain) + log | Q |
-| Player sleeps mid-work | Time-budgeted headless completion → deposit → mailed refund | S / U |
+| Player sleeps mid-work | Stop worker; mail collected-but-undelivered items + refund; leave remaining tasks undone | S / U |
 | Player sleeps after work done | U-14 interruption path; mailed refund | S / U |
 | Save ordering race | Fixed handler order: settle → persist | S |
 | Missing tool | Degrade to basic tier; no skip/warning | T |
 | MFM can't attach money | Text-only letter, credit gold on collection | U |
-| Very large zone fast-forward | Run to completion in the save fade; hitch is a play-test finding | S |
+| Very large zone sleep | No remaining-work mutation during sleep; only settlement of collected items/refund | S |
 | Any U-13/U-13B/U-14 regression | Guarded by retained patterns + green test suites | retained |
 
 ## Scalability Assessment

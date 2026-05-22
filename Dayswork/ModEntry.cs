@@ -32,13 +32,12 @@ public sealed class ModEntry : Mod
         var config      = ConfigDefaults.Build();
         var rateCalc    = new RateCalculator();
         var depositCalc = new DepositCalculator();
-        var hoursEst    = new HoursEstimator();
         var store       = new ContractStore(logWarning);
         var serializer  = new SaveDataSerializer(logWarning);
 
         // ── Mod singletons ───────────────────────────────────────────────────
         var chestResolver = new ChestResolver(Helper);
-        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, hoursEst, config, store, chestResolver, Helper);
+        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, config, store, chestResolver, Helper);
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
@@ -57,15 +56,19 @@ public sealed class ModEntry : Mod
             depositPlanner,
             mailDispatcher);
         Orchestrator = orchestrator;
-        var scheduler       = new RecurringContractScheduler(store, orchestrator);
+        var calendarHandlers = new CalendarHandlers(orchestrator);
+        var scheduler       = new RecurringContractScheduler(
+            store, orchestrator, calendarHandlers, rateCalc, depositCalc, config, mailDispatcher);
 
         // ── Event registrations ──────────────────────────────────────────────
         // Fetch the MFM API after all mods are initialised (never in Entry()).
         helper.Events.GameLoop.GameLaunched += (_, _) =>
             mailDispatcher.SetApi(helper.ModRegistry.GetApi("DIGUS.MailFrameworkMod"));
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
+        // Stop and settle any in-flight shift (sleep-stop + mailed refund) BEFORE contracts persist and
+        // before the day rolls over — handler order is authoritative (Pattern S / REL-U15-02).
+        helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;
         helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
-        helper.Events.GameLoop.Saving       += orchestrator.OnSaving;   // must run before save writes
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
         helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;
         helper.Events.GameLoop.TimeChanged  += orchestrator.OnTimeChanged;

@@ -2,7 +2,7 @@
 
 **Unit**: U-15 — Recurring Lifecycle + Calendar Handlers
 **Stage**: CONSTRUCTION — Functional Design
-**Decisions applied**: FD-Q1=A, FD-Q2=A, FD-Q3→Clarification-1a=C, FD-Q4=B, FD-Q5=A, FD-Q6=C, FD-Q7=A, FD-Q8=C (+Clar-2), FD-Q9=C (+Clar-3)
+**Decisions applied**: FD-Q1=A, FD-Q2=A superseded by DEV-U15-09, FD-Q3→Clarification-1a=C, FD-Q4=B, FD-Q5=A, FD-Q6=C, FD-Q7=A, FD-Q8=C (+Clar-2), FD-Q9=C (+Clar-3)
 
 This file defines the data shapes U-15 introduces, extends, or removes. U-15 is mostly *behaviour* over existing types; the new types are small. SMAPI/Stardew classes (weather, festival, mail, money) are named only to anchor the model and live behind `CalendarHandlers` / `MailDispatcher`.
 
@@ -15,7 +15,7 @@ This file defines the data shapes U-15 introduces, extends, or removes. U-15 is 
 | `Contract` | The unit of the daily lifecycle. `Schedule` (OneTime/Recurring), `Status` (Active/Paused/Executed), `Zones`, `EnabledTasks`, `TaskDestinations`. |
 | `ContractStatus` (enum) | `Active` / `Paused` / `Executed`. The single-active-contract invariant (DEV-U15-01) constrains how many may be Active/Paused at once. |
 | `IConfigSnapshot` | Snapshotted at `DayStarted` to lock today's rates (FR-PAY-08). |
-| `RateCalculator` / `HoursEstimator` / `DepositCalculator` / `RefundCalculator` | Pure pricing; `RateCalculator` already accepts the rain flag U-15 supplies. |
+| `RateCalculator` / `DepositHoursPolicy` / `DepositCalculator` / `RefundCalculator` | Pure pricing; `RateCalculator` already accepts the rain flag U-15 supplies. `DepositHoursPolicy` holds the current flat 1.0-hour preview policy shared by hire confirmation and recurring day-start. |
 | `ShiftContext` | Carries `DepositAmount`, `ComputeRefund()`, `Overflow`, the deposit plan, `ShiftEndTime`. |
 | `ToolSnapshot` / `CapabilityMatrix` | Built per shift; U-15 changes only how a *missing* tool maps into `ToolSnapshot` (DEV-U15-03). |
 | `OverflowItem` / `OverflowReason` / `ItemStack` | The U-14 overflow set, reused; the settlement letter (below) carries them. |
@@ -30,12 +30,12 @@ This file defines the data shapes U-15 introduces, extends, or removes. U-15 is 
 CalendarHandlers
   IsFestivalToday() : bool        // true on a festival calendar day
   IsRainyToday()    : bool        // true when today's weather is rain/storm
-  OnSavingHook(sender, args)      // GameLoop.Saving handler: drives the sleep fast-forward, then yields to persistence
+  OnSavingHook(sender, args)      // GameLoop.Saving handler: stops/settles the worker, then yields to persistence
 ```
 
 - `IsFestivalToday()` → consumed by the scheduler's festival gate (skip + letter, DEV-U15-02).
 - `IsRainyToday()` → consumed by the scheduler's rate computation only (DEV-U15-05); it is **not** used to remove the Water Crops task.
-- `OnSavingHook` → calls `ShiftOrchestrator.FastForwardAndSettle()` in a guaranteed order ahead of `ContractPersistenceAdapter.OnSaving` (FD-Q7=A).
+- `OnSavingHook` → calls `ShiftOrchestrator.StopForSleepAndSettle()` in a guaranteed order ahead of `ContractPersistenceAdapter.OnSaving` (FD-Q7=A).
 
 The two predicates wrap live game state so the scheduler/orchestrator stay free of direct weather/festival lookups.
 
@@ -45,14 +45,14 @@ The two predicates wrap live game state so the scheduler/orchestrator stay free 
 
 ### `RecurringContractScheduler` (M-13 — promoted from stub)
 
-The `OnDayStarted` body gains, per due contract: the festival gate, today's config lock, rain-aware rate, hours/deposit, the affordability check, and deduct-then-start. Shape of `OnDayStarted` is unchanged (still a `DayStarted` handler); the *single-active-contract* invariant (DEV-U15-01) means the loop processes ≤1 contract.
+The `OnDayStarted` body gains, per due contract: the festival gate, today's config lock, rain-aware rate, current preview-hours policy/deposit, the affordability check, and deduct-then-start. Shape of `OnDayStarted` is unchanged (still a `DayStarted` handler); the *single-active-contract* invariant (DEV-U15-01) means the loop processes ≤1 contract.
 
 ### `ShiftOrchestrator` (M-12)
 
 | Member | Change |
 |---|---|
 | `OnSaving` (handler) | **Removed as a `Saving` subscriber** (FD-Q7=A). |
-| `FastForwardAndSettle()` (new method) | Called by `CalendarHandlers.OnSavingHook`. Branch (a) time-budgeted headless fast-forward for mid-work; branch (b) the U-14 interruption path for already-finished work. Both end by mailing the refund (DEV-U15-04). |
+| `StopForSleepAndSettle()` (new method) | Called by `CalendarHandlers.OnSavingHook`. Branch (a) mid-work hard stop: set `ShiftEndTime` to sleep time, mail collected-but-undelivered items, leave remaining world tasks undone; branch (b) the U-14 interruption path for already-finished work. Both end by mailing the refund (DEV-U15-04/09). |
 | `IntentApplyRefund` handling | Changes meaning: instead of `player gold += refund`, the refund amount is routed to the settlement letter (mailed gold, DEV-U15-04). |
 
 ### `ToolLevelReader` (M-19, owned by U-10) — DEV-U15-03
@@ -71,11 +71,11 @@ IMailDispatcher
                   reasons : IReadOnlySet<OverflowReason>,
                   refundGold : int)            // 0 ⇒ no gold attached; items empty + refundGold 0 ⇒ no letter
 
-  // NEW (FR-PAY-04, FD-Q5=A): text-only, no items, delivered next morning. One per unaffordable morning.
+  // NEW (FR-PAY-04, FD-Q5=A): text-only, no items, available same day. One per unaffordable morning.
   QueueCannotAffordNotice(contract : Contract, shortfall : int)
 
   // NEW (DEV-U15-02): festival courtesy letter. Text-only for recurring; carries refundGold for a
-  // refunded one-time contract.
+  // refunded one-time contract. Available same day.
   QueueFestivalNotice(contract : Contract, refundGold : int)   // 0 ⇒ text-only
 
   // REMOVED (DEV-U15-03): tool-missing warnings no longer occur.
@@ -100,11 +100,13 @@ IMailDispatcher
 
 | Letter | Trigger | Carries | Delivery |
 |---|---|---|---|
-| **Settlement** | Shift end / fast-forward, when overflow items and/or refund > 0 | Overflow items (MFM attachments) + refund gold | Next morning, one per shift |
-| **Cannot-afford notice** | Recurring deposit unaffordable at 6am | Text only | Next morning, each unaffordable day |
-| **Festival notice** | Festival day (any contract) | Text only (recurring) / refund gold (one-time) | Next morning |
+| **Settlement** | Shift end / sleep-stop, when overflow items and/or refund > 0 | Overflow items (MFM attachments) + refund gold | Next morning, one per shift |
+| **Cannot-afford notice** | Recurring deposit unaffordable at 6am | Text only | Same day, each unaffordable day |
+| **Festival notice** | Festival day (any contract) | Text only (recurring) / refund gold (one-time) | Same day |
 
 All from sender "Your farmhand" (`mail.sender`), no fee, i18n-routed.
+
+No-attachment letters are registered without an MFM `dynamicItems` provider so they do not display an empty item slot. Settlement mail with neither valid attachments nor refund gold is suppressed.
 
 ---
 

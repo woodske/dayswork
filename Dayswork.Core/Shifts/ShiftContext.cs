@@ -16,7 +16,7 @@ public sealed class ShiftContext
     public Queue<WorkItem> WorkList { get; }
     public ItemBuffer Buffer { get; } = new();
 
-    // Game-minutes from midnight. Always 360 (6am). Set at spawn.
+    // Stardew HHMM time (e.g. 600 for 6am). Set at spawn.
     public int ShiftStartTime { get; }
 
     // Set when work list exhausts or 8pm fires — before Depositing begins.
@@ -26,13 +26,9 @@ public sealed class ShiftContext
     // Owned by the orchestrator layer; held here so it travels with the shift context.
     public int RecoveryAttempts { get; set; }
 
-    // Task kinds skipped entirely because the player's tool level was too low (BR-TOOL-02).
-    // Populated during BuildWorkList; read by U-14 to send the warning mail.
-    public HashSet<TaskKind> ToolMissingWarnings { get; } = new();
-
     // The single sink for everything undeliverable this shift (Pattern O / FD-Q5/Q6=A):
     // seeded with mail-bound items at planning, appended on chest-full/missing and on
-    // sleep-interruption, flushed to one overflow letter at exit.
+    // sleep-stop interruption, flushed to one settlement letter at exit or sleep.
     public List<OverflowItem> Overflow { get; } = new();
 
     public ShiftContext(
@@ -60,8 +56,16 @@ public sealed class ShiftContext
     public int ComputeRefund()
     {
         var endTime      = ShiftEndTime ?? ShiftStartTime;
-        var hoursWorked  = (endTime - ShiftStartTime) / 60;
+        var workedMins   = Math.Max(0, HhmmToMinutes(endTime) - HhmmToMinutes(ShiftStartTime));
+        var hoursWorked  = workedMins / 60;
         var billed       = hoursWorked * HourlyRate;
         return Math.Clamp(DepositAmount - billed, 0, DepositAmount);
+    }
+
+    private static int HhmmToMinutes(int hhmm)
+    {
+        var hours   = hhmm / 100;
+        var minutes = hhmm % 100;
+        return hours * 60 + minutes;
     }
 }
