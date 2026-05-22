@@ -54,7 +54,7 @@ Drives visit ordering (FD-Q2=A) and which work the scanner produces for the batc
 
 ### `AnimalWorkItem` (Core — `Dayswork.Core/Shifts/`)
 
-A pet-or-collect action targeting a specific animal. Unlike `WorkItem`, the target **moves**, so its approach tile is resolved at execution time, not at scan time.
+A pet-or-collect action targeting a specific animal. Unlike `WorkItem`, the target **moves**, so the scan fixes only the animal's *identity* (`AnimalRef.Id`); its approach tile is resolved — and re-resolved while approaching — at execution time, and "still needs it" eligibility is re-validated live. A target that can't be reached within the stuck window is skipped (NFR-Q3=A).
 
 ```
 AnimalWorkItem

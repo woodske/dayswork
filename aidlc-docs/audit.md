@@ -2033,3 +2033,19 @@ From the logs:
 **Context**: CONSTRUCTION — U-16 Animals & Buildings Functional Design (artifacts generated; awaiting approval)
 
 ---
+
+## U-16 Animals & Buildings — Functional Design APPROVED; NFR Requirements Started
+**Timestamp**: 2026-05-22T18:05:00Z
+**User Input**: "continue"
+**AI Response**: Recorded U-16 Functional Design approval (the three FD artifacts stand as-is, including DEV-U16-01 milk/shear tool-independence which was surfaced and left unchallenged). Advanced the per-unit Construction loop to NFR Requirements. Loaded the nfr-requirements rule details and the U-15 NFR artifacts as a format template. Wrote the U-16 NFR Requirements Plan with a checklist, an inherited-vs-new NFR context summary, and 3 embedded design questions (NFR-Q1 animal-care gameplay gains — does worker feed/pet/collect grant normal vanilla friendship/mood/quality; NFR-Q2 building-interior scan timing — lazy at batch entry vs pre-scan at 6am; NFR-Q3 moving/unreachable outdoor grazing animals — stuck-skip vs attempt-cap vs no-chase) at aidlc-docs/construction/plans/u-16-animals-buildings-nfr-requirements-plan.md. Updated aidlc-state.md Current Stage to U-16 NFR Requirements IN PROGRESS. Stopped to await answers to NFR-Q1–Q3.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings NFR Requirements (plan stored; awaiting answers)
+
+---
+
+## U-16 Animals & Buildings — NFR Answers + Clarification + Artifacts
+**Timestamp**: 2026-05-22T18:40:00Z
+**User Input**: (answered NFR-Q1=A, NFR-Q2=A, NFR-Q3=A inline) + "I've answered the question, one clarification: since we scan the farm once, does that mean if the animal moves then the worker will miss petting it?"
+**AI Response**: Answered the clarification: scanning once fixes which animals need care by stable identity (AnimalRef.Id), NOT their positions; tile positions are frozen (fine) but animal approach tiles are resolved and re-resolved live while approaching, and eligibility ("still needs petting / still has product") is re-validated live — so a moving animal is pursued, an animal that left its building is caught in the later outdoor batch, and an animal is only skipped if unreachable within the stuck window (NFR-Q3=A). Strengthened the FD wording to make this explicit: business-logic-model.md Flow 4 gained a "Live targeting" note and Flow 4b was updated; domain-entities.md AnimalWorkItem note updated. Generated the two NFR artifacts at aidlc-docs/construction/u-16-animals-buildings/nfr-requirements/: nfr-requirements.md (SAFE-U16-01..05 incl. worker-never-serialized-into-a-building; PERF-U16-01..04 lazy once-per-location scan + bounded warps; REL-U16-01..05 incl. live animal targeting + stuck-skip; UX-U16-01 full vanilla animal-care gains; MAINT/COMPAT; PBT-U16-01..06) and tech-stack-decisions.md (TS-U16-01..10: no new deps; orchestration helpers behind seams; manual warp handoff; vanilla animal interactions for full gains; tool-independent milk/shear; lazy DetectTask interior scan; StuckDetector reuse; location-aware ClearWorker; no new save/pricing; multi-location deposit loop extension). Updated the NFR plan checklist and aidlc-state.md Current Stage to "NFR Requirements artifacts generated; AWAITING APPROVAL". Presenting the standardized 2-option completion message; next stage on approval is NFR Design.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings NFR Requirements (artifacts generated; awaiting approval)
+
+---

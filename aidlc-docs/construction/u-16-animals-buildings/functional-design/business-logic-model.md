@@ -92,6 +92,8 @@ One enter + one exit per building per shift (FD-Q1=A), minimizing warps. The wor
 
 ## 4. Animal task execution (`AnimalTaskHandler`)
 
+**Live targeting (animals move).** The scan fixes the *set* of animals to care for **by stable identity** (`AnimalRef.Id`), not by frozen position. When it is a given animal's turn, the worker resolves that animal's **current** tile and re-resolves it while approaching, so a wandering animal is pursued, not missed. Eligibility ("still needs petting / still has product") is **re-validated live** at execution, so an animal handled in one batch is never re-handled, and an animal that left its building before the worker arrived is caught later in the outdoor-farm batch. If the animal cannot be reached within the stuck window, it is skipped (NFR-Q3=A) and handled next morning. Contrast tile work, where the tile position is correctly frozen at scan time.
+
 ### 4a. Feed animals (FD-Q4=A + hopper refinement, FR-TASK-03)
 
 Building-level action inside an `AnimalBuilding`:
@@ -102,7 +104,7 @@ Building-level action inside an `AnimalBuilding`:
 
 ### 4b. Pet animals (FR-TASK-01 / FR-WORK-03)
 
-For each target animal not yet petted today: approach its current tile, perform the pet interaction, mark petted. Already-petted animals are skipped at scan time (no wasted beats). No output.
+For each target animal not yet petted today: approach its **live** current tile (re-resolved while walking), perform the pet interaction, mark petted. Eligibility is re-validated live, so an already-petted animal is skipped (no wasted beats). No output.
 
 ### 4c. Collect animal products (FD-Q3=B, FR-TASK-04)
 
