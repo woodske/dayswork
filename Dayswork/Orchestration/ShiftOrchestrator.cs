@@ -1494,21 +1494,19 @@ internal sealed class ShiftOrchestrator
 
         if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is { } clump)
         {
-            // One pickaxe hit per action cycle. Pass damage=1 (standard per-swing value).
-            // performToolAction returns true only when health reaches 0.
-            var beforeHit = new HashSet<Debris>(loc.debris);
-            var destroyed = clump.performToolAction(pickaxe, 1, clump.Tile);
-            CollectNewDebrisAtTile(beforeHit, loc, _pendingTask, clump.Tile);
+            // performToolAction applies tool-level damage per swing:
+            //   Math.Max(1, (upgradeLevel + 1) * 0.75)
+            // The clump's health persists between action cycles, so the action loop
+            // naturally requires multiple swings — tool quality determines how many.
+            // When health reaches 0, performToolAction calls destroy() internally to
+            // spawn all loot drops, then returns true. Never call destroy() again.
+            var beforeClump = new HashSet<Debris>(loc.debris);
+            var destroyed   = clump.performToolAction(pickaxe, 0, clump.Tile);
+            CollectNewDebrisAtTile(beforeClump, loc, _pendingTask, clump.Tile);
 
             if (destroyed)
-            {
-                // destroy() spawns the actual loot drops; collect them immediately after.
-                var beforeDestroy = new HashSet<Debris>(loc.debris);
-                clump.destroy(pickaxe, loc, clump.Tile);
-                loc.resourceClumps.Remove(clump); // ensure removed even if destroy didn't
-                CollectNewDebrisAtTile(beforeDestroy, loc, _pendingTask, clump.Tile);
-            }
-            // If not destroyed, IsTaskComplete still finds the clump → action loop re-fires next swing.
+                loc.resourceClumps.Remove(clump);
+            // If not destroyed, IsTaskComplete still finds the clump → action loop re-fires.
             return;
         }
 
@@ -1556,10 +1554,11 @@ internal sealed class ShiftOrchestrator
 
         if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is { } clump)
         {
-            var before = new HashSet<Debris>(loc.debris);
-            clump.performToolAction(axe, 0, clump.Tile);
-            loc.resourceClumps.Remove(clump);
-            CollectNewDebrisAtTile(before, loc, _pendingTask, clump.Tile);
+            var beforeClump = new HashSet<Debris>(loc.debris);
+            var destroyed   = clump.performToolAction(axe, 0, clump.Tile);
+            CollectNewDebrisAtTile(beforeClump, loc, _pendingTask, clump.Tile);
+            if (destroyed)
+                loc.resourceClumps.Remove(clump);
             return;
         }
 
