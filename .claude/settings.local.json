@@ -41,7 +41,10 @@
       "Bash(ls \"X:\\\\Steam\\\\steamapps\\\\common\\\\Stardew Valley\" | head -20)",
       "Bash(find ~/.nuget/packages -name \"*.cs\" -path \"*Pathoschild*\" 2>/dev/null | head -20)",
       "PowerShell(dotnet nuget locals all --list)",
-      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\kwood\\\\.nuget\\\\packages\\\\\" -Directory | Where-Object { $_.Name -match \"pathoschild\" } | Select-Object FullName)"
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\kwood\\\\.nuget\\\\packages\\\\\" -Directory | Where-Object { $_.Name -match \"pathoschild\" } | Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(grep -E \"\\\\.cs$\")"
     ]
   }
 }

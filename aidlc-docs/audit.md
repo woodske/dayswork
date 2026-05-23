@@ -2495,3 +2495,23 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION → OPERATIONS transition
 
 ---
+
+## Post-Delivery Fix — Regrowable Crops Not Watered After Harvest
+**Timestamp**: 2026-05-23T00:00:00Z
+**User Input**: "Crops that continue to grow after harvest are not watered when harvested for that day. The worker should harvest and water crops that continue to grow."
+**AI Response**: Identified root cause: `WorkAreaScanner.DetectTask()` skips watering for harvest-ready crops (final phase condition), so no `WaterCrops` task is ever queued for that tile. After `InvokeHarvest()` completes and the crop resets to regrow, no mid-shift re-scan picks up the unwatered state. Fixed by watering the dirt immediately after a successful regrowable-crop harvest in `InvokeHarvest()`, gated on `WaterCrops` being enabled.
+**Context**: Operations phase — post-U-17 maintenance. Single-line addition to `Dayswork/Orchestration/ShiftOrchestrator.cs` after existing regrow check.
+**Build Status**: Success — 0 errors, 0 warnings, auto-deployed to `Mods/Dayswork`
+**Test Status**: Pass — 211 passed / 1 expected skip / 0 failures
+
+---
+
+## Post-Delivery Fix — Regrowing Crops Skipped by Watering Scan
+**Timestamp**: 2026-05-23T00:00:00Z
+**User Input**: "I had 3 beans, 2 were ready to harvest and all 3 needed water. The worker harvested and watered the two that were ready for harvest, but then skipped watering the one that wasn't ready for harvest."
+**AI Response**: Root cause: after a multi-harvest crop is harvested, Stardew sets `currentPhase` to `phaseDays.Count - 1` while counting down regrow days. The watering scan condition `currentPhase < phaseDays.Count - 1` treated these regrowing crops as harvest-ready and skipped them, even though `readyForHarvest()` returned false. Fixed by replacing the phase-index approximation with `!dirt.readyForHarvest()` in `WorkAreaScanner.DetectTask()`. Confirmed by user playtesting.
+**Context**: Operations phase — post-U-17 maintenance. Single-line change to `Dayswork/Orchestration/WorkAreaScanner.cs` line 121.
+**Build Status**: Success — 0 errors, 0 warnings, auto-deployed to `Mods/Dayswork`
+**Test Status**: Pass — 211 passed / 1 expected skip / 0 failures
+
+---

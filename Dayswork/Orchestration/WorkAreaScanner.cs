@@ -118,7 +118,7 @@ internal sealed class WorkAreaScanner
                 if (enabled.Contains(TaskKind.WaterCrops) &&
                     dirt.state.Value != HoeDirt.watered &&
                     !dirt.crop.dead.Value &&
-                    dirt.crop.currentPhase.Value < dirt.crop.phaseDays.Count - 1)
+                    !dirt.readyForHarvest())
                     return TaskKind.WaterCrops;
 
                 return null;
