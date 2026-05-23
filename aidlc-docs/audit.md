@@ -24,6 +24,30 @@
 
 ---
 
+## U-17 NFR Requirements — Approved
+**Timestamp**: 2026-05-23T03:25:10Z
+**User Input**: "continue"
+**AI Response**: Treated `continue` as approval of U-17 NFR Requirements. Marked that gate complete and proceeded to U-17 NFR Design.
+**Context**: CONSTRUCTION — U-17 GMCM + i18n Polish, NFR Requirements approved
+
+---
+
+## U-17 NFR Design — Complete (Awaiting Approval)
+**Timestamp**: 2026-05-23T03:25:11Z
+**User Input**: (continuation — no new input)
+**AI Response**: Generated the U-17 NFR Design plan at `aidlc-docs/construction/plans/u-17-gmcm-i18n-polish-nfr-design-plan.md` and the NFR design artifacts at `aidlc-docs/construction/u-17-gmcm-i18n-polish/nfr-design/`. Depth is Minimal; no clarification questions were needed because the approved NFRs and current codebase already determine the design. Recorded the governing patterns: optional dependency probe/no-op registration, mutable Mod config to immutable runtime snapshot mapping, centralized GMCM field metadata, i18n-first registration, deterministic source-lint gate with explicit allowlist, one-time registration with zero tick cost, and preservation of current-day config lock semantics. Updated `aidlc-state.md` to show U-17 NFR Design complete and awaiting approval.
+**Context**: CONSTRUCTION — U-17 GMCM + i18n Polish, NFR Design complete
+
+---
+
+## U-17 NFR Design — Approval Prompt
+**Timestamp**: 2026-05-23T03:25:12Z
+**User Input**: (pending)
+**AI Response**: Presenting the U-17 NFR Design review gate. User may request changes or continue to the next stage (Code Generation).
+**Context**: CONSTRUCTION — U-17 GMCM + i18n Polish, NFR Design approval gate
+
+---
+
 ## U-16 Code Generation — Approved
 **Timestamp**: 2026-05-22T01:30:00Z
 **User Input**: "U-16 code generation is approved"
