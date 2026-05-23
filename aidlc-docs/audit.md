@@ -1,5 +1,37 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## Session Continuity — U-17 Resume
+**Timestamp**: 2026-05-23T03:21:19Z
+**User Input**: "continue ai-dlc workflow"
+**AI Response**: Resumed the existing AI-DLC workflow from `aidlc-state.md`. Loaded the mandatory common rules (`process-overview.md`, `session-continuity.md`, `content-validation.md`, `question-format-guide.md`), scanned extension opt-in files, confirmed Security Baseline remains disabled and Property-Based Testing remains enabled in Partial mode, and loaded the U-17 unit definition plus relevant requirements/components/current code. Determined the next unit is U-17 GMCM + i18n Polish and that Functional Design is skipped because the unit is integration/polish work with no new business-logic model.
+**Context**: Session continuity / CONSTRUCTION resume
+
+---
+
+## U-17 NFR Requirements — Complete (Awaiting Approval)
+**Timestamp**: 2026-05-23T03:21:20Z
+**User Input**: (continuation — no new input)
+**AI Response**: Generated the U-17 NFR Requirements plan at `aidlc-docs/construction/plans/u-17-gmcm-i18n-polish-nfr-requirements-plan.md` and the NFR artifacts at `aidlc-docs/construction/u-17-gmcm-i18n-polish/nfr-requirements/`. Depth is Minimal; no clarification questions were needed because the scope is fully determined by approved requirements and the current codebase. Key NFRs recorded: optional GMCM dependency/probe, active-day config snapshot safety (`today uses R1, tomorrow uses R2`), default-safe behavior when GMCM/config data is absent or invalid, i18n coverage for all GMCM labels/tooltips, one-time `GameLaunched` registration cost, and a deterministic hardcoded-string lint gate in `Dayswork.Tests/Lint/` to complete S-20. Updated `aidlc-state.md` to show U-17 NFR Requirements complete and awaiting approval.
+**Context**: CONSTRUCTION — U-17 GMCM + i18n Polish, NFR Requirements complete
+
+---
+
+## U-17 NFR Requirements — Approval Prompt
+**Timestamp**: 2026-05-23T03:21:21Z
+**User Input**: (pending)
+**AI Response**: Presenting the U-17 NFR Requirements review gate. User may request changes or continue to the next stage (NFR Design).
+**Context**: CONSTRUCTION — U-17 GMCM + i18n Polish, NFR Requirements approval gate
+
+---
+
+## U-16 Code Generation — Approved
+**Timestamp**: 2026-05-22T01:30:00Z
+**User Input**: "U-16 code generation is approved"
+**AI Response**: Marked U-16 Code Generation approved. Step 34 deployed (game closed, build succeeded 0/0). Updated aidlc-state.md. Presenting standardized completion message. Next unit: U-17 GMCM + i18n Polish.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings, Code Generation approved
+
+---
+
 ## U-16 Playtest Fix — Step 34 (big rocks: multi-hit + correct loot)
 **Timestamp**: 2026-05-22T01:00:00Z
 **User Input**: "The worker is one shotting the big rocks, it should take multiple hits depending on the tool quality and the rock health. It's also only collecting one rock from it. All of the hits and collections should be from real in game data."
