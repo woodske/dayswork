@@ -30,7 +30,8 @@ public sealed class ModEntry : Mod
 
         // ── Core singletons (dependency order) ──────────────────────────────
         var logWarning  = (string msg) => this.Monitor.Log(msg, LogLevel.Warn);
-        var config      = ConfigDefaults.Build();
+        var configManager = new ModConfigManager(helper);
+        var config      = configManager.CurrentSnapshot;
         var rateCalc    = new RateCalculator();
         var depositCalc = new DepositCalculator();
         var store       = new ContractStore(logWarning);
@@ -38,7 +39,7 @@ public sealed class ModEntry : Mod
 
         // ── Mod singletons ───────────────────────────────────────────────────
         var chestResolver = new ChestResolver(Helper);
-        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, config, store, chestResolver, Helper);
+        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, configManager, store, chestResolver, Helper);
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
@@ -69,12 +70,16 @@ public sealed class ModEntry : Mod
         Orchestrator = orchestrator;
         var calendarHandlers = new CalendarHandlers(orchestrator);
         var scheduler       = new RecurringContractScheduler(
-            store, orchestrator, calendarHandlers, rateCalc, depositCalc, config, mailDispatcher);
+            store, orchestrator, calendarHandlers, rateCalc, depositCalc, configManager, mailDispatcher);
+        var gmcmRegistrar = new GMCMRegistrar(helper, this.ModManifest, configManager);
 
         // ── Event registrations ──────────────────────────────────────────────
         // Fetch the MFM API after all mods are initialised (never in Entry()).
         helper.Events.GameLoop.GameLaunched += (_, _) =>
+        {
             mailDispatcher.SetApi(helper.ModRegistry.GetApi("DIGUS.MailFrameworkMod"));
+            gmcmRegistrar.RegisterIfAvailable();
+        };
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
         // Stop and settle any in-flight shift (sleep-stop + mailed refund) BEFORE contracts persist and
         // before the day rolls over — handler order is authoritative (Pattern S / REL-U15-02).
@@ -91,7 +96,7 @@ public sealed class ModEntry : Mod
         // TODO: REMOVE before release — debug command for verifying save/load persistence (task #1 play-test)
         RegisterDebugCommands(helper, store);
 
-        this.Monitor.Log($"Dayswork loaded ({this.ModManifest.Version}) build=U16-Step31", LogLevel.Info);
+        this.Monitor.Log($"Dayswork loaded ({this.ModManifest.Version}) build=U17-Step16", LogLevel.Info);
     }
 
     private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)

@@ -63,7 +63,7 @@ internal sealed class SummaryMenu : IClickableMenu
 
         _tasksLabel = draft.EnabledTasks.Count > 0
             ? string.Join(", ", draft.EnabledTasks.Select(t => I18nHelper.Get($"ui.task_selection.{ToKey(t)}")))
-            : "—";
+            : I18nHelper.Get("ui.common.none");
 
         _wrappedTasksList   = Game1.parseText(_tasksLabel, Game1.smallFont, MenuWidth - 96);
         _wrappedTasksHeight = (int)Game1.smallFont.MeasureString(_wrappedTasksList).Y;

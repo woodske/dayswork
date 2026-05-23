@@ -2410,3 +2410,59 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest fix Step 28 complete; awaiting continued playtest/approval
 
 ---
+
+## Workflow Guidance
+**Timestamp**: 2026-05-23T03:53:05Z
+**User Input**: "question before we continue. So this it the last unit to implement. Once this is done and I am play testing I will almost certainly want to make some changes and tweak things. Do I still use ai-dlc for that or do I just ask Codex to make those changes. What's ai-dlc's role going forward after U-17?"
+**AI Response**: Explained that AI-DLC remains useful as the governance/documentation workflow for major follow-on work, but post-U-17 playtest fixes can default to direct Codex requests unless they become larger requirement/design changes that should re-enter AI-DLC. Recommended finishing U-17 plus Build and Test through AI-DLC, then using direct Codex changes by default and re-entering AI-DLC for substantial new slices.
+**Context**: Workflow guidance during CONSTRUCTION before U-17 Code Generation Part 2
+
+---
+
+## U-17 GMCM + i18n Polish — Code Generation Approval Received
+**Timestamp**: 2026-05-23T03:53:05Z
+**User Input**: "thanks. continue to the next stage"
+**AI Response**: Treated the input as approval to proceed from U-17 Code Generation Part 1 into Part 2 implementation. Loaded the code-generation rules and current plan/state, resumed the approved 15-step plan, and began implementation plus verification.
+**Context**: CONSTRUCTION — U-17 Code Generation Part 2 start
+
+---
+
+## U-17 GMCM + i18n Polish — Code Generation Complete
+**Timestamp**: 2026-05-23T03:53:05Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed all 15 U-17 code-generation plan steps. Added the mutable `ModConfig` + `ModConfigManager`, `RuntimeConfigSnapshotMapper`, and `ConfigSnapshotFactory`; wired optional `GMCMRegistrar` registration in `ModEntry`; updated manifest/i18n for the GMCM surface; added config snapshot/mapper tests plus `Dayswork.Tests/Lint/HardcodedUserFacingStringLintTests`; created the code summary at `aidlc-docs/construction/u-17-gmcm-i18n-polish/code/code-summary.md`; updated the startup marker to `build=U17-Step15`; and verified the final result with `dotnet build Dayswork.sln` (0 errors / 0 warnings, auto-deployed) plus `dotnet test Dayswork.sln` (211 passed / 1 expected skip).
+**Context**: CONSTRUCTION — U-17 Code Generation complete; awaiting user review/approval
+
+---
+
+## U-17 GMCM + i18n Polish — Code Generation Review Prompt
+**Timestamp**: 2026-05-23T03:53:05Z
+**User Input**: (continuation — no new input)
+**AI Response**: Prepared the standardized Code Generation completion message directing review to the application code in `C:\Users\kwood\Repos\dayswork` and the documentation in `aidlc-docs/construction/u-17-gmcm-i18n-polish/code/`, with the next stage set to Build and Test on approval.
+**Context**: CONSTRUCTION — U-17 Code Generation approval prompt logging
+
+---
+
+## U-17 GMCM + i18n Polish — GMCM API Proxy Failure Reported (Step 16 — incorrect fix)
+**Timestamp**: 2026-05-23T03:58:50Z
+**User Input**: "[Dayswork] Tried to map a mod-provided API to interface 'Dayswork.Integration.IGenericModConfigMenuApi', which isn't compatible with the actual mod API.\n\nTechnical details: ArgumentException: Unhandled proxy/conversion method for info: ProxyInfo{target: TypeInfo{context: spacechase0.GenericModConfigMenu, type: GenericModConfigMenu.Framework.Api, GenericModConfigMenu, Version=1.16.0.0, Culture=neutral, PublicKeyToken=null}, proxy: TypeInfo{context: Bindicle.Dayswork, type: Dayswork.Integration.IGenericModConfigMenuApi, Dayswork, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null}}\n ---> ArgumentException: The IGenericModConfigMenuApi interface defines method AddNumberOption which doesn't exist in the API or depends on an interface that cannot be mapped!\n   at Nanoray.Pintail.ProxyManagerConfiguration`1.<>c.<.cctor>b__45_4(ProxyInfo`1 proxyInfo, MethodInfo proxyMethod)\n   at Nanoray.Pintail.InterfaceOrDelegateProxyFactory`1.Prepare(ProxyManager`1 manager, String typeName)\n   at Nanoray.Pintail.InterfaceOrDelegateProxyFactory`1.Prepare(ProxyManager`1 manager, String typeName)\n   at Nanoray.Pintail.ProxyManager`1.ObtainProxyFactorySync(ProxyInfo`1 proxyInfo)\n   --- End of inner exception stack trace ---\n   at Nanoray.Pintail.ProxyManager`1.ObtainProxyFactorySync(ProxyInfo`1 proxyInfo)\n   at Nanoray.Pintail.ProxyManager`1.ObtainProxyFactory(ProxyInfo`1 proxyInfo)\n   at Nanoray.Pintail.IProxyManagerExtensions.ObtainProxy[Context,TProxy](IProxyManager`1 self, Object instance, Context targetContext, Context proxyContext)\n   at StardewModdingAPI.Framework.ModHelpers.ModRegistryHelper.GetApi[TInterface](String uniqueID) in /home/runner/work/SMAPI/SMAPI/src/SMAPI/Framework/ModHelpers/ModRegistryHelper.cs:line 171"
+**AI Response**: Step 16 incorrectly reverted to the old pre-1.6 GMCM names (`RegisterModConfig`, `RegisterLabel`, `RegisterClampedOption`), believing the installed GMCM 1.16.0 still used those. The old names exist only in `IGenericModConfigMenuApiWithObsoleteMethods`, not in `Framework.Api` that Pintail proxies. Build marker set to `build=U17-Step16`.
+**Context**: CONSTRUCTION — U-17 Code Generation review/playtest fix Step 16 (incorrect; superseded by Step 17)
+
+---
+
+## U-17 GMCM + i18n Polish — GMCM API Proxy Failure Step 17 (correct fix)
+**Timestamp**: 2026-05-23T00:00:00Z
+**User Input**: "[Dayswork] Tried to map a mod-provided API to interface 'Dayswork.Integration.IGenericModConfigMenuApi' ... ArgumentException: The IGenericModConfigMenuApi interface defines method RegisterClampedOption which doesn't exist in the API"
+**AI Response**: Reflected the installed GMCM 1.16.0 DLL via PowerShell. Confirmed `GenericModConfigMenu.IGenericModConfigMenuApi` exposes `Register(IManifest,Action,Action,bool)`, `AddSectionTitle(IManifest,Func<string>,Func<string>?)`, and `AddNumberOption` (two overloads with `Func<string>` name/tooltip). Old names only in `Framework.IGenericModConfigMenuApiWithObsoleteMethods`. Updated `Dayswork/Integration/IGenericModConfigMenuApi.cs` with the correct method names and `Func<string>` parameter types. Updated all call sites in `GMCMRegistrar.cs`: `Register`, `AddSectionTitle` (with `() => string` wrappers), `AddNumberOption` (with `() => string` wrappers). Build: `dotnet build Dayswork.sln` 0 errors / 0 warnings, auto-deployed. Tests: 211 passed / 1 expected skip. Build marker: `build=U17-Step17`.
+**Context**: CONSTRUCTION — U-17 Code Generation playtest fix Step 17 complete; awaiting continued playtest
+
+---
+
+## U-17 GMCM + i18n Polish — TypeInitializationException in GMCMRegistrar..cctor (Step 18)
+**Timestamp**: 2026-05-23T00:00:00Z
+**User Input**: "TypeInitializationException: The type initializer for 'Dayswork.Integration.GMCMRegistrar' threw an exception. ---> ArgumentNullException: Value cannot be null. (Parameter 'source') ... at Dayswork.Integration.GMCMRegistrar..cctor() in GMCMRegistrar.cs:line 9"
+**AI Response**: Diagnosed static field initialization order bug. `RateOptions` (declared first at line 9) called `.Select()` on `TaskKindOrder` (declared last at line 163), which was still `null` at that point because C# initializes static fields top-to-bottom. Moved `TaskKindOrder` to the top of the class (above `RateOptions`) and removed the now-duplicate declaration from the bottom. Also removed the null-forgiving `!` on `TaskKindOrder` since it is now provably initialized first. Build: `dotnet build Dayswork.sln` 0 errors / 0 warnings, auto-deployed. Tests: 211 passed / 1 expected skip. Build marker: `build=U17-Step18`.
+**Context**: CONSTRUCTION — U-17 Code Generation playtest fix Step 18 complete; awaiting continued playtest
+
+---

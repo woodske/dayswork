@@ -22,7 +22,7 @@ internal sealed class RecurringContractScheduler
     private readonly CalendarHandlers   _calendar;
     private readonly IRateCalculator    _rateCalc;
     private readonly IDepositCalculator _depositCalc;
-    private readonly IConfigSnapshot    _config;
+    private readonly ModConfigManager   _configManager;
     private readonly IMailDispatcher    _mail;
 
     public RecurringContractScheduler(
@@ -31,16 +31,16 @@ internal sealed class RecurringContractScheduler
         CalendarHandlers   calendar,
         IRateCalculator    rateCalc,
         IDepositCalculator depositCalc,
-        IConfigSnapshot    config,
+        ModConfigManager   configManager,
         IMailDispatcher    mail)
     {
-        _store        = store;
-        _orchestrator = orchestrator;
-        _calendar     = calendar;
-        _rateCalc     = rateCalc;
-        _depositCalc  = depositCalc;
-        _config       = config;
-        _mail         = mail;
+        _store         = store;
+        _orchestrator  = orchestrator;
+        _calendar      = calendar;
+        _rateCalc      = rateCalc;
+        _depositCalc   = depositCalc;
+        _configManager = configManager;
+        _mail          = mail;
     }
 
     public void OnDayStarted(object? sender, DayStartedEventArgs e)
@@ -52,6 +52,7 @@ internal sealed class RecurringContractScheduler
         var today = CurrentGameDate();
         var contractsForToday = _store.ListActiveForDate(today.Day, today.Season, today.Year);
         var festival = _calendar.IsFestivalToday();
+        var config = _configManager.CurrentSnapshot;
 
         foreach (var contract in contractsForToday)
         {
@@ -67,11 +68,11 @@ internal sealed class RecurringContractScheduler
                 // One-time: deposit already paid at hire. Mark Executed before spawning so a reload on
                 // the same day cannot re-fire.
                 _store.Update(contract.Id, contract with { Status = ContractStatus.Executed });
-                _orchestrator.StartShift(contract, contract.DepositAmount, contract.HourlyRate);
+                _orchestrator.StartShift(contract, contract.DepositAmount, contract.HourlyRate, config);
             }
             else
             {
-                StartRecurring(contract);
+                StartRecurring(contract, config);
             }
         }
     }
@@ -94,12 +95,12 @@ internal sealed class RecurringContractScheduler
     }
 
     // Full per-recurring-day sequence (BR-DAY-04..07, BR-AFF-01..03).
-    private void StartRecurring(Contract contract)
+    private void StartRecurring(Contract contract, IConfigSnapshot config)
     {
         // Today's rate excludes the Water Crops surcharge on rainy days (FR-PAY-07 / DEV-U15-05); the
         // task itself stays enabled. Config is the live snapshot at day-start (FR-PAY-08).
-        var rate    = _rateCalc.Calculate(contract.EnabledTasks, _config, _calendar.IsRainyToday());
-        var hours   = DepositHoursPolicy.EstimateBillableHours(contract.Zones, contract.EnabledTasks.Count, _config);
+        var rate    = _rateCalc.Calculate(contract.EnabledTasks, config, _calendar.IsRainyToday());
+        var hours   = DepositHoursPolicy.EstimateBillableHours(contract.Zones, contract.EnabledTasks.Count, config);
         var deposit = _depositCalc.Calculate(hours, rate) is PositiveDeposit p ? p.Amount : 0;
 
         // Affordability gate (FR-PAY-04 / FD-Q5=A): skip + mail, stay Active, retry tomorrow.
@@ -113,7 +114,7 @@ internal sealed class RecurringContractScheduler
         }
 
         Game1.player.Money -= deposit;
-        _orchestrator.StartShift(contract, deposit, rate);
+        _orchestrator.StartShift(contract, deposit, rate, config);
     }
 
     private static GameDate CurrentGameDate()

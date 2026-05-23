@@ -17,7 +17,7 @@ internal sealed class HiringFlowCoordinator
 
     private readonly IRateCalculator    _rateCalc;
     private readonly IDepositCalculator _depositCalc;
-    private readonly IConfigSnapshot    _config;
+    private readonly ModConfigManager   _configManager;
     private readonly IContractStore     _contractStore;
     private readonly ChestResolver      _chestResolver;
     private readonly IModHelper         _helper;
@@ -25,14 +25,14 @@ internal sealed class HiringFlowCoordinator
     public HiringFlowCoordinator(
         IRateCalculator    rateCalc,
         IDepositCalculator depositCalc,
-        IConfigSnapshot    config,
+        ModConfigManager   configManager,
         IContractStore     contractStore,
         ChestResolver      chestResolver,
         IModHelper         helper)
     {
         _rateCalc      = rateCalc;
         _depositCalc   = depositCalc;
-        _config        = config;
+        _configManager = configManager;
         _contractStore = contractStore;
         _chestResolver = chestResolver;
         _helper        = helper;
@@ -73,7 +73,7 @@ internal sealed class HiringFlowCoordinator
     private void ShowTaskSelection(ContractDraft draft)
     {
         Game1.activeClickableMenu = new TaskSelectionMenu(
-            draft, _rateCalc, _config,
+            draft, _rateCalc, _configManager.CurrentSnapshot,
             onAdvance: d => ShowZoneAndChest(d),
             onCancel:  CloseFlow);
     }
@@ -124,7 +124,7 @@ internal sealed class HiringFlowCoordinator
     private void ShowSummary(ContractDraft draft)
     {
         Game1.activeClickableMenu = new SummaryMenu(
-            draft, _depositCalc, _config, WholeFarmZone,
+            draft, _depositCalc, _configManager.CurrentSnapshot, WholeFarmZone,
             onConfirm: (d, deposit, rate) => ConfirmContract(d, deposit, rate),
             onBack:    d => ShowZoneAndChest(d));
     }

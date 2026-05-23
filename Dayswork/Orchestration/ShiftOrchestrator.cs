@@ -43,7 +43,7 @@ internal sealed class ShiftOrchestrator
     private readonly ToolSwapAnimator     _toolAnimator;
     private readonly ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
     private readonly ShiftPlanBuilder     _shiftPlanBuilder = new();
-    private readonly IConfigSnapshot      _config;
+    private IConfigSnapshot               _config;
     private readonly WorkerMovementDriver _nav;
     private readonly WorkAreaScanner      _workAreaScanner;
     private readonly IndoorWorkScanner    _indoorScanner;
@@ -161,13 +161,15 @@ internal sealed class ShiftOrchestrator
         BeginDeposit();
     }
 
-    public void StartShift(Contract contract, int dayDeposit, int dayRate)
+    public void StartShift(Contract contract, int dayDeposit, int dayRate, IConfigSnapshot runtimeConfig)
     {
         if (_ctx is not null)
         {
             ModEntry.ModMonitor.Log("[Dayswork] StartShift called while a shift is already active — ignoring.", LogLevel.Warn);
             return;
         }
+
+        _config = runtimeConfig;
 
         var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);

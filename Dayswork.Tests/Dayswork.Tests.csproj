@@ -25,5 +25,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Dayswork.Core\Dayswork.Core.csproj" />
+    <ProjectReference Include="..\Dayswork\Dayswork.csproj" />
   </ItemGroup>
 </Project>

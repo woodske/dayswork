@@ -46,57 +46,70 @@
 ### A. Config runtime seam
 
 **Step 1 — Create the mutable Mod config source**
-[ ] Create a mutable config model in `Dayswork/Integration/` (or adjacent config folder) that represents every player-tunable field required by S-13: base rate, per-task increments, average-speed constant, hard cap time, and both stuck thresholds. Seed it from `ConfigDefaults`-equivalent values and structure it for SMAPI `config.json` persistence. *S-13; PAT-U17-02.*
+[x] Create a mutable config model in `Dayswork/Integration/` (or adjacent config folder) that represents every player-tunable field required by S-13: base rate, per-task increments, average-speed constant, hard cap time, and both stuck thresholds. Seed it from `ConfigDefaults`-equivalent values and structure it for SMAPI `config.json` persistence. *S-13; PAT-U17-02.*
 
 **Step 2 — Create the runtime snapshot mapper boundary**
-[ ] Add a dedicated mapping/validation seam that converts the mutable Mod config source into `IConfigSnapshot` / `ConfigSnapshot`, enforcing range checks and preserving the existing immutable runtime contract. This step should be the only path by which edited config reaches pricing/scheduler/orchestration code. *S-13; SAFE-U17-01/03; PAT-U17-02/PAT-U17-07.*
+[x] Add a dedicated mapping/validation seam that converts the mutable Mod config source into `IConfigSnapshot` / `ConfigSnapshot`, enforcing range checks and preserving the existing immutable runtime contract. This step should be the only path by which edited config reaches pricing/scheduler/orchestration code. *S-13; SAFE-U17-01/03; PAT-U17-02/PAT-U17-07.*
 
 **Step 3 — Rewire `ModEntry` to load real config instead of `ConfigDefaults.Build()` directly**
-[ ] Modify `Dayswork/ModEntry.cs` so startup reads the mutable Mod config through SMAPI, materializes the validated runtime snapshot via the new mapper, and injects that snapshot into existing services. Preserve current-day config lock semantics by keeping in-flight consumers on the snapshot they were constructed or started with. *S-13; FR-PAY-08; PAT-U17-07.*
+[x] Modify `Dayswork/ModEntry.cs` so startup reads the mutable Mod config through SMAPI, materializes the validated runtime snapshot via the new mapper, and injects that snapshot into existing services. Preserve current-day config lock semantics by keeping in-flight consumers on the snapshot they were constructed or started with. *S-13; FR-PAY-08; PAT-U17-07.*
 
 ### B. GMCM integration
 
 **Step 4 — Create `GMCMRegistrar` (M-17)**
-[ ] Create `Dayswork/Integration/GMCMRegistrar.cs` with a single optional-dependency registration entrypoint. It must probe GMCM at `GameLaunched`, no-op cleanly if absent, and register the Dayswork config screen if present. *S-13; PAT-U17-01.*
+[x] Create `Dayswork/Integration/GMCMRegistrar.cs` with a single optional-dependency registration entrypoint. It must probe GMCM at `GameLaunched`, no-op cleanly if absent, and register the Dayswork config screen if present. *S-13; PAT-U17-01.*
 
 **Step 5 — Centralize GMCM field metadata**
-[ ] Inside `GMCMRegistrar`, define the registration surface from a single metadata table describing each config field: getter/setter, bounds/validation, display key root, and tooltip key root. Avoid one-off hand-written registration code for each option unless the GMCM API shape forces a tiny wrapper. *S-13; PAT-U17-03.*
+[x] Inside `GMCMRegistrar`, define the registration surface from a single metadata table describing each config field: getter/setter, bounds/validation, display key root, and tooltip key root. Avoid one-off hand-written registration code for each option unless the GMCM API shape forces a tiny wrapper. *S-13; PAT-U17-03.*
 
 **Step 6 — Wire the registrar into the composition root**
-[ ] Extend `Dayswork/ModEntry.cs` to construct the registrar and invoke it during `GameLoop.GameLaunched`, keeping all GMCM-specific work one-time only and out of the worker tick loop. *S-13; PAT-U17-06.*
+[x] Extend `Dayswork/ModEntry.cs` to construct the registrar and invoke it during `GameLoop.GameLaunched`, keeping all GMCM-specific work one-time only and out of the worker tick loop. *S-13; PAT-U17-06.*
 
 **Step 7 — Update manifest metadata for optional GMCM support**
-[ ] Modify `Dayswork/manifest.json` to add the GMCM optional dependency metadata described in the unit-of-work docs while preserving the existing MFM required dependency. *S-13; COMPAT-U17-01.*
+[x] Modify `Dayswork/manifest.json` to add the GMCM optional dependency metadata described in the unit-of-work docs while preserving the existing MFM required dependency. *S-13; COMPAT-U17-01.*
 
 ### C. i18n surface
 
 **Step 8 — Extend `Dayswork/i18n/default.json` for the full GMCM surface**
-[ ] Add all GMCM-facing strings: menu title, section names if used, per-field labels, per-field tooltips, and any user-visible validation or explanatory text needed for "today uses R1, tomorrow uses R2" semantics. No new user-visible English literals should remain in code after this step. *S-13/S-20; PAT-U17-04.*
+[x] Add all GMCM-facing strings: menu title, section names if used, per-field labels, per-field tooltips, and any user-visible validation or explanatory text needed for "today uses R1, tomorrow uses R2" semantics. No new user-visible English literals should remain in code after this step. *S-13/S-20; PAT-U17-04.*
 
 ### D. Tests and maintainability gate
 
 **Step 9 — Add config mapping tests**
-[ ] Create or extend tests under `Dayswork.Tests/Config/` to cover the mutable-config-to-runtime-snapshot seam: valid mapping, default equivalence, and representative invalid/clamped input behavior. Use example-based tests; add property-style coverage only if a new pure helper with meaningful invariants emerges during implementation. *S-13; SAFE-U17-03; PBT reassessment point.*
+[x] Create or extend tests under `Dayswork.Tests/Config/` to cover the mutable-config-to-runtime-snapshot seam: valid mapping, default equivalence, and representative invalid/clamped input behavior. Use example-based tests; add property-style coverage only if a new pure helper with meaningful invariants emerges during implementation. *S-13; SAFE-U17-03; PBT reassessment point.*
 
 **Step 10 — Add the hardcoded user-visible string lint gate**
-[ ] Create `Dayswork.Tests/Lint/` and implement the U-17 i18n lint test that scans the `Dayswork` source surface for hardcoded user-visible strings outside approved `I18nHelper` callsites. Prefer a deterministic source-level approach; add a test-only Roslyn dependency to `Dayswork.Tests.csproj` only if simpler scanning is too noisy. *S-19/S-20; PAT-U17-05.*
+[x] Create `Dayswork.Tests/Lint/` and implement the U-17 i18n lint test that scans the `Dayswork` source surface for hardcoded user-visible strings outside approved `I18nHelper` callsites. Prefer a deterministic source-level approach; add a test-only Roslyn dependency to `Dayswork.Tests.csproj` only if simpler scanning is too noisy. *S-19/S-20; PAT-U17-05.*
 
 **Step 11 — Encode and document the allowlist**
-[ ] Build the lint allowlist for known non-user-facing literal classes: manifest keys, console/debug command names, asset identifiers, internal IDs, and test-only literals. Keep the allowlist explicit and reviewable so failures remain actionable. *S-20; SAFE-U17-04; PAT-U17-05.*
+[x] Build the lint allowlist for known non-user-facing literal classes: manifest keys, console/debug command names, asset identifiers, internal IDs, and test-only literals. Keep the allowlist explicit and reviewable so failures remain actionable. *S-20; SAFE-U17-04; PAT-U17-05.*
 
 ### E. Verification and documentation
 
 **Step 12 — `dotnet build`**
-[ ] Run `dotnet build Dayswork.sln` and fix compile issues across the Mod, Core, and test projects. The resulting mod should still auto-deploy as configured. *Regression gate.*
+[x] Run `dotnet build Dayswork.sln` and fix compile issues across the Mod, Core, and test projects. The resulting mod should still auto-deploy as configured. *Regression gate.*
 
 **Step 13 — `dotnet test`**
-[ ] Run `dotnet test Dayswork.sln` and confirm the new config tests and lint gate pass alongside existing regressions. If the lint gate exposes pre-existing hardcoded user-facing strings outside U-17 scope, fix them within this unit until S-20 truly holds. *S-19/S-20.*
+[x] Run `dotnet test Dayswork.sln` and confirm the new config tests and lint gate pass alongside existing regressions. If the lint gate exposes pre-existing hardcoded user-facing strings outside U-17 scope, fix them within this unit until S-20 truly holds. *S-19/S-20.*
 
 **Step 14 — Create `aidlc-docs/construction/u-17-gmcm-i18n-polish/code/code-summary.md`**
-[ ] Document files created/modified, the GMCM registration surface, config snapshot behavior, lint allowlist scope, extension compliance, and a play-test checklist. Checklist should include: GMCM screen appears when installed, no crash when absent, each configurable value edits correctly, active-day config lock still holds, and lint test passes. *Docs + verification.*
+[x] Document files created/modified, the GMCM registration surface, config snapshot behavior, lint allowlist scope, extension compliance, and a play-test checklist. Checklist should include: GMCM screen appears when installed, no crash when absent, each configurable value edits correctly, active-day config lock still holds, and lint test passes. *Docs + verification.*
 
 **Step 15 — Update `aidlc-state.md` and `audit.md`**
-[ ] Mark U-17 Code Generation complete when implementation is finished, append audit entries, and update the current stage/next step accordingly. *Workflow bookkeeping.*
+[x] Mark U-17 Code Generation complete when implementation is finished, append audit entries, and update the current stage/next step accordingly. *Workflow bookkeeping.*
+
+---
+
+## Playtest Review Fixes
+
+**Step 16 — GMCM proxy failure: `AddNumberOption` (reverted incorrectly)**
+[x] Attempted fix: changed interface to old pre-1.6 names (`RegisterModConfig`, `RegisterLabel`, `RegisterClampedOption`), believing the installed GMCM 1.16.0 still used those names. This was incorrect — `RegisterClampedOption` only exists in `IGenericModConfigMenuApiWithObsoleteMethods` (not in `Framework.Api` that Pintail proxies against). Build marker: `build=U17-Step16`.
+
+**Step 17 — GMCM proxy failure: `RegisterClampedOption` (correct fix)**
+[x] Reflected the installed GMCM 1.16.0 DLL (`GenericModConfigMenu.dll`) to enumerate the actual public API surface. Confirmed `GenericModConfigMenu.IGenericModConfigMenuApi` exposes `Register`, `AddSectionTitle`, and `AddNumberOption(int)` / `AddNumberOption(float)` — NOT the old pre-1.6 names. Updated `Dayswork/Integration/IGenericModConfigMenuApi.cs` to use the correct method names and `Func<string>` types for name/tooltip (the original Step 15 failure was `string` vs `Func<string>`). Updated all three `GMCMRegistrar.cs` call sites (`Register`, `AddSectionTitle`, `AddNumberOption`). Verified: `dotnet build Dayswork.sln` 0 errors / 0 warnings, auto-deployed; `dotnet test Dayswork.sln` 211 passed / 1 expected skip. Build marker: `build=U17-Step17`.
+
+**Step 18 — `TypeInitializationException` in `GMCMRegistrar..cctor`: static field init order**
+[x] `RateOptions` (declared first) referenced `TaskKindOrder` (declared last) during the static constructor — C# initializes static fields top-to-bottom, so `TaskKindOrder` was `null` when `RateOptions` tried to `.Select()` over it, producing `ArgumentNullException: source`. Fixed by moving `TaskKindOrder` above `RateOptions` (and removing the null-forgiving `!` operator since it's now guaranteed non-null) and removing the now-duplicate declaration at the bottom of the class. Verified: `dotnet build Dayswork.sln` 0 errors / 0 warnings, auto-deployed; `dotnet test Dayswork.sln` 211 passed / 1 expected skip. Build marker: `build=U17-Step18`.
 
 ---
 

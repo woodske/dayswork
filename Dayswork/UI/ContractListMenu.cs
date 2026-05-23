@@ -155,7 +155,7 @@ internal sealed class ContractListMenu : IClickableMenu
     {
         string rawTaskSummary = contract.EnabledTasks.Count > 0
             ? string.Join(", ", contract.EnabledTasks.Select(TaskLabel))
-            : "—";
+            : I18nHelper.Get("ui.common.none");
 
         // Wrap task text to the left text-area column (buttons occupy the right).
         string wrapped    = Game1.parseText(rawTaskSummary, Game1.smallFont, TextAreaWidth);

@@ -21,21 +21,12 @@ public static class ConfigDefaults
             [TaskKind.ClearGrass]            = 20,
         };
 
-        // INV-CFG-03: every defined TaskKind must have a rate entry or the factory fails fast.
-        foreach (TaskKind kind in Enum.GetValues<TaskKind>())
-        {
-            if (!increments.ContainsKey(kind))
-                throw new InvalidOperationException(
-                    $"ConfigDefaults.Build is missing a TaskIncrement entry for {kind}.");
-        }
-
-        return new ConfigSnapshot(
-            BaseRate: 50,
-            TaskIncrements: new ReadOnlyDictionary<TaskKind, int>(increments),
-            AverageSpeedConstant: 0.3,  // pricing-min per raw tile per task; see U-05 HoursEstimator
-            HardCapTime: 2000,
-            StuckInitialWaitMinutes: 10,
-            StuckPostTeleportWaitMinutes: 10
-        );
+        return ConfigSnapshotFactory.Create(
+            baseRate: 50,
+            taskIncrements: new ReadOnlyDictionary<TaskKind, int>(increments),
+            averageSpeedConstant: 0.3,  // pricing-min per raw tile per task; see U-05 HoursEstimator
+            hardCapTime: 2000,
+            stuckInitialWaitMinutes: 10,
+            stuckPostTeleportWaitMinutes: 10);
     }
 }
