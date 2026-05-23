@@ -86,11 +86,8 @@ internal sealed class ChestResolver
         var result = new List<BuildingOutline>();
         foreach (var building in farm.buildings)
         {
-            // Some buildings (e.g. Greenhouse) are primary world locations whose interior is
-            // not linked via building.indoors — fall back to a lookup by building type name.
-            var indoors = building.indoors.Value
-                          ?? Game1.getLocationFromName(building.buildingType.Value);
-            if (indoors == null) continue;
+            if (!BuildingLocationResolver.TryGetInteriorForBuilding(building, out var indoors))
+                continue;
 
             result.Add(new BuildingOutline(
                 indoors.Name,

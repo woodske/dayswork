@@ -1,0 +1,417 @@
+using Dayswork.Core.Domain;
+using Dayswork.Core.Inventory;
+using Dayswork.Core.Shifts;
+using Dayswork.Integration;
+using Dayswork.Worker;
+using Microsoft.Xna.Framework;
+using StardewModdingAPI;
+using StardewValley;
+using StardewValley.Tools;
+using SObject = StardewValley.Object;
+
+namespace Dayswork.Orchestration;
+
+internal sealed record FeedWorkPlan(
+    IReadOnlyList<WorkItem> WorkItems,
+    TileCoord HopperTile,
+    int HayToTake,
+    int EmptySlots);
+
+internal sealed class AnimalTaskHandler
+{
+    private readonly IMonitor _monitor;
+
+    public AnimalTaskHandler(IMonitor monitor) => _monitor = monitor;
+
+    public IReadOnlyList<(AnimalRef Ref, FarmAnimal Live)> EnumerateAnimals(
+        GameLocation location,
+        IReadOnlySet<string>? selectedHomeLocations = null)
+    {
+        var result = new List<(AnimalRef Ref, FarmAnimal Live)>();
+
+        if (location is AnimalHouse animalHouse)
+        {
+            foreach (var pair in animalHouse.Animals.Pairs)
+                AddIfSelected(pair.Value, selectedHomeLocations, result);
+        }
+        else if (location is Farm farm)
+        {
+            foreach (var pair in farm.Animals.Pairs)
+                AddIfSelected(pair.Value, selectedHomeLocations, result);
+        }
+
+        return result;
+    }
+
+    public FarmAnimal? FindLiveAnimal(GameLocation location, AnimalRef animalRef)
+    {
+        if (location is AnimalHouse animalHouse &&
+            animalHouse.Animals.TryGetValue(animalRef.Id, out var housed))
+            return housed;
+
+        if (location is Farm farm &&
+            farm.Animals.TryGetValue(animalRef.Id, out var grazing))
+            return grazing;
+
+        return null;
+    }
+
+    public FeedWorkPlan CreateFeedWork(GameLocation animalHouseLocation)
+    {
+        if (animalHouseLocation is not AnimalHouse animalHouse)
+            return EmptyFeedWork();
+
+        var parent = animalHouse.ParentBuilding;
+        if (IsAutoFeedBuilding(parent?.buildingType.Value, animalHouseLocation))
+            return EmptyFeedWork();
+
+        var capacity = FeedCapacity(parent?.buildingType.Value);
+        var filled = Math.Clamp(CountPlacedHay(animalHouse), 0, capacity);
+        var emptySlots = Math.Max(0, capacity - filled);
+        if (emptySlots == 0)
+            return EmptyFeedWork();
+
+        var farmHay = Game1.getFarm().piecesOfHay.Value;
+        if (farmHay <= 0)
+        {
+            _monitor.Log(I18nHelper.Get("log.animal.no_silo", new { location = animalHouse.Name }), LogLevel.Warn);
+            return EmptyFeedWork(emptySlots);
+        }
+
+        var emptyTroughTiles = ResolveEmptyTroughTiles(animalHouseLocation)
+            .Take(Math.Min(emptySlots, farmHay))
+            .ToList();
+        if (emptyTroughTiles.Count == 0)
+        {
+            _monitor.Log(
+                $"[Dayswork][feed-plan] location={animalHouse.Name} unable to discover empty trough tiles; skipping visible feed work. troughs=0 filled={filled} empty={emptySlots}",
+                LogLevel.Warn);
+            return EmptyFeedWork(emptySlots);
+        }
+
+        var hasHopper = TryResolveHopperTile(animalHouseLocation, null, out var hopperTile, out var hopperSource);
+
+        if (!hasHopper)
+        {
+            _monitor.Log(
+                $"[Dayswork][feed-plan] location={animalHouse.Name} unable to discover feed hopper; skipping visible feed work. troughs={emptyTroughTiles.Count} hopper=<null>",
+                LogLevel.Warn);
+            return EmptyFeedWork(emptySlots);
+        }
+
+        var hopperNav = FindPreferredStandTile(hopperTile, animalHouseLocation) ?? hopperTile;
+        var feedItems = new List<WorkItem>
+        {
+            new(hopperNav, hopperTile, TaskKind.FeedAnimals, animalHouseLocation.Name),
+        };
+
+        var feederItems = emptyTroughTiles
+            .Select(tile => new WorkItem(
+                FindPreferredFeedStandTile(tile, hopperTile, animalHouseLocation) ?? hopperNav,
+                tile,
+                TaskKind.FeedAnimals,
+                animalHouseLocation.Name))
+            .ToList();
+
+        feedItems.AddRange(feederItems);
+        _monitor.Log(
+            $"[Dayswork][feed-plan] location={animalHouse.Name} hopper=({hopperTile.X},{hopperTile.Y}) hopperNav=({hopperNav.X},{hopperNav.Y}) hopperSource={hopperSource} troughSource=Back:Trough filled={filled} empty={emptySlots} hayToTake={feederItems.Count} feeders=[{string.Join("; ", feederItems.Select(item => $"task=({item.TaskTile.X},{item.TaskTile.Y}) nav=({item.NavTile.X},{item.NavTile.Y})"))}]",
+            LogLevel.Info);
+        return new FeedWorkPlan(feedItems, hopperTile, feederItems.Count, emptySlots);
+    }
+
+    public bool TakeHay(GameLocation animalHouseLocation, int count)
+    {
+        if (animalHouseLocation is not AnimalHouse || count <= 0)
+            return false;
+
+        var farm = Game1.getFarm();
+        var taken = Math.Min(count, farm.piecesOfHay.Value);
+        if (taken <= 0)
+            return false;
+
+        farm.piecesOfHay.Value -= taken;
+        animalHouseLocation.playSound("shwip");
+        return true;
+    }
+
+    public bool PlaceHay(GameLocation animalHouseLocation, TileCoord troughTile)
+    {
+        if (animalHouseLocation is not AnimalHouse animalHouse)
+            return false;
+
+        var tileVec = new Vector2(troughTile.X, troughTile.Y);
+        if (animalHouse.objects.ContainsKey(tileVec))
+            return false;
+
+        if (animalHouseLocation.doesTileHaveProperty(troughTile.X, troughTile.Y, "Trough", "Back", false) is null)
+            return false;
+
+        var hay = ItemRegistry.Create<SObject>("(O)178", 1);
+        if (!animalHouse.dropObject(hay, tileVec * 64f, Game1.viewport, initialPlacement: false, who: Game1.player))
+            return false;
+
+        animalHouseLocation.playSound("grassyStep");
+        return true;
+    }
+
+    public bool ShouldPet(FarmAnimal animal) => !animal.wasPet.Value;
+
+    public bool Pet(FarmAnimal animal)
+    {
+        if (!ShouldPet(animal))
+            return false;
+
+        animal.pet(Game1.player, is_auto_pet: false);
+        return true;
+    }
+
+    public bool HasToolHarvestReady(FarmAnimal animal) =>
+        !string.IsNullOrWhiteSpace(animal.currentProduce.Value);
+
+    public bool TryCollect(FarmAnimal animal, ItemBuffer buffer)
+    {
+        if (!HasToolHarvestReady(animal))
+            return false;
+
+        var produceId = animal.currentProduce.Value;
+        var item = ItemRegistry.Create(produceId, 1) ?? ItemRegistry.Create($"(O){produceId}", 1);
+        if (item is null)
+            return false;
+
+        if (item is SObject obj)
+            obj.Quality = Math.Max(0, animal.produceQuality.Value);
+
+        buffer.Add(item.QualifiedItemId, Math.Max(1, item.Stack), TaskKind.CollectAnimalProducts);
+        animal.HandleStatsOnProduceCollected(item, (uint)Math.Max(1, item.Stack));
+        animal.currentProduce.Value = string.Empty;
+        animal.daysSinceLastLay.Value = 0;
+        return true;
+    }
+
+    public static bool IsMilkProduce(FarmAnimal animal)
+    {
+        var animalType = animal.type.Value;
+        return animalType.Contains("Cow", StringComparison.OrdinalIgnoreCase) ||
+               animalType.Contains("Goat", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsShearProduce(FarmAnimal animal)
+    {
+        var animalType = animal.type.Value;
+        return animalType.Contains("Sheep", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public TileCoord CurrentTile(FarmAnimal animal) =>
+        new(animal.TilePoint.X, animal.TilePoint.Y);
+
+    public TileCoord? CurrentNavigationTile(FarmAnimal animal, GameLocation location)
+    {
+        var current = CurrentTile(animal);
+        if (WorkerMovementDriver.IsTilePassableForWorker(new Point(current.X, current.Y), location))
+            return current;
+
+        return WorkAreaScanner.FindOrthogonalNeighbour(current, location);
+    }
+
+    private static void AddIfSelected(
+        FarmAnimal animal,
+        IReadOnlySet<string>? selectedHomeLocations,
+        List<(AnimalRef Ref, FarmAnimal Live)> result)
+    {
+        var homeLocation = ResolveHomeLocation(animal);
+        if (selectedHomeLocations is not null && !selectedHomeLocations.Contains(homeLocation))
+            return;
+
+        result.Add((
+            new AnimalRef(animal.myID.Value, homeLocation, animal.displayName),
+            animal));
+    }
+
+    private static string ResolveHomeLocation(FarmAnimal animal)
+    {
+        if (animal.homeInterior is not null)
+            return animal.homeInterior.Name;
+
+        var indoors = animal.home?.indoors.Value;
+        return indoors?.Name ?? animal.buildingTypeILiveIn.Value ?? string.Empty;
+    }
+
+    private static FeedWorkPlan EmptyFeedWork(int emptySlots = 0) =>
+        new(Array.Empty<WorkItem>(), new TileCoord(0, 0), 0, emptySlots);
+
+    private static int CountPlacedHay(AnimalHouse animalHouse) =>
+        animalHouse.numberOfObjectsWithName("Hay");
+
+    private static int FeedCapacity(string? buildingType)
+    {
+        if (buildingType?.Contains("Deluxe", StringComparison.OrdinalIgnoreCase) == true)
+            return 12;
+
+        if (buildingType?.Contains("Big", StringComparison.OrdinalIgnoreCase) == true)
+            return 8;
+
+        return 4;
+    }
+
+    private static bool IsAutoFeedBuilding(string? buildingType, GameLocation animalHouseLocation)
+    {
+        if (buildingType?.Contains("Deluxe", StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        if (animalHouseLocation.Map.Properties.TryGetValue("AutoFeed", out var autoFeed))
+        {
+            var value = autoFeed.ToString();
+            return value.Equals("T", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("True", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveHopperTile(
+        GameLocation animalHouseLocation,
+        TileCoord? feedStartTile,
+        out TileCoord hopperTile,
+        out string source)
+    {
+        foreach (var (tile, obj) in animalHouseLocation.Objects.Pairs)
+        {
+            if (!IsFeedHopperObject(obj))
+                continue;
+
+            hopperTile = new TileCoord((int)tile.X, (int)tile.Y);
+            source = "object";
+            return true;
+        }
+
+        if (TryFindTileAction(animalHouseLocation, IsFeedHopperAction, out hopperTile))
+        {
+            source = "tile-action";
+            return true;
+        }
+
+        if (feedStartTile is not null)
+        {
+            hopperTile = new TileCoord(feedStartTile.Value.X, feedStartTile.Value.Y + 1);
+            source = "feed-below-fallback";
+            return true;
+        }
+
+        hopperTile = default;
+        source = "<none>";
+        return false;
+    }
+
+    private static bool IsFeedHopperObject(SObject obj) =>
+        obj.QualifiedItemId.Equals("(BC)99", StringComparison.OrdinalIgnoreCase) ||
+        obj.ItemId.Equals("99", StringComparison.OrdinalIgnoreCase) ||
+        obj.Name.Contains("Feed Hopper", StringComparison.OrdinalIgnoreCase) ||
+        obj.DisplayName.Contains("Feed Hopper", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsFeedHopperAction(string action) =>
+        action.Contains("FeedHopper", StringComparison.OrdinalIgnoreCase) ||
+        action.Contains("HayHopper", StringComparison.OrdinalIgnoreCase) ||
+        action.Contains("Hopper", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryFindTileAction(
+        GameLocation location,
+        Func<string, bool> predicate,
+        out TileCoord tile)
+    {
+        var width = location.Map.Layers.Max(layer => layer.LayerWidth);
+        var height = location.Map.Layers.Max(layer => layer.LayerHeight);
+        var layers = location.Map.Layers
+            .Select(layer => layer.Id)
+            .Where(id => id is "Buildings" or "Back" or "Front" or "AlwaysFront")
+            .ToArray();
+
+        for (var x = 0; x < width; x++)
+        for (var y = 0; y < height; y++)
+        {
+            foreach (var layer in layers)
+            {
+                var action = location.doesTileHaveProperty(x, y, "Action", layer);
+                if (!string.IsNullOrWhiteSpace(action) && predicate(action))
+                {
+                    tile = new TileCoord(x, y);
+                    return true;
+                }
+            }
+        }
+
+        tile = default;
+        return false;
+    }
+
+    private static IEnumerable<TileCoord> ResolveEmptyTroughTiles(GameLocation location)
+    {
+        var layer = location.Map.Layers[0];
+        for (var x = 0; x < layer.LayerWidth; x++)
+        for (var y = 0; y < layer.LayerHeight; y++)
+        {
+            if (location.doesTileHaveProperty(x, y, "Trough", "Back", false) is null)
+                continue;
+
+            var tile = new Vector2(x, y);
+            if (location.objects.ContainsKey(tile))
+                continue;
+
+            yield return new TileCoord(x, y);
+        }
+    }
+
+    private static TileCoord? FindPreferredFeedStandTile(
+        TileCoord feedTile,
+        TileCoord hopperTile,
+        GameLocation location)
+    {
+        TileCoord[] candidates =
+        {
+            new(feedTile.X, feedTile.Y + 1),
+            new(feedTile.X + 1, feedTile.Y + 1),
+            new(feedTile.X - 1, feedTile.Y + 1),
+            new(feedTile.X + 1, feedTile.Y),
+            new(feedTile.X - 1, feedTile.Y),
+            new(feedTile.X, feedTile.Y - 1),
+        };
+
+        return candidates.FirstOrDefaultPassable(location, hopperTile);
+    }
+
+    private static TileCoord? FindPreferredStandTile(TileCoord tile, GameLocation location)
+    {
+        TileCoord[] candidates =
+        {
+            new(tile.X, tile.Y + 1),
+            new(tile.X + 1, tile.Y),
+            new(tile.X - 1, tile.Y),
+            new(tile.X, tile.Y - 1),
+        };
+
+        return candidates.FirstOrDefaultPassable(location);
+    }
+}
+
+internal static class TileCoordPassabilityExtensions
+{
+    public static TileCoord? FirstOrDefaultPassable(
+        this IEnumerable<TileCoord> candidates,
+        GameLocation location,
+        TileCoord? blockedTile = null)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (blockedTile is not null && candidate == blockedTile.Value)
+                continue;
+
+            if (location.Objects.ContainsKey(new Vector2(candidate.X, candidate.Y)))
+                continue;
+
+            if (WorkerMovementDriver.IsTilePassableForWorker(new Point(candidate.X, candidate.Y), location))
+                return candidate;
+        }
+
+        return null;
+    }
+}

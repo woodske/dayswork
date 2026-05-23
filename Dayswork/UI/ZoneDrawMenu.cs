@@ -68,7 +68,10 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             }
             else
             {
-                var match = buildingOutlines.FirstOrDefault(o => o.LocationName == zone.LocationName);
+                var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), zone.LocationName);
+                var match = buildingOutlines.FirstOrDefault(o =>
+                    o.LocationName == zone.LocationName ||
+                    o.LocationName == normalizedName);
                 if (match != null && !_selectedBuildings.Contains(match))
                     _selectedBuildings.Add(match);
             }

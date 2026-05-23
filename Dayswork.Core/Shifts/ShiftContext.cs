@@ -13,6 +13,8 @@ public sealed class ShiftContext
     public int HourlyRate { get; }
     public ToolSnapshot ToolSnapshot { get; }
     public ShiftStateMachine StateMachine { get; } = new();
+    public IReadOnlyList<WorkBatch> Batches { get; }
+    public int CurrentBatchIndex { get; set; }
     public Queue<WorkItem> WorkList { get; }
     public ItemBuffer Buffer { get; } = new();
 
@@ -40,7 +42,9 @@ public sealed class ShiftContext
         int hourlyRate,
         ToolSnapshot toolSnapshot,
         IEnumerable<WorkItem> workList,
-        int shiftStartTime)
+        int shiftStartTime,
+        IReadOnlyList<WorkBatch>? batches = null,
+        int currentBatchIndex = 0)
     {
         ContractId       = contractId;
         Zones            = zones;
@@ -49,6 +53,8 @@ public sealed class ShiftContext
         DepositAmount    = depositAmount;
         HourlyRate       = hourlyRate;
         ToolSnapshot     = toolSnapshot;
+        Batches          = batches ?? Array.Empty<WorkBatch>();
+        CurrentBatchIndex = currentBatchIndex;
         WorkList         = new Queue<WorkItem>(workList);
         ShiftStartTime   = shiftStartTime;
     }

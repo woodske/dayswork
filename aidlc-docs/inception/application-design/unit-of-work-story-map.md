@@ -17,8 +17,8 @@ This document maps each of the 20 user stories in [stories.md](../user-stories/s
 |---|---|---|---|
 | **S-01** Discover the hiring option on the bulletin board | U-08 | — | Bulletin board shows the entry; clicking logs a placeholder message. UI itself lands in U-09. The MP-hidden case also fully works at U-08. |
 | **S-02** Configure tasks and see the live hourly rate | U-09 | — | Full story shipped. Toggles render, rate updates in real time, base rate always included, gamepad navigation works. |
-| **S-03** Draw zones and select buildings on the farm | U-11 | — | Full story shipped (zone drawing + building selection + multi-rectangle + unreachable-tile silent skip + gamepad cursor). |
-| **S-04** Assign output destinations per task | U-11 | U-14 | At U-11: chest assignment UI works; rename preserves assignment. At U-14: the orphaned-chest Gherkin case fully fires through the mail fallback. |
+| **S-03** Draw zones and select buildings on the farm | U-11 | U-16 deepening | Full story shipped at U-11 (zone drawing + building selection + multi-rectangle + unreachable-tile silent skip + gamepad cursor). U-16 makes selected buildings executable work areas. |
+| **S-04** Assign output destinations per task | U-11 | U-14, U-16 deepening | At U-11: chest assignment UI works; rename preserves assignment. At U-14: the orphaned-chest Gherkin case fully fires through the mail fallback. At U-16: building-interior output destinations are exercised by the multi-location deposit run. |
 | **S-05** Choose a one-time or recurring schedule | U-09 | U-12 | At U-09: one-time contracts persist through save/load (Gherkin clause). At U-12: schedule selection UI ships and recurring contracts are creatable. |
 | **S-06** Review the contract and confirm | U-09 | — | Full story shipped. Summary renders, confirm path deducts deposit, insufficient-gold path is blocked. |
 
@@ -27,7 +27,7 @@ This document maps each of the 20 user stories in [stories.md](../user-stories/s
 | Story | Primary | Completing | State after primary unit |
 |---|---|---|---|
 | **S-07** Watch the farmhand arrive and work on day one | U-10 | U-13B | At U-10: arrival + walk (teleport stub) to first task tile + placeholder sprite. At U-13: real walking. At U-13B: Farmer worker with visible tool-swap when changing task class. |
-| **S-08** Execute tasks in priority order within a zone | U-10 | U-13, U-16 | At U-10: single task executes (one zone, one task type). At U-13: outdoor priority/deepening lands for non-animal tasks. At U-16: animal tasks and building-interior work complete the full priority queue. |
+| **S-08** Execute tasks in priority order within a zone | U-10 | U-13, U-16 | At U-10: single task executes (one zone, one task type). At U-13: outdoor priority/deepening lands for non-animal tasks. At U-16 Code Generation: animal tasks and building-interior work complete the full priority queue. |
 | **S-09** Snapshot tool capabilities at spawn and skip what can't be done | U-10 | U-13 | At U-10: ToolLevelReader runs at 6am and snapshot is captured. At U-13: full capability matrix applied to skip rules (axe-level guards, pickaxe=0 guards, fruit-tree always-skip) plus tool-missing mail warning queued (mail itself delivered by U-14). |
 | **S-10** Deposit collected items at shift end | U-10 | U-14 | At U-10: single-trip deposit to shipping bin. At U-14: multi-trip deposit to assigned chests + 8pm-cap-still-deposits + chest-full fallback + chest-destroyed fallback + refund at exit. |
 | **S-11** Receive mail for overflow and unassigned output | U-14 | — | Full story shipped. MailDispatcher delivers overflow / chest-missing / no-chest-assigned letters with no fee; shipping-bin-no-overflow holds. |
@@ -64,8 +64,8 @@ This document maps each of the 20 user stories in [stories.md](../user-stories/s
 |---|---|
 | S-01 | ✅ U-08 |
 | S-02 | ✅ U-09 |
-| S-03 | ✅ U-11 |
-| S-04 | ✅ U-11 (primary), U-14 (completes) |
+| S-03 | ✅ U-11 (primary), U-16 (selected buildings become executable) |
+| S-04 | ✅ U-11 (primary), U-14 (completes fallback), U-16 (building-interior destinations) |
 | S-05 | ✅ U-09 (primary), U-12 (completes) |
 | S-06 | ✅ U-09 |
 | S-07 | ✅ U-10 (primary), U-13 (real walking), U-13B (completes — Farmer + tool-swap) |
@@ -109,7 +109,7 @@ For developers picking up a unit, what stories does Construction need to satisfy
 | U-13B Farmer Worker + Tool Visuals | S-07 (completes) |
 | U-14 Output: Multi-Destination Deposit + Overflow Mail | S-04 (completes), S-10 (completes), S-11 |
 | U-15 Recurring Lifecycle + Calendar | S-12 (completes), S-14, S-15 |
-| U-16 Animals & Buildings | S-08 (completes animal tasks and building-interior work), S-03/S-04 deepening for selected buildings |
+| U-16 Animals & Buildings | S-08 (completes animal tasks and building-interior work), S-03/S-04 deepening for selected buildings — implemented in U-16 Code Generation 2026-05-22 |
 | U-17 GMCM + i18n Polish | S-13, S-19 (lint completes), S-20 (lint completes) |
 
 ---

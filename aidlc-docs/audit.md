@@ -1,5 +1,29 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## U-16 Playtest Fix — Step 34 (big rocks: multi-hit + correct loot)
+**Timestamp**: 2026-05-22T01:00:00Z
+**User Input**: "The worker is one shotting the big rocks, it should take multiple hits depending on the tool quality and the rock health. It's also only collecting one rock from it. All of the hits and collections should be from real in game data."
+**AI Response**: Reflected the game DLL (loading all game DLLs first so deps resolved) to find ResourceClump's exact API: `NetFloat health`, `performToolAction(Tool t, int damage, Vector2 tileLocation)` returns bool (true when destroyed), `destroy(Tool t, GameLocation location, Vector2 tileLocation)` spawns loot (3680 bytes IL — the complex drop logic). Root causes: (1) `damage = 0` passed to performToolAction → zero health reduction per hit; (2) clump always force-removed after one call via `loc.resourceClumps.Remove(clump)` — `destroy()` was never called. Fix: pass `damage = 1`, check return value, only call `destroy()` + Remove when true, collect debris after both hit and destroy. Multi-hit behavior falls out of the existing action-loop retry (action-pending reset → re-invoke next tick until IsTaskComplete). Compile: 0 errors/warnings. Deploy pending (game DLL locked); rebuild after closing game.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings, Code Generation playtest fix Step 34
+
+---
+
+## U-16 Playtest Fix — Step 33 (greenhouse crop harvest: infinite loop + player inventory)
+**Timestamp**: 2026-05-22T00:30:00Z
+**User Input**: "[log excerpt showing HarvestCrops invoked dozens of times on the same tile, and crops going straight into the farmer's inventory]"
+**AI Response**: Reflected the actual game DLL via PowerShell to confirm exact API shapes before fixing — discovered `Crop.RegrowsAfterHarvest()` (method, not property), `HoeDirt.destroyCrop(bool showAnimation)`, and `HoeDirt.readyForHarvest()`. Fixed two root causes in `InvokeHarvest`: (1) Infinite loop — `Crop.harvest()` does not clear `dirt.crop`; the caller is responsible. For non-regrowable crops, call `dirt.destroyCrop(false)` when `!dirt.crop.RegrowsAfterHarvest()`. Extended `IsTaskComplete` for `HarvestCrops` to use `!hd.readyForHarvest()` (covers regrowable crops where the crop remains but is no longer ready). Also updated `WorkAreaScanner.DetectTask` to use `dirt.readyForHarvest()` and removed dead hand-rolled `IsReadyToHarvest(Crop)` helper. (2) Items to player inventory — SDV 1.6 `Crop.harvest(null junimoHarvester)` adds produce directly to `Game1.player`. Fixed by snapshotting player inventory by object reference before calling `harvest()`, then diffing and redirecting any new/increased stacks to the worker buffer while removing them from the player. Build: 0 errors, deployed. Tests: 201 passed / 1 expected skip.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings, Code Generation playtest fix Step 33
+
+---
+
+## U-16 Playtest Fix — Step 32 (per-animal task grouping)
+**Timestamp**: 2026-05-22T00:00:00Z
+**User Input**: "Continuing ai-dlc workflow. I am in the middle of playtesting U-16 code generation. I have a request to improve the animal tasks workflow. Right now for cows, the worker goes to each cow and pets them, then loops through each cow again to milk them. The worker should pet and milk the cow before moving to the next."
+**AI Response**: Identified root cause in `ShiftOrchestrator.BuildAnimalWork`: the final `.OrderBy(item => _priorityOrderer.Order(new[] { item.Task })[0])` sorted all work items by task kind globally, grouping all PetAnimals tasks before all CollectAnimalProducts tasks. Fixed by grouping by `animal.Id` first, then sorting tasks within each group by priority — so the worker pets and milks each cow before moving to the next. Code change applied; build/test/deploy and plan step logging in progress.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings, Code Generation playtest fix Step 32
+
+---
+
 ## U-13B Code Generation — Part 1 Plan Created, Awaiting Approval
 **Timestamp**: 2026-05-21T06:05:00Z
 **User Input**: "continue"
@@ -29,6 +53,79 @@
 **User Input**: "continue"
 **AI Response**: Functional Design approved (FD stage marked complete). Proceeded to NFR Requirements for U-13B. No blocking user questions — all NFRs determinable from the approved FD + prior project decisions, consistent with how U-07/U-10/U-13 NFR Requirements were handled; tech stack adds no new frameworks (Farmer rendering/movement use existing Stardew APIs; testing stays xUnit + FsCheck). The one open engineering choice — movement smoothness cadence (per-tick stepping vs render-side interpolation) — is recorded as a deferred NFR-Design pattern decision (mirrors how U-13 deferred its render-hook choice), not a product question. Generated nfr-requirements.md (PERF-U13B-01..04 incl. the deferred-from-U-13 per-frame Farmer draw + manual movement stepping; SAFE-U13B-01 Farmer-never-serialized; REL-U13B-01..03; MAINT-U13B-01..04 incl. Core purity of WorkerTool + i18n N/A; PBT obligations) and tech-stack-decisions.md (no new deps; WorkerTool is the only new Core type, unit-tested not PBT). Plan at construction/plans/. Presenting REVIEW REQUIRED gate per nfr-requirements.md Step 7.
 **Context**: CONSTRUCTION — U-13B Farmer Worker + Tool Visuals, NFR Requirements complete, awaiting approval
+
+---
+
+## U-16 Animals & Buildings — Outdoor Animal Rescan Feedback Received
+**Timestamp**: 2026-05-22T22:23:58Z
+**User Input**: "the worker is not petting or milking animals when they are outside. Do we need to rescan the farm after they're done with the buildings? why is this happening?"
+**AI Response**: Continuing U-16 Code Generation playtest refinement. Identified likely root cause: outdoor farm animal work is currently built at shift start, while U-16 executes animal-building batches before the outdoor farm batch. If animals move outside after the initial snapshot, the later outdoor batch has no queued pet/milk/shear work for them. Planned Step 31 to refresh outdoor animal work when the outdoor batch actually begins, while keeping outdoor tile work eager for the existing empty-zone/refund behavior.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest feedback; Step 31 in progress
+
+---
+
+## U-16 Animals & Buildings — Outdoor Animal Rescan Fix Step 31 Complete
+**Timestamp**: 2026-05-22T22:25:06Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed Step 31 playtest fix. Outdoor farm tile work remains eagerly scanned at shift start for the existing empty-zone/refund behavior, but the outdoor farm batch now refreshes animal work from live farm animals when that batch actually begins after the building batches. The selected animal homes are derived from the animal-building batches, so only animals from selected barns/coops are considered. Added `[Dayswork][outdoor-animals] refreshed homes=N animalWork=N` diagnostics. Updated the startup marker to `build=U16-Step31`; updated U-16 plan, code summary, state, and audit. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest fix Step 31 complete; awaiting continued playtest/approval
+
+---
+
+## U-16 Animals & Buildings — Actual Trough Feedback / Step 30 Complete
+**Timestamp**: 2026-05-22T22:07:54Z
+**User Input**: "They made it to the hopper, but just went along the hopper's row, faced the trough, then did nothing. Are we able to pick up in code where the trough is so we're not making a best guess? The hay was never deposited onto the trough either."
+**AI Response**: Completed Step 30 playtest fix. Confirmed through Stardew's installed assembly that vanilla animal-house feeding uses `Back:Trough` tile properties and places hay by calling `AnimalHouse.dropObject(...)` with vanilla Hay `"(O)178"` on those trough tiles. Replaced guessed feeder-row placement with actual trough discovery, changed filled-slot detection to count existing placed Hay objects instead of `piecesOfHay`, and changed placement to drop real hay objects on the trough so the trough visibly fills. Updated the startup marker to `build=U16-Step30`; updated U-16 plan, code summary, state, and audit. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest fix Step 30 complete; awaiting continued playtest/approval
+
+---
+
+## U-16 Animals & Buildings — Hopper-Through Feedback Received
+**Timestamp**: 2026-05-22T21:58:02Z
+**User Input**: "[Mail Framework Mod] Updating mailbox for the day.
+[Dayswork] [Dayswork][shift-plan] zones=Greenhouse->Greenhouse; Big Barn->Big Barn; Coop->Coop
+[Dayswork] Farmhand entering Big Barn.
+[Dayswork] [Dayswork][scan] location=Big Barn zones=1 scannedTiles=330 enabled=WaterCrops,FeedAnimals,PetAnimals,CollectAnimalProducts detected=[none] accepted=[none] acceptedItems=0 capabilitySkipped=0 noStandTile=0 duplicateClumpTiles=0
+[Dayswork] [Dayswork][feed-plan] location=Big Barn hopper=(6,3) hopperNav=(6,4) hopperSource=object feedStart=(6,2) feedSource=hopper-above-fallback filled=0 empty=8 hayToTake=8 feeders=[task=(6,2) nav=(6,3); task=(7,2) nav=(7,2); task=(8,2) nav=(8,2); task=(9,2) nav=(9,2); task=(10,2) nav=(10,2); task=(11,2) nav=(11,2); task=(12,2) nav=(12,2); task=(13,2) nav=(13,2)]
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(6,4) task=(6,3) worker=(6,4) fallback=True.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(6,3) worker=(6,4).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(6,3).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(6,3) task=(6,2) worker=(6,3) fallback=True.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(6,2) worker=(6,3).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(6,2).
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(7,2) task=(7,2); skipping.
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(8,2) task=(8,2); skipping.
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(9,2) task=(9,2); skipping.
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(10,2) task=(10,2); skipping.
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(11,2) task=(11,2); skipping.
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(12,2) task=(12,2); skipping.
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(13,2) task=(13,2); skipping.
+[Dayswork] Farmhand entering Coop.
+[Dayswork] [Dayswork][scan] location=Coop zones=1 scannedTiles=120 enabled=WaterCrops,FeedAnimals,PetAnimals,CollectAnimalProducts detected=[CollectAnimalProducts=31] accepted=[CollectAnimalProducts=31] acceptedItems=31 capabilitySkipped=0 noStandTile=0 duplicateClumpTiles=0
+[Dayswork] [Dayswork][feed-plan] location=Coop hopper=(3,3) hopperNav=(3,4) hopperSource=object feedStart=(3,2) feedSource=hopper-above-fallback filled=0 empty=4 hayToTake=4 feeders=[task=(3,2) nav=(3,3); task=(4,2) nav=(4,3); task=(5,2) nav=(5,2); task=(6,2) nav=(6,2)]
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(3,4) task=(3,3) worker=(3,4) fallback=True.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(3,3) worker=(3,4).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(3,3).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(3,3) task=(3,2) worker=(3,3) fallback=True.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(3,2) worker=(3,3).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(3,2).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(4,3) task=(4,2) worker=(4,3) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(4,2) worker=(4,3).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(4,2).
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(5,2) task=(5,2); skipping.
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(6,2) task=(6,2); skipping.
+
+the worker made it to the hopper, but then went through it and bugged out trying to feed"
+**AI Response**: Continuing U-16 Code Generation playtest refinement. The Step 28 hopper resolution is correct, but the feeder fallback inferred `feedStart` above the hopper, causing feeder navigation to route onto the hopper/object tile and then into unreachable top-row tiles. Planned Step 29 to avoid deriving feeder navigation from unreachable feed tiles: use the hopper row as the fallback feed row, choose passable aisle tiles below each feeder slot, exclude hopper/object tiles as navigation targets, and keep logging the feed plan for verification.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest feedback; Step 29 in progress
+
+---
+
+## U-16 Animals & Buildings — Hopper-Through Fix Step 29 Complete
+**Timestamp**: 2026-05-22T22:00:29Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed Step 29 playtest fix. Feeding still starts by walking to the resolved hopper and taking hay, but fallback feeder work now uses the hopper row as the visual feed row instead of the row above it. Feeder navigation candidates prefer passable aisle tiles below/near each feed slot, exclude the hopper tile, and exclude object-occupied tiles so the worker does not path through the hopper. If a visual feed slot shares the hopper task tile after hay has already been taken, the action places hay instead of trying to take hay again. Updated the startup marker to `build=U16-Step29`; updated U-16 plan, code summary, state, and audit. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest fix Step 29 complete; awaiting continued playtest/approval
 
 ---
 
@@ -2079,5 +2176,157 @@ From the logs:
 **User Input**: "continue ai-dlc workflow. My other agent stopped right after creating the code generation plan."
 **AI Response**: Resumed the AI-DLC workflow from saved state. Loaded common rules, session-continuity guidance, content-validation rules, question-format rules, extension opt-in prompts, enabled Property-Based Testing rules, the Code Generation rule details, aidlc-state.md, audit.md, and the U-16 code generation plan. Treated the user's continue request as approval to move from Code Generation Part 1 (Planning) into Part 2 (Generation), updated aidlc-state.md accordingly, and began executing the plan step-by-step with checkbox tracking.
 **Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation (Part 2 generation started)
+
+---
+
+## U-16 Animals & Buildings — Code Generation Complete
+**Timestamp**: 2026-05-22T17:50:07Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed U-16 Code Generation plan Steps 1-22. Created Core batch/animal types, ShiftPlanBuilder, ShiftPlanBuilderTests, WorkAreaScanner, IndoorWorkScanner, AnimalTaskHandler, and BuildingWorkNavigator. Modified WorkItem, ShiftIntent, ShiftContext, ShiftOrchestrator, WorkerMovementDriver, ModEntry, and i18n/default.json for multi-location batches, animal work, building-interior scanning, building chest deposits, and location-aware cleanup. Created code summary and play-test checklist at aidlc-docs/construction/u-16-animals-buildings/code/code-summary.md. Updated the story map for S-08 and S-03/S-04 deepening, updated aidlc-state.md to Code Generation complete, and closed TODO-05. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`. PBT compliance: Partial mode compliant via new ShiftPlanBuilder FsCheck property plus existing PBT coverage; Security Baseline disabled/N/A.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation complete; awaiting user review/play-test approval
+
+---
+
+## U-16 Animals & Buildings — Post-Completion Consistency Fix
+**Timestamp**: 2026-05-22T17:52:37Z
+**User Input**: (continuation — no new input)
+**AI Response**: During final consistency review, noticed floor/ground animal products were not yet represented in tile scanning. Added explicit `CollectAnimalProducts` object detection for eggs, duck egg/feather, dinosaur egg, rabbit's foot, and truffles in `WorkAreaScanner`; added `InvokeCollectAnimalProduct` and completion detection in `ShiftOrchestrator`; updated the U-16 code summary. Re-ran verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation final consistency fix
+
+---
+
+## U-16 Animals & Buildings — Playtest Feedback Received
+**Timestamp**: 2026-05-22T18:36:33Z
+**User Input**: "[Dayswork] Farmhand skipped Greenhouse because it could not be reached or resolved.
+[Dayswork] Farmhand skipped Big Barn because it could not be reached or resolved.
+[Dayswork] Farmhand skipped Coop because it could not be reached or resolved.
+[Dayswork] [Dayswork][exit] worker leaving through farm entrance.
+[Dayswork] [Dayswork] Shift complete. Hours: 0. Refund (mailed): 115g.
+[Dayswork] [Dayswork][mail] queue settlement letter attachments=0 refund=115 reasons=.
+[Dayswork] [Dayswork][mail] register MFM letter id=Dayswork.Settlement.102.d8ebf382ea0e4be7a3999af89162120b attachments=0 refund=115 timing=Tomorrow.
+
+I've set the worker to work in the greenhouse, coop, and barn. They were not able to resolve any of them."
+**AI Response**: Resuming U-16 Code Generation playtest-fix workflow. Will trace building-zone naming from the hiring UI and ChestResolver through BuildingWorkNavigator, add a playtest-fix plan step, patch building/interior resolution, rebuild/test/deploy, and update U-16 docs/state/audit.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest feedback
+
+---
+
+## U-16 Animals & Buildings — Playtest Fix Complete
+**Timestamp**: 2026-05-22T18:39:27Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed Step 23 playtest fix. Root cause: selected building zones can be saved as building-facing names such as `Greenhouse`, `Big Barn`, and `Coop`, while the runtime navigator required a narrower building/interior resolution path and could skip candidates when the interior object was not resolved before matching. Added shared `BuildingLocationResolver` to match by interior name, `GetIndoorsName`, building type, loose upgraded type names, and farm warp targets; reused it from `ChestResolver.GetBuildingOutlines`, `BuildingWorkNavigator.TryResolveDoorTile`, and U-16 animal-house classification. Updated U-16 plan, code summary, state, and audit. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest fix complete; awaiting continued playtest/approval
+
+---
+
+## U-16 Animals & Buildings — Additional Playtest Feedback Received
+**Timestamp**: 2026-05-22T18:49:42Z
+**User Input**: "[Dayswork] Farmhand skipped Big Barn because it could not be reached or resolved.
+[Dayswork] Farmhand skipped Coop because it could not be reached or resolved.
+[Dayswork] Farmhand skipped Greenhouse because it could not be reached or resolved.
+[Dayswork] [Dayswork][exit] worker leaving through farm entrance.
+[Dayswork] [Dayswork] Shift complete. Hours: 0. Refund (mailed): 115g.
+[Dayswork] [Dayswork][mail] queue settlement letter attachments=0 refund=115 reasons=.
+[Dayswork] [Dayswork][mail] register MFM letter id=Dayswork.Settlement.102.d4c4c413caa34528bf9ece007e02675d attachments=0 refund=115 timing=Tomorrow.
+
+still the same error"
+**AI Response**: Continuing the U-16 playtest-fix workflow. Traced the remaining failure as a legacy persisted-zone problem: older contracts can still carry display labels such as `Big Barn`, `Coop`, or `Greenhouse`, and several pre-batch code paths still operated on those raw strings. Planned a second fix to canonicalize saved non-farm zone names to the resolved interior `GameLocation.Name` before batch planning and to use the same normalization when restoring building selections in the edit UI.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation additional playtest feedback
+
+---
+
+## U-16 Animals & Buildings — Playtest Fix Step 24 Complete
+**Timestamp**: 2026-05-22T18:49:42Z
+**User Input**: (continuation — no new input)
+**AI Response**: Completed Step 24 playtest fix. Added `BuildingLocationResolver.NormalizeLocationName(Farm, string)` and used it to canonicalize persisted non-farm zone names to interior `GameLocation.Name` values before `ShiftPlanBuilder.BuildBatchPlan(...)` in `ShiftOrchestrator.BuildInitialBatches`. This ensures older contracts saved with labels like `Big Barn`, `Coop`, or `Greenhouse` execute against stable runtime names for batch planning, animal-home matching, and building entry. Also updated `ZoneDrawMenu` to normalize legacy saved building-zone names when restoring edit-mode building selections. Updated the U-16 plan, code summary, state, and audit. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest fix Step 24 complete; awaiting continued playtest/approval
+
+---
+
+## U-16 Animals & Buildings — Repeated Building Resolution Failure
+**Timestamp**: 2026-05-22T20:54:32Z
+**User Input**: "I'm getting the same errors:
+
+[Mail Framework Mod] Updating mailbox for the day.
+[Dayswork] Farmhand skipped Big Barn because it could not be reached or resolved.
+[Dayswork] Farmhand skipped Coop because it could not be reached or resolved.
+[Dayswork] Farmhand skipped Greenhouse because it could not be reached or resolved.
+[Dayswork] [Dayswork][exit] worker leaving through farm entrance.
+[Dayswork] [Dayswork] Shift complete. Hours: 0. Refund (mailed): 115g.
+[Dayswork] [Dayswork][mail] queue settlement letter attachments=0 refund=115 reasons=.
+[Dayswork] [Dayswork][mail] register MFM letter id=Dayswork.Settlement.102.fba33bad3432430a873e7159aa38ccce attachments=0 refund=115 timing=Tomorrow."
+**AI Response**: Treated this as continued U-16 Code Generation playtest failure. Verified the deployed DLL timestamp matched the workspace build, inspected the resolver path, and concluded the next fix needs actual runtime candidate data because the repeated failure could be caused by the running game not loading the new DLL or by the farm/building graph seen at DayStarted differing from expectations. Added Step 25 diagnostics: startup build marker `build=U16-Step25`, raw-to-normalized shift zone log, failed-resolution candidate dump, and `dayswork_debug_buildings <name>` console command. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation diagnostic Step 25 complete; awaiting diagnostic playtest logs
+
+---
+
+## U-16 Animals & Buildings — Playtest Fix Step 26 Complete
+**Timestamp**: 2026-05-22T21:01:59Z
+**User Input**: "[Mail Framework Mod] Updating mailbox for the day.
+[Dayswork] [Dayswork][shift-plan] zones=Greenhouse->Greenhouse; Big Barn->Big Barn; Coop->Coop
+[Dayswork] Farmhand skipped Big Barn because it could not be reached or resolved.
+[Dayswork] [Dayswork][building-resolve] requested='Big Barn' farm='Farm' buildings=6 warps=10 standalone=<null> | #0 type='Farmhouse' indoorsName='FarmHouse' indoors='FarmHouse' tile=(59,12) size=(9x5) door=(64,14) matches=False | #1 type='Greenhouse' indoorsName='Greenhouse' indoors='Greenhouse' tile=(25,10) size=(7x6) door=(28,15) matches=False | #2 type='Shipping Bin' indoorsName='<null>' indoors='<null>' tile=(71,14) size=(2x1) door=(70,13) matches=False | #3 type='Pet Bowl' indoorsName='<null>' indoors='<null>' tile=(53,7) size=(2x2) door=(52,6) matches=False | #4 type='Coop' indoorsName='Coop3374e2f2-4d03-4d30-a9f1-f8bc768445d7' indoors='Coop' tile=(50,13) size=(6x3) door=(51,15) matches=False | #5 type='Big Barn' indoorsName='Barn9d1aa15a-e4a8-4483-bd09-f7ccb1d1bb2c' indoors='Big Barn' tile=(40,15) size=(7x4) door=(41,18) matches=True
+[Dayswork] Farmhand skipped Coop because it could not be reached or resolved.
+[Dayswork] [Dayswork][building-resolve] requested='Coop' farm='Farm' buildings=6 warps=10 standalone=<null> | #0 type='Farmhouse' indoorsName='FarmHouse' indoors='FarmHouse' tile=(59,12) size=(9x5) door=(64,14) matches=False | #1 type='Greenhouse' indoorsName='Greenhouse' indoors='Greenhouse' tile=(25,10) size=(7x6) door=(28,15) matches=False | #2 type='Shipping Bin' indoorsName='<null>' indoors='<null>' tile=(71,14) size=(2x1) door=(70,13) matches=False | #3 type='Pet Bowl' indoorsName='<null>' indoors='<null>' tile=(53,7) size=(2x2) door=(52,6) matches=False | #4 type='Coop' indoorsName='Coop3374e2f2-4d03-4d30-a9f1-f8bc768445d7' indoors='Coop' tile=(50,13) size=(6x3) door=(51,15) matches=True | #5 type='Big Barn' indoorsName='Barn9d1aa15a-e4a8-4483-bd09-f7ccb1d1bb2c' indoors='Big Barn' tile=(40,15) size=(7x4) door=(41,18) matches=False
+[Dayswork] Farmhand skipped Greenhouse because it could not be reached or resolved.
+[Dayswork] [Dayswork][building-resolve] requested='Greenhouse' farm='Farm' buildings=6 warps=10 standalone=Greenhouse | #0 type='Farmhouse' indoorsName='FarmHouse' indoors='FarmHouse' tile=(59,12) size=(9x5) door=(64,14) matches=False | #1 type='Greenhouse' indoorsName='Greenhouse' indoors='Greenhouse' tile=(25,10) size=(7x6) door=(28,15) matches=True | #2 type='Shipping Bin' indoorsName='<null>' indoors='<null>' tile=(71,14) size=(2x1) door=(70,13) matches=False | #3 type='Pet Bowl' indoorsName='<null>' indoors='<null>' tile=(53,7) size=(2x2) door=(52,6) matches=False | #4 type='Coop' indoorsName='Coop3374e2f2-4d03-4d30-a9f1-f8bc768445d7' indoors='Coop' tile=(50,13) size=(6x3) door=(51,15) matches=False | #5 type='Big Barn' indoorsName='Barn9d1aa15a-e4a8-4483-bd09-f7ccb1d1bb2c' indoors='Big Barn' tile=(40,15) size=(7x4) door=(41,18) matches=False
+[Dayswork] [Dayswork][exit] worker leaving through farm entrance.
+[Dayswork] [Dayswork] Shift complete. Hours: 0. Refund (mailed): 115g.
+[Dayswork] [Dayswork][mail] queue settlement letter attachments=0 refund=115 reasons=.
+[Dayswork] [Dayswork][mail] register MFM letter id=Dayswork.Settlement.102.8a9a6c867d1643b2978e447745050d42 attachments=0 refund=115 timing=Tomorrow."
+**AI Response**: Used Step 25 diagnostics to identify the true root cause. Building resolution was successful (`matches=True` for all three selected buildings), but navigation failed because the worker targeted the human-door tile, which is part of the building footprint and therefore rejected by `WorkerMovementDriver.IsTilePassableForWorker` on the farm. Patched `BuildingLocationResolver` to return a reachable outdoor approach tile adjacent to the human door, preferring the tile below the door, while keeping the interior warp target unchanged. Updated diagnostics to include `approach=(x,y)`. Updated U-16 plan, code summary, state, and audit. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest fix Step 26 complete; awaiting continued playtest/approval
+
+---
+
+## U-16 Animals & Buildings — Building Behavior Feedback / Step 27 Complete
+**Timestamp**: 2026-05-22T21:33:40Z
+**User Input**: "Feedback:
+* The hay from the hay hopper should be taken and placed individually instead of automatically filling when the worker enters the building. (have the worker go to the hopper and obtain enough hay to fill the feeders, only if the feeders are not already filled)
+* I want animations for milking and shearing, with the appropriate audio
+* the worker should walk back towards the door while inside of the buildings instead of warping out anywhere once they're done with the tasks"
+**AI Response**: Treated the feedback as U-16 Code Generation playtest refinement. Replaced instant `animalHouse.feedAllAnimals()` on building entry with visible `FeedAnimals` work items: the worker walks to the hopper, takes only enough hay for empty feeder slots if any, then visits feeder slots individually. Added a collect-animal-product action beat for tool harvests with `Milking` sound for cows/goats, `Shears` sound for sheep, and fallback sound for other produce before buffering the item. Changed building batch completion to navigate to the interior exit tile before warping back to the farm. Updated the startup marker to `build=U16-Step27`; updated U-16 plan, code summary, state, and audit. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest refinement Step 27 complete; awaiting continued playtest/approval
+
+---
+
+## U-16 Animals & Buildings — Hopper Pathing Feedback Received / Step 28 Complete
+**Timestamp**: 2026-05-22T21:50:47Z
+**User Input**: "[Mail Framework Mod] Updating mailbox for the day.
+[Dayswork] [Dayswork][shift-plan] zones=Greenhouse->Greenhouse; Big Barn->Big Barn; Coop->Coop
+[Dayswork] Farmhand entering Big Barn.
+[Dayswork] [Dayswork][scan] location=Big Barn zones=1 scannedTiles=330 enabled=WaterCrops,FeedAnimals,PetAnimals,CollectAnimalProducts detected=[none] accepted=[none] acceptedItems=0 capabilitySkipped=0 noStandTile=0 duplicateClumpTiles=0
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(9,4) task=(9,3) worker=(9,4) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(9,3) worker=(9,4).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(9,3).
+[Dayswork] [Dayswork][nav] failed task=FeedAnimals nav=(1,3) task=(1,3); skipping.
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(3,3) task=(2,3) worker=(3,3) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(2,3) worker=(3,3).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(2,3).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(4,3) task=(3,3) worker=(4,3) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(3,3) worker=(4,3).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(3,3).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(5,3) task=(4,3) worker=(5,3) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(4,3) worker=(5,3).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(4,3).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(6,3) task=(5,3) worker=(6,3) fallback=True.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(5,3) worker=(6,3).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(5,3).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(6,4) task=(6,3) worker=(6,4) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(6,3) worker=(6,4).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(6,3).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(7,4) task=(7,3) worker=(7,4) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(7,3) worker=(7,4).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(7,3).
+[Dayswork] [Dayswork][nav] arrived task=FeedAnimals nav=(8,4) task=(8,3) worker=(8,4) fallback=False.
+[Dayswork] [Dayswork][action] invoke task=FeedAnimals taskTile=(8,3) worker=(8,4).
+[Dayswork] [Dayswork][action] complete task=FeedAnimals taskTile=(8,3).
+[Dayswork] [Dayswork][building] could not walk to interior exit at (11,15); warping out.
+[Dayswork] Farmhand entering Coop.
+[Dayswork] [Dayswork][scan] location=Coop zones=1 scannedTiles=120 enabled=WaterCrops,FeedAnimals,PetAnimals,CollectAnimalProducts detected=[CollectAnimalProducts=31] accepted=[CollectAnimalProducts=31] acceptedItems=31 capabilitySkipped=0 noStandTile=0 duplicateClumpTiles=0
+
+the worker isn't pathing to the hopper, they're going to the corner then attempting to feed the animals."
+**AI Response**: Completed Step 28 playtest fix. Replaced the guessed feed coordinates with animal-house map/object discovery: the feed hopper is resolved from live interior objects (`(BC)99`) or tile actions, feeder slots begin at the interior map `Feed` property, and fallbacks now log `[Dayswork][feed-plan]` diagnostics instead of silently using `capacity+1,3`. Also changed building-batch exit walking to target a passable tile adjacent to the exit warp, so the Big Barn example should now walk to `(11,14)` or another reachable neighbor instead of attempting unreachable `(11,15)`. Updated the startup marker to `build=U16-Step28`; updated U-16 plan, code summary, state, and audit. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed 0 errors / 0 warnings; `dotnet test Dayswork.sln` passed 201 / 1 expected skip; `dotnet build Dayswork.sln` passed 0 errors / 0 warnings and auto-deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — U-16 Animals & Buildings Code Generation playtest fix Step 28 complete; awaiting continued playtest/approval
 
 ---

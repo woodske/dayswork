@@ -86,6 +86,19 @@ internal sealed class WorkerMovementDriver
         MarkArrivedIfNoWaypoints(worker);
     }
 
+    public void WarpWorker(FarmhandNpc worker, GameLocation from, GameLocation to, TileCoord entryTile)
+    {
+        Clear();
+
+        from.characters.Remove(worker);
+        to.characters.Remove(worker);
+        to.addCharacter(worker);
+        worker.currentLocation = to;
+        worker.Position = ToPixel(entryTile);
+        worker.StopTaskAnimation();
+        HasArrived = true;
+    }
+
     public void Update()
     {
         if (_worker is null || HasArrived || NavigationFailed)

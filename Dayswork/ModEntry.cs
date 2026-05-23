@@ -1,4 +1,5 @@
 using Dayswork.Core.Config;
+using Dayswork.Core.Capabilities;
 using Dayswork.Core.Inventory;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
@@ -42,6 +43,11 @@ public sealed class ModEntry : Mod
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
         var toolAnimator    = new ToolSwapAnimator();
+        var movementDriver  = new WorkerMovementDriver();
+        var workAreaScanner = new WorkAreaScanner(new CapabilityEvaluator());
+        var indoorScanner   = new IndoorWorkScanner(workAreaScanner);
+        var animalHandler   = new AnimalTaskHandler(this.Monitor);
+        var buildingNavigator = new BuildingWorkNavigator(this.Monitor, movementDriver);
         var depositPlanner  = new DepositPlanner();
         // MFM is a required dependency (manifest). Mod-provided APIs must be fetched after all mods
         // initialize (GameLaunched), NOT in Entry() — so construct the dispatcher now and inject the
@@ -52,6 +58,11 @@ public sealed class ModEntry : Mod
             toolReader,
             config,
             toolAnimator,
+            movementDriver,
+            workAreaScanner,
+            indoorScanner,
+            animalHandler,
+            buildingNavigator,
             chestResolver,
             depositPlanner,
             mailDispatcher);
@@ -80,7 +91,7 @@ public sealed class ModEntry : Mod
         // TODO: REMOVE before release — debug command for verifying save/load persistence (task #1 play-test)
         RegisterDebugCommands(helper, store);
 
-        this.Monitor.Log("Dayswork loaded", LogLevel.Info);
+        this.Monitor.Log($"Dayswork loaded ({this.ModManifest.Version}) build=U16-Step31", LogLevel.Info);
     }
 
     private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
@@ -121,5 +132,14 @@ public sealed class ModEntry : Mod
             "dayswork_end_shift",
             "Ends the current worker shift immediately. Worker deposits buffered items and exits. Partial refund applies.",
             (_, _) => Orchestrator.EndShiftEarly());
+
+        helper.ConsoleCommands.Add(
+            "dayswork_debug_buildings",
+            "Logs Dayswork's current building-resolution candidates for the farm.",
+            (_, args) =>
+            {
+                var requested = args.Length > 0 ? string.Join(" ", args) : "Greenhouse";
+                this.Monitor.Log(BuildingLocationResolver.DescribeResolutionState(Game1.getFarm(), requested), LogLevel.Info);
+            });
     }
 }

@@ -86,5 +86,9 @@
     "mail.cannot_afford.body": "I came by this morning, but you couldn't cover today's deposit (short by {{shortfall}}g), so I took the day off. I'll try again tomorrow.",
     "mail.festival.body": "There's a festival in town today, so I'm taking the day off. See you tomorrow!",
     "mail.festival.refund_body": "There's a festival in town today, so I won't be working. I've returned your deposit of {{refund}}g.",
-    "log.festival.skipped": "Festival today — the farmhand is taking the day off."
+    "log.festival.skipped": "Festival today — the farmhand is taking the day off.",
+    "log.building.entering": "Farmhand entering {{location}}.",
+    "log.building.skipped": "Farmhand skipped {{location}} because it could not be reached or resolved.",
+    "log.animal.fed": "Farmhand fed {{count}} animal spot(s) in {{location}}.",
+    "log.animal.no_silo": "Farmhand could not feed animals in {{location}} because no hay was available."
 }
