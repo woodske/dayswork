@@ -2466,3 +2466,32 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — U-17 Code Generation playtest fix Step 18 complete; awaiting continued playtest
 
 ---
+
+## U-17 GMCM + i18n Polish — Code Generation APPROVED
+**Timestamp**: 2026-05-23T00:00:00Z
+**User Input**: "approved changes"
+**AI Response**: Logged approval. Updated aidlc-state.md to mark U-17 Code Generation approved. Advanced to Build and Test stage; generated all instruction files and summary.
+**Context**: CONSTRUCTION — U-17 Code Generation approved by user; advancing to Build and Test
+
+---
+
+## Build and Test Stage
+**Timestamp**: 2026-05-23T00:00:00Z
+**Build Status**: Success — 0 errors, 0 warnings, `build=U17-Step18`, auto-deployed to `Mods/Dayswork`
+**Test Status**: Pass — 211 passed / 1 expected skip / 0 failures
+**Files Generated**:
+- `aidlc-docs/construction/build-and-test/build-instructions.md`
+- `aidlc-docs/construction/build-and-test/unit-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/integration-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/performance-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/build-and-test-summary.md`
+
+---
+
+## Build and Test — APPROVED
+**Timestamp**: 2026-05-23T00:00:00Z
+**User Input**: "approve"
+**AI Response**: Logged approval. Updating aidlc-state.md to mark Build and Test complete. Advancing to Operations phase.
+**Context**: CONSTRUCTION → OPERATIONS transition
+
+---
