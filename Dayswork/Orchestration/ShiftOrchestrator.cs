@@ -896,7 +896,7 @@ internal sealed class ShiftOrchestrator
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][action] invoke task={intent.Task} taskTile=({intent.Tile.X},{intent.Tile.Y}) worker=({_farmhand.TilePoint.X},{_farmhand.TilePoint.Y}).",
                 LogLevel.Debug);
-            InvokeTaskAction(intent.Tile, intent.Task, location);
+            InvokeTaskActionGuarded(intent.Tile, intent.Task, location);
             _actionPending = true;
             return;
         }
@@ -1318,6 +1318,41 @@ internal sealed class ShiftOrchestrator
         WorkerMovementDriver.IsTilePassableForWorker(new Point(tile.X, tile.Y), location);
 
     // ── Task invocation (Invoke-and-Poll) ─────────────────────────────────────
+
+    private void InvokeTaskActionGuarded(TileCoord tile, TaskKind task, GameLocation location)
+    {
+        // Vanilla game methods (crop.harvest, performToolAction, etc.) reach into
+        // Game1.player and set animation state as a side effect, even though the
+        // worker — not the player — is doing the work. Save and restore the player's
+        // sprite state so those side effects are invisible to the farmer.
+        var sprite                       = Game1.player.FarmerSprite;
+        var savedAnimation               = sprite.currentAnimation?.ToList();
+        var savedFrame                   = sprite.CurrentFrame;
+        var savedUsingTool               = Game1.player.UsingTool;
+        var savedCanMove                 = Game1.player.CanMove;
+        var savedPauseForSingleAnimation = sprite.pauseForSingleAnimation;
+        var savedCurrentSingleAnimation  = sprite.currentSingleAnimation;
+
+        InvokeTaskAction(tile, task, location);
+
+        // FarmerSprite.StopAnimation() is a no-op when pauseForSingleAnimation is true
+        // (which crop.harvest sets). Clear the flag before restoring so the sprite
+        // actually resets, then put everything back to the pre-call state.
+        sprite.pauseForSingleAnimation  = false;
+        sprite.currentSingleAnimation   = savedCurrentSingleAnimation;
+
+        if (savedAnimation is { Count: > 0 })
+            sprite.setCurrentAnimation(savedAnimation);
+        else
+        {
+            sprite.ClearAnimation();
+            sprite.StopAnimation();
+        }
+        sprite.CurrentFrame              = savedFrame;
+        sprite.pauseForSingleAnimation   = savedPauseForSingleAnimation;
+        Game1.player.UsingTool           = savedUsingTool;
+        Game1.player.CanMove             = savedCanMove;
+    }
 
     private void InvokeTaskAction(TileCoord tile, TaskKind task, GameLocation location)
     {

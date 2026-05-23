@@ -2515,3 +2515,11 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Test Status**: Pass — 211 passed / 1 expected skip / 0 failures
 
 ---
+
+## Post-U-17 Maintenance - Bug Fix: Player Farmer Run Animation on Worker Harvest
+**Timestamp**: 2026-05-23T00:00:00Z
+**User Input**: "When the worker harvests a crop, the crop harvesting animation is triggered on the player's farmer. This shouldn't happen. This happens with other animations as well like chopping wood."
+**AI Response**: Root cause: Crop.harvest() calls Game1.player.animateOnce(279 + FacingDirection), which calls FarmerSprite.animateOnce(int, float, int). That overload sets pauseForSingleAnimation = true, currentSingleAnimation = 279+dir, and CanMove = false. The existing InvokeTaskActionGuarded save/restore was calling StopAnimation() and ClearAnimation() to reset animation state, but FarmerSprite.StopAnimation() has a guard -- if (pauseForSingleAnimation) return; -- making it a no-op whenever the harvest animation was triggered. Fixed by (1) saving pauseForSingleAnimation, currentSingleAnimation, and CanMove before InvokeTaskAction(), (2) forcibly setting pauseForSingleAnimation = false before the restore so StopAnimation() can execute, (3) restoring all three fields after. File changed: Dayswork/Orchestration/ShiftOrchestrator.cs (InvokeTaskActionGuarded). Build: 0 errors / 0 warnings. Tests: 211 passed / 1 skip.
+**Context**: Post-delivery maintenance, Bug 3 of 3 -- player animation bleed during worker task execution
+
+---
