@@ -48,6 +48,30 @@
 
 ---
 
+## U-17 NFR Design — Approved
+**Timestamp**: 2026-05-23T03:28:13Z
+**User Input**: "continue"
+**AI Response**: Treated `continue` as approval of U-17 NFR Design. Marked that gate complete and proceeded to Code Generation Part 1 (Planning).
+**Context**: CONSTRUCTION — U-17 GMCM + i18n Polish, NFR Design approved
+
+---
+
+## U-17 Code Generation Part 1 — Plan Created (Awaiting Approval)
+**Timestamp**: 2026-05-23T03:28:14Z
+**User Input**: (continuation — no new input)
+**AI Response**: Generated the U-17 Code Generation plan at `aidlc-docs/construction/plans/u-17-gmcm-i18n-polish-code-generation-plan.md`. The plan contains 15 explicit steps covering the mutable Mod config source, runtime snapshot mapper, `GMCMRegistrar`, optional GMCM manifest metadata, i18n keys, config mapping tests, the `Dayswork.Tests/Lint/` hardcoded-string gate, build/test verification, and code-summary/state updates. Updated `aidlc-state.md` to show U-17 Code Generation Part 1 created and awaiting approval.
+**Context**: CONSTRUCTION — U-17 GMCM + i18n Polish, Code Generation Part 1 complete
+
+---
+
+## U-17 Code Generation Part 1 — Approval Prompt
+**Timestamp**: 2026-05-23T03:28:15Z
+**User Input**: (pending)
+**AI Response**: Presenting the U-17 Code Generation plan review gate. User may request changes or continue to Code Generation Part 2.
+**Context**: CONSTRUCTION — U-17 GMCM + i18n Polish, Code Generation Part 1 approval gate
+
+---
+
 ## U-16 Code Generation — Approved
 **Timestamp**: 2026-05-22T01:30:00Z
 **User Input**: "U-16 code generation is approved"
