@@ -2955,3 +2955,59 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — Functional Design approval gate for U-18
 
 ---
+
+## Functional Design — U-18 APPROVED
+**Timestamp**: 2026-05-24T22:10:13Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-18 functional-design artifacts. Proceeding to NFR Requirements for the first pricing-redesign retrofit unit.
+**Context**: CONSTRUCTION — transition from Functional Design to NFR Requirements for U-18
+
+---
+
+## NFR Requirements — U-18 Plan Created
+**Timestamp**: 2026-05-24T22:10:13Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-18-contract-terms-foundation-nfr-requirements-plan.md`. The plan focuses the NFR stage on the quality concerns that matter for this pure Core unit: live preview latency, strict deterministic pricing snapshots, resilience to incomplete config tables, and the expected depth of example-based plus property-based test coverage.
+**Context**: CONSTRUCTION — NFR Requirements planning for U-18
+
+---
+
+## NFR Requirements — U-18 Input Prompt
+**Timestamp**: 2026-05-24T22:10:13Z
+**User Input**: "continue"
+**AI Response**: Requesting that the user fill in the `[Answer]:` tags in `aidlc-docs/construction/plans/u-18-contract-terms-foundation-nfr-requirements-plan.md` before the U-18 NFR requirements artifacts are generated.
+**Context**: CONSTRUCTION — NFR Requirements answer gate for U-18
+
+---
+
+## NFR Requirements — U-18 Answers Received
+**Timestamp**: 2026-05-24T22:19:45Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-18-contract-terms-foundation-nfr-requirements-plan.md` and extracted these decisions: keep preview builds immediate and synchronous, require strict deterministic stability for pricing snapshots, fall back to defaults with logging for missing or stale config keys, and apply strong example-based plus FsCheck-backed property coverage to this pure foundation unit.
+**Context**: CONSTRUCTION — NFR Requirements answer intake for U-18
+
+---
+
+## NFR Requirements — U-18 Answer Analysis Complete
+**Timestamp**: 2026-05-24T22:19:45Z
+**User Input**: "done"
+**AI Response**: Analyzed the U-18 NFR answers and found no blocking contradictions or ambiguities. No clarification round was needed.
+**Context**: CONSTRUCTION — NFR Requirements answer validation for U-18
+
+---
+
+## NFR Requirements — U-18 Artifacts Generated
+**Timestamp**: 2026-05-24T22:19:45Z
+**User Input**: "done"
+**AI Response**: Generated `aidlc-docs/construction/u-18-contract-terms-foundation/nfr-requirements/nfr-requirements.md` and `tech-stack-decisions.md`. The artifacts set the non-functional bar for the pure pricing foundation: same-frame preview expectations, strict deterministic snapshot behavior, default-backed config resilience, and strong property-based test obligations for the core contract invariants.
+**Context**: CONSTRUCTION — NFR Requirements generation complete for U-18
+
+---
+
+## NFR Requirements — U-18 Review Prompt
+**Timestamp**: 2026-05-24T22:19:45Z
+**User Input**: "done"
+**AI Response**: Presenting the U-18 NFR requirements artifacts for review before proceeding to NFR Design for the first retrofit unit.
+**Context**: CONSTRUCTION — NFR Requirements approval gate for U-18
+
+---
