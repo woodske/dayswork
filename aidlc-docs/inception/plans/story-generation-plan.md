@@ -1,163 +1,97 @@
-# Story Generation Plan — Dayswork
+# Story Generation Plan — Pricing Model Redesign
 
-**Status**: Part 1 — Planning. Answer the embedded questions below, then approve the plan to move into Part 2 — Generation.
+## Goal
 
-**Assessment**: See [user-stories-assessment.md](user-stories-assessment.md). Decision: **Execute User Stories**.
+Update the existing Dayswork user stories and personas so they reflect the approved pricing redesign requirements instead of the legacy deposit/refund model.
 
----
+## Recommended Approach
 
-## How to use this document
+**Recommended**: User Journey-Based update of the existing story set.
 
-1. Answer each `[Answer]:` line below with the letter of your choice (or `X` plus a custom description for Other).
-2. When all answers are filled, reply with "done" or "approve".
-3. I'll re-read your answers, raise any ambiguities, and then ask for explicit plan approval before generating the stories.
-4. If a question's recommendation already matches what you want, just pick it.
+Why this is recommended:
+- The existing stories are already organized around the player journey.
+- The redesign mainly changes how the player experiences hiring, pricing, recurring work, and worker exhaustion.
+- This minimizes churn while still letting us rewrite the affected stories cleanly.
 
----
+## Story Breakdown Options
+
+### Option A — User Journey-Based (Recommended)
+- Keep the current section structure and update affected stories in place.
+- Best when the redesign changes an existing workflow more than it adds a totally new feature area.
+
+### Option B — Feature-Based
+- Reorganize around pricing, energy, animal scope, and calendar behavior.
+- Best for technical clarity, but weaker for player-facing reading flow.
+
+### Option C — Hybrid
+- Keep journey-based sections, but add a short redesign-focused subsection where needed.
+- Best if a few changes do not fit neatly into the current story order.
 
 ## Planning Questions
 
-Each question shapes how stories will be written and organized.
+Please answer each question by filling in the letter after `[Answer]:`. If none fit, choose `X` and describe your preference.
 
-### Question 1 — Persona scope
+## Question 1
+How should we update the existing story set?
 
-How many user personas should we define?
-
-A) **One unified "Stardew player" persona** — fastest, but loses nuance about why different players want different things
-B) **3 playstyle-based personas** (e.g., "The Efficient Farmer", "The Animal Keeper", "The Time-Crunched Player") — moderate detail; recommended for a feature with this breadth
-C) **5+ fine-grained personas** including narrative/roleplay personas, mining-focused, completionist, etc. — more detail, more story-to-persona mapping work
-D) **2 personas: player + worker NPC** treated as a system actor — useful if we want stories like "as the worker, I path-find around obstacles"
-X) Other (describe after [Answer]: tag below)
-
-[Answer]: A — one unified "Stardew player" persona (combined with Farmhand and Mod Maintainer added separately in Q6/Q7 → total persona set = 3)
-
-> Recommendation: **B**. The mod's surface area is big enough that distinct playstyles motivate genuinely different stories (an animal-keeper wants tight feed-loop guarantees; an efficient farmer wants the deposit/refund math airtight).
-
----
-
-### Question 2 — Story breakdown approach
-
-How should stories be organized in `stories.md`?
-
-A) **User journey-based** — stories follow the temporal flow: discover the feature → first hire → daily life → handling edge cases → uninstall
-B) **Feature-based** — stories grouped by component: Hiring UI / Worker Behavior / Payment / Mail / Config
-C) **Persona-based** — stories grouped under each persona, with that persona's full journey under their section
-D) **Epic-based** — a small number of epics (e.g., "Hire a Farmhand", "Watch them work", "Get paid") each broken into sub-stories
-X) Other
+A) Revise the existing stories in place, keeping the current journey structure
+B) Keep existing stories and add a compact redesign addendum section
+C) Rewrite the whole story set from scratch around the new pricing model
+X) Other (please describe after [Answer]: tag below)
 
 [Answer]: A
 
-> Recommendation: **A** (user journey-based). It naturally surfaces the order in which a Construction unit-of-work breakdown should happen, and journey order maps to the spec's "Suggested build order" (§Technical architecture).
+## Question 2
+How should personas be handled for this redesign?
 
----
-
-### Question 3 — Story format
-
-What template should each story use?
-
-A) **Standard agile** — `As a [persona], I want [capability], so that [benefit]` + acceptance criteria
-B) **Job story** — `When [situation], I want to [motivation], so I can [expected outcome]` (more context-driven, less actor-focused)
-C) **Hybrid** — standard format for player-facing stories, job-story format for cross-cutting/system stories
-X) Other
+A) Keep the existing personas and only adjust them if a pricing-related motivation clearly changed
+B) Refresh all personas to explicitly reflect pricing/efficiency playstyles
+C) Keep personas unchanged and only update stories
+X) Other (please describe after [Answer]: tag below)
 
 [Answer]: A
 
-> Recommendation: **A**. Most readable for the broader Stardew modding community if you later open the docs.
+## Question 3
+What level of story granularity do you want for the pricing redesign?
 
----
-
-### Question 4 — Acceptance criteria format
-
-How should acceptance criteria be written?
-
-A) **Gherkin (Given / When / Then)** — verbose but maps directly to xUnit + FsCheck test scaffolding
-B) **Bullet checklist** — concise; easier to skim; mapping to tests is manual
-C) **Hybrid** — Gherkin for behaviors involving state transitions (worker shift, deposit/refund); bullet lists for UI and visual rules
-X) Other
-
-[Answer]: C
-
-> Recommendation: **C** (hybrid). Pays back during Construction when we feed criteria into PBT (which loves Given/When/Then framing) for the math-heavy stuff, while keeping the UI stories readable.
-
----
-
-### Question 5 — Story granularity
-
-How big should each story be?
-
-A) **Thin slices** — each story is independently shippable; maybe 25–35 small stories total
-B) **Moderate** — fewer, slightly larger stories (maybe 12–20) each covering a coherent capability
-C) **Thick epics + sub-stories** — 4–6 epics, each with 3–6 sub-stories
-X) Other
-
-[Answer]: B (12–20 moderate stories)
-
-> Recommendation: **B**. Avoids both extremes — granular enough for clear acceptance criteria, not so granular that Construction units fragment.
-
----
-
-### Question 6 — Worker as a persona?
-
-Should the worker NPC have stories written from its perspective (a "system actor" persona)?
-
-A) **Yes** — add a "Farmhand" persona; stories like "as the Farmhand, I path-find around obstacles" make AI/state-machine behavior concrete
-B) **No** — keep all stories from the player's perspective; encode worker behavior as acceptance criteria on player stories
-X) Other
+A) Focus only on changed stories and acceptance criteria; leave unaffected stories mostly intact
+B) Refresh every story that touches hiring, recurring work, worker pacing, or calendar behavior
+C) Expand into more, smaller stories so pricing and energy behavior are separated in detail
+X) Other (please describe after [Answer]: tag below)
 
 [Answer]: A
 
-> Recommendation: **A**. The worker's behavior is rich enough (stuck escalation, capability snapshot, deposit runs, festival skip) that "as the Farmhand" framing reads better than "as the player I expect the worker to…" for many requirements.
+## Question 4
+How explicit should the user stories be about balance and vanilla feel?
 
----
+A) Mention it only in acceptance criteria where it affects observable behavior
+B) Include explicit story language around convenience-vs-efficiency tradeoffs
+C) Keep balance mostly in requirements/design, not in stories
+X) Other (please describe after [Answer]: tag below)
 
-### Question 7 — Developer / operator stories?
+[Answer]: A
 
-Should we include any stories from the developer/maintainer perspective (you, future-you, contributors)?
+## Mandatory Artifacts
 
-A) **No** — developer onboarding is captured in NFR-ONBOARD-01/02; not modeled as user stories
-B) **Yes, lightly** — 1–2 stories like "as the mod maintainer, I want pure logic separated from SMAPI integration so I can unit-test without launching the game" to anchor architectural choices
-X) Other
+- [x] Generate `stories.md` with updated user stories following INVEST criteria
+- [x] Generate `personas.md` with updated or confirmed user archetypes
+- [x] Ensure stories are Independent, Negotiable, Valuable, Estimable, Small, Testable
+- [x] Include acceptance criteria for each story
+- [x] Map personas to relevant user stories
 
-[Answer]: B (yes, lightly — 1–2 maintainer stories)
+## Execution Checklist
 
-> Recommendation: **B**. A small number of these makes the testability/maintainability decisions traceable from stories to code.
-
----
-
-### Question 8 — Story prioritization signal
-
-Do you want a priority indicator on each story (Must / Should / Could / Won't, or P0/P1/P2)?
-
-A) **Yes, MoSCoW** (Must / Should / Could / Won't)
-B) **Yes, simple P0/P1/P2**
-C) **No prioritization** — all v1 stories are equally must-have; out-of-scope items already live in §4 of requirements.md
-X) Other
-
-[Answer]: C (no prioritization)
-
-> Recommendation: **C**. All FRs in v1 are already in-scope; explicit prioritization would just duplicate information. Items deferred to v2 are already captured in `§4 Out of Scope` of requirements.md.
-
----
-
-## Story Plan Checklist (executes in Part 2 after approval)
-
-When you approve, Part 2 will execute the following:
-
-- [x] Generate `aidlc-docs/inception/user-stories/personas.md` with the chosen persona set (per Q1) — 3 personas: Player, Farmhand, Mod Maintainer
-- [x] Generate `aidlc-docs/inception/user-stories/stories.md` with stories grouped per the chosen breakdown approach (per Q2) — journey-based: Discovery → First day → Daily life → Edge cases → Maintainability
-- [x] Each story uses the chosen template (per Q3) — standard agile
-- [x] Each story has acceptance criteria in the chosen format (per Q4) — hybrid Gherkin/bullets
-- [x] Story sizing follows the chosen granularity (per Q5) — 20 stories, within the 12–20 moderate band
-- [x] Worker NPC persona/stories included per Q6 — P-02 Farmhand persona drives S-08, S-09, S-15, S-16, S-17
-- [x] Developer/maintainer stories included per Q7 — S-19 (testable pure logic), S-20 (i18n)
-- [x] Prioritization applied per Q8 (if any) — none, as agreed
-- [x] All stories tagged with the FR-IDs they implement (traceability) — see Coverage Summary in stories.md
-- [x] Stories satisfy INVEST (Independent, Negotiable, Valuable, Estimable, Small, Testable)
-- [x] Personas mapped to stories in personas.md (which personas care about which stories) — Persona → Story Coverage Matrix in personas.md
-- [x] Story plan checkboxes updated to `[x]` as each artifact lands
-
----
-
-## Out of scope for this stage
-
-Per Stage 11 in the user-stories rules: this stage does **not** include sprint planning, sequencing into units of work, or technical implementation details. Story-to-unit decomposition happens in **Application Design** and **Units Generation** later in Inception.
+- [x] Validate that user stories are justified for this pricing redesign
+- [x] Choose a recommended story breakdown approach
+- [x] Create context-appropriate planning questions
+- [x] Include mandatory story artifacts
+- [x] Store this plan in `aidlc-docs/inception/plans/story-generation-plan.md`
+- [x] Read all user answers from this plan
+- [x] Analyze answers for ambiguity or contradictions
+- [x] Create follow-up clarification questions if needed
+- [x] Log the approval prompt in `aidlc-docs/audit.md`
+- [x] Obtain explicit approval of the story generation approach
+- [x] Update `stories.md`
+- [x] Update `personas.md`
+- [x] Mark completed execution steps immediately in this plan
+- [x] Present generated stories for approval
