@@ -2899,3 +2899,59 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: INCEPTION — Units Generation approval gate
 
 ---
+
+## Units Generation — APPROVED
+**Timestamp**: 2026-05-24T18:26:45Z
+**User Input**: "approve"
+**AI Response**: Logged approval of the retrofit Units Generation artifacts. The pricing redesign's Inception refresh is complete, and the workflow is advancing into CONSTRUCTION starting with U-18 — Contract Terms Foundation.
+**Context**: INCEPTION — transition from Units Generation to Construction
+
+---
+
+## Functional Design — U-18 Plan Created
+**Timestamp**: 2026-05-24T18:26:45Z
+**User Input**: "approve"
+**AI Response**: Created `aidlc-docs/construction/plans/u-18-contract-terms-foundation-functional-design-plan.md`. The plan loads the approved retrofit context and asks the remaining design questions needed to lock the pure contract-terms model: outdoor scope normalization, band schema, scope relevance pruning, animal/greenhouse package composition, line-item granularity, invalid-preview behavior, and worker-energy profile shape.
+**Context**: CONSTRUCTION — Functional Design planning for U-18
+
+---
+
+## Functional Design — U-18 Input Prompt
+**Timestamp**: 2026-05-24T18:26:45Z
+**User Input**: "approve"
+**AI Response**: Requesting that the user fill in the `[Answer]:` tags in `aidlc-docs/construction/plans/u-18-contract-terms-foundation-functional-design-plan.md` before the U-18 functional-design artifacts are generated.
+**Context**: CONSTRUCTION — Functional Design answer gate for U-18
+
+---
+
+## Functional Design — U-18 Answers Received
+**Timestamp**: 2026-05-24T18:26:45Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-18-contract-terms-foundation-functional-design-plan.md` and extracted these decisions: union outdoor rectangles before pricing, use shared outdoor thresholds with service-specific prices, materialize only scope families relevant to enabled tasks, key animal-building prices by building tier, make animal-service pricing additive per selected service, price greenhouse work as separate fixed packages per selected crop service, aggregate breakdown lines by pricing key, block only contracts with zero chargeable scope-task pairs, use fine-grained work-action energy costs, and snapshot the full action-cost table into one-time terms.
+**Context**: CONSTRUCTION — Functional Design answer intake for U-18
+
+---
+
+## Functional Design — U-18 Answer Analysis Complete
+**Timestamp**: 2026-05-24T18:26:45Z
+**User Input**: "done"
+**AI Response**: Analyzed the U-18 functional-design answers and found no blocking contradictions or ambiguities. No clarification round was needed.
+**Context**: CONSTRUCTION — Functional Design answer validation for U-18
+
+---
+
+## Functional Design — U-18 Artifacts Generated
+**Timestamp**: 2026-05-24T18:26:45Z
+**User Input**: "done"
+**AI Response**: Generated `aidlc-docs/construction/u-18-contract-terms-foundation/functional-design/business-logic-model.md`, `domain-entities.md`, and `business-rules.md`. The artifacts define the pure contract-terms pipeline, normalized typed work-scope model, pricing-key and snapshot shapes, preview-validity rules, and the full worker-energy profile structure for the redesign foundation unit.
+**Context**: CONSTRUCTION — Functional Design generation complete for U-18
+
+---
+
+## Functional Design — U-18 Review Prompt
+**Timestamp**: 2026-05-24T18:26:45Z
+**User Input**: "done"
+**AI Response**: Presenting the U-18 functional-design artifacts for review before proceeding to NFR Requirements for the first retrofit unit.
+**Context**: CONSTRUCTION — Functional Design approval gate for U-18
+
+---
