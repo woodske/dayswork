@@ -1,6 +1,6 @@
 # Dayswork — Requirements
 
-**Source documents**: [source-spec.md](../source-spec.md) (user-provided design draft) + [requirement-verification-questions.md](requirement-verification-questions.md) (29 answered clarifying questions).
+**Source documents**: [source-spec.md](../source-spec.md) (user-provided design draft) + [requirement-verification-questions.md](requirement-verification-questions.md) (29 answered clarifying questions) + [pricing-model-discussion-notes.md](pricing-model-discussion-notes.md) + [pricing-model-requirement-verification-questions.md](pricing-model-requirement-verification-questions.md).
 
 ---
 
@@ -8,12 +8,12 @@
 
 | Field | Value |
 |---|---|
-| **Request type** | New project (greenfield) |
-| **Scope estimate** | System-wide — UI menus, NPC, pathfinding, persistence, payments, mail, configuration |
-| **Complexity estimate** | Complex — multi-component, save-game side effects, in-game currency + items at stake, NPC AI |
+| **Request type** | Enhancement — pricing and pacing redesign of an existing gameplay system |
+| **Scope estimate** | System-wide within worker contracts — UI menus, pricing logic, shift execution, recurring lifecycle, pacing, configuration |
+| **Complexity estimate** | Complex — multi-component, save-game side effects, in-game currency balance, NPC AI, player-facing UX |
 | **User profile** | Experienced software engineer; **new to C# and SMAPI** (onboarding-level docs are in-scope for this project, just-in-time during Construction per Q5) |
 | **Requirements depth** | Comprehensive |
-| **One-line summary** | A Stardew Valley 1.6 SMAPI mod that lets the player hire a generic farmhand NPC from the bulletin board to perform configurable farm tasks within configurable zones, paid via an upfront refundable deposit. |
+| **One-line summary** | A Stardew Valley 1.6 SMAPI mod that lets the player hire a generic farmhand NPC from the bulletin board to perform configurable farm tasks within configurable scopes, paid by a simple fixed contract price and limited by a farmer-like daily energy budget. |
 
 ---
 
@@ -27,18 +27,19 @@
 | FR-HIRE-01 | The Pelican Town bulletin board displays a "Hire a Farmhand" option, added via a Harmony patch to the bulletin-board menu. | spec §Hiring menu |
 | FR-HIRE-02 | Selecting the option opens a custom 4-screen hiring UI: (1) Task selection, (2) Zone & output configuration, (3) Schedule, (4) Summary & confirm. | spec §Hiring menu |
 | FR-HIRE-03 | The hiring UI is fully navigable with mouse/keyboard **and** gamepad. | Q24 |
-| FR-HIRE-04 | Screen 1 displays all available tasks as toggles; the hourly rate updates live as tasks are enabled/disabled; the base rate is always charged; each task shows its rate contribution. | spec §Screen 1 |
+| FR-HIRE-04 | Screen 1 displays all available tasks as toggles; the contract price preview updates live as tasks are enabled/disabled or scopes change; each selected service shows its price contribution. | pricing redesign Q2, Q6 |
 | FR-HIRE-05 | Screen 2 lets the player draw tile-rectangle zones (click-and-drag on the farm map) and select buildings (click). Multiple zones and multiple buildings can be combined in one contract. | spec §Screen 2 |
 | FR-HIRE-06 | For each task that produces output, the player can assign an output destination. Open-farm chests are assigned by clicking the chest on the farm map (same interaction as zone tile selection). Building chests are assigned via a dropdown panel grouped by building. | spec §Screen 2 |
 | FR-HIRE-07 | Building-chest labels use the in-game chest name if set; otherwise fall back to "{Building name} — Chest at {x}, {y}". Buildings with no chests are omitted from the dropdown. | spec §Screen 2 |
 | FR-HIRE-08 | A chest assignment is identified by location name + tile coordinates. Renaming the chest does not break the assignment; moving it does. | spec §Screen 2 |
 | FR-HIRE-09 | Multiple tasks can share the same output chest. | spec §Screen 2 |
 | FR-HIRE-10 | If no chest is assigned to a task that produces output, the worker buffers the output and mails it to the player the following morning (no penalty). | spec §Screen 2 |
-| FR-HIRE-11 | Screen 3 offers two schedules: **one-time** (next morning only) and **recurring** (each morning automatically, daily deposit). | spec §Screen 3 |
+| FR-HIRE-11 | Screen 3 offers two schedules: **one-time** (next morning only) and **recurring** (each morning automatically at a fixed daily price for that contract). | pricing redesign Q1 |
 | FR-HIRE-12 | Recurring contracts can be paused or cancelled from the bulletin board any time before 6am. Zones and task settings persist between days and are editable. | spec §Screen 3 |
-| FR-HIRE-13 | Screen 4 shows: selected tasks, estimated hours, hourly rate, total deposit, refund policy. Confirming deducts the deposit immediately. | spec §Screen 4 |
-| FR-HIRE-14 | If the player cannot afford the deposit at confirmation, confirmation is blocked with a clear error message. | spec §Screen 4 |
+| FR-HIRE-13 | Screen 4 shows: selected tasks, selected zones/buildings, pricing breakdown, worker energy summary, and a clear explanation that the worker works until the job is done, energy is exhausted, or the day ends. | pricing redesign discussion + Q7 |
+| FR-HIRE-14 | If the player cannot afford the one-time contract price at confirmation, confirmation is blocked with a clear error message. | pricing redesign Q1 |
 | FR-HIRE-15 | Once a contract has started for the day, the player cannot cancel mid-shift. The shift runs until all tasks complete or the 8pm hard cap. | Q25 |
+| FR-HIRE-16 | Editing a recurring contract re-prices it from the saved scope and selected services before the player confirms the edit; the new fixed daily price applies starting on the next eligible work day. | pricing redesign discussion |
 
 ### 2.2 Tasks (v1 scope)
 | ID | Requirement | Source |
@@ -52,23 +53,32 @@
 | FR-TASK-07 | Clear rocks deposits stone, ore, geodes, and gems into the designated chest — **no item filtering** in v1 (all rock-clearing drops go to the same chest). | spec §Tasks, §No item filtering |
 | FR-TASK-08 | Clear weeds deposits fiber and mixed seeds into the designated chest. | spec §Tasks |
 | FR-TASK-09 | Clear grass attempts to store hay in the silo first (matching vanilla scythe behavior). If the silo is full, hay is dropped on the ground at the worker's current tile. If the player has no silo, grass is cleared but no hay is produced. Hay is **never mailed** (prevents item duplication via mail). | spec §Hay |
+| FR-TASK-10 | Animal-care tasks are anchored to selected barns/coops rather than drawn zones. Selecting an animal building means the worker is responsible for all animals assigned to that building. | pricing redesign discussion |
+| FR-TASK-11 | Greenhouse crop work is treated as a dedicated crop-work scope with its own fixed package price rather than tile-band pricing. | pricing redesign discussion |
+| FR-TASK-12 | Outdoor crop and clearing tasks remain anchored to selected work zones; animal buildings and greenhouse selection add their own specialized work scopes on top of zone selection. | pricing redesign discussion |
 
 ### 2.3 Worker arrival, departure, and shift loop
 | ID | Requirement | Source |
 |---|---|---|
 | FR-WORK-01 | The worker spawns at the farm entrance at 6am on contract days. | spec §Arrival |
 | FR-WORK-02 | The worker pathfinds between task tiles using the game's built-in `PathFindController`. | spec §Tech |
-| FR-WORK-03 | Within a zone, tasks execute in this priority order: Feed animals → Pet animals → Collect animal products → Water crops → Harvest crops → Collect fruit → Clear weeds → Clear grass → Clear rocks → Cut trees. | spec §Task priority |
-| FR-WORK-04 | The shift ends when all tasks in all zones are complete, **or** at the 8pm hard cap. | spec §Arrival |
+| FR-WORK-03 | By default, the worker prioritizes animal work first, then crop work, then clearing work, preserving the existing broad task-order behavior unless a later feature adds more player control. | pricing redesign discussion |
+| FR-WORK-04 | The shift ends when all tasks in all selected scopes are complete, **or** when the worker's energy is exhausted, **or** at the 8pm hard cap. | pricing redesign discussion |
 | FR-WORK-05 | After shift end, the worker walks to each unique designated chest (one trip per chest) and deposits all buffered items. Items from multiple tasks going to the same chest are deposited in one trip. | spec §Arrival, §Deposit |
-| FR-WORK-06 | If the 8pm cap is reached mid-task, the worker still completes all deposit runs before leaving — items are never lost in v1. | spec §Arrival |
-| FR-WORK-07 | The worker exits via the farm entrance after all deposits complete. Refund is calculated and added to player gold at the moment of exit. | spec §Arrival |
-| FR-WORK-08 | Unreachable tiles inside a zone (water, cliffs, walls) are silently skipped by the worker and do not count toward estimated hours. No UI warning at hire time. | Q11 |
+| FR-WORK-06 | If the 8pm cap is reached or the worker's energy reaches zero during an in-progress work unit, the worker finishes that work unit, completes all deposit runs, and then leaves. A later stage of the same object (for example stump removal after dropping a full tree) counts as a new work unit and does not begin at zero energy. | pricing redesign discussion |
+| FR-WORK-07 | The worker exits via the farm entrance after all deposits complete. No end-of-day refund is calculated under the redesigned pricing model. | pricing redesign discussion |
+| FR-WORK-08 | Unreachable tiles inside a zone (water, cliffs, walls) are silently skipped by the worker. No UI warning is required at hire time. | Q11 |
 | FR-WORK-09 | The worker enters buildings by walking to the building door and warping inside (vanilla NPC pattern). | Q14 |
 | FR-WORK-10 | The worker visually swaps tools (axe / watering can / scythe / pickaxe) when changing task types. (Sprite work scoped accordingly.) | Q12 |
 | FR-WORK-11 | The worker is considered **stuck** if it makes no progress toward its current target tile and completes no task work for a configurable in-game-minutes threshold (default: 10 in-game minutes). Progress is measured in tile movement or completed task ticks. | Change request (stuck handling) |
-| FR-WORK-12 | On stuck detection, the worker escalates through three steps: (1) play a confused emote (e.g., "?" speech balloon), (2) attempt to teleport to the next reachable task tile in the priority queue and resume work, (3) if still stuck after another stuck-detection window, teleport to the farm entrance and end the shift early as if the 8pm cap had been reached. Buffered items are deposited into assigned chests where reachable, otherwise mailed next morning per FR-OUT-02/03/04/05. Refund is computed from actual hours worked per FR-PAY-05. | Change request (stuck handling — option C, hybrid escalation) |
+| FR-WORK-12 | On stuck detection, the worker escalates through three steps: (1) play a confused emote (e.g., "?" speech balloon), (2) attempt to teleport to the next reachable task tile in the priority queue and resume work, (3) if still stuck after another stuck-detection window, teleport to the farm entrance and end the shift early as if the 8pm cap had been reached. Buffered items are deposited into assigned chests where reachable, otherwise mailed next morning per FR-OUT-02/03/04/05. The day remains charged at its explicit contract price; the redesign does not compute a refund from partial progress. | adapted stuck handling + pricing redesign |
 | FR-WORK-13 | Stuck-detection thresholds (initial wait and post-teleport wait) are configurable via GMCM. | Change request |
+| FR-WORK-14 | When a selected barn or coop is in scope, the worker services animals assigned to that building wherever they currently are on the farm, not only inside a drawn zone. | pricing redesign discussion |
+| FR-WORK-15 | Worker energy is spent on actual labor actions only. Walking and pathfinding do not consume energy. | pricing redesign discussion |
+| FR-WORK-16 | Worker energy costs generally mirror the farmer's vanilla-style energy usage: tool work spends energy per tool use, including repeated swings on the same object, and non-tool labor such as petting or harvesting also spends energy per interaction. | pricing redesign discussion |
+| FR-WORK-17 | The worker's energy bar never goes below zero. If the final action that depletes energy resolves the current work unit, the bar remains at zero while the worker finishes that unit and transitions to deposit-and-exit behavior. | pricing redesign discussion |
+| FR-WORK-18 | The worker's movement speed and task animation tempo must be slower and more readable than the current implementation so the service feels like in-world labor rather than instant automation. | pricing redesign discussion |
+| FR-WORK-19 | When the worker runs out of energy, no extra mail or summary message is required; the player infers this from unfinished work and the worker's in-world departure behavior. | pricing redesign Q7 |
 
 ### 2.4 Skipped objects (capability-based)
 | ID | Requirement | Source |
@@ -98,30 +108,35 @@
 | FR-OUT-06 | Shipping bin has no capacity limit (vanilla); overflow cannot occur when the shipping bin is the destination. | spec §Chest full or missing |
 | FR-OUT-07 | Within a task, all drops go to a single designated chest with no sorting or filtering. | spec §No item filtering |
 
-### 2.7 Pricing, deposit, refund
+### 2.7 Pricing, contract cost, and energy
 | ID | Requirement | Source |
 |---|---|---|
-| FR-PAY-01 | Base hourly rate is 50g, always charged. Each enabled task adds a configurable per-task increment to the hourly rate (see spec table for defaults). | spec §Pricing |
-| FR-PAY-02 | Deposit = hourly rate × estimated hours. Estimated hours are derived from zone size, number of tasks, and a configurable "average speed" constant. | spec §Deposit |
-| FR-PAY-03 | One-time contracts deduct the deposit immediately at confirmation. Recurring contracts deduct the daily deposit at 6am on each contract day. | spec §Deposit |
-| FR-PAY-04 | If the player cannot afford the daily deposit on a recurring contract, the worker does not show up that day and a mail notification is sent. | spec §Deposit |
-| FR-PAY-05 | Unused deposit is refunded at shift end: `refund = deposit − (actual hours worked × hourly rate)`. Refund is added directly to player gold at worker exit. Deposit-run time (walking to chests post-shift) is **not** billed. | spec §Deposit |
-| FR-PAY-06 | If a day's selected work yields zero actionable objects (empty zone), the player is fully refunded (effectively no charge beyond the base rate × 0 hours = 0). | Q20 |
-| FR-PAY-07 | On rainy days, if Water Crops is enabled, the watering task is skipped and that day's hourly rate is recalculated to exclude the Water Crops surcharge. The worker still shows up if any other task is enabled. | Q10 |
-| FR-PAY-08 | Config-driven rate changes (via GMCM) for active recurring contracts apply starting the next morning. The current day's deposit and refund are at the rate in effect when that day began. | Q21 |
-| FR-PAY-09 | All rates are configurable via GenericModConfigMenu (GMCM) and `config.json`. | spec §Pricing |
+| FR-PAY-01 | The redesigned system does not use hourly billing, estimated-hours deposits, or end-of-day refunds. The player pays a clear fixed contract price for that day of labor. | pricing redesign discussion |
+| FR-PAY-02 | One-time contracts use the same pricing model as recurring contracts for a single day of work; the player simply pays that day's contract price at confirmation. | pricing redesign Q1 |
+| FR-PAY-03 | Outdoor zone-based work uses broad size bands per selected service (for example small / medium / large) rather than exact hour calculations. The system derives the band from the configured scope; the player does not choose a band manually. | pricing redesign Q2 + discussion |
+| FR-PAY-04 | Animal-care pricing is building-based. Each selected barn or coop contributes fixed animal-service pricing based on that building scope rather than the animals' exact moment-to-moment positions. | pricing redesign discussion |
+| FR-PAY-05 | Greenhouse crop work uses a fixed greenhouse package price rather than zone-area banding. | pricing redesign discussion |
+| FR-PAY-06 | Contract price is determined from the saved contract scope and selected services, not from the exact amount of actionable work found on a particular morning. | pricing redesign discussion |
+| FR-PAY-07 | One-time contracts deduct the full contract price immediately at confirmation. Recurring contracts deduct the fixed daily contract price at 6am on each eligible contract day. | pricing redesign Q1 |
+| FR-PAY-08 | If the player cannot afford the recurring contract's fixed daily price on a given day, the worker does not show up and a same-day mail notification is sent. | pricing redesign carry-forward |
+| FR-PAY-09 | If a recurring contract's selected scope yields little or no actionable work on a given morning, the normal recurring price is still charged because that day's labor capacity was reserved. | pricing redesign Q4 |
+| FR-PAY-10 | Rain does not change the recurring contract price. Rain may reduce the amount of actionable outdoor work, but the contract still charges its normal fixed price for that day. | pricing redesign Q3 |
+| FR-PAY-11 | Pricing and energy tuning values are configurable via GMCM and `config.json`, including contract price values, worker energy capacity, and per-action energy costs. | pricing redesign Q6 |
+| FR-PAY-12 | Config-driven price and energy-value changes for active recurring contracts apply starting the next morning. The current day's charge remains the one in effect when that day began. | adapted from Q21 |
 
 ### 2.8 Day & calendar edge cases
 | ID | Requirement | Source |
 |---|---|---|
-| FR-DAY-01 | On festival days, the worker does not show up. For recurring contracts, the daily deposit is not deducted. No mail is sent. | Q16 |
-| FR-DAY-02 | If the player goes to sleep before the worker's shift ends, the worker completes the rest of the shift off-screen instantly at sleep-confirm. The deposit run is performed atomically, the refund is applied, and overflow mail (if any) is queued for next morning before the day rolls over. | Q17 |
+| FR-DAY-01 | On festival days, the worker does not show up and no charge is taken for either one-time or recurring contracts. A same-day mail message is sent to explain the skipped work day. | pricing redesign Q5 |
+| FR-DAY-02 | If the player goes to sleep before the worker's shift ends, the worker completes its current sleep-stop behavior, settles deposits/overflow handling, and exits before the day rolls over. No refund logic is involved in the redesigned pricing model. | adapted from current behavior + pricing redesign |
+| FR-DAY-03 | On rainy days, outdoor crops already satisfied by rain simply result in fewer actionable watering tasks. Greenhouse or other indoor watering targets still behave normally when present. Price does not change because of rain. | pricing redesign Q3 + discussion |
 
 ### 2.9 Worker NPC behavior
 | ID | Requirement | Source |
 |---|---|---|
 | FR-NPC-01 | The worker uses a placeholder sprite for v1 (recolored vanilla NPC). Custom art is post-v1 scope. | Q9 |
 | FR-NPC-02 | The worker is invulnerable to player weapon swings. On hit, the worker plays a brief "ouch" / surprised animation + emote but takes no damage and does not abandon the shift. | Q18 |
+| FR-NPC-03 | The worker has a visible energy bar during the shift so the player can understand the worker's remaining daily labor capacity at a glance. | pricing redesign discussion |
 
 ### 2.10 Persistence and lifecycle
 | ID | Requirement | Source |
@@ -137,7 +152,7 @@
 ### 2.12 Configuration & UX
 | ID | Requirement | Source |
 |---|---|---|
-| FR-CFG-01 | All player-tunable values (base rate, per-task rates, average-speed constant, 8pm cap, etc.) are exposed via GMCM with sensible defaults matching the spec. | spec §Pricing, §Tech |
+| FR-CFG-01 | All player-tunable values for the redesigned contract system (contract price values, worker energy capacity, per-action energy costs, 8pm cap, stuck thresholds, and other retained operational knobs) are exposed via GMCM with sensible defaults. | pricing redesign Q6 |
 | FR-CFG-02 | All user-visible strings are routed through SMAPI's i18n system (`i18n/default.json`), so community translators can add languages without code changes. v1 ships English only. | Q23 |
 
 ### 2.13 Mod compatibility
@@ -162,14 +177,14 @@
 | ID | Requirement |
 |---|---|
 | NFR-SAFE-01 | No items are ever lost: every drop the worker collects is either deposited into a chest/shipping bin, buffered for next-day mail, or (for hay only) dropped on the ground per vanilla scythe behavior. |
-| NFR-SAFE-02 | No gold is ever lost beyond the contractually-billed hourly rate × hours worked. Refunds are integer-clamped to avoid floating-point gold leakage. |
+| NFR-SAFE-02 | No gold is ever lost beyond the explicit contract price charged for that day of labor. The redesign must avoid hidden refund/debt mechanics and keep pricing legible. |
 | NFR-SAFE-03 | The mod must not corrupt save files. All persisted data is namespaced via SMAPI's data API and tolerates being absent on first load. |
 | NFR-SAFE-04 | The worker never picks up items the player has dropped or placed; it only collects drops it caused. |
 
 ### 3.3 Performance
 | ID | Requirement |
 |---|---|
-| NFR-PERF-01 | The worker's per-frame update must not introduce visible frame drops on typical hardware. (Stardew targets 60fps; the worker's update loop should stay well under 1ms per frame.) |
+| NFR-PERF-01 | The worker's per-frame update must not introduce visible frame drops on typical hardware. (Stardew targets 60fps; the worker's update loop should stay well under 1ms per frame.) Slower worker pacing must come from intentional gameplay timing, not from frame-rate-dependent lag or inefficient loops. |
 | NFR-PERF-02 | Tile scanning to build the task queue happens once at zone entry per shift, not per frame. |
 | NFR-PERF-03 | The hiring UI's zone overlay rendering must remain responsive for zones up to the size of the full Standard Farm map (~80×65 tiles). |
 
@@ -179,13 +194,14 @@
 | NFR-UX-01 | Full gamepad navigation for all hiring UI screens. (Q24) |
 | NFR-UX-02 | All user-visible strings localizable via i18n/default.json. (Q23) |
 | NFR-UX-03 | Hiring UI does not require the player to leave the bulletin board to configure zones — zone draw mode overlays the farm map and returns to Screen 2 on completion. |
+| NFR-UX-04 | Pricing should be easier to understand than the original deposit/refund model: the player should be able to tell what they are paying for from the selected services and scopes without mentally simulating refunds. |
 
 ### 3.5 Maintainability & testability
 | ID | Requirement |
 |---|---|
 | NFR-MAINT-01 | Test framework: **xUnit**. (Q4) Unit tests live in a separate project (e.g., `Dayswork.Tests`) referencing the main mod assembly. |
 | NFR-MAINT-02 | Property-based testing framework: **FsCheck** (xUnit integration). (PBT-09) PBT enforcement is **Partial mode**: rules PBT-02, PBT-03, PBT-07, PBT-08, PBT-09 are blocking; PBT-01, PBT-04, PBT-05, PBT-06, PBT-10 are advisory. |
-| NFR-MAINT-03 | Pure business-logic modules (rate calculation, deposit/refund math, tile-zone intersection, save-data DTO round-trips) are separated from SMAPI/game-engine integration so they can be unit-tested without launching Stardew. |
+| NFR-MAINT-03 | Pure business-logic modules (contract pricing, energy-cost accounting, tile-zone intersection, save-data DTO round-trips) are separated from SMAPI/game-engine integration so they can be unit-tested without launching Stardew. |
 | NFR-MAINT-04 | Harmony patches are isolated in a single namespace (e.g., `Dayswork.Patches`) for visibility and conflict diagnosis. |
 | NFR-MAINT-05 | Code style follows standard .NET conventions (`dotnet format`); CI configuration (optional v1) enforces format check + test execution. |
 
@@ -228,6 +244,7 @@ Restated from spec §Out of scope, plus clarified items from Q&A:
 - Localizations beyond English at v1 launch (Q23 — i18n-ready but English-only)
 - Save cleanup on uninstall (FR-PERSIST-02 — leaked segments are accepted)
 - Overtime pay
+- Advanced player-controlled zone/task priority editing as part of this pricing rework
 
 ---
 
@@ -252,18 +269,25 @@ Restated from spec §Out of scope, plus clarified items from Q&A:
 | License | MIT | Q7 |
 | Author handle | Bindicle | Q8 |
 | Worker sprite | Recolored vanilla placeholder for v1 | Q9 |
-| Rain handling | Skip watering, reduce rate | Q10 |
+| Pricing model | Fixed contract price with no hourly deposit/refund loop | pricing redesign discussion |
+| Outdoor pricing | Broad size bands per selected outdoor service | pricing redesign Q2 |
+| Animal pricing | Building-based pricing per selected barn/coop; selected-building animals are serviced wherever they are on the farm | pricing redesign discussion |
+| Greenhouse pricing | Fixed greenhouse package | pricing redesign discussion |
+| Energy model | Roughly farmer-equivalent daily energy budget spent per action; walking does not consume energy | pricing redesign discussion |
+| Zero-energy behavior | Clamp energy at zero, finish the current work unit, then deposit and leave | pricing redesign discussion |
+| Worker pacing | Slow movement and task tempo so the worker feels like real labor rather than instant automation | pricing redesign discussion |
+| Rain handling | Price stays fixed; rain may simply reduce actionable outdoor work | pricing redesign Q3 |
 | Unreachable tiles | Silent skip | Q11 |
 | Tool animations | Visible swap | Q12 |
 | Player stumps | Choppable | Q13 |
 | Building entry | Walk to door + warp (vanilla) | Q14 |
 | Multiplayer | Refuse to load | Q15 |
-| Festival days | Worker stays home | Q16 |
+| Festival days | Worker stays home, no charge, same-day explanatory mail | pricing redesign Q5 |
 | Early sleep | Fast-forward shift atomically | Q17 |
 | Player attacks worker | Invulnerable, plays "ouch" reaction | Q18 |
 | Chest gone mid-shift | Buffer + mail next morning | Q19 |
-| Empty zone | Full refund, no charge | Q20 |
-| Mid-contract rate changes | New rates apply next morning | Q21 |
+| No-work recurring day | Charge still applies because labor capacity was reserved | pricing redesign Q4 |
+| Mid-contract config changes | New price/energy values apply next morning | adapted from Q21 |
 | Uninstall cleanup | None | Q22 |
 | Localization | i18n-ready, English at launch | Q23 |
 | Gamepad UI | Full support | Q24 |
@@ -276,4 +300,4 @@ Restated from spec §Out of scope, plus clarified items from Q&A:
 
 ## 7. Brief Summary
 
-**Dayswork** is a single-player Stardew Valley 1.6 mod, built in C# / .NET 6 against SMAPI 4.x, that adds a "Hire a Farmhand" option to the Pelican Town bulletin board. The player configures tasks, zones, and output chests through a four-screen UI (full gamepad support). A generic NPC walks onto the farm at 6am, performs prioritized tasks within tool-capability limits, deposits collected items into designated chests (or mails overflow), and exits via the entrance — applying a refund of unused deposit. The mod is engineered around a "no items, no gold are ever lost" safety invariant: all overflow becomes next-morning mail, and refunds are pro-rated against actual hours worked. v1 is single-player only, uses a placeholder worker sprite, is published under MIT to Nexus Mods under author "Bindicle", and is i18n-ready (English-only at launch). Pure business logic (rates, deposits, zone math, save round-trips) is tested with xUnit + FsCheck under Partial-mode PBT enforcement.
+**Dayswork** is a single-player Stardew Valley 1.6 mod, built in C# / .NET 6 against SMAPI 4.x, that adds a "Hire a Farmhand" option to the Pelican Town bulletin board. The player configures tasks, zones/buildings, and output chests through a four-screen UI (full gamepad support). A generic NPC walks onto the farm at 6am, performs prioritized work within tool-capability limits and a visible farmer-like daily energy budget, deposits collected items into designated chests (or mails overflow), and exits via the entrance when the work is done, the day ends, or energy is exhausted. The pricing redesign replaces the old deposit/refund model with a simpler fixed contract price derived from the saved contract scope: broad outdoor size bands for zone work, building-based pricing for animal care, and a fixed greenhouse package. The mod is engineered around a "no items, no gold are ever lost" safety invariant: all overflow becomes next-morning mail, and pricing remains legible because there is no hidden refund loop. v1 is single-player only, uses a placeholder worker sprite, is published under MIT to Nexus Mods under author "Bindicle", and is i18n-ready (English-only at launch). Pure business logic (contract pricing, energy accounting, zone math, save round-trips) is tested with xUnit + FsCheck under Partial-mode PBT enforcement.

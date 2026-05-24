@@ -2541,3 +2541,169 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: Post-delivery maintenance, Bug 3 of 3 -- player animation bleed during worker task execution
 
 ---
+
+## Post-U-17 Maintenance — Milk Pail & Shears Animation Fix
+**Timestamp**: 2026-05-24T00:00:00Z
+**User Input**: "continuing on fixing bugs: No pail animation is used when milking cows and no shear animation is used for sheep"
+**AI Response**: Root cause: `WorkerToolExtensions.ForTask(CollectAnimalProducts)` returned `WorkerTool.None`, so `SpawnToolSwing` emitted no visual overlay for any animal product collection. Body animation and sounds were already correct. Fix: (1) Added `MilkPail` and `Shears` to `WorkerTool` enum in `Dayswork.Core/Domain/WorkerTool.cs`. (2) Added `PlaySwing(WorkerTool, int)` overload to `ToolSwapAnimator` (existing `PlaySwing(TaskKind, int)` now delegates to it). Added `SpawnToolIconOverlay(facingDirection, spriteIndex)` — renders the tool's 16×16 inventory icon from `TileSheets/tools` at 4× scale beside the worker (MilkPail index 6 → rect (96,0,16,16); Shears index 7 → rect (112,0,16,16)); vanilla SDV explicitly excludes MilkPail/Shears from the swing-sprite overlay path so the inventory icon is the correct fallback. Added `MilkPail` and `Shears` cases to `SpawnToolSwing`. (3) Updated `HandleCollectFromAnimal` in `ShiftOrchestrator.cs` to detect animal type via `AnimalTaskHandler.IsShearProduce`/`IsMilkProduce` and pass the specific `WorkerTool` to the new overload. Build: 0 warnings/0 errors. Tests: 211 passed / 1 expected skip / 0 failures.
+**Context**: Post-U-17 maintenance bug fix — animal collection visual animation
+
+## Post-U-17 Maintenance — Milk Pail & Shears Animation — User Confirmation
+**Timestamp**: 2026-05-24T00:00:00Z
+**User Input**: "looks good"
+**AI Response**: Fix confirmed working in-game.
+**Context**: Post-U-17 maintenance — milk pail & shears animation fix verified
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I don't want an ai-dlc guided discussion yet, just a back and forth between me and you"
+**AI Response**: Switched out of guided workflow mode and discussed the charging model informally, focusing on simplifying pricing, avoiding deposit/refund friction, and exploring flat-fee plus energy-based alternatives.
+**Context**: Pre-workflow design discussion — user requested informal exploration first
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "most wrong to me now, is the potential large upfront deposit only to get money back the next morning. It feels overly complicated. I agree that it would feel strange to pay the same amount for a 250 tile crops field vs 15. could we potentially do something with how much energy is left at the end of the day? that may be slipping back into the refund territory though"
+**AI Response**: Explored separating contract price from worker energy, avoiding refund-like behavior through leftover-energy payouts, and using fixed contract pricing with energy only as a daily output cap.
+**Context**: Pre-workflow design discussion — core pricing pain point identified
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "are you thinking that small/medium/large would affect the energy bar, or rather the output of the worker?"
+**AI Response**: Clarified that job-size bands would affect contract price while the energy bar would affect actual daily output.
+**Context**: Pre-workflow design discussion — separated price from energy/output
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "what would stop a player from selecting small harvest job on a 250 tile field?"
+**AI Response**: Identified that job size cannot be chosen manually if it is banded, because the system must determine scope automatically from the contract setup.
+**Context**: Pre-workflow design discussion — exploit concern for manual size selection
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I think that would feel weird with recurring jobs, because the player would have a variable amount of money taken from their wallet every morning depending on available crops or terrain"
+**AI Response**: Agreed that recurring prices should stay stable and predictable, with price determined when the contract is created or edited rather than recalculated from daily farm state.
+**Context**: Pre-workflow design discussion — recurring-price predictability
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I like that approach, I think it would be tough to do for animals because if a player is using a drawn zone for animals, it's hard to tell how many animals outside of the barn/coop will end up in that zone. you'd have to assume that all animals will be serviced, even if some aren't in range I think"
+**AI Response**: Converged on animal care being building-based rather than zone-based, with selected barns/coops implying service for their assigned animals.
+**Context**: Pre-workflow design discussion — animal-care scope
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I like that. Now how would we handle doing animal tasks outside of the barn/coop? the worker would need to make sure to service each animal when they're outside, even if it's not within a drawn zone as long as the barn/coop is selected."
+**AI Response**: Defined the rule that animal jobs are building-owned, not zone-owned, and that the worker should service selected-building animals wherever they are on the farm.
+**Context**: Pre-workflow design discussion — outdoor animal servicing
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "the animals don't tend to wander too far away from the buildings, and those are prioritized first so they wouldn't have a lot of time to move away. I think chase always"
+**AI Response**: Accepted "chase always" as the intended animal-service rule so selected-building animals are always pursued.
+**Context**: Pre-workflow design discussion — animal chase behavior
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "We need to keep in mind that greenhouse is a building and is primarily crop based too"
+**AI Response**: Refined the model from a simple building-vs-zone split into job-type anchors, treating greenhouse as crop-work scope rather than animal-building scope.
+**Context**: Pre-workflow design discussion — greenhouse exception
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I agree, fixed for greenhouse"
+**AI Response**: Accepted greenhouse work as a fixed package rather than tile-band pricing.
+**Context**: Pre-workflow design discussion — greenhouse pricing
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I think energy consumption should generally match the farmer's energy consumption. Energy is expended per tool usage (so multiple swings of an axe on a tree expends energy for each swing) plus any non-tool labor like petting or harvesting"
+**AI Response**: Adopted a farmer-like per-action energy model, covering tool use and non-tool labor while keeping walking free.
+**Context**: Pre-workflow design discussion — energy model baseline
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I'm thinking keep it roughly equal, but we also need to slow the worker's movement speed down and task animations because it's too fast at this point. If we slow the worker down, it will feel more like the player is getting their money's worth out of the contract"
+**AI Response**: Captured pacing as part of the redesign direction: worker energy roughly farmer-equivalent, but movement and action tempo should slow down to feel like real labor rather than instant automation.
+**Context**: Pre-workflow design discussion — pacing and feel
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I'd say that the worker always finishes the individual task they're on when their energy drains (so like finishing chopping a tree -- but stopping at the different stages like full tree -> stump and not clear the stump). once the energy drains, they go deposit the materials and exit the farm"
+**AI Response**: Defined the "finish current work unit, then deposit and leave" rule, with stage boundaries such as full tree versus stump treated as separate work units.
+**Context**: Pre-workflow design discussion — zero-energy completion behavior
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "For the energy bar, i'd say never let it go below zero, but if it drops to zero during a task, just finish the task and leave it at zero"
+**AI Response**: Refined the zero-energy rule so the energy bar clamps at zero, the current work unit finishes, and no new work begins.
+**Context**: Pre-workflow design discussion — energy clamping
+
+---
+
+## Informal Pricing Discussion Capture
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "I'd say let the player optimize the contract setup. They could even set a custom priority order (by zone or by task). That may be too much to do right now, but if it doesn't seem to difficult to implement then it may be a good solution."
+**AI Response**: Noted future interest in player-controlled prioritization, while recommending that the pricing redesign stay focused on pricing/energy rather than broad prioritization work in the same pass.
+**Context**: Pre-workflow design discussion — scope control
+
+---
+
+## Requirements Analysis Restart — Pricing Model Redesign
+**Timestamp**: 2026-05-24T05:47:32Z
+**User Input**: "No you're right, let's just focus on pricing rework. I think we've had a good discussion, let's re-kick off the ai-dlc workflow for this design work"
+**AI Response**: Reopened AI-DLC Inception Requirements Analysis for the pricing redesign, created structured discussion notes, created a focused pricing question file for unresolved decisions, and updated `aidlc-state.md` to point at the next required user step.
+**Context**: INCEPTION — Requirements Analysis restart for worker pricing redesign
+
+---
+
+## Requirements Analysis — Pricing Model Answers Received
+**Timestamp**: 2026-05-24T16:06:05Z
+**User Input**: "I've answered the questions"
+**AI Response**: Read `pricing-model-requirement-verification-questions.md`, found no blocking contradictions, and extracted the following decisions: one-time pricing matches recurring for a single day; outdoor pricing uses broad size bands; rain does not change recurring price; no-work recurring days still charge because labor capacity was reserved; festivals skip with no charge and same-day mail; GMCM exposes contract prices, worker energy capacity, and per-action energy costs; no extra exhaustion message is required.
+**Context**: INCEPTION — Requirements Analysis answer intake
+
+---
+
+## Requirements Analysis — Pricing Model Requirements Updated
+**Timestamp**: 2026-05-24T16:06:05Z
+**User Input**: "I've answered the questions"
+**AI Response**: Updated `aidlc-docs/inception/requirements/requirements.md` to replace the old hourly/deposit/refund pricing model with the new fixed-contract-price plus worker-energy model, captured greenhouse/animal/building scope rules, slower worker pacing, zero-energy completion behavior, and the revised festival/rain/no-work charging rules. Updated `aidlc-state.md` and the pricing-analysis plan to reflect that requirements drafting is complete and pending user approval.
+**Context**: INCEPTION — Requirements Analysis drafting complete, awaiting review
+
+---
+
+## Requirements Analysis — Review Prompt
+**Timestamp**: 2026-05-24T16:06:05Z
+**User Input**: "I've answered the questions"
+**AI Response**: Presenting Requirements Analysis completion and requesting explicit approval or change requests on `aidlc-docs/inception/requirements/requirements.md` before proceeding to User Stories.
+**Context**: INCEPTION — Requirements Analysis approval gate
+
+---
