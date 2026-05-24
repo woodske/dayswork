@@ -1,127 +1,113 @@
-# Unit of Work — Story Map
+# Unit of Work — Story Map for Pricing Model Redesign Retrofit
 
-This document maps each of the 20 user stories in [stories.md](../user-stories/stories.md) to the unit(s) that deliver it. Many stories are delivered by a thin slice in one early unit and then **completed** in a later deepening unit (consistent with the U4 = Hybrid sequencing strategy and the FoundationsThin SliceDeepening structure in [unit-of-work.md](unit-of-work.md)).
+This document maps the refreshed story set to the appended retrofit units `U-18` through `U-24`.
+
+Historical units `U-01` through `U-17` still explain how the original system was built. This map explains which retrofit unit now changes or regression-verifies each refreshed story under the pricing redesign.
 
 **Reading the table**:
-- **Primary unit** — where the story's main behavior is first delivered (the unit that "owns" the story for traceability purposes)
-- **Completing unit(s)** — later units that finish the story by deepening the initial slice; same column is "—" if the primary unit ships the full story
-- **State at unit X** — what the player can actually do at the end of the primary unit's Construction loop; useful for picking smoke-test scenarios
+- **Historical baseline** = where the story originally landed before the redesign
+- **Primary retrofit unit** = the main redesign unit responsible for changing or re-validating that story now
+- **Supporting retrofit units** = other redesign units that deepen or verify the story
 
 ---
 
-## Story-to-unit map
+## Story-to-retrofit map
 
 ### Section 1 — Discovery & First Hire
 
-| Story | Primary | Completing | State after primary unit |
-|---|---|---|---|
-| **S-01** Discover the hiring option on the bulletin board | U-08 | — | Bulletin board shows the entry; clicking logs a placeholder message. UI itself lands in U-09. The MP-hidden case also fully works at U-08. |
-| **S-02** Configure tasks and see the live hourly rate | U-09 | — | Full story shipped. Toggles render, rate updates in real time, base rate always included, gamepad navigation works. |
-| **S-03** Draw zones and select buildings on the farm | U-11 | U-16 deepening | Full story shipped at U-11 (zone drawing + building selection + multi-rectangle + unreachable-tile silent skip + gamepad cursor). U-16 makes selected buildings executable work areas. |
-| **S-04** Assign output destinations per task | U-11 | U-14, U-16 deepening | At U-11: chest assignment UI works; rename preserves assignment. At U-14: the orphaned-chest Gherkin case fully fires through the mail fallback. At U-16: building-interior output destinations are exercised by the multi-location deposit run. |
-| **S-05** Choose a one-time or recurring schedule | U-09 | U-12 | At U-09: one-time contracts persist through save/load (Gherkin clause). At U-12: schedule selection UI ships and recurring contracts are creatable. |
-| **S-06** Review the contract and confirm | U-09 | — | Full story shipped. Summary renders, confirm path deducts deposit, insufficient-gold path is blocked. |
+| Story | Historical baseline | Primary retrofit unit | Supporting retrofit units | Retrofit role |
+|---|---|---|---|---|
+| `S-01` Discover the hiring option on the bulletin board | `U-08` | `U-20` | `U-24` | Board entry still exists, but the opened flow now lands in the redesigned preview/confirmation pipeline; final regression verifies multiplayer and entry behavior still hold |
+| `S-02` Configure tasks and see the live contract price | `U-09` | `U-20` | `U-18` | Core pricing/terms model changes in `U-18`; player-facing live preview ships in `U-20` |
+| `S-03` Draw zones and select buildings on the farm | `U-11`, `U-16` | `U-20` | `U-18`, `U-22` | UI/preview semantics change in `U-20`; typed-scope foundation lands in `U-18`; runtime alignment for those selections completes in `U-22` |
+| `S-04` Assign output destinations per task | `U-11`, `U-14`, `U-16` | `U-22` | `U-24` | Destination behavior must remain correct under typed scopes; final regression/docs pass confirms unchanged mail/deposit behavior |
+| `S-05` Choose a one-time or recurring schedule | `U-09`, `U-12`, `U-15` | `U-20` | `U-19`, `U-23` | UI/preview language changes in `U-20`; persistence semantics in `U-19`; recurring daily behavior in `U-23` |
+| `S-06` Review the contract, price, and worker stamina before confirming | `U-09` | `U-20` | `U-18` | `U-18` defines fixed terms and energy profile; `U-20` surfaces them in the final summary/confirm step |
 
 ### Section 2 — First Day of Work
 
-| Story | Primary | Completing | State after primary unit |
-|---|---|---|---|
-| **S-07** Watch the farmhand arrive and work on day one | U-10 | U-13B | At U-10: arrival + walk (teleport stub) to first task tile + placeholder sprite. At U-13: real walking. At U-13B: Farmer worker with visible tool-swap when changing task class. |
-| **S-08** Execute tasks in priority order within a zone | U-10 | U-13, U-16 | At U-10: single task executes (one zone, one task type). At U-13: outdoor priority/deepening lands for non-animal tasks. At U-16 Code Generation: animal tasks and building-interior work complete the full priority queue. |
-| **S-09** Snapshot tool capabilities at spawn and skip what can't be done | U-10 | U-13 | At U-10: ToolLevelReader runs at 6am and snapshot is captured. At U-13: full capability matrix applied to skip rules (axe-level guards, pickaxe=0 guards, fruit-tree always-skip) plus tool-missing mail warning queued (mail itself delivered by U-14). |
-| **S-10** Deposit collected items at shift end | U-10 | U-14 | At U-10: single-trip deposit to shipping bin. At U-14: multi-trip deposit to assigned chests + 8pm-cap-still-deposits + chest-full fallback + chest-destroyed fallback + refund at exit. |
-| **S-11** Receive mail for overflow and unassigned output | U-14 | — | Full story shipped. MailDispatcher delivers overflow / chest-missing / no-chest-assigned letters with no fee; shipping-bin-no-overflow holds. |
+| Story | Historical baseline | Primary retrofit unit | Supporting retrofit units | Retrofit role |
+|---|---|---|---|---|
+| `S-07` Watch the farmhand arrive and work on day one | `U-10`, `U-13B` | `U-21` | — | Runtime now adds visible worker energy and slower pacing |
+| `S-08` Execute prioritized work across zones, buildings, and animals | `U-10`, `U-13`, `U-16` | `U-21` | `U-22` | Energy-limited runtime lands in `U-21`; typed-scope animal/greenhouse alignment completes in `U-22` |
+| `S-09` Snapshot tool capabilities at spawn and skip what can't be done | `U-10`, `U-13` | `U-21` | `U-24` | Runtime rework must preserve capability snapshot rules; final regression confirms no accidental breakage |
+| `S-10` Deposit collected items at shift end | `U-10`, `U-14`, `U-16` | `U-21` | `U-22` | Shift-end behavior loses refund settlement in `U-21`; scope-driven deposit/output routing stays correct in `U-22` |
+| `S-11` Receive mail for overflow and unassigned output | `U-14` | `U-22` | `U-24` | Output fallback behavior must remain correct under typed scopes and no-refund semantics; final regression/docs confirm it |
 
 ### Section 3 — Daily Life with a Recurring Contract
 
-| Story | Primary | Completing | State after primary unit |
-|---|---|---|---|
-| **S-12** Pause, cancel, or edit a recurring contract | U-12 | U-15 | At U-12: Pause/Cancel/Edit UI on the bulletin board; cancel-after-6am-blocked rule enforced; Edit returns to pre-filled menus. At U-15: deposit-deduction-each-morning + can't-afford → cannot-afford mail Gherkin clauses fire. |
-| **S-13** Tune rates and constants in GMCM | U-17 | — | Full story shipped. Every spec-listed configurable value editable in GMCM; today's-deposit-uses-R1-tomorrow's-uses-R2 holds. |
+| Story | Historical baseline | Primary retrofit unit | Supporting retrofit units | Retrofit role |
+|---|---|---|---|---|
+| `S-12` Pause, cancel, or edit a recurring contract | `U-12`, `U-15` | `U-23` | `U-19`, `U-20` | Persistence and edit-preview groundwork comes first; recurring pricing and day-start behavior completes in `U-23` |
+| `S-13` Tune contract prices, worker stamina, and action costs in GMCM | `U-17` | `U-24` | `U-18` | New config shape comes from `U-18`; GMCM exposure and validation finalize in `U-24` |
 
 ### Section 4 — Calendar & Edge Cases
 
-| Story | Primary | Completing | State after primary unit |
-|---|---|---|---|
-| **S-14** Handle festivals, rainy days, and empty zones without surprise charges | U-15 | — | Full story shipped. Festival skip silent + no deduction; rainy-day Water Crops surcharge excluded by RateCalculator branch (the C-01 rain flag wired up in this unit through CalendarHandlers); empty-zone full-refund per FR-PAY-06. |
-| **S-15** Player sleeps before the farmhand finishes — shift stops and settles atomically | U-15 | — | Full story shipped. Sleep-confirm stops the worker, mails collected-but-undelivered items and refund, and lands settlement in *today*'s state before day-rollover. |
-| **S-16** Recover from getting stuck (hybrid escalation) | U-13 | — | Full story shipped. StuckDetector fires, ShiftStateMachine transitions Working → Stuck → Recovering → (Working OR Exiting). Configured thresholds via [requirements.md](../requirements/requirements.md) FR-WORK-13 default values; GMCM exposure of the thresholds in U-17. |
-| **S-17** Survive player attacks without abandoning the shift | U-13 | — | Full story shipped. FarmhandNpc overrides damage hooks, returns 0 damage, plays ouch emote, resumes task. |
-| **S-18** Multiplayer refuses to load with a friendly message | U-08 | — | Full story shipped. MultiplayerGuard short-circuits BulletinBoardPatch in multiplayer; friendly log message written. |
+| Story | Historical baseline | Primary retrofit unit | Supporting retrofit units | Retrofit role |
+|---|---|---|---|---|
+| `S-14` Handle festivals, rainy days, and low-work days without confusing contract behavior | `U-15` | `U-23` | `U-18` | Contract-price stability and recurring billing semantics are finalized here |
+| `S-15` Player sleeps before the farmhand finishes — shift settles cleanly before rollover | `U-15` | `U-23` | `U-21` | `U-21` removes refund settlement from shift runtime; `U-23` completes calendar/sleep semantics |
+| `S-16` Recover from getting stuck | `U-13` | `U-21` | `U-24` | Runtime rework must preserve stuck handling under the new energy/billing model; final regression verifies it |
+| `S-17` Survive player attacks without abandoning the shift | `U-13` | `U-21` | `U-24` | Runtime/NPC refresh must not break invulnerability and resume behavior |
+| `S-18` Multiplayer refuses to load with a friendly message | `U-08` | `U-24` | — | No major redesign logic changes here; this is a regression/documentation checkpoint story |
 
 ### Section 5 — Maintainability
 
-| Story | Primary | Completing | State after primary unit |
-|---|---|---|---|
-| **S-19** Pure logic separable from SMAPI for testability | U-02 | U-04, U-05, U-06, U-10, U-17 | At U-02: `Dayswork.Tests` project compiles against only `Dayswork.Core`; FsCheck + xUnit wired; seed-logging + shrunk-input logging convention established (PBT-08 + PBT-09 obligations satisfied as infrastructure). Each later foundation unit delivers its specific PBT obligation: U-04 ZoneGeometry round-trip + invariants (PBT-02, PBT-03); U-05 rate/deposit/refund invariants (PBT-03); U-06 SaveDataSerializer round-trip (PBT-02 primary); U-10 ShiftStateMachine + ItemBuffer invariants (PBT-02, PBT-03). U-17 ratifies the architectural promise with the i18n lint test surveying the whole assembly. |
-| **S-20** Externalize all user-visible strings for community translation | U-08 | U-17 | At U-08: I18nHelper exists, `i18n/default.json` is the source of truth for all U-08-introduced strings; every subsequent UI-introducing unit (U-09, U-11, U-12, U-14, U-15, U-16, U-17) adds its keys to the same file. At U-17: lint test enforces that no user-visible string exists outside `I18nHelper` callsites — proves the architectural promise. |
+| Story | Historical baseline | Primary retrofit unit | Supporting retrofit units | Retrofit role |
+|---|---|---|---|---|
+| `S-19` Pure logic separable from SMAPI for testability | `U-02`, `U-04`, `U-05`, `U-06`, `U-10`, `U-17` | `U-18` | `U-19`, `U-21`, `U-24` | New pure seams for contract terms land in `U-18`; persistence and runtime invariants extend in `U-19/U-21`; final regression/docs close the loop in `U-24` |
+| `S-20` Externalize all user-visible strings for community translation | `U-08`, `U-17` | `U-24` | `U-20`, `U-23` | New preview/config/calendar strings are introduced earlier, but the dedicated cleanup unit ensures the redesign remains fully i18n-routed |
 
 ---
 
 ## Coverage verification
 
-| Story | Has at least one delivering unit? |
+| Story | Assigned to at least one retrofit unit? |
 |---|---|
-| S-01 | ✅ U-08 |
-| S-02 | ✅ U-09 |
-| S-03 | ✅ U-11 (primary), U-16 (selected buildings become executable) |
-| S-04 | ✅ U-11 (primary), U-14 (completes fallback), U-16 (building-interior destinations) |
-| S-05 | ✅ U-09 (primary), U-12 (completes) |
-| S-06 | ✅ U-09 |
-| S-07 | ✅ U-10 (primary), U-13 (real walking), U-13B (completes — Farmer + tool-swap) |
-| S-08 | ✅ U-10 (primary), U-13 (outdoor worker behavior), U-16 (completes animal/building work) |
-| S-09 | ✅ U-10 (primary), U-13 (completes) |
-| S-10 | ✅ U-10 (primary), U-14 (completes) |
-| S-11 | ✅ U-14 |
-| S-12 | ✅ U-12 (primary), U-15 (completes) |
-| S-13 | ✅ U-17 |
-| S-14 | ✅ U-15 |
-| S-15 | ✅ U-15 |
-| S-16 | ✅ U-13 |
-| S-17 | ✅ U-13 |
-| S-18 | ✅ U-08 |
-| S-19 | ✅ U-02 (infra), U-04/U-05/U-06/U-10 (specific PBT obligations), U-17 (lint) |
-| S-20 | ✅ U-08 (primary), U-17 (lint completes) |
+| `S-01` | ✅ `U-20`, `U-24` |
+| `S-02` | ✅ `U-20`, `U-18` |
+| `S-03` | ✅ `U-20`, `U-18`, `U-22` |
+| `S-04` | ✅ `U-22`, `U-24` |
+| `S-05` | ✅ `U-20`, `U-19`, `U-23` |
+| `S-06` | ✅ `U-20`, `U-18` |
+| `S-07` | ✅ `U-21` |
+| `S-08` | ✅ `U-21`, `U-22` |
+| `S-09` | ✅ `U-21`, `U-24` |
+| `S-10` | ✅ `U-21`, `U-22` |
+| `S-11` | ✅ `U-22`, `U-24` |
+| `S-12` | ✅ `U-23`, `U-19`, `U-20` |
+| `S-13` | ✅ `U-24`, `U-18` |
+| `S-14` | ✅ `U-23`, `U-18` |
+| `S-15` | ✅ `U-23`, `U-21` |
+| `S-16` | ✅ `U-21`, `U-24` |
+| `S-17` | ✅ `U-21`, `U-24` |
+| `S-18` | ✅ `U-24` |
+| `S-19` | ✅ `U-18`, `U-19`, `U-21`, `U-24` |
+| `S-20` | ✅ `U-24`, `U-20`, `U-23` |
 
-**All 20 stories are covered.** ✓
+**All refreshed stories are assigned to at least one retrofit unit.**
 
 ---
 
-## Stories by unit (inverse map)
+## Stories by retrofit unit
 
-For developers picking up a unit, what stories does Construction need to satisfy?
-
-| Unit | Stories delivered (primary or completing) |
+| Retrofit unit | Stories touched |
 |---|---|
-| U-01 Project Scaffold | (foundational — no stories directly; sets up the Core/Mod split underpinning S-19) |
-| U-02 Test Infrastructure | S-19 (infra portion: PBT-08, PBT-09 obligations) |
-| U-03 Config Foundation | (foundation for S-13 — GMCM later exposes these fields) |
-| U-04 Geometry & Domain Primitives | S-19 (PBT-02, PBT-03 for ZoneGeometry) |
-| U-05 Pricing Core | S-19 (PBT-03 invariants for rate/deposit/refund) |
-| U-06 Persistence Core | S-19 (PBT-02 primary obligation), foundation for S-05 |
-| U-07 Capability & Priority Core | (foundation for S-08, S-09) |
-| U-08 Bulletin Board + i18n + MP Guard | S-01, S-18, S-20 (primary) |
-| U-09 Minimum Hiring Flow | S-02, S-06, S-05 (primary) |
-| U-10 Minimum Worker Shift | S-07 (primary), S-08 (primary), S-09 (primary), S-10 (primary), S-19 (PBT for state machine + buffer) |
-| U-11 Hiring UI: Zones & Chests | S-03, S-04 (primary) |
-| U-12 Hiring UI: Schedule + Edit/Pause/Cancel | S-05 (completes), S-12 (primary) |
-| U-13 Worker AI: Priority + Capability/Skip + Stuck + Invuln | S-08 (outdoor task ordering/deepening), S-09 (completes), S-16, S-17 |
-| U-13B Farmer Worker + Tool Visuals | S-07 (completes) |
-| U-14 Output: Multi-Destination Deposit + Overflow Mail | S-04 (completes), S-10 (completes), S-11 |
-| U-15 Recurring Lifecycle + Calendar | S-12 (completes), S-14, S-15 |
-| U-16 Animals & Buildings | S-08 (completes animal tasks and building-interior work), S-03/S-04 deepening for selected buildings — implemented in U-16 Code Generation 2026-05-22 |
-| U-17 GMCM + i18n Polish | S-13, S-19 (lint completes), S-20 (lint completes) |
+| `U-18` Contract Terms Foundation | `S-02`, `S-03`, `S-06`, `S-13`, `S-14`, `S-19` |
+| `U-19` Contract Snapshot Persistence + Legacy Cleanup | `S-05`, `S-12`, `S-19` |
+| `U-20` Hiring Flow Preview Refresh | `S-01`, `S-02`, `S-03`, `S-05`, `S-06`, `S-12`, `S-20` |
+| `U-21` Worker Energy + Shift Runtime Refresh | `S-07`, `S-08`, `S-09`, `S-10`, `S-15`, `S-16`, `S-17`, `S-19` |
+| `U-22` Scope-Driven Runtime Alignment | `S-03`, `S-04`, `S-08`, `S-10`, `S-11` |
+| `U-23` Recurring Billing + Calendar Refresh | `S-05`, `S-12`, `S-14`, `S-15`, `S-20` |
+| `U-24` Config, Regression, and Documentation Cleanup | `S-01`, `S-04`, `S-09`, `S-11`, `S-13`, `S-16`, `S-17`, `S-18`, `S-19`, `S-20` |
 
 ---
 
-## Cross-cutting concerns
+## Notes on historically unchanged stories
 
-A few requirements groups thread across multiple units rather than concentrating in one. They're listed here so per-unit Construction can pick up the relevant slices:
+Some stories are not being reinvented from scratch, but they still need a retrofit unit assignment because the redesign can regress them indirectly.
 
-- **i18n (NFR-UX-02 / FR-CFG-02 / S-20)**: Every UI- or mail-introducing unit must route its user-visible strings through `I18nHelper` (introduced in U-08). The lint test in U-17 enforces this end-to-end.
-- **Gamepad navigation (FR-HIRE-03 / NFR-UX-01)**: Every menu-introducing unit (U-08, U-09, U-11, U-12, U-17) must verify gamepad navigation as part of its play-test gate.
-- **Multiplayer guard (FR-MP-01 / S-18)**: MultiplayerGuard (introduced in U-08) must be consulted in every entry-point unit. The three callsites per [components.md](components.md) M-18 are: M-01 ModEntry (short-circuit in U-08 itself), M-02 BulletinBoardPatch (U-08), M-13 RecurringContractScheduler (skeleton in U-10, full check in U-15).
-- **No items lost (NFR-SAFE-01)**: This invariant cuts across U-10 (single-trip deposit case) and U-14 (multi-trip + overflow mail case). U-14's Construction loop must verify NFR-SAFE-01 still holds in every overflow / missing-chest / destroyed-chest path.
-- **Integer rounding (NFR-SAFE-02)**: Originates in U-05's PBT-03 invariants (`deposit − refund == hoursWorked × rate` modulo integer rounding). Must continue to hold as RefundCalculator is called from U-10's exit path and any future deepening that touches the math.
-- **Tolerate absent save data (NFR-SAFE-03)**: U-06 owns this for the contracts segment. U-09 wires the persistence adapter that exposes the behavior to the player.
-- **Harmony isolation (NFR-MAINT-04)**: U-08 establishes `Dayswork/Patches/` namespace. Every subsequent unit that adds a Harmony patch (none anticipated in this plan — only U-08 needs one) must use this namespace.
+Examples:
+- `S-18` multiplayer guard is historically unchanged, but `U-24` explicitly regression-verifies it after the pricing overhaul
+- `S-04` destination assignment UI already existed, but `U-22` must ensure typed scopes do not break how those destinations are consumed at runtime
+- `S-17` invulnerability is historically unchanged, but `U-21` touches the worker runtime deeply enough that regression coverage is warranted

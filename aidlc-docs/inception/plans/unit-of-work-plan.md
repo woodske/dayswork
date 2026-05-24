@@ -1,102 +1,124 @@
-# Unit of Work Plan — Dayswork
+# Unit of Work Plan — Pricing Model Redesign
 
-**Status**: ✅ Part 1 complete (plan approved 2026-05-18). ✅ Part 2 complete — three unit artifacts generated.
+**Status**: Answers reviewed, no clarification round needed, and retrofit unit artifacts generated. Pending user review.
 
-**Scope**: Decompose the 35 components from [components.md](../application-design/components.md) into logical "units of work" — each unit is a coherent batch of code that goes through the Construction per-unit loop (Functional Design → NFR Requirements → NFR Design → Code Generation) before the next one starts.
+**Scope**: This plan decomposes the pricing overhaul into brownfield retrofit units. We are not replacing the historical greenfield unit history. We are defining the new units needed to rework pricing, worker energy, preview flow, recurring billing, and regression coverage on top of the already-built codebase.
 
-**Context loaded**: [requirements.md](../requirements/requirements.md), [stories.md](../user-stories/stories.md), [application-design.md](../application-design/application-design.md), [design-verification-notes.md](../application-design/design-verification-notes.md), [execution-plan.md](execution-plan.md).
+**Still valid from earlier unit planning**:
+- solo developer
+- single deployable SMAPI mod
+- `Dayswork`, `Dayswork.Core`, and `Dayswork.Tests` remain the codebase structure
+- hybrid sequencing is still generally preferred unless the redesign answers change that
 
-**Things already decided** (no need to re-ask):
-- Solo developer, no team coordination concerns
-- Single deployable artifact (one mod assembly + assets, distributed as one Nexus zip)
-- Solution layout = 3 projects (`Dayswork`, `Dayswork.Core`, `Dayswork.Tests`) — D1
-- 35 components + 6 services already inventoried in Application Design
-- Source spec's "Suggested build order" lists 12 candidate sequence points; the execution plan estimated ~12–17 units total
+**Not re-asked here**:
+- team-ownership boundaries, because this remains a solo-developer workflow
+- greenfield directory-structure preferences, because this is a brownfield retrofit inside an existing solution
+- deployable-service boundaries, because this remains one local mod, not a multi-service system
+
+---
+
+## Context Loaded
+- [requirements.md](../requirements/requirements.md)
+- [stories.md](../user-stories/stories.md)
+- [application-design.md](../application-design/application-design.md)
+- [components.md](../application-design/components.md)
+- [component-methods.md](../application-design/component-methods.md)
+- [services.md](../application-design/services.md)
+- [component-dependency.md](../application-design/component-dependency.md)
+- [execution-plan.md](execution-plan.md)
+- existing unit artifacts in `aidlc-docs/inception/application-design/`
+
+**Known high-impact historical units**:
+- U-05 Pricing Core
+- U-09 Minimum Hiring Flow
+- U-10 Minimum Worker Shift
+- U-12 Hiring UI Schedule
+- U-15 Recurring Lifecycle + Calendar
+- U-16 Animals & Buildings
+- U-17 GMCM + i18n Polish
+
+---
+
+## Plan Checklist
+- [x] Review refreshed requirements, stories, and application design for the pricing redesign
+- [x] Identify which historical units are materially affected by the redesign
+- [x] Prepare targeted unit-planning questions for the brownfield retrofit delta
+- [x] Analyze your answers for ambiguity or contradictions and add follow-up questions if needed
+- [x] Generate refreshed `aidlc-docs/inception/application-design/unit-of-work.md`
+- [x] Generate refreshed `aidlc-docs/inception/application-design/unit-of-work-dependency.md`
+- [x] Generate refreshed `aidlc-docs/inception/application-design/unit-of-work-story-map.md`
+- [x] Validate retrofit unit boundaries and dependency order
+- [x] Ensure every refreshed story is assigned to at least one retrofit unit
+- [x] Ensure every refreshed pricing-redesign component is owned or explicitly extended by at least one retrofit unit
 
 ---
 
 ## Planning Questions
 
-### Question U1 — Unit slicing axis
+### Question U-R1 — How should the redesign units relate to the historical unit history?
+The repo already has greenfield units U-01 through U-17 and associated Construction artifacts. We need to decide how the pricing-redesign units should coexist with that history.
 
-How should units be sliced relative to the Core ↔ Mod project boundary?
+A) **Append new retrofit units after the historical sequence (Recommended)** — preserve the old unit history as-is and create new redesign units that explicitly extend or replace parts of U-05/U-09/U-10/U-15/U-17
+B) **Rewrite the old unit map in place** — update the existing unit IDs and artifacts as if the redesign had always been part of the original greenfield plan
+C) **Hybrid** — keep the old units for audit history, but revise some of the historical unit definitions directly and add only a few new retrofit units
+X) Other (please describe after [Answer]: tag below)
 
-A) **Vertical feature slices** — each unit owns both its Core pieces AND its Mod pieces AND its tests (e.g., the "Rate calculation" unit ships `Dayswork.Core/Pricing/RateCalculator.cs` + xUnit tests + the bits of `HiringFlowCoordinator`/`SummaryMenu` that call it). User-facing functionality lands in one PR per unit.
-B) **Horizontal layers** — `Dayswork.Core` is built bottom-up first as a few foundational units, then `Dayswork` (Mod) is built feature-by-feature on top.
-C) **Hybrid (Recommended)** — small foundational Core-only units come first for testable primitives (rate calc, deposit/refund, save serialization, state machine). Then vertical feature slices that combine remaining Core + Mod work.
-X) Other
-
-[Answer]: (recommendation accepted)
-
-> Recommendation: **C**. Foundational pure-logic primitives are valuable to land + test first (they're the easiest wins and pay back PBT-09's framework setup early). After that, the user-facing features benefit from vertical slicing so each unit produces something demonstrable.
+[Answer]: A
 
 ---
 
-### Question U2 — Unit granularity
+### Question U-R2 — What should be the primary slicing strategy for the retrofit units?
+We have a few natural ways to group the redesign work.
 
-How many units total? The source spec gestures at 12; the execution plan estimated 12–17.
+A) **Architecture-first slices** — one unit for contract terms/pricing core, one for hiring preview/UI, one for runtime energy, one for recurring lifecycle, one for config/test/docs
+B) **Player-journey slices** — one unit for “hire flow”, one for “day-of-work runtime”, one for “recurring life”, one for “admin/config cleanup”
+C) **Hybrid (Recommended)** — start with foundational contract-terms and scope work, then vertical slices for hire preview, shift runtime, recurring lifecycle, and final config/regression cleanup
+X) Other (please describe after [Answer]: tag below)
 
-A) **~12 units** — coarser; some units bundle related Core and Mod pieces (e.g., "Hiring UI" is one unit covering all 4 menus + the coordinator + the overlay)
-B) **~16 units (Recommended)** — finer; each major UI screen or worker subsystem is its own unit. Smaller per-unit Construction loop iteration; more checkpoints
-C) **~22+ units** — very fine; each individual menu screen, each pure-logic primitive separately. More overhead per unit
-X) Other
-
-[Answer]: (recommendation accepted)
-
-> Recommendation: **B**. ~16 units is small enough that each unit's Construction loop finishes in one or two work sessions, but coarse enough to avoid Functional-Design overhead per file. Matches the spec's build-order granularity.
+[Answer]: C
 
 ---
 
-### Question U3 — Where does the test project fit?
+### Question U-R3 — How many retrofit units do you want for this redesign?
+This controls checkpoint size and how much code churn each Construction loop will carry.
 
-The PBT obligations live in `Dayswork.Tests`. How should test code map to units?
+A) **4-5 coarse retrofit units** — fewer checkpoints, each unit rewrites a larger surface area
+B) **6-8 medium retrofit units (Recommended)** — enough separation to isolate pricing core, UI preview, runtime energy, recurring lifecycle, and cleanup/regression without exploding overhead
+C) **9+ fine-grained retrofit units** — tighter focus per loop, but more AI-DLC overhead and more review gates
+X) Other (please describe after [Answer]: tag below)
 
-A) **Tests live in the same unit as the production code they cover** (Recommended) — each Core-unit's Code Generation includes its corresponding test file(s); each Mod-unit's includes whatever light unit tests are practical
-B) **One separate "Test infrastructure" unit early** that sets up `Dayswork.Tests` project, FsCheck integration, shared generators, seed-logging conventions — then each later unit drops tests into the established infrastructure
-X) Other
-
-[Answer]: (recommendation accepted)
-
-> Recommendation: **B**. There's a real setup cost for the test project (csproj, FsCheck/xUnit packaging, shared FsCheck generators per PBT-07, seed-logging CI pattern per PBT-08). Doing it once upfront as its own unit then having subsequent units just add test files is cleaner than re-inventing each time.
+[Answer]: B
 
 ---
 
-### Question U4 — Sequencing strategy
+### Question U-R4 — How should animal/greenhouse scope alignment be grouped?
+Typed work scopes touch both pricing and runtime. We should decide whether that alignment lands early as part of the contract-terms foundation or later inside runtime-oriented units.
 
-How should units be ordered for the Construction loop?
+A) **Include animal/greenhouse scope modeling in the first foundation unit (Recommended)** — make typed scopes part of the earliest contract-terms/pricing unit so every later unit builds on the same scope model
+B) **Split it** — outdoor scope modeling lands in the first unit, while animal/greenhouse alignment waits for later runtime-focused units
+C) **Runtime-first** — keep the first unit focused on price structure only and defer full scope alignment until worker execution units
+X) Other (please describe after [Answer]: tag below)
 
-A) **Dependency-first** — units with no dependencies on later units come first; user-facing features come after their foundations land
-B) **Demo-first** — get a minimum end-to-end happy path running early (even with stubs), then fill in depth. E.g., a "Hello bulletin board" unit ships in week 1 that just adds the menu entry that opens a hardcoded "Hi" dialog; everything else replaces stubs
-C) **Hybrid (Recommended)** — foundational Core units first (no dependencies), then take a thin end-to-end vertical slice (minimal hire-flow → minimal worker → minimal payment) before deepening each feature
-X) Other
-
-[Answer]: (recommendation accepted)
-
-> Recommendation: **C**. Pure dependency-first risks discovering integration issues late. Pure demo-first means re-doing work as scope deepens. The hybrid surfaces integration issues early without throwing away foundational work.
+[Answer]: A
 
 ---
 
-### Question U5 — Where does "Project Scaffold" live?
+### Question U-R5 — Should regression/docs cleanup be a distinct final retrofit unit?
+The redesign also requires build/test doc refresh, story-map cleanup, config/i18n polish, and regression coverage updates. We should choose whether that is its own unit or folded into feature units.
 
-Things like the `Dayswork.sln`, `Dayswork.csproj` with the `<EnableHarmony>true</EnableHarmony>` flag and `ModBuildConfig` NuGet, `manifest.json` skeleton, `i18n/default.json` skeleton, README/LICENSE — these don't map to a user story but are real work.
+A) **Yes, keep a dedicated final cleanup/regression unit (Recommended)** — feature units focus on behavior changes, then a final unit consolidates config/i18n/test/doc updates and cross-cutting regression fixes
+B) **No, fold cleanup into each feature unit** — each retrofit unit must leave its docs/tests/config surface fully updated before moving on
+C) **Hybrid** — do most cleanup inline, but still keep a very small final verification/docs unit
+X) Other (please describe after [Answer]: tag below)
 
-A) **One "Project Scaffold" unit at the very start** (Recommended) — explicit unit; produces a buildable empty mod that loads in SMAPI with a "Dayswork loaded" log line
-B) **Fold scaffold work into the first feature unit** — e.g., the first Core unit includes setting up `Dayswork.sln`; the first Mod unit includes the manifest
-C) **Implicit (not a unit; just "do it before everything")** — risks under-thought decisions
-X) Other
-
-[Answer]: (recommendation accepted)
-
-> Recommendation: **A**. A loadable empty mod is the smallest thing that proves "Construction is unblocked"; it's the foundation literally everything else rests on. Making it a unit forces a clean checkpoint.
+[Answer]: A
 
 ---
 
-## Plan Checklist (Part 2 — runs after approval)
+## Artifact Goals After Approval
 
-When you approve, Part 2 will generate these artifacts in `aidlc-docs/inception/application-design/`:
+The answers are complete and the stage has refreshed these artifacts in `aidlc-docs/inception/application-design/`:
 
-- [x] `unit-of-work.md` — full unit list with: ID, name, purpose, components included, stories implemented, code-organization notes
-- [x] `unit-of-work-dependency.md` — dependency matrix + sequence diagram (Mermaid + text fallback) showing the per-unit Construction loop order
-- [x] `unit-of-work-story-map.md` — mapping from each of the 20 stories in [stories.md](../user-stories/stories.md) to the unit(s) that deliver it
-- [x] Validate every story is covered by at least one unit
-- [x] Validate every component from [components.md](../application-design/components.md) is owned by exactly one unit
+- [x] `unit-of-work.md` — retrofit unit list with purpose, owned/extended components, stories covered, and relationship to historical units
+- [x] `unit-of-work-dependency.md` — dependency matrix and recommended execution order for the retrofit units
+- [x] `unit-of-work-story-map.md` — mapping from refreshed stories to retrofit units and notes on which historical units are being superseded/extended
