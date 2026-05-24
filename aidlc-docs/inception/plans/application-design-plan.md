@@ -1,114 +1,122 @@
-# Application Design Plan — Dayswork
+# Application Design Plan — Pricing Model Redesign
 
-**Status**: Awaiting answers to embedded questions. Reply "done" or "approve" when complete, or just answer interactively.
+**Status**: Answers reviewed, no clarification round needed, and refreshed application-design artifacts generated. Pending user review.
 
-**Scope**: This stage identifies high-level **components**, their **methods (signatures only)**, the **services** that orchestrate them, and **dependencies** between them. Detailed business logic stays out — that's per-unit Functional Design in Construction.
+**Scope**: This pass refreshes the existing application design for the brownfield pricing overhaul. We are not redesigning the entire mod from scratch. We are updating the component model, method seams, orchestration boundaries, and dependencies affected by the move from hourly deposit/refund billing to fixed contract pricing plus worker energy.
 
-**Context loaded**:
-- [requirements.md](../requirements/requirements.md) — 29 FRs across 13 groups, 7 NFR groups
-- [stories.md](../user-stories/stories.md) — 20 stories, 3 personas
-- [execution-plan.md](execution-plan.md) — risks called out
-
----
-
-## Design Questions
-
-These are the genuine decisions that shape the component layout. Recommendations are based on Stardew/SMAPI community norms and the maintainability bar set in NFR-MAINT-01 / S-19.
-
-### Question D1 — Pure-logic separation strategy
-
-Where does the pure logic (rate calc, deposit/refund, zone math, capability eval, save DTOs) live relative to SMAPI-bound code?
-
-A) **Separate project** (e.g., `Dayswork.Core` referenced by `Dayswork`) with **zero** SMAPI/StardewValley assembly references — guarantees you cannot accidentally couple pure logic to the runtime; tests in `Dayswork.Tests` reference only `Dayswork.Core`
-B) **Single project, separated by namespace** (e.g., `Dayswork.Domain.*` vs `Dayswork.Integration.*`) — simpler solution structure; relies on discipline to avoid using SMAPI types in `Domain`
-X) Other
-
-[Answer]: A (recommendation accepted)
-
-> Recommendation: **A**. Mechanically enforces NFR-MAINT-01/03 and makes S-19's PBT obligations trivial to satisfy. The cost is one extra project file. The benefit is "can it compile?" answers "did I just pollute the pure layer?"
+**Previously approved design decisions still assumed unless changed here**:
+- Separate `Dayswork.Core` pure-logic project and `Dayswork` SMAPI project
+- Hand-wired composition root in `ModEntry`
+- Explicit shift state machine
+- Immutable config snapshot semantics
+- Direct orchestration calls instead of an event bus
+- Four-screen menu structure with `HiringFlowCoordinator`
 
 ---
 
-### Question D2 — Dependency injection / composition
-
-How should component dependencies be wired?
-
-A) **Hand-wired composition root** in `ModEntry.Entry()` — a few constructor calls, no DI container; standard for small-to-medium SMAPI mods
-B) **Microsoft.Extensions.DependencyInjection container** — familiar from ASP.NET, scales well, slight overhead and a new dependency
-C) **Static service locator** (a static class exposing singletons) — easy to use but harder to test and a known antipattern
-X) Other
-
-[Answer]: A (recommendation accepted)
-
-> Recommendation: **A**. SMAPI mods are small; a container is overkill. Hand-wired composition is explicit, debuggable, and adds no dependencies. Easy to test because each component takes its dependencies via constructor.
+## Context Loaded
+- [requirements.md](../requirements/requirements.md) — pricing, energy, recurring, greenhouse, animal-scope, pacing, and config redesign rules
+- [stories.md](../user-stories/stories.md) — updated player/admin journeys for the redesign
+- [personas.md](../user-stories/personas.md) — revised player/farmhand/maintainer motivations
+- [execution-plan.md](execution-plan.md) — brownfield retrofit sequence and affected units
+- Existing application-design artifacts in [application-design](/C:/Users/kwood/Repos/dayswork/aidlc-docs/inception/application-design/)
 
 ---
 
-### Question D3 — Shift orchestrator pattern
-
-How should the worker's shift be modeled?
-
-A) **Explicit state machine** (states: `WaitingForSpawn → Working → Stuck → Recovering → Depositing → Exiting → Done`) with transitions driven by the SMAPI `UpdateTicked` event — testable, debuggable, matches the spec's stuck-escalation language
-B) **Imperative update() loop** with nested if/else inside the worker NPC's `update()` override — closer to how vanilla Stardew code works; harder to test
-C) **Coroutine-style** using `IEnumerator` (Unity-ish pattern) — expressive for sequencing but unidiomatic for SMAPI mods; harder for newcomers to read
-X) Other
-
-[Answer]: A (recommendation accepted)
-
-> Recommendation: **A**. The shift has many discrete phases with non-trivial transitions (stuck recovery, festival skip, sleep fast-forward). A state machine makes those transitions explicit, testable in isolation (the state-transition function is pure), and easy to extend if v2 adds more states. The state-machine engine itself becomes part of `Dayswork.Core`.
-
----
-
-### Question D4 — Configuration access pattern
-
-How should components read tunable config values (rates, average-speed constant, stuck thresholds)?
-
-A) **Inject an immutable `IConfigSnapshot` into each component that needs config** — captured per-contract or per-shift; mid-shift config changes don't take effect until next shift (matches FR-PAY-08)
-B) **Inject a live `IConfigProvider`** that always returns current values — components see config changes immediately
-C) **Static config singleton** — easiest to use, hardest to test, doesn't enforce snapshot semantics
-X) Other
-
-[Answer]: A (recommendation accepted)
-
-> Recommendation: **A**. FR-PAY-08 already mandates snapshot semantics ("new rates apply next morning"). Modelling that with an immutable snapshot makes the requirement self-documenting at the type level and tests for rate calc become trivial (no mocking of a live provider).
+## Plan Checklist
+- [x] Review pricing-redesign requirements, stories, personas, and existing application-design artifacts
+- [x] Identify which existing components and services are outdated because they still assume hourly deposits/refunds
+- [x] Prepare targeted application-design questions for the redesign delta instead of redoing settled architecture choices
+- [x] Analyze your answers for ambiguity or contradictions and add follow-up questions if needed
+- [x] Generate refreshed `components.md` with updated responsibilities and project placement
+- [x] Generate refreshed `component-methods.md` with redesigned pricing/energy/service interfaces
+- [x] Generate refreshed `services.md` with updated orchestration flows
+- [x] Generate refreshed `component-dependency.md` with updated dependency and data-flow relationships
+- [x] Validate the refreshed application design for completeness and consistency
+- [x] Generate refreshed `application-design.md` consolidating the redesign architecture
 
 ---
 
-### Question D5 — Cross-component eventing
+## Redesign Questions
 
-Some events are interesting to multiple components (e.g., "shift ended" matters to refund calc, mail dispatcher, NPC despawn, save persistence). How should those fan out?
+### Question AD-R1 — Pricing core component boundaries
+The old design had `RateCalculator`, `DepositCalculator`, `RefundCalculator`, and `HoursEstimator` as first-class pricing components. The redesign needs a new pure-logic pricing surface.
 
-A) **In-process event bus** (a tiny pub/sub class in `Dayswork.Core`) — components subscribe at composition; orchestrator publishes events
-B) **Direct method calls** from the orchestrator to each affected component, in a fixed order — explicit, simple, harder to extend
-C) **SMAPI's own events for everything** (`DayEnding`, `Saving`, `TimeChanged`) — relies on SMAPI's lifecycle entirely; can't represent mod-internal events
-X) Other
+A) **Split pricing into focused pure components (Recommended)** — introduce components such as `ScopeClassifier` / `ServiceBandCalculator`, `ContractPriceCalculator`, and `PriceBreakdownBuilder`, with hourly deposit/refund components removed from the architecture
+B) **One unified pricing engine** — replace the old pricing components with a single `ContractPricingEngine` that returns total price and breakdown in one call
+C) **Minimal rename/refactor of the old components** — keep a calculator-heavy shape and repurpose the existing pricing components even if some names become less exact
+X) Other (please describe after [Answer]: tag below)
 
-[Answer]: A (recommendation accepted)
-
-> Recommendation: **B** for v1. The number of fan-out events is small and stable (shift started, shift ended, deposit overflowed, contract created/cancelled). An event bus is the right move at v2 if subscribers proliferate. For v1, direct method calls in a documented order keep the orchestrator readable for someone new to the codebase.
-
----
-
-### Question D6 — UI menu structure
-
-The four hiring screens — one big menu class with internal screen state, or four small `IClickableMenu` subclasses?
-
-A) **Four separate `IClickableMenu` subclasses** with a thin coordinator that hands off between them (`HiringFlowCoordinator`) — each screen is independently testable / readable / replaceable
-B) **One `HireFarmhandMenu : IClickableMenu`** with an internal `currentScreen` enum and conditional render/handle logic — fewer files; common Stardew pattern for small flows
-X) Other
-
-[Answer]: A (recommendation accepted)
-
-> Recommendation: **A**. Four screens with substantial individual responsibility (Screen 2 alone has zone draw mode + chest assignment dropdown — a screen unto itself). Separate classes also make gamepad-focus management cleaner.
+[Answer]: A
 
 ---
 
-## Plan Checklist (executes after approval)
+### Question AD-R2 — How contract price should be represented on saved contracts
+We need a consistent design for one-time and recurring contracts, especially because recurring prices are derived from saved scope plus current config, while one-time contracts are prepaid at confirmation.
 
-When you approve, Part 2 will generate these artifacts in `aidlc-docs/inception/application-design/`:
+A) **Persist both scope and a computed pricing snapshot (Recommended)** — save the scope/config-derived price breakdown used when the contract is created or edited, while still allowing recurring repricing workflows to rebuild a new snapshot when appropriate
+B) **Persist scope only; always recompute price on demand** — menus and day-start flows derive price fresh each time from saved scope and current config
+C) **Persist only a flat total price** — keep the saved contract price minimal and rebuild any breakdown purely for UI display when possible
+X) Other (please describe after [Answer]: tag below)
 
-- [x] `components.md` — every named component with purpose, responsibilities, public interface, and which project (Core vs Mod) it lives in
-- [x] `component-methods.md` — method signatures for each component's public interface; brief purpose + I/O types per method (no business logic — that's Functional Design)
-- [x] `services.md` — orchestration services (shift orchestrator, hiring-flow coordinator, mail dispatcher, etc.) and how they sequence component calls
-- [x] `component-dependency.md` — dependency matrix + data-flow diagram (Mermaid + text fallback)
-- [x] `application-design.md` — consolidated overview tying all of the above together with a high-level architecture diagram
+[Answer]: A
+
+---
+
+### Question AD-R3 — Work-scope modeling for zones, barns/coops, and greenhouse
+The redesign now has three distinct pricing/work anchors: outdoor zones, animal buildings, and the greenhouse.
+
+A) **Explicit typed work scopes (Recommended)** — represent them as distinct scope records/components, such as outdoor-zone scope, animal-building scope, and greenhouse scope, then build pricing and runtime behavior on top of that common abstraction
+B) **Keep today’s mixed representation** — zones and building selections stay in ad hoc contract fields, and pricing/runtime logic interpret those fields directly
+C) **Pricing-only typed scopes** — add a typed scope model only inside the pricing layer, while the rest of the runtime continues to use the existing contract representation
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: A
+
+---
+
+### Question AD-R4 — Energy accounting ownership
+Worker energy now affects execution, visibility, and contract feel. We need to decide whether energy is embedded in shift state or given its own component boundary.
+
+A) **Dedicated pure energy component (Recommended)** — add a focused `WorkerEnergyLedger` / `EnergyCostCalculator` style component in `Dayswork.Core`, and let the shift/orchestrator consume it
+B) **Energy lives inside shift state only** — no separate component; the state machine/context owns all energy tracking and action-cost math directly
+C) **Hybrid** — a pure component defines action costs while the mutable remaining-energy tracking lives inside shift state/context
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: A
+
+---
+
+### Question AD-R5 — Hiring preview orchestration
+The updated UI needs live price contribution breakdowns, scope-sensitive messaging, and worker-energy summary information. We should decide whether menus assemble this themselves or rely on a dedicated seam.
+
+A) **Dedicated preview/query service (Recommended)** — introduce a `ContractPreviewService` or similar orchestrator/facade that menus call to get a single preview model containing price breakdown, scope classification, and energy summary
+B) **Menus compose pricing pieces directly** — `TaskSelectionMenu` and `SummaryMenu` call the underlying pricing/scope/energy components themselves through the coordinator
+C) **Coordinator-owned preview assembly** — `HiringFlowCoordinator` computes all preview models and pushes them into the menus
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: A
+
+---
+
+### Question AD-R6 — Transition strategy for old saved contracts
+The codebase and possibly player saves may still contain active contracts shaped around the hourly deposit/refund system.
+
+A) **Add an explicit migration path (Recommended)** — keep a compatibility seam in persistence/load logic that upgrades old saved contracts into the new pricing model or marks them for safe repricing
+B) **Invalidate old active contracts on load** — if a saved contract predates the redesign, clear or deactivate it and surface a player-facing explanation
+C) **Best-effort reinterpretation with no formal migration type** — load old contracts through the current DTO path and reprice them from whatever saved scope still exists
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: X, this project has not been released yet so we do not need to transition old contracts. Just delete old ones and do not surface an explanation.
+
+---
+
+## Artifact Goals After Approval
+
+When the answers are complete and approved, this stage will refresh these artifacts in `aidlc-docs/inception/application-design/`:
+
+- [ ] `components.md` — updated pricing, scope, energy, preview, persistence, and runtime component inventory
+- [ ] `component-methods.md` — revised method signatures reflecting fixed-price and energy-oriented interfaces
+- [ ] `services.md` — updated sequences for hiring preview, shift runtime, recurring charging, and persistence/migration
+- [ ] `component-dependency.md` — refreshed dependency map and communication/data-flow patterns
+- [ ] `application-design.md` — consolidated brownfield redesign architecture and rationale

@@ -1,72 +1,76 @@
-# Component Dependencies — Dayswork
+# Component Dependencies — Dayswork Pricing Model Redesign
 
-## Dependency rules (architecturally enforced)
+## Dependency Rules
 
-1. **`Dayswork.Core` may not reference SMAPI / StardewValley assemblies.** Enforced at the project file level — only `Newtonsoft.Json` as an outside dependency. Violations are a compile error.
-2. **`Dayswork.Tests` references only `Dayswork.Core`.** Catches accidental SMAPI coupling at test build time.
-3. **`Dayswork` (the mod project) references both `Dayswork.Core` and SMAPI/Stardew.** All adapters / orchestration live here.
-4. **Direction**: SMAPI-facing components depend on Core abstractions, not vice versa. Core does not know about SMAPI events, NPCs, menus, or game state.
-5. **Composition is hand-wired in `ModEntry.Entry()` (D2).** No DI container, no service locator.
+1. `Dayswork.Core` may not reference SMAPI or StardewValley assemblies.
+2. `Dayswork.Tests` references only `Dayswork.Core`.
+3. `Dayswork` references `Dayswork.Core` plus SMAPI/Stardew APIs.
+4. Dependency direction remains **Mod -> Core**, never Core -> Mod.
+5. Composition is still hand-wired in `ModEntry.Entry()`.
+6. The fixed-price and energy redesign must remain testable through pure Core seams.
 
 ---
 
-## Dependency diagram (Mermaid)
+## Dependency Diagram (Mermaid)
 
 ```mermaid
 flowchart TD
-    subgraph SMAPI["SMAPI Runtime (external)"]
-        smapi_events[GameLoop / Display / Input events]
-        smapi_data[Helper.Data]
-        smapi_mail[Helper.Mail]
-        smapi_translation[Helper.Translation]
-        harmony[Harmony]
-        gmcm[GenericModConfigMenu - optional]
-        game1[Game1 - player, weather, location, npcs]
+    subgraph smapi["SMAPI Runtime"]
+        smapiEvents["GameLoop / Display / Input events"]
+        smapiData["Helper.Data"]
+        smapiMail["Mail / MFM"]
+        smapiTranslation["Helper.Translation"]
+        harmony["Harmony"]
+        gmcm["GMCM (optional)"]
+        game1["Game1 / locations / NPCs"]
     end
 
-    subgraph Core["Dayswork.Core (no SMAPI refs)"]
-        rate[RateCalculator]
-        deposit[DepositCalculator]
-        refund[RefundCalculator]
-        hours[HoursEstimator]
-        geom[ZoneGeometry]
-        caps[CapabilityEvaluator]
-        order[TaskPriorityOrderer]
-        machine[ShiftStateMachine]
-        stuck[StuckDetector]
-        buffer[ItemBuffer]
-        planner[DepositPlanner]
-        store[ContractStore]
-        serializer[SaveDataSerializer]
-        config[IConfigSnapshot]
-        defaults[ConfigDefaults]
+    subgraph core["Dayswork.Core"]
+        scope["WorkScopeClassifier"]
+        bands["OutdoorServiceBandClassifier"]
+        price["ContractPriceCalculator"]
+        breakdown["PriceBreakdownBuilder"]
+        energyProfile["WorkerEnergyProfileBuilder"]
+        terms["ContractTermsBuilder"]
+        energyLedger["WorkerEnergyLedger"]
+        geom["ZoneGeometry"]
+        caps["CapabilityEvaluator"]
+        order["TaskPriorityOrderer"]
+        machine["ShiftStateMachine"]
+        stuck["StuckDetector"]
+        buffer["ItemBuffer"]
+        planner["DepositPlanner"]
+        store["ContractStore"]
+        serializer["SaveDataSerializer"]
+        config["ConfigSnapshot"]
+        defaults["ConfigDefaults"]
     end
 
-    subgraph Mod["Dayswork (SMAPI mod)"]
-        entry[ModEntry]
-        patch[BulletinBoardPatch]
-        coord[HiringFlowCoordinator]
-        m1[TaskSelectionMenu]
-        m2[ZoneAndChestMenu]
-        m3[ScheduleMenu]
-        m4[SummaryMenu]
-        overlay[ZoneDrawOverlay]
-        npc[FarmhandNpc]
-        anim[ToolSwapAnimator]
-        path[PathFindControllerAdapter]
-        orch[ShiftOrchestrator]
-        sched[RecurringContractScheduler]
-        cal[CalendarHandlers]
-        persist[ContractPersistenceAdapter]
-        mail[MailDispatcher]
-        gmcmreg[GMCMRegistrar]
-        guard[MultiplayerGuard]
-        tools[ToolLevelReader]
-        chests[ChestResolver]
-        i18n[I18nHelper]
+    subgraph mod["Dayswork"]
+        entry["ModEntry"]
+        patch["BulletinBoardPatch"]
+        coord["HiringFlowCoordinator"]
+        menu1["TaskSelectionMenu"]
+        menu2["ZoneAndChestMenu"]
+        menu3["ScheduleMenu"]
+        menu4["SummaryMenu"]
+        overlay["ZoneDrawOverlay"]
+        npc["FarmhandNpc"]
+        anim["ToolSwapAnimator"]
+        path["PathFindControllerAdapter"]
+        orch["ShiftOrchestrator"]
+        sched["RecurringContractScheduler"]
+        cal["CalendarHandlers"]
+        persist["ContractPersistenceAdapter"]
+        mail["MailDispatcher"]
+        gmcmreg["GMCMRegistrar"]
+        guard["MultiplayerGuard"]
+        tools["ToolLevelReader"]
+        chests["ChestResolver"]
+        i18n["I18nHelper"]
     end
 
-    smapi_events --> entry
+    smapiEvents --> entry
     entry --> patch
     entry --> coord
     entry --> orch
@@ -79,42 +83,43 @@ flowchart TD
     entry --> tools
     entry --> chests
     entry --> i18n
+    entry --> defaults
 
     patch --> coord
     patch --> guard
 
-    coord --> m1
-    coord --> m2
-    coord --> m3
-    coord --> m4
-    coord --> rate
-    coord --> hours
-    coord --> deposit
+    coord --> terms
     coord --> store
     coord --> chests
     coord --> game1
+    coord --> menu1
+    coord --> menu2
+    coord --> menu3
+    coord --> menu4
+    menu2 --> overlay
 
-    m2 --> overlay
-    m2 --> chests
+    terms --> scope
+    terms --> bands
+    terms --> price
+    terms --> breakdown
+    terms --> energyProfile
+    terms --> config
 
     sched --> store
-    sched --> cal
-    sched --> rate
-    sched --> deposit
-    sched --> hours
+    sched --> terms
     sched --> orch
+    sched --> cal
     sched --> mail
     sched --> guard
-    sched --> tools
     sched --> game1
 
     orch --> machine
+    orch --> energyLedger
+    orch --> caps
+    orch --> order
     orch --> stuck
     orch --> buffer
     orch --> planner
-    orch --> caps
-    orch --> order
-    orch --> refund
     orch --> npc
     orch --> path
     orch --> anim
@@ -123,20 +128,20 @@ flowchart TD
     orch --> game1
 
     cal --> orch
-    cal --> store
+    cal --> game1
 
     persist --> store
     persist --> serializer
-    persist --> smapi_data
+    persist --> smapiData
 
-    mail --> smapi_mail
+    mail --> smapiMail
     mail --> i18n
 
     gmcmreg --> gmcm
     gmcmreg --> i18n
     gmcmreg --> config
 
-    i18n --> smapi_translation
+    i18n --> smapiTranslation
 
     patch -.-> harmony
     npc -.-> game1
@@ -144,93 +149,110 @@ flowchart TD
     tools -.-> game1
     chests -.-> game1
 
-    style Core fill:#C8E6C9,stroke:#2E7D32,stroke-width:2px,color:#000
-    style Mod fill:#BBDEFB,stroke:#1565C0,stroke-width:2px,color:#000
-    style SMAPI fill:#FFF59D,stroke:#F57F17,stroke-width:2px,color:#000
+    style core fill:#C8E6C9,stroke:#2E7D32,stroke-width:2px,color:#000
+    style mod fill:#BBDEFB,stroke:#1565C0,stroke-width:2px,color:#000
+    style smapi fill:#FFF59D,stroke:#F57F17,stroke-width:2px,color:#000
 ```
 
 ---
 
-## Text fallback — adjacency list
+## Text Fallback — Adjacency Summary
 
-For accessibility / parser fallback:
+### Core inbound callers
+- `WorkScopeClassifier` <- `ContractTermsBuilder`
+- `OutdoorServiceBandClassifier` <- `ContractTermsBuilder`
+- `ContractPriceCalculator` <- `ContractTermsBuilder`
+- `PriceBreakdownBuilder` <- `ContractTermsBuilder`
+- `WorkerEnergyProfileBuilder` <- `ContractTermsBuilder`
+- `ContractTermsBuilder` <- `HiringFlowCoordinator`, `RecurringContractScheduler`
+- `WorkerEnergyLedger` <- `ShiftOrchestrator`
+- `ZoneGeometry` <- scope/pricing helpers and runtime scanners
+- `CapabilityEvaluator` <- `ShiftOrchestrator`
+- `TaskPriorityOrderer` <- `ShiftOrchestrator`
+- `ShiftStateMachine` <- `ShiftOrchestrator`
+- `StuckDetector` <- `ShiftOrchestrator`
+- `ItemBuffer` <- `ShiftOrchestrator`
+- `DepositPlanner` <- `ShiftOrchestrator`
+- `ContractStore` <- `HiringFlowCoordinator`, `RecurringContractScheduler`, `ContractPersistenceAdapter`
+- `SaveDataSerializer` <- `ContractPersistenceAdapter`
+- `ConfigSnapshot` <- `ContractTermsBuilder`, `GMCMRegistrar`, `ModEntry`
+- `ConfigDefaults` <- `ModEntry`
 
-**Inbound to Core components** (who reads / calls them):
-- `RateCalculator` ← HiringFlowCoordinator, RecurringContractScheduler
-- `DepositCalculator` ← HiringFlowCoordinator, RecurringContractScheduler
-- `RefundCalculator` ← ShiftOrchestrator
-- `HoursEstimator` ← HiringFlowCoordinator, RecurringContractScheduler
-- `ZoneGeometry` ← HoursEstimator (Core-internal), ShiftOrchestrator
-- `CapabilityEvaluator` ← ShiftOrchestrator
-- `TaskPriorityOrderer` ← ShiftOrchestrator
-- `ShiftStateMachine` ← ShiftOrchestrator (one instance per shift)
-- `StuckDetector` ← ShiftOrchestrator
-- `ItemBuffer` ← ShiftOrchestrator
-- `DepositPlanner` ← ShiftOrchestrator
-- `ContractStore` ← HiringFlowCoordinator, RecurringContractScheduler, CalendarHandlers, ContractPersistenceAdapter
-- `SaveDataSerializer` ← ContractPersistenceAdapter
-- `IConfigSnapshot` ← (passed by value almost everywhere)
-- `ConfigDefaults` ← ModEntry
-
-**Inbound to Mod components**:
-- `ModEntry` ← SMAPI (lifecycle entry point)
-- `BulletinBoardPatch` ← Harmony (via patch dispatch)
-- `HiringFlowCoordinator` ← BulletinBoardPatch
-- 4 menu classes ← HiringFlowCoordinator
-- `ZoneDrawOverlay` ← ZoneAndChestMenu
-- `FarmhandNpc` ← ShiftOrchestrator (constructs at shift start)
-- `ToolSwapAnimator` ← ShiftOrchestrator (constructs per shift)
-- `PathFindControllerAdapter` ← ShiftOrchestrator
-- `ShiftOrchestrator` ← RecurringContractScheduler, CalendarHandlers
-- `RecurringContractScheduler` ← SMAPI DayStarted via ModEntry
-- `CalendarHandlers` ← SMAPI Saving via ModEntry, RecurringContractScheduler, ShiftOrchestrator
-- `ContractPersistenceAdapter` ← SMAPI SaveLoaded / Saving via ModEntry
-- `MailDispatcher` ← ShiftOrchestrator, RecurringContractScheduler
-- `GMCMRegistrar` ← ModEntry (once at startup)
-- `MultiplayerGuard` ← ModEntry, BulletinBoardPatch, RecurringContractScheduler
-- `ToolLevelReader` ← RecurringContractScheduler, ShiftOrchestrator
-- `ChestResolver` ← HiringFlowCoordinator, ZoneAndChestMenu, ShiftOrchestrator
-- `I18nHelper` ← every component that emits player-visible strings
+### Mod inbound callers
+- `ModEntry` <- SMAPI
+- `BulletinBoardPatch` <- Harmony/entry wiring
+- `HiringFlowCoordinator` <- `BulletinBoardPatch`
+- `TaskSelectionMenu`, `ZoneAndChestMenu`, `ScheduleMenu`, `SummaryMenu` <- `HiringFlowCoordinator`
+- `ZoneDrawOverlay` <- `ZoneAndChestMenu`
+- `FarmhandNpc` <- `ShiftOrchestrator`
+- `ToolSwapAnimator` <- `ShiftOrchestrator`
+- `PathFindControllerAdapter` <- `ShiftOrchestrator`
+- `ShiftOrchestrator` <- `RecurringContractScheduler`, `CalendarHandlers`, SMAPI tick/time events
+- `RecurringContractScheduler` <- SMAPI `DayStarted`
+- `CalendarHandlers` <- SMAPI `Saving`, `RecurringContractScheduler`
+- `ContractPersistenceAdapter` <- SMAPI save events
+- `MailDispatcher` <- `RecurringContractScheduler`, `ShiftOrchestrator`
+- `GMCMRegistrar` <- `ModEntry`
+- `MultiplayerGuard` <- `ModEntry`, `BulletinBoardPatch`, `RecurringContractScheduler`
+- `ToolLevelReader` <- `ShiftOrchestrator`
+- `ChestResolver` <- `HiringFlowCoordinator`, `ShiftOrchestrator`
+- `I18nHelper` <- UI/config/mail components
 
 ---
 
-## Coupling assessment
+## Coupling Assessment
 
 | Concern | Status |
 |---|---|
-| **Cycles** | None. Dependency arrows are strictly Mod → Core, never Core → Mod. Within Mod, orchestrators call adapters/components; no back-calls. |
-| **God-objects** | None. The two largest classes are `ModEntry` (composition only, no logic) and `ShiftOrchestrator` (~10 collaborators but a clear sequencing role). |
-| **Hidden dependencies** | None. Static singletons explicitly avoided per D2. All dependencies passed via constructors. |
-| **SMAPI leakage into Core** | Enforced at project boundary — Core has no SMAPI assembly reference, so a leak fails to compile. |
-| **Test isolation** | `Dayswork.Tests` builds against only Core, so all Core components are testable without launching Stardew. Mod components are play-tested manually + spot-covered with light xUnit where worthwhile. |
+| **Core purity** | Preserved. The pricing/energy redesign remains entirely expressible without SMAPI references. |
+| **Cycles** | None introduced. The main shape is still Mod -> Core, with no reverse dependency. |
+| **UI/business-logic leakage** | Reduced. Menus no longer assemble pricing themselves; they depend on `ContractTermsBuilder` through the coordinator. |
+| **Runtime/billing entanglement** | Reduced. `ShiftOrchestrator` consumes stored terms and energy state; it no longer calculates refunds or settlement billing. |
+| **Legacy-save complexity** | Intentionally minimized. Serializer drops legacy pre-release contracts instead of trying to migrate them. |
 
 ---
 
-## Data flow at a glance
+## Data Flow At A Glance
 
-```
-Hiring flow:
-  player → BulletinBoardPatch → HiringFlowCoordinator → 4 menus
-                                                       → ContractStore.Add()
-                                                       → Game1.player.Money -= deposit
+```text
+Hiring preview:
+  player
+    -> BulletinBoardPatch
+    -> HiringFlowCoordinator
+    -> ContractTermsBuilder
+       -> WorkScopeClassifier
+       -> OutdoorServiceBandClassifier
+       -> ContractPriceCalculator
+       -> PriceBreakdownBuilder
+       -> WorkerEnergyProfileBuilder
+    -> menus render ContractPreview
 
-Daily lifecycle:
-  SMAPI DayStarted → RecurringContractScheduler
-                       ↳ for each contract:
-                          → guards (festival / multiplayer / can-afford)
-                          → ShiftOrchestrator.StartShift(contract, tools, config)
+One-time confirmation:
+  SummaryMenu confirm
+    -> HiringFlowCoordinator
+    -> ContractTermsSnapshot persisted in ContractStore
+    -> Game1.player.Money -= fixed total price
 
-Per-shift execution:
-  SMAPI UpdateTicked → ShiftOrchestrator
-                         → ShiftStateMachine.Step(event)
-                         → dispatch returned intents (move / task / emote / deposit / refund / exit)
+Recurring day start:
+  SMAPI DayStarted
+    -> RecurringContractScheduler
+    -> ContractTermsBuilder.RebuildTerms(...)
+    -> ContractStore.ReplaceTermsSnapshot(...)
+    -> affordability check
+    -> fixed daily charge
+    -> ShiftOrchestrator.StartShift(...)
 
-Per-shift conclusion:
-  intent ApplyRefund → Game1.player.Money += refund
-  intent QueueMail   → MailDispatcher → SMAPI mail next morning
+Shift runtime:
+  UpdateTicked / TimeChanged
+    -> ShiftOrchestrator
+    -> ShiftStateMachine
+    -> WorkerEnergyLedger
+    -> deposit/exit intents
 
-Save/load:
-  SMAPI SaveLoaded → ContractPersistenceAdapter.Deserialize → ContractStore.Hydrate
-  SMAPI Saving     → ContractPersistenceAdapter.Serialize ← ContractStore.List
-                  + CalendarHandlers.OnSavingHook → ShiftOrchestrator (sleep fast-forward if mid-shift)
+Persistence:
+  SaveLoaded
+    -> ContractPersistenceAdapter
+    -> SaveDataSerializer.Deserialize(...)
+    -> legacy contracts silently dropped if old schema
+    -> ContractStore hydration
 ```

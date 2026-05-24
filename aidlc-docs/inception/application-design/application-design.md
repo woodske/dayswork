@@ -1,84 +1,112 @@
-# Application Design — Dayswork (Consolidated)
+# Application Design — Pricing Model Redesign
 
-> This document is the entry point to the Application Design stage. It ties together [components.md](components.md), [component-methods.md](component-methods.md), [services.md](services.md), and [component-dependency.md](component-dependency.md).
->
-> **📎 Verification addendum**: After producing this design, we cross-checked it against the current Stardew/SMAPI wiki and source. Findings live in [design-verification-notes.md](design-verification-notes.md) — 8 minor adjustments captured (V1–V8), 1 user decision needed (V9 — mail-attachment strategy), 4 items deferred to Construction. Core architecture (D1–D6) is unchanged.
+This document is the consolidated entry point for the refreshed Application Design stage. It supersedes only the pricing-related seams of the earlier design. The broader project architecture remains the same: pure logic in `Dayswork.Core`, SMAPI integration in `Dayswork`, and tests against the pure layer in `Dayswork.Tests`.
 
----
-
-## Architectural decisions (locked in via D1–D6)
-
-| Question | Decision | Why |
-|---|---|---|
-| **D1 Pure-logic separation** | Separate `Dayswork.Core` project, zero SMAPI refs | Mechanically enforces NFR-MAINT-01; PBT obligations from S-19 land trivially |
-| **D2 Composition** | Hand-wired in `ModEntry.Entry()`; no DI container | Standard for SMAPI mods; explicit; no new dependencies |
-| **D3 Shift orchestrator** | Explicit state machine in Core; intents executed by Mod-side orchestrator | Testable state-transition function; matches stuck-escalation language in spec |
-| **D4 Config access** | Immutable `IConfigSnapshot` injected per shift | FR-PAY-08 says rate changes apply next morning — snapshot semantics enforce that at the type level |
-| **D5 Eventing** | Direct method calls in fixed order; no event bus in v1 | Few fan-out points; orchestrator readability beats abstraction overhead |
-| **D6 UI menus** | Four separate `IClickableMenu` subclasses + `HiringFlowCoordinator` | Screen 2 alone justifies its own class; gamepad-focus management cleaner |
+Supporting design artifacts:
+- [components.md](components.md)
+- [component-methods.md](component-methods.md)
+- [services.md](services.md)
+- [component-dependency.md](component-dependency.md)
+- [design-verification-notes.md](design-verification-notes.md) for non-pricing SMAPI/Stardew verification details that still apply
 
 ---
 
-## High-level architecture diagram
+## Redesign Decisions Locked In
+
+| Decision | Outcome |
+|---|---|
+| **Pure-logic separation** | Unchanged: `Dayswork.Core` stays free of SMAPI/Stardew references |
+| **Composition** | Unchanged: hand-wired in `ModEntry` |
+| **Shift orchestration** | Unchanged in shape: explicit state machine |
+| **Config semantics** | Unchanged in principle: immutable snapshots still matter |
+| **Pricing architecture** | Changed: remove hourly deposit/refund/estimated-hours components entirely |
+| **Saved contract shape** | Changed: persist both scope and computed contract-terms snapshot |
+| **Scope modeling** | Changed: explicit typed scopes for outdoor work, animal buildings, and greenhouse |
+| **Energy architecture** | Changed: dedicated pure energy profile + ledger |
+| **Preview/query seam** | Changed: dedicated pure `ContractTermsBuilder` used by UI and recurring scheduler |
+| **Legacy contract handling** | Changed: silently drop unreleased legacy hourly contracts instead of migrating them |
+
+---
+
+## Architectural Summary
+
+The redesign introduces a cleaner contract model:
+
+- **Typed work scopes** define what kind of work the contract covers:
+  - outdoor zones
+  - selected barns/coops
+  - greenhouse crop scope
+- **Contract terms snapshots** define what was promised and what was charged:
+  - fixed pricing breakdown
+  - worker energy profile
+- **Recurring day-start logic** rebuilds terms from saved scope plus current config
+- **One-time contracts** keep the terms snapshot created at confirmation time
+- **Shift runtime** consumes stored terms and energy state, but no longer calculates refunds/change settlement
+
+This separates three concerns that were previously entangled:
+
+1. **What the player selected**
+2. **What that selection costs**
+3. **How much work the worker can physically perform that day**
+
+---
+
+## High-Level Architecture Diagram
 
 ```mermaid
 flowchart LR
     subgraph game["Stardew Valley + SMAPI"]
-        player[player]
-        smapi[SMAPI events]
+        player["Player"]
+        smapi["SMAPI events"]
     end
 
-    subgraph mod["Dayswork (SMAPI Mod Project)"]
-        direction TB
-        entry[ModEntry - composition root]
-        ui[Hiring UI - 4 menus + coordinator]
-        worker[Worker Subsystem - NPC + animator + pathfinding adapter]
-        orch[Orchestration - shift / scheduler / calendar]
-        adapters[SMAPI Adapters - persistence / mail / GMCM / tools / chests / i18n / multiplayer]
-        patches[Harmony Patches]
+    subgraph mod["Dayswork"]
+        entry["ModEntry"]
+        ui["Hiring UI + coordinator"]
+        runtime["Shift / scheduler / calendar orchestration"]
+        adapters["Persistence / mail / GMCM / tool / chest / i18n adapters"]
+        patch["Bulletin board patch"]
     end
 
-    subgraph core["Dayswork.Core (pure logic, no SMAPI)"]
-        pricing[Pricing - rate / deposit / refund / hours]
-        domain[Domain - Contract / Zone / ChestRef / TaskKind]
-        shifts[Shifts - state machine / priority / stuck / buffer / planner]
-        geom[Geometry / Capability]
-        cfg[Config snapshot]
-        persist[Persistence DTOs + serializer]
-        contracts[ContractStore]
+    subgraph core["Dayswork.Core"]
+        pricing["Typed scopes + fixed pricing snapshots"]
+        energy["Energy profile + runtime ledger"]
+        shift["Shift state machine + priority + stuck"]
+        inventory["Item buffer + deposit planner"]
+        persistence["Contracts + save serializer"]
+        shared["Geometry + capability + config"]
     end
 
     subgraph tests["Dayswork.Tests"]
-        xunit[xUnit + FsCheck PBT]
+        pbt["xUnit + FsCheck"]
     end
 
-    player -->|interacts with bulletin board| patches
-    smapi -->|lifecycle events| entry
+    player --> patch
+    smapi --> entry
     entry --> ui
-    entry --> orch
+    entry --> runtime
     entry --> adapters
-    entry --> patches
+    entry --> patch
 
     ui --> pricing
-    ui --> domain
-    ui --> contracts
+    ui --> energy
+    ui --> persistence
 
-    orch --> shifts
-    orch --> pricing
-    orch --> geom
-    orch --> cfg
-    orch --> contracts
-    orch --> worker
-    orch --> adapters
+    runtime --> pricing
+    runtime --> energy
+    runtime --> shift
+    runtime --> inventory
+    runtime --> shared
+    runtime --> adapters
 
-    adapters --> persist
-    adapters --> contracts
+    adapters --> persistence
 
-    xunit --> pricing
-    xunit --> shifts
-    xunit --> geom
-    xunit --> persist
-    xunit --> domain
+    pbt --> pricing
+    pbt --> energy
+    pbt --> shift
+    pbt --> inventory
+    pbt --> persistence
+    pbt --> shared
 
     style core fill:#C8E6C9,stroke:#2E7D32,stroke-width:2px,color:#000
     style mod fill:#BBDEFB,stroke:#1565C0,stroke-width:2px,color:#000
@@ -86,88 +114,114 @@ flowchart LR
     style game fill:#FFF59D,stroke:#F57F17,stroke-width:2px,color:#000
 ```
 
-### Text fallback
+### Text Fallback
 
-```
-+--------------------------+         +--------------------------------+
-|  Stardew Valley + SMAPI  |         |       Dayswork.Tests           |
-|  (player, events)        |         |       (xUnit + FsCheck)        |
-+--------------------------+         +--------------------------------+
-            |                                       |
-            v                                       v references only Core
-+------------------------------------+   +----------------------------+
-|        Dayswork (SMAPI mod)        |   |   Dayswork.Core            |
-|  - ModEntry (composition root)     |-->|   (NO SMAPI references)    |
-|  - Hiring UI (4 menus + coord)     |   |   - Pricing                |
-|  - Worker subsystem (NPC, anim)    |   |   - Domain                 |
-|  - Orchestration (shift, sched,    |   |   - Shifts (state machine) |
-|    calendar)                       |   |   - Geometry / Capability  |
-|  - SMAPI adapters                  |   |   - Config snapshot        |
-|    (persistence, mail, GMCM,       |   |   - Persistence (DTOs +    |
-|     tools, chests, i18n, MP)       |   |     serializer)            |
-|  - Harmony patches                 |   |   - ContractStore          |
-+------------------------------------+   +----------------------------+
+```text
+Player / SMAPI
+  -> Dayswork integration layer
+     -> Hiring UI + coordinator
+     -> Shift / scheduler / calendar orchestration
+     -> Persistence / mail / config / chest / i18n adapters
+
+Dayswork integration layer
+  -> Dayswork.Core pricing layer
+  -> Dayswork.Core energy layer
+  -> Dayswork.Core shift/state layer
+  -> Dayswork.Core inventory layer
+  -> Dayswork.Core persistence layer
+  -> Dayswork.Core shared geometry/capability/config layer
+
+Dayswork.Tests
+  -> tests the pure Core layers directly
 ```
 
 ---
 
-## Component inventory at a glance
+## What Changed From The Earlier Design
 
-- **14 Core components** (testable without launching the game):
-  RateCalculator · DepositCalculator · RefundCalculator · HoursEstimator · ZoneGeometry · CapabilityEvaluator · TaskPriorityOrderer · ShiftStateMachine · StuckDetector · ItemBuffer · DepositPlanner · ContractStore · SaveDataSerializer · ConfigSnapshot
+### Removed concepts
+- hourly rate as the main player-facing price model
+- deposit calculation at hire/day-start
+- refund calculation at shift end
+- estimated-hours preview as the main contract explanation
 
-- **21 Mod components** (SMAPI-bound):
-  ModEntry · BulletinBoardPatch · HiringFlowCoordinator · TaskSelectionMenu · ZoneAndChestMenu · ScheduleMenu · SummaryMenu · ZoneDrawOverlay · FarmhandNpc · ToolSwapAnimator · PathFindControllerAdapter · ShiftOrchestrator · RecurringContractScheduler · CalendarHandlers · ContractPersistenceAdapter · MailDispatcher · GMCMRegistrar · MultiplayerGuard · ToolLevelReader · ChestResolver · I18nHelper
+### Added concepts
+- typed work-scope modeling
+- outdoor service banding
+- persisted pricing snapshots
+- persisted worker-energy profiles
+- runtime energy ledger
+- shared pure contract-terms builder for preview and recurring daily activation
 
-- **6 Services** (orchestrators that sequence components):
-  S-A ModEntry composition · S-B HiringFlowCoordinator · S-C ShiftOrchestrator · S-D RecurringContractScheduler · S-E ContractPersistenceAdapter · S-F MailDispatcher
-
-See [components.md](components.md) for purpose and responsibilities, [component-methods.md](component-methods.md) for interface signatures, [services.md](services.md) for orchestration sequences, [component-dependency.md](component-dependency.md) for the dependency graph.
+### Preserved concepts
+- chest/mail output safety model
+- tool capability snapshot
+- broad task priority ordering
+- stuck handling
+- building traversal and deposit pipeline
+- save-data persistence approach
 
 ---
 
-## Mapping back to requirements
+## Requirement Coverage Highlights
 
-Every FR group from `requirements.md §2` maps to at least one Core or Mod component:
-
-| FR group | Primary components |
+| Requirement area | Primary design seam |
 |---|---|
-| §2.1 Hiring entry point and menu | M-02 BulletinBoardPatch, M-03 HiringFlowCoordinator, M-04 through M-08 menus + overlay, M-20 ChestResolver |
-| §2.2 Tasks | M-12 ShiftOrchestrator + intent dispatch |
-| §2.3 Worker arrival / shift loop | C-08 ShiftStateMachine, M-09 FarmhandNpc, M-11 PathFindControllerAdapter, M-12 ShiftOrchestrator |
-| §2.4 Skipped objects | C-06 CapabilityEvaluator, C-07 TaskPriorityOrderer |
-| §2.5 Tool inheritance | M-19 ToolLevelReader, C-06 CapabilityEvaluator |
-| §2.6 Output, deposit, fallback | C-10 ItemBuffer, C-11 DepositPlanner, M-20 ChestResolver, M-16 MailDispatcher |
-| §2.7 Pricing | C-01 RateCalculator, C-02 DepositCalculator, C-03 RefundCalculator, C-04 HoursEstimator |
-| §2.8 Day & calendar edges | M-14 CalendarHandlers, M-13 RecurringContractScheduler |
-| §2.9 Worker NPC behavior | M-09 FarmhandNpc, M-10 ToolSwapAnimator |
-| §2.10 Persistence | C-12 ContractStore, C-13 SaveDataSerializer, M-15 ContractPersistenceAdapter |
-| §2.11 Multiplayer | M-18 MultiplayerGuard |
-| §2.12 Config & UX | C-14 IConfigSnapshot, M-17 GMCMRegistrar, M-21 I18nHelper |
-| §2.13 Mod compatibility | (docs only — README) |
-| NFR-MAINT (testability) | Project structure itself (Core / Mod / Tests split) |
-| NFR-SAFE | C-10 ItemBuffer, M-16 MailDispatcher (mail fallback) |
-| NFR-UX | M-21 I18nHelper |
-| NFR-PERF | C-08 ShiftStateMachine + single tile-scan-at-zone-entry pattern (covered in per-unit Functional Design) |
-
-No FR or NFR is left without a component.
+| **Fixed contract pricing** | `WorkScopeClassifier`, `OutdoorServiceBandClassifier`, `ContractPriceCalculator`, `PriceBreakdownBuilder` |
+| **Recurring stable pricing** | `ContractTermsBuilder`, `RecurringContractScheduler`, persisted `ContractTermsSnapshot` |
+| **Animal building scope** | `WorkScopeClassifier`, runtime work-scope consumption in `ShiftOrchestrator` |
+| **Greenhouse package pricing** | `WorkScopeClassifier`, `ContractPriceCalculator` |
+| **Worker energy bar and per-action costs** | `WorkerEnergyProfileBuilder`, `WorkerEnergyLedger`, `FarmhandNpc`, `ShiftOrchestrator` |
+| **Finish current work unit at zero** | `WorkerEnergyLedger`, `ShiftStateMachine`, `ShiftOrchestrator` |
+| **No refund/debt behavior** | removal of refund components and removal of billing intents from shift runtime |
+| **GMCM price/energy knobs** | `ConfigSnapshot`, `ConfigDefaults`, `GMCMRegistrar` |
+| **Silent pre-release legacy cleanup** | `SaveDataSerializer`, `ContractPersistenceAdapter` |
 
 ---
 
-## What is intentionally NOT decided here
+## Intentionally Deferred To Construction
 
-These belong to later stages and are flagged so they don't get answered prematurely:
+The following are not resolved at Application Design level:
 
-- **Detailed business rules per component** — Functional Design (per-unit, Construction)
-- **Performance budgets per component** — NFR Requirements (per-unit, Construction)
-- **Pattern selection per component** (e.g., immutable record vs mutable class for which DTOs, specific FsCheck generator design) — NFR Design / Functional Design (per-unit)
-- **File layout within each project** — Code Generation planning (per-unit)
-- **Asset file structure** (sprite atlases, i18n key naming convention) — Code Generation planning
+- exact outdoor band thresholds per service
+- exact config key/value schema
+- exact `WorkActionKind` catalog and per-action energy-cost table
+- exact UI view-model shape for preview rendering
+- exact contract DTO schema details and serializer version numbers
+- exact worker HUD rendering details
+- exact migration-detection heuristic for silently dropping old contracts
+
+These belong in per-unit Functional Design / NFR Design / Code Generation.
 
 ---
 
-## Risks called out in Workflow Planning, now addressed
+## Risks Addressed By This Design
 
-1. **Coupling pure logic to game runtime** → Addressed by D1 separate Core project + project-reference enforcement.
-2. **Worker shift orchestration sprawling** → Addressed by D3 explicit state machine in Core + thin SMAPI orchestrator that executes intents.
-3. **Harmony patch conflicts** → Addressed by NFR-MAINT-04 (single namespace) + only one patch (BulletinBoardPatch) in v1.
+1. **Hidden legacy billing seams**
+   - Addressed by explicitly removing hourly/deposit/refund components from the design.
+
+2. **Preview/runtime disagreement**
+   - Addressed by routing both hiring preview and recurring daily activation through `ContractTermsBuilder`.
+
+3. **Energy becoming an opaque side effect**
+   - Addressed by giving energy its own profile and ledger components instead of burying it inside unrelated runtime code.
+
+4. **Scope confusion between zones, barns/coops, and greenhouse**
+   - Addressed by explicit typed work scopes.
+
+5. **Overengineering migration for an unreleased project**
+   - Addressed by the explicit pre-release policy to silently drop legacy contracts instead of migrating them.
+
+---
+
+## Completeness Check
+
+- `components.md` defines the refreshed component inventory
+- `component-methods.md` defines the refreshed public seams
+- `services.md` defines the orchestration flows
+- `component-dependency.md` defines dependency direction and data flow
+- The design remains compatible with the current execution plan and the approved pricing requirements
+
+Extension compliance for this stage:
+- **Security Baseline**: N/A, disabled for the project
+- **Property-Based Testing**: Compliant, because the redesign keeps pricing, scope, energy, and persistence logic in pure Core seams suitable for xUnit + FsCheck

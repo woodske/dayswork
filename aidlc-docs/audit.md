@@ -2787,3 +2787,59 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: INCEPTION — Workflow Planning approval gate
 
 ---
+
+## Workflow Planning — APPROVED
+**Timestamp**: 2026-05-24T17:45:20Z
+**User Input**: "approve and continue"
+**AI Response**: Logged approval of the pricing-redesign execution plan. Proceeding into Application Design and loading the existing application-design artifacts to prepare a focused brownfield redesign plan.
+**Context**: INCEPTION — transition from Workflow Planning to Application Design
+
+---
+
+## Application Design — Plan Created
+**Timestamp**: 2026-05-24T17:45:20Z
+**User Input**: "approve and continue"
+**AI Response**: Replaced `aidlc-docs/inception/plans/application-design-plan.md` with a redesign-specific plan for the pricing overhaul. The plan preserves earlier Core-vs-Mod architectural decisions and asks only the remaining questions needed to refresh the component model: pricing core boundaries, saved-contract price representation, typed work scopes, energy-accounting ownership, preview orchestration, and migration strategy for old saved contracts.
+**Context**: INCEPTION — Application Design planning
+
+---
+
+## Application Design — Input Prompt
+**Timestamp**: 2026-05-24T17:45:20Z
+**User Input**: "approve and continue"
+**AI Response**: Requesting that the user fill in the `[Answer]:` tags in `aidlc-docs/inception/plans/application-design-plan.md` before the refreshed application-design artifacts are generated.
+**Context**: INCEPTION — Application Design answer gate
+
+---
+
+## Application Design — Answers Received
+**Timestamp**: 2026-05-24T17:49:51Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/plans/application-design-plan.md` and extracted the following decisions: split pricing into focused pure components; persist both scope and computed pricing snapshot; model outdoor zones, animal buildings, and greenhouse as explicit typed scopes; give worker energy its own dedicated pure component boundary; use a dedicated preview/query facade rather than letting menus assemble pricing directly; and, because the project is unreleased, silently delete old hourly/deposit/refund contracts instead of migrating or explaining them.
+**Context**: INCEPTION — Application Design answer intake
+
+---
+
+## Application Design — Answer Analysis Complete
+**Timestamp**: 2026-05-24T17:49:51Z
+**User Input**: "done"
+**AI Response**: Analyzed the application-design answers and found no blocking contradictions or ambiguities. No clarification round was needed.
+**Context**: INCEPTION — Application Design answer validation
+
+---
+
+## Application Design — Artifacts Generated
+**Timestamp**: 2026-05-24T17:49:51Z
+**User Input**: "done"
+**AI Response**: Refreshed the application-design artifacts in `aidlc-docs/inception/application-design/`. The new design removes hourly pricing components, introduces typed work scopes, fixed `ContractTermsSnapshot` persistence, a dedicated pure energy profile/ledger, a shared `ContractTermsBuilder` preview/query facade, updated orchestration flows, and silent pre-release legacy-contract dropping in persistence.
+**Context**: INCEPTION — Application Design generation complete
+
+---
+
+## Application Design — Review Prompt
+**Timestamp**: 2026-05-24T17:49:51Z
+**User Input**: "done"
+**AI Response**: Presenting the refreshed application-design artifacts for review before proceeding to Units Generation.
+**Context**: INCEPTION — Application Design approval gate
+
+---

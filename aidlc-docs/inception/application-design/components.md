@@ -1,208 +1,363 @@
-# Components — Dayswork
+# Components — Dayswork Pricing Model Redesign
 
-This document inventories every component in the planned implementation, its purpose, its responsibilities, the project it lives in (per D1 — separate `Dayswork.Core` for pure logic vs `Dayswork` for SMAPI-bound code), and the public interface it exposes. **Method signatures live in [component-methods.md](component-methods.md). Detailed business rules are deferred to per-unit Functional Design in Construction.**
+This document refreshes the Application Design component inventory for the pricing overhaul. The earlier design's Core-vs-Mod split still stands, but the hourly deposit/refund seam has been replaced with fixed contract pricing, typed work scopes, persisted contract-term snapshots, and worker-energy accounting.
 
-## Solution layout (decided in D1, D2, D6)
+**Still valid from the earlier design**:
+- `Dayswork.Core` stays free of SMAPI/Stardew references
+- `Dayswork` remains the SMAPI-bound integration layer
+- `Dayswork.Tests` continues to reference only `Dayswork.Core`
+- The worker still runs through an explicit shift state machine
 
-```
+**Superseded by this redesign**:
+- `RateCalculator`
+- `DepositCalculator`
+- `RefundCalculator`
+- `HoursEstimator`
+
+Those components are removed from the refreshed architecture. Their responsibilities are replaced by scope classification, fixed-price calculation, persisted pricing snapshots, and energy-profile modeling.
+
+---
+
+## Solution Layout
+
+```text
 Dayswork.sln
-├── Dayswork.Core/          .NET 6 class library — ZERO SMAPI / StardewValley references
-│   ├── Domain/             Records: Contract, Zone, ChestRef, TaskKind, etc.
-│   ├── Pricing/            Rate / deposit / refund calculation
-│   ├── Shifts/             State machine, task queue, priority ordering
-│   ├── Capabilities/       Tool-snapshot evaluation
-│   ├── Geometry/           Zone-tile math
+├── Dayswork.Core/          Pure logic, zero SMAPI/Stardew refs
+│   ├── Domain/             Contract, scopes, snapshots, work/action enums
+│   ├── Pricing/            Scope classification, outdoor banding, fixed-price calculation
+│   ├── Energy/             Worker energy profile + per-action spend ledger
+│   ├── Geometry/           Zone math
+│   ├── Capabilities/       Tool capability snapshot evaluation
+│   ├── Shifts/             State machine, priority ordering, stuck detection
 │   ├── Inventory/          Item buffer + deposit planning
-│   ├── Persistence/        Save DTOs + JSON serialization (Newtonsoft, already in SMAPI's transitive deps)
-│   └── Config/             IConfigSnapshot + defaults
-├── Dayswork/               SMAPI mod — references Dayswork.Core + StardewModdingAPI + StardewValley + Harmony
-│   ├── ModEntry.cs         Composition root (D2 — hand-wired)
-│   ├── Patches/            Harmony patches, one per file (NFR-MAINT-04)
-│   ├── UI/                 IClickableMenu subclasses + zone-draw overlay (D6 — four menus + coordinator)
-│   ├── Worker/             FarmhandNpc + animator + path-find adapter
-│   ├── Orchestration/      ShiftOrchestrator + RecurringContractScheduler + CalendarHandlers
-│   ├── Integration/        SMAPI adapters: persistence, mail, GMCM, tool-level reader, chest resolver
-│   ├── Guards/             MultiplayerGuard
-│   ├── i18n/default.json   English strings
+│   ├── Persistence/        Save DTOs + serializer
+│   └── Config/             Immutable config snapshot + defaults
+├── Dayswork/               SMAPI mod integration layer
+│   ├── Patches/
+│   ├── UI/
+│   ├── Worker/
+│   ├── Orchestration/
+│   ├── Integration/
+│   ├── Guards/
+│   ├── i18n/default.json
 │   └── manifest.json
-└── Dayswork.Tests/         xUnit + FsCheck — references ONLY Dayswork.Core
+└── Dayswork.Tests/         xUnit + FsCheck, references only Dayswork.Core
 ```
 
 ---
 
-## Core components (pure, `Dayswork.Core`)
+## Core Components (`Dayswork.Core`)
 
-### C-01 RateCalculator
-- **Purpose**: Compute hourly rate given an enabled-task set and a config snapshot.
-- **Responsibilities**: Pure function over `(IReadOnlySet<TaskKind>, IConfigSnapshot) → int`. Handles rain-day exclusion of the Water Crops surcharge (FR-PAY-07).
-- **PBT obligations**: Invariant `rate = base + sum(enabled task increments)` (PBT-03).
-- **Interface**: `IRateCalculator`
+### C-01 WorkScopeClassifier
+- **Purpose**: Convert the player's selected zones/buildings plus enabled tasks into explicit typed work scopes.
+- **Responsibilities**:
+  - Distinguish outdoor zone work from animal-building scope
+  - Represent greenhouse work as its own dedicated crop-work scope
+  - Produce a normalized `WorkScopeSet` that pricing and runtime can both consume
+- **Interface**: `IWorkScopeClassifier`
 
-### C-02 DepositCalculator
-- **Purpose**: Compute deposit amount from estimated hours + hourly rate.
-- **Responsibilities**: Pure function `(decimal hours, int rate) → int`, integer-rounded toward ceiling (NFR-SAFE-02). Handles "zero work" edge case → 0 (FR-PAY-06).
-- **PBT obligations**: `deposit ≥ 0`; `deposit ≥ hoursWorked * rate` for all valid inputs (PBT-03).
-- **Interface**: `IDepositCalculator`
+### C-02 OutdoorServiceBandClassifier
+- **Purpose**: Assign broad size bands for outdoor crop/clearing services.
+- **Responsibilities**:
+  - Derive per-service `Small / Medium / Large` style banding from saved outdoor scope
+  - Keep band logic deterministic and independent of daily actionable work
+  - Support service-sensitive banding without leaking exact-hour math back into the design
+- **Interface**: `IOutdoorServiceBandClassifier`
 
-### C-03 RefundCalculator
-- **Purpose**: Compute refund `deposit − (actualHoursWorked × rate)`, clamped to `[0, deposit]`.
-- **PBT obligations**: `0 ≤ refund ≤ deposit`; `deposit − refund == hoursWorked × rate` modulo integer rounding (PBT-03; NFR-SAFE-02).
-- **Interface**: `IRefundCalculator`
+### C-03 ContractPriceCalculator
+- **Purpose**: Compute fixed contract price from typed scopes, selected tasks, and config.
+- **Responsibilities**:
+  - Apply outdoor service-band pricing
+  - Apply fixed animal-building pricing
+  - Apply fixed greenhouse package pricing
+  - Produce raw totals without any deposit/refund concepts
+- **Interface**: `IContractPriceCalculator`
 
-### C-04 HoursEstimator
-- **Purpose**: Estimate hours required for a given contract (zones × tasks × avg-speed constant).
-- **Responsibilities**: Pure function `(IReadOnlyList<Zone>, IReadOnlySet<TaskKind>, IConfigSnapshot) → decimal`. Excludes unreachable tile area (FR-WORK-08).
-- **Interface**: `IHoursEstimator`
+### C-04 PriceBreakdownBuilder
+- **Purpose**: Build the persisted and UI-friendly pricing breakdown.
+- **Responsibilities**:
+  - Convert raw price totals into stable line items the UI can show directly
+  - Produce a `PricingSnapshot` suitable for contract persistence
+  - Preserve the player-facing explanation of what is being paid for
+- **Interface**: `IPriceBreakdownBuilder`
 
-### C-05 ZoneGeometry
-- **Purpose**: Tile-rectangle math: union, intersection, contains, count reachable tiles given a passability oracle.
-- **Responsibilities**: Pure operations over `Zone` records. Takes a `Func<TileCoord, bool>` passability oracle (injected by the SMAPI side from `Game1` location data).
-- **PBT obligations**: Round-trip serialization of zones (PBT-02); invariants on rectangle union (PBT-03).
+### C-05 WorkerEnergyProfileBuilder
+- **Purpose**: Build the worker's daily energy profile from config.
+- **Responsibilities**:
+  - Produce daily energy capacity
+  - Produce per-action energy cost mappings
+  - Provide a preview-friendly summary for hiring screens
+- **Interface**: `IWorkerEnergyProfileBuilder`
+
+### C-06 ContractTermsBuilder
+- **Purpose**: Pure preview/query facade selected in AD-R5.
+- **Responsibilities**:
+  - Orchestrate scope classification, outdoor banding, price calculation, pricing snapshot building, and energy-profile building
+  - Return both a persisted `ContractTermsSnapshot` and a UI-ready `ContractPreview`
+  - Rebuild recurring contract terms from saved scope plus current config when needed
+- **Interface**: `IContractTermsBuilder`
+
+### C-07 WorkerEnergyLedger
+- **Purpose**: Track remaining worker energy during a shift.
+- **Responsibilities**:
+  - Spend energy per work action
+  - Clamp remaining energy at zero
+  - Support the rule “finish the current work unit, then deposit and leave”
+  - Expose state useful to the shift state machine and worker HUD
+- **Interface**: `IWorkerEnergyLedger`
+
+### C-08 ZoneGeometry
+- **Purpose**: Tile-rectangle math for outdoor zones.
+- **Responsibilities**:
+  - Union/containment/enumeration
+  - Reachable tile counting when needed by pricing/runtime helpers
+  - Shared geometry utilities for both UI and runtime
 - **Interface**: `IZoneGeometry`
 
-### C-06 CapabilityEvaluator
-- **Purpose**: Map tool upgrade levels → "what objects the worker can break/chop/water/scythe".
-- **Responsibilities**: Pure function `ToolSnapshot → CapabilityMatrix`. The matrix is a struct of bools per object class (small stump, large log, small boulder, large boulder, meteorite, etc.). Hardcodes the always-skip rule for fruit trees (FR-SKIP-03).
+### C-09 CapabilityEvaluator
+- **Purpose**: Map the player's tool snapshot to worker capabilities.
+- **Responsibilities**:
+  - Determine what the worker can chop/break/water/scythe
+  - Preserve hard exclusions like fruit-tree felling
+  - Keep capability logic independent from the SMAPI runtime
 - **Interface**: `ICapabilityEvaluator`
 
-### C-07 TaskPriorityOrderer
-- **Purpose**: Sort `(TaskKind, TileCoord)` work items into the spec's priority order (FR-WORK-03).
-- **Responsibilities**: Pure stable sort. Deterministic given identical input ordering, which matters for test reproducibility.
+### C-10 TaskPriorityOrderer
+- **Purpose**: Order work items according to the approved broad priority rules.
+- **Responsibilities**:
+  - Prioritize animal work ahead of crop work, then clearing work
+  - Preserve deterministic ordering inside equal-priority groups
+  - Support future extension without changing worker orchestration shape
 - **Interface**: `ITaskPriorityOrderer`
 
-### C-08 ShiftStateMachine
-- **Purpose**: Per the D3 decision — the pure state machine driving the worker's shift.
-- **Responsibilities**: States `WaitingForSpawn`, `Working`, `Stuck`, `Recovering`, `Depositing`, `Exiting`, `Done`. Transition function `(State, Event) → State` is pure and free of side effects. Events come in from the SMAPI-side `ShiftOrchestrator` (a sub-service in the Mod project) and the state machine emits intent records (e.g., `IntentMoveToTile`, `IntentEmote`, `IntentTeleportHome`, `IntentDepositAtChest`) that the orchestrator carries out.
-- **PBT obligations**: Invariants on legal transitions (PBT-03); the state graph should never leave `Done` once entered.
+### C-11 ShiftStateMachine
+- **Purpose**: Pure state machine driving the worker's daily lifecycle.
+- **Responsibilities**:
+  - Model working, stuck recovery, deposit, exit, and completion phases
+  - React to work-unit completion, energy depletion, time cap, and stuck events
+  - Emit runtime intents without knowing about SMAPI/NPC types
 - **Interface**: `IShiftStateMachine`
 
-### C-09 StuckDetector
-- **Purpose**: Track no-progress windows and fire stuck events (FR-WORK-11/12).
-- **Responsibilities**: Per-shift counter, advanced by tick events with a "made-progress this tick" flag. Emits `StuckDetected` after the configured threshold. Reset on progress.
+### C-12 StuckDetector
+- **Purpose**: Detect lack of movement/progress and trigger stuck recovery.
+- **Responsibilities**:
+  - Measure no-progress windows in in-game minutes
+  - Differentiate “still working” from “truly stuck”
+  - Feed stuck events into the shift state machine
 - **Interface**: `IStuckDetector`
 
-### C-10 ItemBuffer
-- **Purpose**: Hold all collected items for the shift, indexed by destination key (Chest|ShippingBin|Mail).
-- **Responsibilities**: Mutable but bounded type. Methods to `Add(Item)`, `TakeAllFor(DestinationKey)`, `Snapshot()`. Snapshot used for save persistence on early-sleep fast-forward (FR-DAY-02).
-- **PBT obligations**: Round-trip on `Snapshot()` (PBT-02); invariant `Add + TakeAllFor preserves total item count` (PBT-03).
+### C-13 ItemBuffer
+- **Purpose**: Hold collected output until deposit or mail fallback.
+- **Responsibilities**:
+  - Buffer items by destination
+  - Snapshot/hydrate buffered state for persistence-safe stop conditions
+  - Remain independent of pricing/billing logic
 - **Interface**: `IItemBuffer`
 
-### C-11 DepositPlanner
-- **Purpose**: Given the buffer state and a set of chest assignments, produce the ordered list of deposit trips (FR-WORK-05 — one trip per unique destination, items consolidated).
-- **Responsibilities**: Pure planner over `(IItemBuffer.Snapshot, ChestAssignmentMap) → IReadOnlyList<DepositTrip>`. Trip ordering minimizes total walking distance given a tile-distance oracle.
+### C-14 DepositPlanner
+- **Purpose**: Plan deposit trips at shift end.
+- **Responsibilities**:
+  - Group buffered items by unique destination
+  - Produce one trip per unique chest/bin destination
+  - Keep deposit ordering separate from billing concerns
 - **Interface**: `IDepositPlanner`
 
-### C-12 ContractStore
-- **Purpose**: In-memory authoritative list of all contracts (one-time + recurring) for the active save.
-- **Responsibilities**: CRUD-ish (`Add`, `Get`, `Update`, `Cancel`, `Pause`, `Resume`, `List`). Stable identifiers (GUID per contract). Hydrated by `ContractPersistenceAdapter` at save-load; flushed back at save-write.
+### C-15 ContractStore
+- **Purpose**: Authoritative in-memory contract registry for the loaded save.
+- **Responsibilities**:
+  - Store contracts, terms snapshots, schedule state, and status
+  - Support add/update/pause/cancel/edit workflows
+  - Support daily lookup for one-time and recurring start logic
 - **Interface**: `IContractStore`
 
-### C-13 SaveDataSerializer
-- **Purpose**: Convert `ContractStore`'s in-memory state to/from a versioned JSON DTO.
-- **Responsibilities**: Pure serialization. Tolerates absent data (NFR-SAFE-03). Versioned schema for future migrations.
-- **PBT obligations**: Round-trip `deserialize(serialize(x)) == x` for all valid x (PBT-02 — primary obligation).
+### C-16 SaveDataSerializer
+- **Purpose**: Serialize/deserialize persisted contract data.
+- **Responsibilities**:
+  - Convert current contract schema to/from versioned DTOs
+  - Silently drop legacy hourly/deposit/refund contracts during load, per the pre-release deletion policy chosen in AD-R6
+  - Keep save-data handling tolerant of absent or stale data
 - **Interface**: `ISaveDataSerializer`
 
-### C-14 ConfigSnapshot
-- **Purpose**: Immutable record of all tunable config values per D4.
-- **Responsibilities**: Captured at shift-start; passed to all Core components that need config. Fields: base rate, per-task increments, average-speed constant, 8pm cap (in-game minutes), stuck initial threshold, stuck post-teleport threshold.
-- **Interface**: `IConfigSnapshot` (record)
+### C-17 ConfigSnapshot
+- **Purpose**: Immutable view of all tunable redesign values.
+- **Responsibilities**:
+  - Hold price tables, energy capacity, per-action costs, pacing knobs, and operational thresholds
+  - Provide a stable input snapshot for contract pricing and runtime setup
+- **Interface**: `IConfigSnapshot`
 
-### C-15 ConfigDefaults
-- **Purpose**: Static factory producing the default `ConfigSnapshot` matching the spec's pricing table.
-- **Interface**: `ConfigDefaults.Build() → IConfigSnapshot`
+### C-18 ConfigDefaults
+- **Purpose**: Produce default config values for the redesigned system.
+- **Responsibilities**:
+  - Define baseline outdoor band prices, animal-building prices, greenhouse package prices, energy capacity, and action costs
+  - Centralize balance defaults so GMCM/config overlay has one stable base
+- **Interface**: `ConfigDefaults.Build()`
 
 ---
 
-## SMAPI-bound components (`Dayswork` project)
+## Mod Components (`Dayswork`)
 
 ### M-01 ModEntry
-- **Purpose**: SMAPI entry point. Composition root per D2.
-- **Responsibilities**: Implements `Mod` interface; in `Entry()` constructs every singleton, wires SMAPI events, applies Harmony patches, registers GMCM. Loads `IConfigSnapshot` defaults + user overrides from `config.json`. Holds references to top-level services for the mod lifetime.
+- **Purpose**: SMAPI composition root.
+- **Responsibilities**:
+  - Build Core and Mod singletons
+  - Register SMAPI events
+  - Wire Harmony, GMCM, persistence, and orchestration
 
-### M-02 BulletinBoardPatch (Harmony)
-- **Purpose**: Inject "Hire a Farmhand" option into the vanilla bulletin-board menu (FR-HIRE-01).
-- **Responsibilities**: Single Harmony postfix on the bulletin board menu's draw + click handler. Calls `HiringFlowCoordinator.OpenHiringFlow()` when the entry is clicked. Suppresses itself in multiplayer per `MultiplayerGuard`.
+### M-02 BulletinBoardPatch
+- **Purpose**: Inject “Hire a Farmhand” entry into the vanilla bulletin board.
+- **Responsibilities**:
+  - Patch the entry point
+  - Respect multiplayer guard
+  - Open the hiring flow
 
 ### M-03 HiringFlowCoordinator
-- **Purpose**: Drives screen-to-screen transitions for the 4-screen hiring flow per D6.
-- **Responsibilities**: Owns the in-progress `ContractDraft`. Opens `TaskSelectionMenu`; on advance, swaps to `ZoneAndChestMenu`; etc. On final confirm, persists the contract to `ContractStore` and deducts the deposit via SMAPI's `Game1.player.Money` API.
+- **Purpose**: Orchestrate the four-screen hiring/editing flow.
+- **Responsibilities**:
+  - Hold the in-progress draft
+  - Request previews/terms from `ContractTermsBuilder`
+  - Persist confirmed contracts with their terms snapshot
 
-### M-04 TaskSelectionMenu  *(extends `IClickableMenu`)*
-- **Purpose**: Screen 1 — task toggles with live rate display (FR-HIRE-04).
-- **Responsibilities**: Renders toggles, calls `RateCalculator` on every change, emits the resulting `EnabledTasks` set back into `ContractDraft`.
+### M-04 TaskSelectionMenu
+- **Purpose**: Screen 1 — task toggles + live contract preview entry point.
+- **Responsibilities**:
+  - Show task toggles
+  - Trigger live preview refresh
+  - Display price contributions in a player-readable way
 
-### M-05 ZoneAndChestMenu  *(extends `IClickableMenu`)*
-- **Purpose**: Screen 2 — zone drawing + chest assignment (FR-HIRE-05/06/07).
-- **Responsibilities**: Hosts the building-chest dropdown panel; delegates to `ZoneDrawOverlay` for tile-rectangle drawing; uses `ChestResolver` to enumerate buildings and their chests for the dropdown.
+### M-05 ZoneAndChestMenu
+- **Purpose**: Screen 2 — work-scope and output configuration.
+- **Responsibilities**:
+  - Manage outdoor zones, selected barns/coops, greenhouse selection, and output destinations
+  - Use `ChestResolver` and `ZoneDrawOverlay`
 
-### M-06 ScheduleMenu  *(extends `IClickableMenu`)*
-- **Purpose**: Screen 3 — one-time vs recurring selection (FR-HIRE-11).
+### M-06 ScheduleMenu
+- **Purpose**: Screen 3 — one-time vs recurring selection.
+- **Responsibilities**:
+  - Capture schedule choice
+  - Support edit/pause/cancel entry points coherently
 
-### M-07 SummaryMenu  *(extends `IClickableMenu`)*
-- **Purpose**: Screen 4 — summary + confirm (FR-HIRE-13/14).
-- **Responsibilities**: Renders the summary using `HoursEstimator` + `DepositCalculator`. The Confirm action is only enabled when `Game1.player.Money ≥ deposit`.
+### M-07 SummaryMenu
+- **Purpose**: Screen 4 — confirm fixed price + energy summary.
+- **Responsibilities**:
+  - Display pricing breakdown, scope summary, and worker energy summary
+  - Deduct one-time contract price only on confirm
+  - Avoid all deposit/refund/hour terminology
 
 ### M-08 ZoneDrawOverlay
-- **Purpose**: Renders the in-progress zone rectangle overlay on the farm map; handles drag input.
-- **Responsibilities**: Hooks `Display.RenderedWorld` to draw the rectangle preview while the player is in draw-mode.
+- **Purpose**: Farm overlay for rectangle selection.
+- **Responsibilities**:
+  - Draw in-progress rectangles
+  - Return finalized outdoor zone selections
 
-### M-09 FarmhandNpc  *(extends Stardew's `NPC`)*
-- **Purpose**: The visible worker NPC (FR-WORK-01/02, FR-NPC-01).
-- **Responsibilities**: Sprite + animation state. Has an `Update(GameTime)` override that delegates intent execution to `ShiftOrchestrator`. Holds a reference to the current `IShiftStateMachine` (constructed at spawn).
-- **Notes**: Placeholder sprite for v1 (Q9). Invulnerable: overrides damage hooks to plays `OuchEmote` and returns 0 damage (FR-NPC-02).
+### M-09 FarmhandNpc
+- **Purpose**: Visible worker NPC.
+- **Responsibilities**:
+  - Spawn/despawn on contract days
+  - Surface visible energy bar state
+  - Remain invulnerable to player attacks
 
 ### M-10 ToolSwapAnimator
-- **Purpose**: Manages the visual tool-swap when the farmhand changes task class (FR-WORK-10).
-- **Responsibilities**: Brief animation when the current task type differs from the previous tick's task type. Owns the asset references for axe / can / scythe / pickaxe overlays.
+- **Purpose**: Visual tool/task beat presentation.
+- **Responsibilities**:
+  - Show tool changes
+  - Support slower, readable task cadence
 
 ### M-11 PathFindControllerAdapter
-- **Purpose**: Thin wrapper around Stardew's `PathFindController` so the orchestrator depends on an interface, not a Stardew class.
-- **Responsibilities**: `PathTo(TileCoord)`, `IsPathing`, `OnArrived` event. Translates `IntentMoveToTile` records from the state machine into actual pathfinding.
+- **Purpose**: Adapter around Stardew pathfinding.
+- **Responsibilities**:
+  - Move the worker toward target tiles/doors
+  - Surface arrival/failure signals to orchestration
 
 ### M-12 ShiftOrchestrator
-- **Purpose**: The SMAPI-side execution arm of the per-shift state machine. The state machine emits intents; the orchestrator carries them out against the game.
-- **Responsibilities**: Subscribes to `GameLoop.UpdateTicked` and `GameLoop.TimeChanged`. On each tick: feeds events into `IShiftStateMachine.Step(...)`, dispatches resulting intents (move, emote, deposit, teleport, exit). Coordinates with `FarmhandNpc`, `PathFindControllerAdapter`, `ToolSwapAnimator`, `ChestResolver`, `MailDispatcher`, and `RefundCalculator`. Handles the 8pm cap → forced state transition. Calls into `RecurringContractScheduler` when shift ends.
+- **Purpose**: Execute the worker's day against the live game world.
+- **Responsibilities**:
+  - Feed events to the state machine
+  - Spend energy through `WorkerEnergyLedger`
+  - Execute work-unit, deposit, stuck, and exit intents
 
 ### M-13 RecurringContractScheduler
-- **Purpose**: Daily lifecycle for recurring contracts (FR-HIRE-11/12, FR-PAY-04).
-- **Responsibilities**: Subscribed to `GameLoop.DayStarted`. For each recurring contract: check festival/can-afford/multiplayer guards; deduct deposit; trigger `ShiftOrchestrator.StartShift(contract)`. Sends mail on can't-afford via `MailDispatcher`.
+- **Purpose**: Daily lifecycle for saved contracts.
+- **Responsibilities**:
+  - Rebuild recurring terms from saved scope and current config
+  - Apply fixed recurring charges
+  - Skip/notify on festival or cannot-afford cases
 
 ### M-14 CalendarHandlers
-- **Purpose**: Festival skip + rain detection + sleep fast-forward (FR-DAY-01/02, FR-PAY-07).
-- **Responsibilities**: Festival check (queries `Game1.weatherForTomorrow` / `Utility.isFestivalDay`); rain check (`Game1.IsRainingHere`); sleep handler subscribes to `GameLoop.Saving` and triggers atomic shift fast-forward before the day rolls over.
+- **Purpose**: Calendar and save-time hooks.
+- **Responsibilities**:
+  - Detect rain/festivals
+  - Stop/settle the worker on sleep
 
 ### M-15 ContractPersistenceAdapter
-- **Purpose**: Bridge `ContractStore` ↔ SMAPI's `Helper.Data.WriteSaveData` per-save API (FR-PERSIST-01).
-- **Responsibilities**: Subscribed to `GameLoop.SaveLoaded` (hydrate) and `GameLoop.Saving` (flush). Uses `SaveDataSerializer` to convert.
+- **Purpose**: Bridge `ContractStore` and SMAPI save data.
+- **Responsibilities**:
+  - Hydrate on save load
+  - Flush on save
+  - Accept the serializer's silent pre-release legacy-drop behavior
 
 ### M-16 MailDispatcher
-- **Purpose**: Send mail letters for overflow items + warning notices (FR-OUT-05, FR-PAY-04, FR-TOOL-03).
-- **Responsibilities**: Adapter over the **Mail Framework Mod (MFM)** API (per V9 decision in [design-verification-notes.md](design-verification-notes.md)). MFM is acquired via `Helper.ModRegistry.GetApi<...>` at mod-startup and supports multi-item attachments per letter (the vanilla `%item id` token does not). Reads body strings from `I18nHelper`. Single sender label ("Your farmhand", i18n-routed). Warning-only letters (can't-afford, missing-tool) skip MFM and use vanilla `Game1.addMailForTomorrow(mailId)` since they carry no items.
-- **Required dependency**: MFM declared in `manifest.json` `Dependencies` (UniqueID confirmed during Construction).
+- **Purpose**: Send next-day output mail and same-day notices.
+- **Responsibilities**:
+  - Queue overflow/unassigned output mail
+  - Queue same-day cannot-afford/festival notices
+  - Stay out of pricing/refund settlement logic
 
 ### M-17 GMCMRegistrar
-- **Purpose**: Register Dayswork's config schema with GMCM if installed (FR-CFG-01, FR-WORK-13).
-- **Responsibilities**: Optional-dependency probe for `GenericModConfigMenu`; if present, enumerates all `IConfigSnapshot` fields and registers each with appropriate validators and i18n labels.
+- **Purpose**: Expose redesign config through GMCM.
+- **Responsibilities**:
+  - Register price, energy, pacing, and operational knobs
+  - Keep labels/tooltips localized
 
 ### M-18 MultiplayerGuard
-- **Purpose**: Refuse activity in multiplayer (FR-MP-01).
-- **Responsibilities**: Single boolean query `IsSinglePlayerSession()`. Called by `ModEntry`, `BulletinBoardPatch`, and `RecurringContractScheduler` before activating any feature.
+- **Purpose**: Keep v1 single-player only.
+- **Responsibilities**:
+  - Short-circuit entry points in multiplayer
+  - Surface a friendly log message
 
 ### M-19 ToolLevelReader
-- **Purpose**: Read the player's tool upgrade levels into a `ToolSnapshot` (FR-TOOL-01).
-- **Responsibilities**: Pure query against `Game1.player` tools. Used once at shift start; the resulting snapshot is passed into `CapabilityEvaluator`.
+- **Purpose**: Snapshot player tool levels at shift start.
+- **Responsibilities**:
+  - Read upgrade tiers
+  - Produce `ToolSnapshot` for capability evaluation
 
 ### M-20 ChestResolver
-- **Purpose**: Resolve a stored `ChestRef` (location name + tile coords) to the live `Chest` object at runtime (FR-HIRE-08).
-- **Responsibilities**: Lookup by location + tile. Returns `null` if the chest is missing/destroyed (triggers FR-OUT-03 fallback). Also enumerates building chests for the Screen 2 dropdown (FR-HIRE-07).
+- **Purpose**: Resolve stored chest references and enumerate selectable chests.
+- **Responsibilities**:
+  - Resolve live chests by location + tile
+  - Provide building-interior chest lists for configuration
 
 ### M-21 I18nHelper
-- **Purpose**: Thin wrapper around `Helper.Translation` for typed-key access (NFR-UX-02, S-20).
-- **Responsibilities**: Single point of contact for i18n strings; surfaces a `Get(string key, object args)` method. Internal lint pass to detect hardcoded English strings in tests is a recommended Build-and-Test gate.
+- **Purpose**: Typed access to user-visible strings.
+- **Responsibilities**:
+  - Centralize translation lookup
+  - Keep UI/mail/config labels out of hardcoded English
 
 ---
 
-## Components total: 14 Core + 21 Mod = 35
+## Important Domain Types Introduced or Reframed
 
-Most Mod components are <100 LOC stubs that translate between SMAPI APIs and Core abstractions. The complexity budget concentrates in Core (where it's testable) and in M-03/M-05/M-12 (the user-facing flow + worker orchestrator).
+- `ContractScopeSelection`
+- `WorkScopeSet`
+- `OutdoorWorkScope`
+- `AnimalBuildingScope`
+- `GreenhouseWorkScope`
+- `OutdoorServiceBand`
+- `PricingSnapshot`
+- `PricingLineItem`
+- `ContractTermsSnapshot`
+- `ContractPreview`
+- `WorkerEnergyProfile`
+- `WorkerEnergyState`
+- `WorkActionKind`
+
+These are pure domain/value types rather than top-level orchestrators, but they define the new shape the redesign depends on.
+
+---
+
+## Component Count
+
+- **Core**: 18 components
+- **Mod**: 21 components
+- **Total**: 39 components
+
+The increase versus the earlier design is intentional: the redesign replaces one big hourly-billing mental model with clearer, explicitly separated responsibilities for typed scope modeling, pricing snapshots, and worker energy.

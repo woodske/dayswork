@@ -1,52 +1,104 @@
-# Component Methods — Dayswork
+# Component Methods — Dayswork Pricing Model Redesign
 
-Method signatures for each component's public interface. **No business logic** — those rules land in per-unit Functional Design during Construction. I/O types and one-line purposes only.
+Method signatures for each refreshed component interface. Detailed business rules still belong to Functional Design during Construction.
 
-> C# convention: `interface` types start with `I`. Records (`record class`) used for immutable DTOs. `Result<T>` is a discriminated-union-ish wrapper (e.g., `OneOf<T, Error>`); the choice of library is a Construction decision but the *shape* is decided here.
+This refresh removes hourly billing, deposit, refund, and estimated-hours methods from the public application-design surface. The new signatures center on typed work scopes, contract terms snapshots, fixed pricing, and worker energy.
 
 ---
 
-## Core method signatures
+## Core Method Signatures
 
-### IRateCalculator (C-01)
+### IWorkScopeClassifier (C-01)
 ```csharp
-int ComputeHourlyRate(
+WorkScopeSet Classify(
+    ContractScopeSelection selection,
+    IReadOnlySet<TaskKind> enabledTasks);
+```
+Builds the normalized set of outdoor, animal-building, and greenhouse work scopes.
+
+---
+
+### IOutdoorServiceBandClassifier (C-02)
+```csharp
+IReadOnlyList<OutdoorServiceBand> ClassifyBands(
+    WorkScopeSet scopes,
     IReadOnlySet<TaskKind> enabledTasks,
-    IConfigSnapshot config,
-    bool isRainyDay);
+    IConfigSnapshot config);
 ```
-Returns gold/hour. Strips Water Crops surcharge when `isRainyDay && enabledTasks contains WaterCrops`.
+Assigns broad outdoor size bands per relevant outdoor service.
 
 ---
 
-### IDepositCalculator (C-02)
+### IContractPriceCalculator (C-03)
 ```csharp
-int ComputeDeposit(decimal estimatedHours, int hourlyRate);
-```
-Integer gold; rounds up to the nearest gold piece. Returns 0 if `estimatedHours == 0`.
-
----
-
-### IRefundCalculator (C-03)
-```csharp
-int ComputeRefund(int deposit, decimal actualHoursWorked, int hourlyRate);
-```
-`refund = deposit - ceiling(actualHoursWorked * hourlyRate)`, clamped to `[0, deposit]`.
-
----
-
-### IHoursEstimator (C-04)
-```csharp
-decimal EstimateHours(
-    IReadOnlyList<Zone> zones,
+ContractPriceTotals Calculate(
+    WorkScopeSet scopes,
     IReadOnlySet<TaskKind> enabledTasks,
-    IConfigSnapshot config,
-    Func<TileCoord, bool> passabilityOracle);
+    IReadOnlyList<OutdoorServiceBand> outdoorBands,
+    IConfigSnapshot config);
 ```
+Returns raw totals for the fixed-price model.
 
 ---
 
-### IZoneGeometry (C-05)
+### IPriceBreakdownBuilder (C-04)
+```csharp
+PricingSnapshot BuildSnapshot(
+    WorkScopeSet scopes,
+    IReadOnlySet<TaskKind> enabledTasks,
+    IReadOnlyList<OutdoorServiceBand> outdoorBands,
+    ContractPriceTotals totals,
+    IConfigSnapshot config);
+```
+Creates stable persisted/UI line items for contract pricing.
+
+---
+
+### IWorkerEnergyProfileBuilder (C-05)
+```csharp
+WorkerEnergyProfile BuildProfile(
+    IReadOnlySet<TaskKind> enabledTasks,
+    IConfigSnapshot config);
+```
+Creates the worker's daily energy capacity plus per-action cost table.
+
+---
+
+### IContractTermsBuilder (C-06)
+```csharp
+ContractTermsSnapshot BuildTerms(
+    ContractScopeSelection selection,
+    IReadOnlySet<TaskKind> enabledTasks,
+    IConfigSnapshot config);
+
+ContractTermsSnapshot RebuildTerms(
+    Contract contract,
+    IConfigSnapshot config);
+
+ContractPreview BuildPreview(
+    ContractScopeSelection selection,
+    IReadOnlySet<TaskKind> enabledTasks,
+    IConfigSnapshot config);
+```
+Pure facade over scope classification, banding, pricing, and energy profile building.
+
+---
+
+### IWorkerEnergyLedger (C-07)
+```csharp
+WorkerEnergyState StartShift(WorkerEnergyProfile profile);
+
+WorkerEnergySpendResult ApplyActionCost(
+    WorkerEnergyState current,
+    WorkActionKind action);
+
+bool CanStartNewWorkUnit(WorkerEnergyState current);
+```
+Tracks remaining energy, clamps at zero, and reports whether a new work unit may begin.
+
+---
+
+### IZoneGeometry (C-08)
 ```csharp
 int CountReachableTiles(Zone zone, Func<TileCoord, bool> passabilityOracle);
 Zone Union(Zone a, Zone b);
@@ -56,35 +108,37 @@ IEnumerable<TileCoord> EnumerateTiles(Zone zone);
 
 ---
 
-### ICapabilityEvaluator (C-06)
+### ICapabilityEvaluator (C-09)
 ```csharp
 CapabilityMatrix Evaluate(ToolSnapshot snapshot);
 ```
-Where `CapabilityMatrix` is a record of booleans: `CanChopSmallStump`, `CanChopLargeLog`, `CanBreakSmallBoulder`, `CanBreakLargeBoulder`, `CanBreakMeteorite`, `CanWater`, `CanScythe`. Fruit-tree felling is *not* in this matrix — it's always false (FR-SKIP-03 is a hard rule, not a capability check).
 
 ---
 
-### ITaskPriorityOrderer (C-07)
+### ITaskPriorityOrderer (C-10)
 ```csharp
 IReadOnlyList<WorkItem> OrderForExecution(IEnumerable<WorkItem> items);
 ```
-Where `WorkItem` is a `(TaskKind kind, TileCoord tile)` record.
+Orders work items by the approved broad priority rules.
 
 ---
 
-### IShiftStateMachine (C-08)
+### IShiftStateMachine (C-11)
 ```csharp
 ShiftState CurrentState { get; }
 
 (ShiftState newState, IReadOnlyList<ShiftIntent> intents)
     Step(ShiftEvent evt);
 ```
-`ShiftEvent` discriminated union: `TickElapsed`, `ArrivedAtTile`, `TaskCompleted`, `StuckDetected`, `TeleportFailed`, `ClockReached8pm`, `DepositRunComplete`, `SleepFastForwardRequested`.
-`ShiftIntent` discriminated union: `MoveToTile`, `PerformTaskOnTile`, `PlayEmote`, `TeleportToTile`, `TeleportHome`, `DepositAtChest`, `DepositInShippingBin`, `QueueMail`, `ApplyRefund`, `ExitFarm`.
+
+**Notes**:
+- `ShiftEvent` now includes energy-oriented events such as `EnergyDepletedAtWorkUnitBoundary`
+- `ShiftIntent` no longer includes refund/billing intents
+- Deposit and exit remain explicit intents
 
 ---
 
-### IStuckDetector (C-09)
+### IStuckDetector (C-12)
 ```csharp
 void RecordTick(bool madeProgressThisTick, int inGameMinutesElapsed);
 bool ShouldFireStuck();
@@ -93,18 +147,17 @@ void Reset();
 
 ---
 
-### IItemBuffer (C-10)
+### IItemBuffer (C-13)
 ```csharp
 void Add(BufferedItem item, DestinationKey destination);
-IReadOnlyDictionary<DestinationKey, IReadOnlyList<BufferedItem>> TakeAllFor(DestinationKey destination);
+IReadOnlyList<BufferedItem> TakeAllFor(DestinationKey destination);
 ItemBufferSnapshot Snapshot();
 void Hydrate(ItemBufferSnapshot snapshot);
 ```
-`DestinationKey` is a discriminated union: `ChestRef chest`, `ShippingBin`, `Mail`.
 
 ---
 
-### IDepositPlanner (C-11)
+### IDepositPlanner (C-14)
 ```csharp
 IReadOnlyList<DepositTrip> PlanTrips(
     ItemBufferSnapshot snapshot,
@@ -115,65 +168,70 @@ IReadOnlyList<DepositTrip> PlanTrips(
 
 ---
 
-### IContractStore (C-12)
+### IContractStore (C-15)
 ```csharp
 ContractId Add(Contract contract);
 Contract Get(ContractId id);
 void Update(ContractId id, Contract updated);
+void ReplaceTermsSnapshot(ContractId id, ContractTermsSnapshot terms);
 void Cancel(ContractId id);
 void Pause(ContractId id);
 void Resume(ContractId id);
 IReadOnlyList<Contract> List();
-IReadOnlyList<Contract> ListActiveForDate(int day, Season season, int year);
+IReadOnlyList<Contract> ListStartingToday(FarmDate today);
 ```
 
 ---
 
-### ISaveDataSerializer (C-13)
+### ISaveDataSerializer (C-16)
 ```csharp
 string Serialize(IReadOnlyList<Contract> contracts);
-IReadOnlyList<Contract> Deserialize(string? json);  // null/empty → empty list
+IReadOnlyList<Contract> Deserialize(string? json);
 ```
+
+**Note**: `Deserialize` silently drops legacy hourly/deposit/refund contract payloads under the pre-release cleanup policy chosen in AD-R6.
 
 ---
 
-### IConfigSnapshot (C-14)
+### IConfigSnapshot (C-17)
 ```csharp
 record ConfigSnapshot(
-    int BaseHourlyRate,
-    IReadOnlyDictionary<TaskKind, int> TaskIncrements,
-    decimal AverageSpeedTilesPerHour,
-    int EightPmCapInGameMinutes,          // 1200 by default (8 * 60)
-    int StuckInitialThresholdMinutes,     // 10 by default
-    int StuckPostTeleportThresholdMinutes // 10 by default
+    IReadOnlyDictionary<OutdoorPriceKey, int> OutdoorBandPrices,
+    IReadOnlyDictionary<AnimalBuildingPriceKey, int> AnimalBuildingPrices,
+    IReadOnlyDictionary<GreenhousePriceKey, int> GreenhousePackagePrices,
+    int WorkerDailyEnergyCapacity,
+    IReadOnlyDictionary<WorkActionKind, int> ActionEnergyCosts,
+    float WorkerMoveSpeedMultiplier,
+    int TaskBeatDurationMs,
+    int EightPmCapInGameMinutes,
+    int StuckInitialThresholdMinutes,
+    int StuckPostTeleportThresholdMinutes
 );
 ```
 
 ---
 
-### ConfigDefaults (C-15)
+### ConfigDefaults (C-18)
 ```csharp
 static IConfigSnapshot Build();
 ```
 
 ---
 
-## Mod method signatures
+## Mod Method Signatures
 
 ### ModEntry (M-01)
 ```csharp
-public override void Entry(IModHelper helper);  // SMAPI required
+public override void Entry(IModHelper helper);
 ```
-Internal composition wires up all Mod- and Core-side singletons and registers SMAPI event handlers.
 
 ---
 
 ### BulletinBoardPatch (M-02)
 ```csharp
-static void Postfix_BulletinBoardDraw(BulletinBoard __instance, SpriteBatch b);
-static void Postfix_BulletinBoardClick(BulletinBoard __instance, int x, int y);
+static void Postfix_BulletinBoardDraw(Billboard __instance, SpriteBatch b);
+static void Postfix_BulletinBoardClick(Billboard __instance, int x, int y);
 ```
-Harmony patch entry points. Postfixes only — no prefixes (NFR-MAINT-04).
 
 ---
 
@@ -181,18 +239,20 @@ Harmony patch entry points. Postfixes only — no prefixes (NFR-MAINT-04).
 ```csharp
 void OpenHiringFlow();
 void OpenEditFlow(ContractId existing);
+void RefreshPreview(ContractDraft draft);
+void ConfirmDraft(ContractDraft draft, ContractTermsSnapshot terms);
 ```
-Both push a `TaskSelectionMenu` onto the menu stack with an in-progress `ContractDraft`.
 
 ---
 
 ### TaskSelectionMenu (M-04), ZoneAndChestMenu (M-05), ScheduleMenu (M-06), SummaryMenu (M-07)
 ```csharp
-override void draw(SpriteBatch b);                 // IClickableMenu
-override void receiveLeftClick(int x, int y, ...); // IClickableMenu
-override void receiveGamePadButton(Buttons b);     // gamepad
-// + each menu exposes a small `Coordinator` callback to advance/back
+override void draw(SpriteBatch b);
+override void receiveLeftClick(int x, int y, bool playSound = true);
+override void receiveGamePadButton(Buttons b);
 ```
+
+Menus receive a current `ContractPreview` from the coordinator rather than computing price/energy details themselves.
 
 ---
 
@@ -200,16 +260,16 @@ override void receiveGamePadButton(Buttons b);     // gamepad
 ```csharp
 void Activate(Action<Zone> onComplete);
 void Deactivate();
-// internally subscribes to Display.RenderedWorld + InputEvents
 ```
 
 ---
 
 ### FarmhandNpc (M-09)
 ```csharp
-override void update(GameTime time, GameLocation location);  // StardewValley.NPC
-override int takeDamage(...);  // overridden to return 0 + play OuchEmote
-void BeginShift(IShiftStateMachine machine, IShiftOrchestrator orchestrator);
+override void update(GameTime time, GameLocation location);
+override int takeDamage(...);
+void BeginShift(IShiftStateMachine machine, ShiftOrchestrator orchestrator);
+void UpdateEnergyBar(WorkerEnergyState state);
 void EndShift();
 ```
 
@@ -235,8 +295,8 @@ event Action OnNoPathFound;
 
 ### ShiftOrchestrator (M-12)
 ```csharp
-void StartShift(Contract contract, ToolSnapshot toolSnapshot, IConfigSnapshot config);
-void OnSleepFastForwardRequested();   // called by CalendarHandlers
+void StartShift(Contract contract, ToolSnapshot toolSnapshot);
+void StopForSleepAndSettle();
 void OnUpdateTicked(UpdateTickedEventArgs e);
 void OnTimeChanged(TimeChangedEventArgs e);
 ```
@@ -254,7 +314,7 @@ void OnDayStarted(DayStartedEventArgs e);
 ```csharp
 bool IsFestivalToday();
 bool IsRainyToday();
-void OnSavingHook(SavingEventArgs e);  // triggers sleep fast-forward
+void OnSavingHook(SavingEventArgs e);
 ```
 
 ---
@@ -269,11 +329,10 @@ void OnSaving(SavingEventArgs e);
 
 ### MailDispatcher (M-16)
 ```csharp
-void QueueOverflowMail(IReadOnlyList<BufferedItem> items, string reasonKey);
-void QueueCannotAffordNotice(ContractId contractId);
-void QueueToolMissingWarning(IReadOnlySet<TaskKind> skippedTasks);
+void QueueOverflowMail(ItemBufferSnapshot overflow);
+void QueueFestivalNotice(Contract contract);
+void QueueCannotAffordNotice(Contract contract);
 ```
-Each method builds the SMAPI mail letter, looks up the body via `I18nHelper`, and queues for the next morning's mail.
 
 ---
 
@@ -281,7 +340,6 @@ Each method builds the SMAPI mail letter, looks up the body via `I18nHelper`, an
 ```csharp
 void RegisterIfAvailable();
 ```
-Probes for the GMCM API; if present, wires up every `IConfigSnapshot` field.
 
 ---
 
@@ -302,13 +360,22 @@ ToolSnapshot ReadCurrent();
 ### ChestResolver (M-20)
 ```csharp
 Chest? Resolve(ChestRef reference);
-IReadOnlyList<(Building building, IReadOnlyList<Chest> chests)> EnumerateBuildingChests(GameLocation farm);
+IReadOnlyList<ChestDescriptor> ListFarmChests();
+IReadOnlyList<ChestDescriptor> ListBuildingChests();
 ```
 
 ---
 
 ### I18nHelper (M-21)
 ```csharp
-string Get(string key);
-string Get(string key, object templateArgs);
+string Get(string key, object? tokens = null);
 ```
+
+---
+
+## Important Notes About Public Surface Changes
+
+- Any method returning or consuming hourly-rate, deposit, refund, or estimated-hours values is intentionally gone from the refreshed application-design surface.
+- Contract confirmation now revolves around `ContractTermsSnapshot` and fixed total price.
+- Daily runtime now revolves around `WorkerEnergyProfile` and `WorkerEnergyState`.
+- Recurring repricing is an explicit scheduler concern, not an emergent side effect of estimated hours.
