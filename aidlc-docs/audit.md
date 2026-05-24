@@ -1,5 +1,23 @@
 # AI-DLC Audit Log — Dayswork SMAPI Mod
 
+## Post-U-17 Maintenance — Exit Pathing Fix (Bug 3)
+**Timestamp**: 2026-05-23T00:00:00Z
+**User Input**: "the worker is still walking through debris and buildings on their way to the exit. On the way to their first task they avoid all debris and buildings, but not on their way to the exit. Compare the pathing mechanisms used. If needed, instead of using the shipping bin, try to use the game info to determine where the exit is if that would help."
+**AI Response**: Root cause identified: `FarmEntrance = new(71, 14)` was the default shipping bin placement tile on Standard Farm (`Farm.GetStarterShippingBinLocation()` returns `(71, 14)`). Navigation to an impassable building tile failed immediately (`IsTilePassableForWorker` → false), setting `NavigationFailed = true`. `HandleExit` then called `StartForcedPixelRoute` from the worker's current mid-field position, producing a straight-line walk through all obstacles.
+
+Fix applied to `Dayswork/Orchestration/ShiftOrchestrator.cs`:
+- Removed hardcoded `FarmEntrance = new(71, 14)` and `FarmExitPastEntrancePixel` static constants.
+- Removed `_exitWalkStarted` two-phase exit flag.
+- Added instance field `_farmExitTile` (TileCoord) computed once per shift via new helper `FindFarmExitTile(Farm farm)`.
+- `FindFarmExitTile` iterates `farm.warps`, skips any warp whose `TargetName` matches a building interior (`farm.buildings[i].indoors.Value.NameOrUniqueName`), and returns the first external-exit warp tile. Falls back to `(77, 15)` with a Warn log if none found.
+- `BeginExit`: replaced `StartNavigation(FarmEntrance, ...)` with `StartNavigation(_farmExitTile, ...)`.
+- `HandleExit`: removed `StartForcedPixelRoute` entirely; shift completes on navigation arrival or failure.
+- All other `FarmEntrance` usages (spawn position, ScanZones entry point, HandleTeleportHome, BeginDeposit fallback, ReturnWorkerToFarmForDeposit fallback) updated to `_farmExitTile`.
+- Build: 0 errors / 0 warnings. Tests: 211 passed / 1 skip.
+**Context**: Post-U-17 maintenance — exit pathfinding bug fix
+
+---
+
 ## Session Continuity — U-17 Resume
 **Timestamp**: 2026-05-23T03:21:19Z
 **User Input**: "continue ai-dlc workflow"

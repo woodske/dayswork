@@ -165,10 +165,23 @@ internal sealed class WorkerMovementDriver
 
     public static bool IsTilePassableForWorker(Point tile, GameLocation location)
     {
+        // Tile-map check: permanent walls, water, map boundaries.
         if (!location.isTilePassable(new xTile.Dimensions.Location(tile.X, tile.Y), Game1.viewport))
             return false;
 
-        if (location is Farm farm && farm.buildings.Any(building => building.occupiesTile(tile.X, tile.Y, false)))
+        // Physical collision check: buildings, fences, machines, resource clumps, furniture, etc.
+        // Use inset rect (+1/62) to match PathFindController.findPath corner math — a full 64x64 rect
+        // maps right/bottom edges to the ADJACENT tile (X+1, Y+1), causing false positives on tiles
+        // next to buildings or objects (e.g. FarmEntrance tile falsely blocked by shipping bin above it).
+        // pathfinding: false matches PathFindController.findPath exactly (it does not pass the parameter,
+        // which defaults to false). Passing true applies extra terrain-feature checks that incorrectly
+        // block some passable tiles — notably exit-corridor tiles near the map boundary.
+        // ignoreCharacterRequirement skips the guard that would otherwise return true for null character.
+        var bounds = new Rectangle(tile.X * 64 + 1, tile.Y * 64 + 1, 62, 62);
+        if (location.isCollidingPosition(bounds, Game1.viewport,
+                isFarmer: false, damagesFarmer: 0, glider: false,
+                character: null, pathfinding: false,
+                ignoreCharacterRequirement: true))
             return false;
 
         return true;

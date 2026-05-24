@@ -17,9 +17,6 @@ namespace Dayswork.Orchestration;
 
 internal sealed class ShiftOrchestrator
 {
-    // Farm entrance tile — worker spawns and exits here.
-    private static readonly TileCoord FarmEntrance   = new(71, 14);
-    private static readonly Vector2 FarmExitPastEntrancePixel = new(FarmEntrance.X * 64f, (FarmEntrance.Y + 2) * 64f);
     // Shipping bin tile on Standard Farm.
     private static readonly TileCoord ShippingBinTile = new(71, 13);
 
@@ -58,7 +55,9 @@ internal sealed class ShiftOrchestrator
     private GameLocation? _currentLocation;
     private int           _tickCount;
     private int           _morningEntranceHoldTicks;
-    private bool          _exitWalkStarted;
+    // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,
+    // because the warp tile varies by farm type and player map edits).
+    private TileCoord     _farmExitTile;
 
     // Multi-trip deposit loop state (Pattern N): the ordered remaining trips and the in-flight one.
     private readonly Queue<DepositTrip> _depositTrips = new();
@@ -125,6 +124,103 @@ internal sealed class ShiftOrchestrator
     private static int Manhattan(TileCoord a, TileCoord b) =>
         Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
 
+    /// <summary>
+    /// Locates the best navigable approach tile for the farm's external exit by scanning
+    /// <see cref="Farm.warps"/>. Warps targeting building interiors are excluded; the first
+    /// remaining warp leads to the outside world (BusStop, Town, etc.).
+    /// SDV warp triggers are sometimes stored one tile outside the map boundary (the player
+    /// "walks off the edge" to fire them). The tile is clamped to the map boundary and we
+    /// then search inward along the exit corridor for the nearest passable tile.
+    /// </summary>
+    private static TileCoord FindFarmExitTile(Farm farm)
+    {
+        // Build the set of interior location names so we can skip building-entry warps.
+        var interiorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var building in farm.buildings)
+        {
+            var interior = building.indoors.Value;
+            if (interior is not null)
+                interiorNames.Add(interior.NameOrUniqueName);
+        }
+
+        var mapLayer = farm.Map.Layers[0];
+
+        foreach (var warp in farm.warps)
+        {
+            if (interiorNames.Contains(warp.TargetName))
+                continue;
+
+            // Secondary guard: the farmhouse/cellar may not appear in farm.buildings in
+            // some SDV versions.  Skip any warp whose resolved target is an indoor location.
+            var targetLocation = Game1.getLocationFromName(warp.TargetName);
+            if (targetLocation is not null && !targetLocation.IsOutdoors)
+                continue;
+
+            // Found an outdoor exit warp.
+            //
+            // Clamp to the map boundary and compute the inward approach direction.
+            // A warp at X=80 on an 80-wide map is outside the map; clamped to X=79 with
+            // approach direction dx=-1 (search leftward into the exit corridor).
+            var cx = Math.Clamp(warp.X, 0, mapLayer.LayerWidth  - 1);
+            var cy = Math.Clamp(warp.Y, 0, mapLayer.LayerHeight - 1);
+
+            int dx = 0, dy = 0;
+            if      (warp.X >= mapLayer.LayerWidth)  dx = -1;  // right edge  → search left
+            else if (warp.X < 0)                     dx =  1;  // left edge   → search right
+            else if (warp.Y >= mapLayer.LayerHeight) dy = -1;  // bottom edge → search up
+            else if (warp.Y < 0)                     dy =  1;  // top edge    → search down
+            // dx=dy=0: warp is within bounds; the loop checks step 0 only (the tile itself)
+            // then falls through to the adjacent-tile search if needed.
+
+            int steps = (dx != 0 || dy != 0) ? 10 : 1;
+            for (int step = 0; step < steps; step++)
+            {
+                var tx = cx + dx * step;
+                var ty = cy + dy * step;
+                if (tx < 0 || ty < 0 || tx >= mapLayer.LayerWidth || ty >= mapLayer.LayerHeight)
+                    break;
+
+                if (WorkerMovementDriver.IsTilePassableForWorker(new Point(tx, ty), farm))
+                {
+                    ModEntry.ModMonitor.Log(
+                        $"[Dayswork] Farm exit: tile ({tx},{ty}) near warp ({warp.X},{warp.Y}) → {warp.TargetName} (step={step}).",
+                        LogLevel.Trace);
+                    return new TileCoord(tx, ty);
+                }
+            }
+
+            // For in-bounds warps where the warp tile itself is impassable, also try
+            // the four cardinal neighbours (handles warps set in the middle of the farm).
+            if (dx == 0 && dy == 0)
+            {
+                foreach (var n in new Point[] { new(cx,cy-1), new(cx+1,cy), new(cx,cy+1), new(cx-1,cy) })
+                {
+                    if (n.X < 0 || n.Y < 0 || n.X >= mapLayer.LayerWidth || n.Y >= mapLayer.LayerHeight)
+                        continue;
+                    if (!WorkerMovementDriver.IsTilePassableForWorker(n, farm))
+                        continue;
+
+                    ModEntry.ModMonitor.Log(
+                        $"[Dayswork] Farm exit: adjacent tile ({n.X},{n.Y}) near warp ({warp.X},{warp.Y}) → {warp.TargetName}.",
+                        LogLevel.Trace);
+                    return new TileCoord(n.X, n.Y);
+                }
+            }
+
+            // No passable tile found — return the clamped boundary tile; HandleExit will
+            // log a warning if navigation ultimately fails.
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Farm exit: no passable approach tile found near warp ({warp.X},{warp.Y}) → {warp.TargetName}.",
+                LogLevel.Warn);
+            return new TileCoord(cx, cy);
+        }
+
+        ModEntry.ModMonitor.Log(
+            "[Dayswork] No external farm exit warp found — using fallback tile (77, 15).",
+            LogLevel.Warn);
+        return new TileCoord(77, 15);
+    }
+
     // ── Public API ───────────────────────────────────────────────────────────
 
     /// <summary>Non-null while a shift is running; null between shifts.</summary>
@@ -174,6 +270,7 @@ internal sealed class ShiftOrchestrator
         var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
 
+        _farmExitTile = FindFarmExitTile(farm);
         var batches = BuildInitialBatches(contract, farm, snapshot);
 
         if (batches.Count == 0 ||
@@ -190,7 +287,7 @@ internal sealed class ShiftOrchestrator
             return;
         }
 
-        var spawnPos = new Vector2(FarmEntrance.X, FarmEntrance.Y) * 64f;
+        var spawnPos = new Vector2(_farmExitTile.X, _farmExitTile.Y) * 64f;
         _farmhand = new FarmhandNpc(spawnPos);
         farm.addCharacter(_farmhand);
         _currentLocation = farm;
@@ -203,7 +300,6 @@ internal sealed class ShiftOrchestrator
         _playerWasSwinging   = false;
         _actionPending       = false;
         _waitingForDebrisBeforeDeposit = false;
-        _exitWalkStarted     = false;
         _morningEntranceHoldTicks = MorningEntranceHoldTicks;
         _pendingBuildingEntry = false;
         _pendingBuildingExit = false;
@@ -264,7 +360,7 @@ internal sealed class ShiftOrchestrator
 
             var tileWork = outdoorZones.Count == 0
                 ? Array.Empty<WorkItem>()
-                : _workAreaScanner.ScanZones(farm, outdoorZones, contract.EnabledTasks, snapshot, FarmEntrance);
+                : _workAreaScanner.ScanZones(farm, outdoorZones, contract.EnabledTasks, snapshot, _farmExitTile);
             var animalWork = BuildAnimalWork(farm, selectedAnimalHomes, contract.EnabledTasks);
             batches.Add(batch with { TileWork = tileWork, AnimalWork = animalWork });
         }
@@ -315,7 +411,7 @@ internal sealed class ShiftOrchestrator
         if (_ctx.CurrentBatchIndex >= _ctx.Batches.Count)
         {
             _ctx.ShiftEndTime ??= Game1.timeOfDay;
-            EnsureWorkingIntent(new IntentMoveToTile(FarmEntrance));
+            EnsureWorkingIntent(new IntentMoveToTile(_farmExitTile));
             BeginDeposit();
             return;
         }
@@ -786,7 +882,7 @@ internal sealed class ShiftOrchestrator
     private void HandleTeleportHome(Farm farm)
     {
         // Step 3: reposition home and end shift via normal Depositing path (SAFE-U13-01).
-        _farmhand!.Position = new Vector2(FarmEntrance.X, FarmEntrance.Y) * 64f;
+        _farmhand!.Position = new Vector2(_farmExitTile.X, _farmExitTile.Y) * 64f;
         _farmhand.currentLocation = farm;
         _currentLocation = farm;
         _nav.Clear();
@@ -1056,26 +1152,27 @@ internal sealed class ShiftOrchestrator
     private void BeginExit(Farm farm)
     {
         _ctx!.StateMachine.Transition(ShiftPhase.Exiting, new IntentExitFarm());
-        _exitWalkStarted = false;
-        _nav.StartNavigation(FarmEntrance, farm, _farmhand!);
+        _nav.StartNavigation(_farmExitTile, farm, _farmhand!);
     }
 
     private void HandleExit(Farm farm)
     {
+        // Wait for pathfinding navigation to the exit warp tile to finish (arrived or failed).
+        // NavigationFailed is treated as "close enough" — remove the worker rather than walking
+        // in a straight line through obstacles.
         if (!_nav.NavigationFailed && !_nav.HasArrived)
             return;
 
-        if (!_exitWalkStarted)
-        {
-            _exitWalkStarted = true;
-            _toolAnimator.StopSwing();
-            ModEntry.ModMonitor.Log("[Dayswork][exit] worker leaving through farm entrance.", LogLevel.Debug);
-            _nav.StartForcedPixelRoute(farm, _farmhand!, FarmExitPastEntrancePixel);
-            return;
-        }
+        _toolAnimator.StopSwing();
+
+        if (_nav.NavigationFailed)
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][exit] could not path to exit tile ({_farmExitTile.X},{_farmExitTile.Y}) — removing worker in place.",
+                LogLevel.Warn);
+        else
+            ModEntry.ModMonitor.Log("[Dayswork][exit] worker reached farm exit — shift complete.", LogLevel.Debug);
 
         var refund = _ctx!.ComputeRefund();
-
         ModEntry.ModMonitor.Log(
             $"[Dayswork] Shift complete. Hours: {((_ctx.ShiftEndTime ?? Game1.timeOfDay) - _ctx.ShiftStartTime) / 60}. Refund (mailed): {refund}g.",
             LogLevel.Info);
@@ -1125,7 +1222,7 @@ internal sealed class ShiftOrchestrator
         // Plan the deposit run from the task-tagged buffer (Pattern M).
         var workerTile = _farmhand is not null
             ? new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y)
-            : FarmEntrance;
+            : _farmExitTile;
         var plan = _depositPlanner.Plan(
             _ctx!.Buffer.Snapshot(),
             _ctx.TaskDestinations,
@@ -1218,7 +1315,7 @@ internal sealed class ShiftOrchestrator
         var exitTile = batch is not null &&
                        _buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out _)
             ? outdoorDoor
-            : FarmEntrance;
+            : _farmExitTile;
 
         _buildingNavigator.ExitToFarm(_farmhand, exitTile);
         _currentLocation = farm;
@@ -1286,7 +1383,6 @@ internal sealed class ShiftOrchestrator
         _currentLocation = null;
         _morningEntranceHoldTicks = 0;
         _waitingForDebrisBeforeDeposit = false;
-        _exitWalkStarted = false;
         _pendingBuildingEntry = false;
         _pendingBuildingExit = false;
         _pendingBuildingInterior = null;
