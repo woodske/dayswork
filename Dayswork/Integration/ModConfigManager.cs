@@ -6,14 +6,16 @@ namespace Dayswork.Integration;
 internal sealed class ModConfigManager
 {
     private readonly IModHelper _helper;
+    private readonly Action<string>? _logWarning;
 
     public ModConfig Editable { get; private set; }
     public IConfigSnapshot CurrentSnapshot { get; private set; }
 
-    public ModConfigManager(IModHelper helper)
+    public ModConfigManager(IModHelper helper, Action<string>? logWarning = null)
     {
         _helper = helper;
-        Editable = RuntimeConfigSnapshotMapper.Normalize(helper.ReadConfig<ModConfig>());
+        _logWarning = logWarning;
+        Editable = RuntimeConfigSnapshotMapper.Normalize(helper.ReadConfig<ModConfig>(), _logWarning);
         CurrentSnapshot = RuntimeConfigSnapshotMapper.BuildSnapshot(Editable);
     }
 
@@ -24,7 +26,7 @@ internal sealed class ModConfigManager
 
     public void SaveAndPublish()
     {
-        Editable = RuntimeConfigSnapshotMapper.Normalize(Editable);
+        Editable = RuntimeConfigSnapshotMapper.Normalize(Editable, _logWarning);
         CurrentSnapshot = RuntimeConfigSnapshotMapper.BuildSnapshot(Editable);
         _helper.WriteConfig(Editable);
     }

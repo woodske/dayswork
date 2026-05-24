@@ -1,6 +1,7 @@
 namespace Dayswork.Core.Config;
 
 using Dayswork.Core.Domain;
+using Dayswork.Core.Energy;
 
 public sealed record ConfigSnapshot(
     int BaseRate,
@@ -8,7 +9,13 @@ public sealed record ConfigSnapshot(
     double AverageSpeedConstant,
     int HardCapTime,
     int StuckInitialWaitMinutes,
-    int StuckPostTeleportWaitMinutes
+    int StuckPostTeleportWaitMinutes,
+    IReadOnlyDictionary<OutdoorBandSize, int> OutdoorBandThresholds,
+    IReadOnlyDictionary<OutdoorPriceKey, int> OutdoorServiceBandPrices,
+    IReadOnlyDictionary<AnimalBuildingPriceKey, int> AnimalBuildingPrices,
+    IReadOnlyDictionary<GreenhousePriceKey, int> GreenhouseServicePrices,
+    int WorkerDailyEnergyCapacity,
+    IReadOnlyDictionary<WorkActionKind, int> WorkActionCosts
 ) : IConfigSnapshot
 {
     // IReadOnlyDictionary uses reference equality, so override to get structural equality.
@@ -19,11 +26,40 @@ public sealed record ConfigSnapshot(
         && HardCapTime == other.HardCapTime
         && StuckInitialWaitMinutes == other.StuckInitialWaitMinutes
         && StuckPostTeleportWaitMinutes == other.StuckPostTeleportWaitMinutes
-        && TaskIncrements.Count == other.TaskIncrements.Count
-        && TaskIncrements.All(kvp =>
-            other.TaskIncrements.TryGetValue(kvp.Key, out var v) && v == kvp.Value);
+        && WorkerDailyEnergyCapacity == other.WorkerDailyEnergyCapacity
+        && DictionaryEquals(TaskIncrements, other.TaskIncrements)
+        && DictionaryEquals(OutdoorBandThresholds, other.OutdoorBandThresholds)
+        && DictionaryEquals(OutdoorServiceBandPrices, other.OutdoorServiceBandPrices)
+        && DictionaryEquals(AnimalBuildingPrices, other.AnimalBuildingPrices)
+        && DictionaryEquals(GreenhouseServicePrices, other.GreenhouseServicePrices)
+        && DictionaryEquals(WorkActionCosts, other.WorkActionCosts);
 
-    public override int GetHashCode() =>
-        HashCode.Combine(BaseRate, AverageSpeedConstant, HardCapTime,
-            StuckInitialWaitMinutes, StuckPostTeleportWaitMinutes, TaskIncrements.Count);
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(BaseRate);
+        hash.Add(AverageSpeedConstant);
+        hash.Add(HardCapTime);
+        hash.Add(StuckInitialWaitMinutes);
+        hash.Add(StuckPostTeleportWaitMinutes);
+        hash.Add(WorkerDailyEnergyCapacity);
+        hash.Add(TaskIncrements.Count);
+        hash.Add(OutdoorBandThresholds.Count);
+        hash.Add(OutdoorServiceBandPrices.Count);
+        hash.Add(AnimalBuildingPrices.Count);
+        hash.Add(GreenhouseServicePrices.Count);
+        hash.Add(WorkActionCosts.Count);
+        return hash.ToHashCode();
+    }
+
+    private static bool DictionaryEquals<TKey>(
+        IReadOnlyDictionary<TKey, int> left,
+        IReadOnlyDictionary<TKey, int> right)
+        where TKey : notnull
+    {
+        if (left.Count != right.Count)
+            return false;
+
+        return left.All(kvp => right.TryGetValue(kvp.Key, out var value) && value == kvp.Value);
+    }
 }

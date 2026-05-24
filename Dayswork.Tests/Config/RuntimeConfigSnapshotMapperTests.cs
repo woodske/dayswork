@@ -2,6 +2,7 @@ namespace Dayswork.Tests.Config;
 
 using Dayswork.Core.Config;
 using Dayswork.Core.Domain;
+using Dayswork.Core.Energy;
 using Dayswork.Integration;
 using Xunit;
 
@@ -36,6 +37,15 @@ public class RuntimeConfigSnapshotMapperTests
             HardCapTime = 999,
             StuckInitialWaitMinutes = 0,
             StuckPostTeleportWaitMinutes = -2,
+            WorkerDailyEnergyCapacity = 0,
+            OutdoorBandThresholds = new Dictionary<string, int>
+            {
+                ["Small"] = -1,
+            },
+            WorkActionCosts = new Dictionary<string, int>
+            {
+                ["AxeSwing"] = -1,
+            },
         });
 
         var defaults = ModConfig.CreateDefaults();
@@ -46,6 +56,9 @@ public class RuntimeConfigSnapshotMapperTests
         Assert.Equal(1000, normalized.HardCapTime);
         Assert.Equal(1, normalized.StuckInitialWaitMinutes);
         Assert.Equal(1, normalized.StuckPostTeleportWaitMinutes);
+        Assert.Equal(defaults.WorkerDailyEnergyCapacity, normalized.WorkerDailyEnergyCapacity);
+        Assert.Equal(defaults.OutdoorBandThresholds["Small"], normalized.OutdoorBandThresholds["Small"]);
+        Assert.Equal(defaults.WorkActionCosts["AxeSwing"], normalized.WorkActionCosts["AxeSwing"]);
     }
 
     [Fact]
@@ -59,6 +72,7 @@ public class RuntimeConfigSnapshotMapperTests
             StuckInitialWaitMinutes = 0,
             StuckPostTeleportWaitMinutes = 0,
             AverageSpeedConstant = -1,
+            WorkerDailyEnergyCapacity = 0,
         });
 
         var defaults = ModConfig.CreateDefaults();
@@ -68,5 +82,7 @@ public class RuntimeConfigSnapshotMapperTests
         Assert.Equal(1, snapshot.StuckInitialWaitMinutes);
         Assert.Equal(1, snapshot.StuckPostTeleportWaitMinutes);
         Assert.Equal(defaults.AverageSpeedConstant, snapshot.AverageSpeedConstant);
+        Assert.Equal(defaults.WorkerDailyEnergyCapacity, snapshot.WorkerDailyEnergyCapacity);
+        Assert.Equal(defaults.WorkActionCosts["AxeSwing"], snapshot.WorkActionCosts[WorkActionKind.AxeSwing]);
     }
 }

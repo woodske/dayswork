@@ -30,7 +30,7 @@ public sealed class ModEntry : Mod
 
         // ── Core singletons (dependency order) ──────────────────────────────
         var logWarning  = (string msg) => this.Monitor.Log(msg, LogLevel.Warn);
-        var configManager = new ModConfigManager(helper);
+        var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, LogLevel.Warn));
         var config      = configManager.CurrentSnapshot;
         var rateCalc    = new RateCalculator();
         var depositCalc = new DepositCalculator();

@@ -9,5 +9,7 @@ public sealed record Contract(
     ContractStatus Status,
     GameDate HireDate,
     int DepositAmount,
-    int HourlyRate
+    int HourlyRate,
+    ContractScopeSelection? ScopeSelection = null,
+    ContractTermsSnapshot? TermsSnapshot = null
 );

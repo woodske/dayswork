@@ -15,6 +15,11 @@ public static class PricingGen
              .Where((_, i) => (bits & (1 << i)) != 0)
              .ToList()).ToArbitrary();
 
+    public static Arbitrary<IReadOnlySet<TaskKind>> TaskSet() =>
+        TaskSubset().Generator
+            .Select(tasks => (IReadOnlySet<TaskKind>)tasks.ToHashSet())
+            .ToArbitrary();
+
     // Valid hourly rate relative to a config snapshot.
     public static Arbitrary<int> ValidRate(IConfigSnapshot config) =>
         Gen.Choose(config.BaseRate,

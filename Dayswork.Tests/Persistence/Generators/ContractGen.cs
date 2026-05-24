@@ -34,7 +34,9 @@ public static class ContractGen
              Status: status,
              HireDate: hireDate,
              DepositAmount: financial.deposit,
-             HourlyRate: financial.rate))
+             HourlyRate: financial.rate,
+             ScopeSelection: null,
+             TermsSnapshot: null))
         .ToArbitrary();
 
     private static Gen<ContractId> ContractIdGen() =>
