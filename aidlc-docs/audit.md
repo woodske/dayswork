@@ -3011,3 +3011,59 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — NFR Requirements approval gate for U-18
 
 ---
+
+## NFR Requirements — U-18 APPROVED
+**Timestamp**: 2026-05-24T22:22:53Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-18 NFR requirements artifacts. Proceeding to NFR Design for the first pricing-redesign retrofit unit.
+**Context**: CONSTRUCTION — transition from NFR Requirements to NFR Design for U-18
+
+---
+
+## NFR Design — U-18 Plan Created
+**Timestamp**: 2026-05-24T22:22:53Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-18-contract-terms-foundation-nfr-design-plan.md`. The plan focuses the NFR Design stage on the pure-pattern decisions that still matter for U-18: where default-backed config fallback lives, whether preview design stays pure recompute or acknowledges memoization, where deterministic ordering ownership sits, and how much dedicated property-test support structure to call for.
+**Context**: CONSTRUCTION — NFR Design planning for U-18
+
+---
+
+## NFR Design — U-18 Input Prompt
+**Timestamp**: 2026-05-24T22:22:53Z
+**User Input**: "continue"
+**AI Response**: Requesting that the user fill in the `[Answer]:` tags in `aidlc-docs/construction/plans/u-18-contract-terms-foundation-nfr-design-plan.md` before the U-18 NFR design artifacts are generated.
+**Context**: CONSTRUCTION — NFR Design answer gate for U-18
+
+---
+
+## NFR Design — U-18 Answers Received
+**Timestamp**: 2026-05-24T22:26:24Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-18-contract-terms-foundation-nfr-design-plan.md` and extracted these decisions: use a dedicated config-resolution seam for default-backed fallback, keep preview design as pure recompute with no cache component, make `PriceBreakdownBuilder` the sole owner of canonical snapshot ordering, and add dedicated U-18 test-side helpers/generators for the property suite.
+**Context**: CONSTRUCTION — NFR Design answer intake for U-18
+
+---
+
+## NFR Design — U-18 Answer Analysis Complete
+**Timestamp**: 2026-05-24T22:26:24Z
+**User Input**: "done"
+**AI Response**: Analyzed the U-18 NFR design answers and found no blocking contradictions or ambiguities. No clarification round was needed.
+**Context**: CONSTRUCTION — NFR Design answer validation for U-18
+
+---
+
+## NFR Design — U-18 Artifacts Generated
+**Timestamp**: 2026-05-24T22:26:24Z
+**User Input**: "done"
+**AI Response**: Generated `aidlc-docs/construction/u-18-contract-terms-foundation/nfr-design/nfr-design-patterns.md` and `logical-components.md`. The artifacts translate the approved NFR bar into a concrete pure-Core pattern set for U-18: shared config fallback resolution, stateless recompute previews, canonical snapshot ordering ownership, and explicit dedicated property-test support on the test side.
+**Context**: CONSTRUCTION — NFR Design generation complete for U-18
+
+---
+
+## NFR Design — U-18 Review Prompt
+**Timestamp**: 2026-05-24T22:26:24Z
+**User Input**: "done"
+**AI Response**: Presenting the U-18 NFR design artifacts for review before proceeding directly to Code Generation. Infrastructure Design remains skipped for this pure Core unit.
+**Context**: CONSTRUCTION — NFR Design approval gate for U-18
+
+---
