@@ -3067,3 +3067,27 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — NFR Design approval gate for U-18
 
 ---
+
+## NFR Design — U-18 APPROVED
+**Timestamp**: 2026-05-24T22:33:01Z
+**User Input**: "continue to next stage"
+**AI Response**: Logged approval of the U-18 NFR design artifacts. Proceeding to Code Generation planning for the first pricing-redesign retrofit unit.
+**Context**: CONSTRUCTION — transition from NFR Design to Code Generation planning for U-18
+
+---
+
+## Code Generation — U-18 Plan Created
+**Timestamp**: 2026-05-24T22:33:01Z
+**User Input**: "continue to next stage"
+**AI Response**: Created `aidlc-docs/construction/plans/u-18-contract-terms-foundation-code-generation-plan.md`. The plan stages the pure fixed-price foundation, worker-energy profile model, config snapshot bridge, and U-18 example/property coverage while explicitly leaving the historical hire UI and recurring scheduler consumers on the legacy pricing path until later retrofit units switch them over.
+**Context**: CONSTRUCTION — Code Generation Part 1 planning for U-18
+
+---
+
+## Code Generation — U-18 Plan Review Prompt
+**Timestamp**: 2026-05-24T22:33:01Z
+**User Input**: "continue to next stage"
+**AI Response**: Presenting the U-18 code-generation plan for approval before any implementation work begins.
+**Context**: CONSTRUCTION — Code Generation Part 1 approval gate for U-18
+
+---
