@@ -7,6 +7,8 @@ public enum WorkerTool
     Scythe,
     Pickaxe,
     Axe,
+    MilkPail,
+    Shears,
 }
 
 public static class WorkerToolExtensions

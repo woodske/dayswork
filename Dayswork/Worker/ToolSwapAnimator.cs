@@ -34,14 +34,17 @@ internal sealed class ToolSwapAnimator
             StopSwing();
     }
 
-    public void PlaySwing(TaskKind task, int facingDirection)
+    public void PlaySwing(TaskKind task, int facingDirection) =>
+        PlaySwing(WorkerToolExtensions.ForTask(task), facingDirection);
+
+    public void PlaySwing(WorkerTool tool, int facingDirection)
     {
         if (_worker is null)
             return;
 
         _worker.FaceTaskDirection(facingDirection);
         _worker.Sprite.setCurrentAnimation(WorkFramesFor(facingDirection));
-        SpawnToolSwing(WorkerToolExtensions.ForTask(task), facingDirection);
+        SpawnToolSwing(tool, facingDirection);
         _swingMsRemaining = WorkAnimationMs;
     }
 
@@ -92,6 +95,12 @@ internal sealed class ToolSwapAnimator
                 break;
             case WorkerTool.Scythe:
                 SpawnSwipeOverlay(facingDirection);
+                break;
+            case WorkerTool.MilkPail:
+                SpawnToolIconOverlay(facingDirection, spriteIndex: 6);
+                break;
+            case WorkerTool.Shears:
+                SpawnToolIconOverlay(facingDirection, spriteIndex: 7);
                 break;
         }
     }
@@ -168,6 +177,32 @@ internal sealed class ToolSwapAnimator
             rotation: 0f,
             rotationChange: 0f,
             local: false), 75));
+    }
+
+    // Milk pail and shears have no swing animation in vanilla SDV — they use only the farmer
+    // body animation. We display the tool's inventory icon (16×16, scaled 4×) hovering near
+    // the worker so the player can tell which task is being performed.
+    // Tool sprite sheet layout: index N → X = (N*16) % sheetWidth, Y = (N*16/sheetWidth)*16.
+    // For indices 6 (MilkPail) and 7 (Shears) the sheet is ≥128 px wide, so both land in row 0:
+    //   MilkPail → (96, 0, 16, 16),  Shears → (112, 0, 16, 16)
+    private void SpawnToolIconOverlay(int facingDirection, int spriteIndex)
+    {
+        if (_worker is null)
+            return;
+
+        var srcX = spriteIndex * 16 % 256; // 256 is a safe upper-bound; actual width is ≥128
+        const int srcY = 0;
+        var srcRect = new Rectangle(srcX, srcY, 16, 16);
+
+        var (offset, flipped) = facingDirection switch
+        {
+            0 => (new Vector2(0f, -96f), false),
+            1 => (new Vector2(48f, -64f), false),
+            3 => (new Vector2(-32f, -64f), true),
+            _ => (new Vector2(16f, -64f), false),
+        };
+
+        BroadcastSprites(ToolSprite(srcRect, 400f, 1, _worker.Position + offset, flipped, rotation: 0f));
     }
 
     private TemporaryAnimatedSprite ToolSprite(

@@ -1038,7 +1038,10 @@ internal sealed class ShiftOrchestrator
         if (!_actionPending)
         {
             _toolAnimator.StopSwing();
-            _toolAnimator.PlaySwing(TaskKind.CollectAnimalProducts,
+            var collectTool = AnimalTaskHandler.IsShearProduce(animal) ? WorkerTool.Shears
+                            : AnimalTaskHandler.IsMilkProduce(animal)  ? WorkerTool.MilkPail
+                            : WorkerTool.None;
+            _toolAnimator.PlaySwing(collectTool,
                 FacingToward(_farmhand!.TilePoint, _animalHandler.CurrentTile(animal), _farmhand.FacingDirection));
             PlayAnimalCollectSound(location, animal);
             _actionPending = true;
