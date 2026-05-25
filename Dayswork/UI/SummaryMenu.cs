@@ -1,6 +1,4 @@
-using Dayswork.Core.Config;
 using Dayswork.Core.Domain;
-using Dayswork.Core.Pricing;
 using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -10,72 +8,42 @@ using StardewValley.Menus;
 
 namespace Dayswork.UI;
 
-// Screen 4 (thin) of the hiring flow — confirms the contract (M-07).
-// _estimatedHours, _rate, and _depositAmount are all computed in the
-// constructor so draw() has zero Core interface calls (NFR-PERF-01).
 internal sealed class SummaryMenu : IClickableMenu
 {
-    private const int MenuWidth     = 700;
-    private const int MinMenuHeight = 500;
+    private const int MenuWidth = 760;
+    private const int MaxMenuHeight = 700;
+    private const int MinMenuHeight = 560;
+    private const int LineSpacing = 34;
 
     private readonly ContractDraft _draft;
-    private readonly Action<ContractDraft, int, int> _onConfirm;
+    private readonly Action<ContractDraft> _onConfirm;
     private readonly Action<ContractDraft> _onBack;
+    private readonly SummaryReviewModel _reviewModel;
 
-    // Pre-computed in ctor; read-only in draw()
-    private readonly double _estimatedHours;
-    private readonly int    _rate;
-    private readonly int    _depositAmount;
-    private readonly string _tasksLabel;          // flat comma-separated list
-    private readonly string _wrappedTasksList;    // word-wrapped for display
-    private readonly int    _wrappedTasksHeight;  // cached to avoid MeasureString in draw()
+    private readonly List<string> _bodyLines = new();
+    private Rectangle _bodyRect;
+    private int _bodyScrollIndex;
+    private int _maxBodyScrollIndex;
+    private bool _draggingBodyScrollBar;
+    private int _bodyScrollDragOffset;
 
     private ClickableComponent _confirmBtn = null!;
-    private ClickableComponent _backBtn    = null!;
+    private ClickableComponent _backBtn = null!;
 
     public SummaryMenu(
         ContractDraft draft,
-        IDepositCalculator depositCalc,
-        IConfigSnapshot config,
-        Zone wholeFarmFallback,
-        Action<ContractDraft, int, int> onConfirm,
+        Action<ContractDraft> onConfirm,
         Action<ContractDraft> onBack)
         : base(0, 0, MenuWidth, MinMenuHeight)
     {
-        _draft     = draft;
+        _draft = draft;
         _onConfirm = onConfirm;
-        _onBack    = onBack;
+        _onBack = onBack;
+        _reviewModel = draft.PreviewState.ReviewModel;
 
-        // Compute all display values once here (NFR-PERF-01, NFR-PERF-02)
-
-        _estimatedHours = DepositHoursPolicy.EstimateBillableHours(
-            draft.Zones.Count > 0 ? draft.Zones : new[] { wholeFarmFallback },
-            draft.EnabledTasks.Count,
-            config);
-        // isRaining: false at hire time; rain branch applies at shift start
-        _rate = new Core.Pricing.RateCalculator().Calculate(draft.EnabledTasks, config, isRaining: false);
-
-        _depositAmount = depositCalc.Calculate(_estimatedHours, _rate) switch
-        {
-            PositiveDeposit pd => pd.Amount,
-            _                  => 0,
-        };
-
-        _tasksLabel = draft.EnabledTasks.Count > 0
-            ? string.Join(", ", draft.EnabledTasks.Select(t => I18nHelper.Get($"ui.task_selection.{ToKey(t)}")))
-            : I18nHelper.Get("ui.common.none");
-
-        _wrappedTasksList   = Game1.parseText(_tasksLabel, Game1.smallFont, MenuWidth - 96);
-        _wrappedTasksHeight = (int)Game1.smallFont.MeasureString(_wrappedTasksList).Y;
-
-        // Expand height to fit content so buttons never overlap text.
-        // Mirrors draw() layout: 90px top pad + task header + wrapped list + 3 data lines +
-        // spacer + refund line, then 20px gap before the 70px button strip at the bottom.
-        const int lineSpacing = 48;
-        int contentHeight = 90 + lineSpacing + (_wrappedTasksHeight + 8)
-                          + lineSpacing + lineSpacing + lineSpacing
-                          + 12 + lineSpacing;
-        height = Math.Max(MinMenuHeight, contentHeight + 20 + 70);
+        BuildBodyLines();
+        var maxAvailableHeight = Math.Max(MinMenuHeight, Game1.uiViewport.Height - 48);
+        height = Math.Min(MaxMenuHeight, maxAvailableHeight);
 
         var topLeft = Utility.getTopLeftPositionForCenteringOnScreen(MenuWidth, height);
         xPositionOnScreen = (int)topLeft.X;
@@ -87,40 +55,112 @@ internal sealed class SummaryMenu : IClickableMenu
 
     private void BuildComponents()
     {
-        int btnY = yPositionOnScreen + height - 70;
+        var btnY = yPositionOnScreen + height - 70;
+        _bodyRect = new Rectangle(
+            xPositionOnScreen + 48,
+            yPositionOnScreen + 80,
+            MenuWidth - 96 - MenuScrollBar.ReservedWidth,
+            btnY - (yPositionOnScreen + 80) - 18);
+        _maxBodyScrollIndex = Math.Max(0, _bodyLines.Count - GetVisibleBodyLineCount());
+        _bodyScrollIndex = Math.Clamp(_bodyScrollIndex, 0, _maxBodyScrollIndex);
 
         _confirmBtn = new ClickableComponent(
             new Rectangle(xPositionOnScreen + MenuWidth - 210, btnY, 170, 56),
-            "Confirm", I18nHelper.Get("ui.summary.confirm_btn"))
+            "Confirm",
+            I18nHelper.Get("ui.summary.confirm_btn"))
         {
-            myID           = 300,
+            myID = 300,
             leftNeighborID = 301,
         };
 
         _backBtn = new ClickableComponent(
             new Rectangle(xPositionOnScreen + 40, btnY, 170, 56),
-            "Back", I18nHelper.Get("ui.summary.back_btn"))
+            "Back",
+            I18nHelper.Get("ui.summary.back_btn"))
         {
-            myID            = 301,
+            myID = 301,
             rightNeighborID = 300,
         };
     }
 
-    // ── Input ────────────────────────────────────────────────────────────────
-
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
-        if (_confirmBtn.bounds.Contains(x, y)) { _onConfirm(_draft, _depositAmount, _rate); return; }
-        if (_backBtn.bounds.Contains(x, y))    { _onBack(_draft);                           return; }
+        if (MenuScrollBar.TryBeginDrag(_bodyRect, GetVisibleBodyLineCount(), _bodyLines.Count, _bodyScrollIndex, x, y, out _bodyScrollDragOffset))
+        {
+            _draggingBodyScrollBar = true;
+            return;
+        }
+
+        if (MenuScrollBar.UpArrowContains(_bodyRect, _bodyLines.Count, GetVisibleBodyLineCount(), x, y))
+        {
+            ScrollBody(-1);
+            return;
+        }
+
+        if (MenuScrollBar.DownArrowContains(_bodyRect, _bodyLines.Count, GetVisibleBodyLineCount(), x, y))
+        {
+            ScrollBody(1);
+            return;
+        }
+
+        if (MenuScrollBar.TrackContains(_bodyRect, GetVisibleBodyLineCount(), _bodyLines.Count, x, y))
+        {
+            _bodyScrollIndex = MenuScrollBar.GetTrackClickScrollIndex(
+                _bodyRect,
+                GetVisibleBodyLineCount(),
+                _bodyLines.Count,
+                _bodyScrollIndex,
+                y);
+            return;
+        }
+
+        if (_confirmBtn.bounds.Contains(x, y) && _reviewModel.CanConfirm)
+        {
+            _onConfirm(_draft);
+            return;
+        }
+
+        if (_backBtn.bounds.Contains(x, y))
+            _onBack(_draft);
+    }
+
+    public override void leftClickHeld(int x, int y)
+    {
+        if (!_draggingBodyScrollBar)
+            return;
+
+        _bodyScrollIndex = MenuScrollBar.GetDragScrollIndex(
+            _bodyRect,
+            GetVisibleBodyLineCount(),
+            _bodyLines.Count,
+            _bodyScrollDragOffset,
+            y);
+    }
+
+    public override void releaseLeftClick(int x, int y)
+    {
+        _draggingBodyScrollBar = false;
+        base.releaseLeftClick(x, y);
     }
 
     public override void receiveGamePadButton(Buttons b)
     {
-        if (b == Buttons.B) { _onBack(_draft); return; }
+        if (b == Buttons.B)
+        {
+            _onBack(_draft);
+            return;
+        }
+
         base.receiveGamePadButton(b);
     }
 
-    // ── Gamepad snapping ─────────────────────────────────────────────────────
+    public override void receiveScrollWheelAction(int direction)
+    {
+        if (direction == 0)
+            return;
+
+        ScrollBody(direction > 0 ? -1 : 1);
+    }
 
     public override void populateClickableComponentList()
     {
@@ -136,8 +176,6 @@ internal sealed class SummaryMenu : IClickableMenu
         snapCursorToCurrentSnappedComponent();
     }
 
-    // ── Rendering ────────────────────────────────────────────────────────────
-
     public override void draw(SpriteBatch b)
     {
         drawTextureBox(b, xPositionOnScreen, yPositionOnScreen, width, height, Color.White);
@@ -149,58 +187,153 @@ internal sealed class SummaryMenu : IClickableMenu
             new Vector2(xPositionOnScreen + 40, yPositionOnScreen + 20),
             Game1.textColor);
 
-        int lineX = xPositionOnScreen + 48;
-        int lineY = yPositionOnScreen + 90;
-        const int lineSpacing = 48;
+        var lineY = _bodyRect.Y;
+        var visibleLineCount = GetVisibleBodyLineCount();
+        for (var i = _bodyScrollIndex; i < _bodyLines.Count && i < _bodyScrollIndex + visibleLineCount; i++)
+        {
+            Utility.drawTextWithShadow(b, _bodyLines[i], Game1.smallFont, new Vector2(_bodyRect.X, lineY), Game1.textColor);
+            lineY += LineSpacing;
+        }
 
-        // "Tasks:" header on its own line, then the wrapped list below it
-        DrawLine(b, I18nHelper.Get("ui.summary.tasks_label"), ref lineY, lineX, lineSpacing);
-        Utility.drawTextWithShadow(b, _wrappedTasksList, Game1.smallFont,
-            new Vector2(lineX + 8, lineY), Game1.textColor);
-        lineY += _wrappedTasksHeight + 8;
+        MenuScrollBar.Draw(b, _bodyRect, visibleLineCount, _bodyLines.Count, _bodyScrollIndex);
 
-        DrawLine(b, I18nHelper.Get("ui.summary.hours_label",   new { hours   = _estimatedHours.ToString("F1") }), ref lineY, lineX, lineSpacing);
-        DrawLine(b, I18nHelper.Get("ui.summary.rate_label",    new { rate    = _rate }),                           ref lineY, lineX, lineSpacing);
-        DrawLine(b, I18nHelper.Get("ui.summary.deposit_label", new { deposit = _depositAmount }),                  ref lineY, lineX, lineSpacing);
-        lineY += 12;
-        DrawLine(b, I18nHelper.Get("ui.summary.refund_policy"), ref lineY, lineX, lineSpacing);
-
-        DrawButton(b, _confirmBtn);
-        DrawButton(b, _backBtn);
-
+        DrawButton(b, _confirmBtn, _reviewModel.CanConfirm);
+        DrawButton(b, _backBtn, true);
         drawMouse(b);
     }
 
-    private static void DrawLine(SpriteBatch b, string text, ref int y, int x, int spacing)
+    private void BuildBodyLines()
     {
-        Utility.drawTextWithShadow(b, text, Game1.smallFont, new Vector2(x, y), Game1.textColor);
-        y += spacing;
+        _bodyLines.Clear();
+
+        var tasks = _reviewModel.SelectedTasks.Count > 0
+            ? string.Join(", ", _reviewModel.SelectedTasks.Select(task => I18nHelper.Get(TaskPresentation.GetI18nKey(task))))
+            : I18nHelper.Get("ui.common.none");
+
+        AddWrappedLine(I18nHelper.Get("ui.summary.tasks_label", new { tasks }));
+        AddWrappedLine(I18nHelper.Get("ui.summary.outdoor_scope_label", new { count = _reviewModel.ScopeSummary.OutdoorZones.Count }));
+        AddWrappedLine(I18nHelper.Get("ui.summary.animal_scope_label", new { count = _reviewModel.ScopeSummary.AnimalBuildings.Count }));
+        AddWrappedLine(
+            _reviewModel.ScopeSummary.Greenhouse is null
+                ? I18nHelper.Get("ui.summary.greenhouse_scope_none")
+                : I18nHelper.Get("ui.summary.greenhouse_scope_selected", new { location = _reviewModel.ScopeSummary.Greenhouse.LocationName }));
+
+        if (_reviewModel.CanConfirm && _reviewModel.Pricing is not null && _reviewModel.WorkerEnergy is not null)
+        {
+            AddWrappedLine(I18nHelper.Get("ui.summary.price_breakdown_header"));
+            foreach (var lineItem in _reviewModel.Pricing.LineItems)
+            {
+                var lineLabel = BuildPricingLineLabel(lineItem);
+                AddWrappedLine(I18nHelper.Get("ui.summary.price_line", new { label = lineLabel, amount = lineItem.LineTotal }));
+            }
+
+            AddWrappedLine(I18nHelper.Get("ui.summary.price_total", new { amount = _reviewModel.Pricing.TotalPrice }));
+            AddWrappedLine(I18nHelper.Get("ui.summary.worker_energy", new { capacity = _reviewModel.WorkerEnergy.DailyCapacity }));
+            AddWrappedLine(GetPaymentTimingText(_reviewModel.PaymentTimingKind));
+        }
+        else
+        {
+            AddWrappedLine(I18nHelper.Get("ui.summary.validation_header"));
+            foreach (var message in _reviewModel.ValidationMessages
+                         .GroupBy(candidate => candidate.Code)
+                         .Select(group => group.First()))
+                AddWrappedLine(BuildValidationText(message));
+        }
     }
 
-    private static void DrawButton(SpriteBatch b, ClickableComponent btn)
+    private string BuildPricingLineLabel(PricingLineItem lineItem)
     {
-        drawTextureBox(b, btn.bounds.X, btn.bounds.Y, btn.bounds.Width, btn.bounds.Height, Color.White);
-        var textSize = Game1.smallFont.MeasureString(btn.label);
-        Utility.drawTextWithShadow(b, btn.label, Game1.smallFont,
-            new Vector2(
-                btn.bounds.X + (int)(btn.bounds.Width  - textSize.X) / 2,
-                btn.bounds.Y + (int)(btn.bounds.Height - textSize.Y) / 2),
-            Game1.textColor);
+        var taskLabel = I18nHelper.Get(TaskPresentation.GetI18nKey(lineItem.Service));
+        return lineItem.Family switch
+        {
+            PricingFamily.Outdoor when lineItem.OutdoorBand is not null =>
+                I18nHelper.Get(
+                    "ui.summary.price_line_outdoor",
+                    new { service = taskLabel, band = Humanize(lineItem.OutdoorBand.Value.ToString()) }),
+            PricingFamily.AnimalBuilding when lineItem.AnimalTier is not null =>
+                I18nHelper.Get(
+                    "ui.summary.price_line_animal",
+                    new { service = taskLabel, tier = Humanize(lineItem.AnimalTier.Value.ToString()), count = lineItem.Quantity }),
+            PricingFamily.Greenhouse =>
+                I18nHelper.Get("ui.summary.price_line_greenhouse", new { service = taskLabel }),
+            _ =>
+                taskLabel,
+        };
     }
 
-    // Maps TaskKind enum name to i18n key suffix (mirrors TaskI18nKeys in TaskSelectionMenu)
-    private static string ToKey(TaskKind task) => task switch
+    private string BuildValidationText(ValidationDisplayMessage message)
     {
-        TaskKind.WaterCrops           => "water_crops",
-        TaskKind.HarvestCrops         => "harvest_crops",
-        TaskKind.CollectFruit         => "collect_fruit",
-        TaskKind.FeedAnimals          => "feed_animals",
-        TaskKind.PetAnimals           => "pet_animals",
-        TaskKind.CollectAnimalProducts => "collect_animal_products",
-        TaskKind.CutTrees             => "cut_trees",
-        TaskKind.ClearRocks           => "clear_rocks",
-        TaskKind.ClearWeeds           => "clear_weeds",
-        TaskKind.ClearGrass           => "clear_grass",
-        _                             => task.ToString().ToLower(),
+        return message.Code switch
+        {
+            ContractValidationCode.NoChargeableScopeTaskPair => I18nHelper.Get("ui.summary.validation.no_chargeable"),
+            ContractValidationCode.NoAnimalBuildingForSelectedAnimalService =>
+                I18nHelper.Get("ui.summary.validation.no_animal"),
+            ContractValidationCode.NoGreenhouseScopeForSelectedGreenhouseService =>
+                I18nHelper.Get("ui.summary.validation.no_greenhouse"),
+            _ => I18nHelper.Get("ui.summary.validation.no_outdoor"),
+        };
+    }
+
+    private static string Humanize(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return value;
+
+        var chars = new List<char>(value.Length + 4) { value[0] };
+        for (var i = 1; i < value.Length; i++)
+        {
+            if (char.IsUpper(value[i]) && !char.IsWhiteSpace(value[i - 1]))
+                chars.Add(' ');
+
+            chars.Add(value[i]);
+        }
+
+        return new string(chars.ToArray());
+    }
+
+    private string GetPaymentTimingText(PaymentTimingKind kind) => kind switch
+    {
+        PaymentTimingKind.RecurringStartsNextEligibleDay => I18nHelper.Get("ui.summary.payment_timing_recurring"),
+        PaymentTimingKind.RecurringEditAppliesNextEligibleDay => I18nHelper.Get("ui.summary.payment_timing_recurring_edit"),
+        _ => I18nHelper.Get("ui.summary.payment_timing_one_time"),
     };
+
+    private void AddWrappedLine(string value)
+    {
+        var wrapped = Game1.parseText(value, Game1.smallFont, MenuWidth - 96 - MenuScrollBar.ReservedWidth)
+            .Replace("\r\n", "\n")
+            .Replace('\r', '\n');
+
+        foreach (var line in wrapped.Split('\n'))
+        {
+            _bodyLines.Add(line);
+        }
+    }
+
+    private int GetVisibleBodyLineCount() => Math.Max(1, _bodyRect.Height / LineSpacing);
+
+    private void ScrollBody(int delta)
+    {
+        var next = Math.Clamp(_bodyScrollIndex + delta, 0, _maxBodyScrollIndex);
+        if (next == _bodyScrollIndex)
+            return;
+
+        _bodyScrollIndex = next;
+    }
+
+    private static void DrawButton(SpriteBatch b, ClickableComponent btn, bool enabled)
+    {
+        var tint = enabled ? Color.White : Color.Gray;
+        var textTint = enabled ? Game1.textColor : Color.Gray;
+        drawTextureBox(b, btn.bounds.X, btn.bounds.Y, btn.bounds.Width, btn.bounds.Height, tint);
+        var textSize = Game1.smallFont.MeasureString(btn.label);
+        Utility.drawTextWithShadow(
+            b,
+            btn.label,
+            Game1.smallFont,
+            new Vector2(
+                btn.bounds.X + (int)(btn.bounds.Width - textSize.X) / 2,
+                btn.bounds.Y + (int)(btn.bounds.Height - textSize.Y) / 2),
+            textTint);
+    }
 }

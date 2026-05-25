@@ -1,5 +1,6 @@
 using Dayswork.Core.Config;
 using Dayswork.Core.Capabilities;
+using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
@@ -32,14 +33,21 @@ public sealed class ModEntry : Mod
         var logWarning  = (string msg) => this.Monitor.Log(msg, LogLevel.Warn);
         var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, LogLevel.Warn));
         var config      = configManager.CurrentSnapshot;
+        var configResolver = new ConfigValueResolver();
         var rateCalc    = new RateCalculator();
         var depositCalc = new DepositCalculator();
+        var contractTermsBuilder = new ContractTermsBuilder(
+            new WorkScopeClassifier(),
+            new OutdoorServiceBandClassifier(configResolver),
+            new ContractPriceCalculator(configResolver),
+            new PriceBreakdownBuilder(configResolver),
+            new WorkerEnergyProfileBuilder(configResolver));
         var store       = new ContractStore(logWarning);
         var serializer  = new SaveDataSerializer(logWarning);
 
         // ── Mod singletons ───────────────────────────────────────────────────
         var chestResolver = new ChestResolver(Helper);
-        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, configManager, store, chestResolver, Helper);
+        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, contractTermsBuilder, configManager, store, chestResolver, Helper);
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();

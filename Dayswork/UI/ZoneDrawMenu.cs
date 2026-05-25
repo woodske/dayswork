@@ -59,22 +59,27 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         _onComplete       = onComplete;
         _onCancel         = onCancel;
 
-        // Restore prior selections so navigating back preserves work
-        foreach (var zone in draft.Zones)
+        // Restore prior selections so navigating back preserves work.
+        _completedZones.AddRange(draft.OutdoorZones);
+
+        foreach (var animalBuilding in draft.AnimalBuildings)
         {
-            if (zone.LocationName == "Farm")
-            {
-                _completedZones.Add(zone);
-            }
-            else
-            {
-                var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), zone.LocationName);
-                var match = buildingOutlines.FirstOrDefault(o =>
-                    o.LocationName == zone.LocationName ||
-                    o.LocationName == normalizedName);
-                if (match != null && !_selectedBuildings.Contains(match))
-                    _selectedBuildings.Add(match);
-            }
+            var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), animalBuilding.LocationName);
+            var match = buildingOutlines.FirstOrDefault(outline =>
+                outline.LocationName == animalBuilding.LocationName
+                || outline.LocationName == normalizedName);
+            if (match is not null && !_selectedBuildings.Contains(match))
+                _selectedBuildings.Add(match);
+        }
+
+        if (draft.Greenhouse is not null)
+        {
+            var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), draft.Greenhouse.LocationName);
+            var greenhouseMatch = buildingOutlines.FirstOrDefault(outline =>
+                outline.LocationName == draft.Greenhouse.LocationName
+                || outline.LocationName == normalizedName);
+            if (greenhouseMatch is not null && !_selectedBuildings.Contains(greenhouseMatch))
+                _selectedBuildings.Add(greenhouseMatch);
         }
 
         // Swap displayed location to the farm (no warp) and freeze the camera so we control it

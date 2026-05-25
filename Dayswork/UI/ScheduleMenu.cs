@@ -18,6 +18,7 @@ internal sealed class ScheduleMenu : IClickableMenu
     private const int CardHeight = 200;
 
     private readonly ContractDraft          _draft;
+    private readonly Action<ContractDraft, ContractSchedule> _onScheduleChanged;
     private readonly Action<ContractDraft>  _onAdvance;
     private readonly Action<ContractDraft>  _onBack;
 
@@ -37,11 +38,13 @@ internal sealed class ScheduleMenu : IClickableMenu
 
     internal ScheduleMenu(
         ContractDraft          draft,
+        Action<ContractDraft, ContractSchedule> onScheduleChanged,
         Action<ContractDraft>  onAdvance,
         Action<ContractDraft>  onBack)
         : base(0, 0, MenuWidth, MenuHeight)
     {
         _draft     = draft;
+        _onScheduleChanged = onScheduleChanged;
         _onAdvance = onAdvance;
         _onBack    = onBack;
 
@@ -112,12 +115,12 @@ internal sealed class ScheduleMenu : IClickableMenu
     {
         if (_oneTimeCard.bounds.Contains(x, y))
         {
-            _draft.Schedule = ContractSchedule.OneTime;
+            _onScheduleChanged(_draft, ContractSchedule.OneTime);
             return;
         }
         if (_recurringCard.bounds.Contains(x, y))
         {
-            _draft.Schedule = ContractSchedule.Recurring;
+            _onScheduleChanged(_draft, ContractSchedule.Recurring);
             return;
         }
         if (_nextBtn.bounds.Contains(x, y)) { _onAdvance(_draft); return; }

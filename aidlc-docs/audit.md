@@ -3307,3 +3307,299 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — Code Generation approval gate for U-19
 
 ---
+
+## Code Generation — U-19 APPROVED
+**Timestamp**: 2026-05-25T04:28:00Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-19 generated code. Proceeding to the next retrofit unit, U-20 Hiring Flow Preview Refresh, starting with Functional Design.
+**Context**: CONSTRUCTION — transition from U-19 Code Generation review to U-20 Functional Design
+
+---
+
+## Functional Design — U-20 Plan Created
+**Timestamp**: 2026-05-25T04:28:00Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-20-hiring-flow-preview-refresh-functional-design-plan.md`. The plan focuses on the remaining player-facing redesign choices for the hire/edit flow: authoritative typed scope inside `ContractDraft`, removal of the whole-farm fallback, per-service contribution behavior before compatible scope exists, supported building selection on Screen 2, typed-scope summary structure, edit-flow entry point, legacy-draft hydration, summary payment copy, and invalid-preview gating.
+**Context**: CONSTRUCTION — Functional Design planning for U-20
+
+---
+
+## Functional Design — U-20 Input Prompt
+**Timestamp**: 2026-05-25T04:28:00Z
+**User Input**: "continue"
+**AI Response**: Requesting that the user fill in the `[Answer]:` tags in `aidlc-docs/construction/plans/u-20-hiring-flow-preview-refresh-functional-design-plan.md` before the U-20 functional-design artifacts are generated.
+**Context**: CONSTRUCTION — Functional Design answer gate for U-20
+
+---
+
+## Functional Design — U-20 Answers Received
+**Timestamp**: 2026-05-25T04:36:00Z
+**User Input**: "use recommended for all"
+**AI Response**: Applied the recommended option to every open U-20 functional-design question: authoritative typed scope inside `ContractDraft`, removal of the whole-farm fallback, explicit selected-service preview rows that can show “needs scope”, only barns/coops plus greenhouse selectable as current work-scope buildings, typed scope section summaries, review-first edit entry, one-time compatibility derivation from legacy zones when authoritative scope is missing, schedule-sensitive Screen 4 payment copy, and Screen 4 as the sole confirmation gate for invalid previews.
+**Context**: CONSTRUCTION — Functional Design answer intake for U-20
+
+---
+
+## Functional Design — U-20 Answer Analysis Complete
+**Timestamp**: 2026-05-25T04:36:00Z
+**User Input**: "use recommended for all"
+**AI Response**: Analyzed the U-20 answers and found no ambiguity because every question explicitly selected the recommended path. No clarification round was needed.
+**Context**: CONSTRUCTION — Functional Design answer validation for U-20
+
+---
+
+## Functional Design — U-20 Artifacts Generated
+**Timestamp**: 2026-05-25T04:36:00Z
+**User Input**: "use recommended for all"
+**AI Response**: Generated `aidlc-docs/construction/u-20-hiring-flow-preview-refresh/functional-design/business-logic-model.md`, `domain-entities.md`, `business-rules.md`, and `frontend-components.md`. The artifacts define typed draft ownership, coordinator-owned live preview refresh, Screen 1 contribution-row states, Screen 2 typed scope semantics, review-first edit flow, Screen 4 invalid-preview gating, and schedule-sensitive confirmation behavior for the refreshed hire/edit pipeline.
+**Context**: CONSTRUCTION — Functional Design generation complete for U-20
+
+---
+
+## Functional Design — U-20 Review Prompt
+**Timestamp**: 2026-05-25T04:36:00Z
+**User Input**: "use recommended for all"
+**AI Response**: Presenting the U-20 functional-design artifacts for review before proceeding to NFR Requirements for the hire-flow preview refresh unit.
+**Context**: CONSTRUCTION — Functional Design approval gate for U-20
+
+---
+
+## Functional Design — U-20 APPROVED
+**Timestamp**: 2026-05-25T04:45:00Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-20 functional-design artifacts. Proceeding to NFR Requirements for the hire-flow preview refresh unit.
+**Context**: CONSTRUCTION — transition from Functional Design to NFR Requirements for U-20
+
+---
+
+## NFR Requirements — U-20 Plan Created
+**Timestamp**: 2026-05-25T04:45:00Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-20-hiring-flow-preview-refresh-nfr-requirements-plan.md`. The plan focuses on the remaining quality decisions for the redesigned hire/edit flow: preview responsiveness, deterministic preview/view-model output, legacy edit hydration resilience, usability/gamepad quality, and regression-test rigor.
+**Context**: CONSTRUCTION — NFR Requirements planning for U-20
+
+---
+
+## NFR Requirements — U-20 Answers Received
+**Timestamp**: 2026-05-25T04:45:00Z
+**User Input**: "continue"
+**AI Response**: Applied the recommended option to every U-20 NFR question to keep the workflow moving under the user's established recommended-default preference. The chosen path locks immediate synchronous preview refresh, strict deterministic preview/review output, best-effort resilient legacy edit hydration, preserved gamepad/review-first usability, and strong example/property regression coverage.
+**Context**: CONSTRUCTION — NFR Requirements answer intake for U-20
+
+---
+
+## NFR Requirements — U-20 Answer Analysis Complete
+**Timestamp**: 2026-05-25T04:45:00Z
+**User Input**: "continue"
+**AI Response**: Analyzed the U-20 NFR answers and found no ambiguity because every question followed the recommended path. No clarification round was needed.
+**Context**: CONSTRUCTION — NFR Requirements answer validation for U-20
+
+---
+
+## NFR Requirements — U-20 Artifacts Generated
+**Timestamp**: 2026-05-25T04:45:00Z
+**User Input**: "continue"
+**AI Response**: Generated `aidlc-docs/construction/u-20-hiring-flow-preview-refresh/nfr-requirements/nfr-requirements.md` and `tech-stack-decisions.md`. The artifacts define the quality bar for immediate preview updates, deterministic view models, safe legacy edit hydration, preserved usability, and testable coordinator-owned orchestration for the refreshed hire/edit pipeline.
+**Context**: CONSTRUCTION — NFR Requirements generation complete for U-20
+
+---
+
+## NFR Requirements — U-20 Review Prompt
+**Timestamp**: 2026-05-25T04:45:00Z
+**User Input**: "continue"
+**AI Response**: Presenting the U-20 NFR requirements artifacts for review before proceeding to NFR Design for the hire-flow preview refresh unit.
+**Context**: CONSTRUCTION — NFR Requirements approval gate for U-20
+
+---
+
+## NFR Requirements — U-20 APPROVED
+**Timestamp**: 2026-05-25T04:52:00Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-20 NFR requirements artifacts. Proceeding to NFR Design for the hire-flow preview refresh unit.
+**Context**: CONSTRUCTION — transition from NFR Requirements to NFR Design for U-20
+
+---
+
+## NFR Design — U-20 Plan Created
+**Timestamp**: 2026-05-25T04:52:00Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-20-hiring-flow-preview-refresh-nfr-design-plan.md`. The plan focuses on the non-functional pattern decisions that remain for the redesigned hire/edit flow: synchronous preview refresh ownership, deterministic view-model shaping, invalid-preview recovery, legacy edit bootstrap, and regression-support component boundaries.
+**Context**: CONSTRUCTION — NFR Design planning for U-20
+
+---
+
+## NFR Design — U-20 Answer Analysis Complete
+**Timestamp**: 2026-05-25T04:52:00Z
+**User Input**: "continue"
+**AI Response**: Determined that no additional U-20 NFR design question round was needed because the approved NFR requirements already fixed the relevant performance, resilience, determinism, compatibility, and maintainability tradeoffs. The established recommended-default preference remained consistent across all categories.
+**Context**: CONSTRUCTION — NFR Design question evaluation for U-20
+
+---
+
+## NFR Design — U-20 Artifacts Generated
+**Timestamp**: 2026-05-25T04:52:00Z
+**User Input**: "continue"
+**AI Response**: Generated `aidlc-docs/construction/u-20-hiring-flow-preview-refresh/nfr-design/nfr-design-patterns.md` and `logical-components.md`. The artifacts define synchronous coordinator-owned preview refresh, canonical view-model shaping, explicit invalid-preview recovery, narrow legacy scope bootstrap, thin-menu boundaries, and dedicated view-model-boundary regression support for the refreshed hire/edit pipeline.
+**Context**: CONSTRUCTION — NFR Design generation complete for U-20
+
+---
+
+## NFR Design — U-20 Review Prompt
+**Timestamp**: 2026-05-25T04:52:00Z
+**User Input**: "continue"
+**AI Response**: Presenting the U-20 NFR design artifacts for review before proceeding to Code Generation for the hire-flow preview refresh unit.
+**Context**: CONSTRUCTION — NFR Design approval gate for U-20
+
+---
+
+## NFR Design — U-20 APPROVED
+**Timestamp**: 2026-05-25T05:10:00Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-20 NFR design artifacts. Proceeding to Code Generation planning for the hire-flow preview refresh unit.
+**Context**: CONSTRUCTION — transition from NFR Design to Code Generation planning for U-20
+
+---
+
+## Code Generation — U-20 Plan Created
+**Timestamp**: 2026-05-25T05:10:00Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-20-hiring-flow-preview-refresh-code-generation-plan.md`. The 22-step plan focuses on replacing the old hourly/deposit hire-flow semantics with redesign-era typed draft scope, coordinator-owned preview refresh, review-first edit hydration, fixed-price/worker-energy summary UI, compatibility contract assembly for transitional consumers, i18n refresh, and focused example/FsCheck regression coverage.
+**Context**: CONSTRUCTION — Code Generation Part 1 planning for U-20
+
+---
+
+## Code Generation — U-20 Plan Review Prompt
+**Timestamp**: 2026-05-25T05:10:00Z
+**User Input**: "continue"
+**AI Response**: Presenting the U-20 code generation plan for review before executing Part 2 of the hire-flow preview refresh retrofit unit.
+**Context**: CONSTRUCTION — Code Generation approval gate for U-20
+
+---
+
+## Code Generation — U-20 APPROVED
+**Timestamp**: 2026-05-25T05:32:00Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-20 code generation plan and started Part 2 execution for the hire-flow preview refresh retrofit unit.
+**Context**: CONSTRUCTION — transition from Code Generation Part 1 review to Part 2 execution for U-20
+
+---
+
+## Code Generation — U-20 Artifacts Generated
+**Timestamp**: 2026-05-25T05:32:00Z
+**User Input**: "continue"
+**AI Response**: Completed U-20 Part 2. Replaced the old hire-flow `ContractDraft`/menu/coordinator pricing path with redesign-era typed scope plus `ContractTermsBuilder` preview data, added `LegacyScopeBootstrapper`, `TaskPresentation`, and `HiringFlowViewModelBuilder`, rewrote Screen 1/2/4 semantics around fixed price and worker stamina, refreshed hire-flow i18n copy, added focused U-20 example/property tests, and wrote `aidlc-docs/construction/u-20-hiring-flow-preview-refresh/code/code-summary.md`. Verification succeeded with `dotnet build Dayswork.sln /p:EnableModDeploy=false` (`0` errors, `0` warnings) and `dotnet test Dayswork.sln` (`246` passed, `1` expected skip, `0` failed).
+**Context**: CONSTRUCTION — Code Generation Part 2 complete for U-20
+
+---
+
+## Code Generation — U-20 Review Prompt
+**Timestamp**: 2026-05-25T05:32:00Z
+**User Input**: "continue"
+**AI Response**: Presenting the completed U-20 generated code and code summary for review before proceeding to the next retrofit unit.
+**Context**: CONSTRUCTION — Code Generation approval gate for U-20
+
+---
+
+## Code Generation — U-20 Review Change Requested
+**Timestamp**: 2026-05-25T05:45:00Z
+**User Input**: "In the review contract screen, the tasks and last message are overflowing the UI. they should wrap"
+**AI Response**: Investigated the review-screen layout in `Dayswork/UI/SummaryMenu.cs`, identified that wrapped text was being flattened back into a single line, and prepared a focused follow-up fix within the existing U-20 code review stage.
+**Context**: CONSTRUCTION — Code Generation review feedback for U-20
+
+---
+
+## Code Generation — U-20 Review Change Applied
+**Timestamp**: 2026-05-25T05:45:00Z
+**User Input**: "In the review contract screen, the tasks and last message are overflowing the UI. they should wrap"
+**AI Response**: Updated `Dayswork/UI/SummaryMenu.cs` so wrapped review text is preserved as multiple body lines instead of being flattened. The tasks row, pricing rows, validation messages, and payment-timing copy now wrap within the panel width and expand the body height accordingly. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` errors and `0` warnings.
+**Context**: CONSTRUCTION — Code Generation review fix applied for U-20
+
+---
+
+## Code Generation — U-20 Review Follow-up Requested
+**Timestamp**: 2026-05-25T05:52:00Z
+**User Input**: "it's still overflowing"
+**AI Response**: Re-investigated the review-screen wrap path using the user's screenshot and identified that `Game1.parseText(...)` line breaks were being split only on `Environment.NewLine`, which missed the in-game `\n` separators and left wrapped text rendered as a single line.
+**Context**: CONSTRUCTION — Code Generation follow-up review feedback for U-20
+
+---
+
+## Code Generation — U-20 Review Follow-up Applied
+**Timestamp**: 2026-05-25T05:52:00Z
+**User Input**: "it's still overflowing"
+**AI Response**: Updated `Dayswork/UI/SummaryMenu.cs` to normalize `Game1.parseText(...)` output and split wrapped text on all newline variants before adding body lines. This makes the task row and payment-timing message render on separate wrapped lines inside the review panel. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` errors and `0` warnings.
+**Context**: CONSTRUCTION — Code Generation follow-up review fix applied for U-20
+
+---
+
+## Code Generation — U-20 Review Follow-up Still Reproducible
+**Timestamp**: 2026-05-25T06:05:00Z
+**User Input**: "still not fixed"
+**AI Response**: Compared the built workspace DLL to the deployed mod DLL and found that the game was still loading an older deployed copy. The local build output at `C:\Users\kwood\Repos\dayswork\Dayswork\bin\Debug\net6.0\Dayswork.dll` had a newer timestamp than `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork\Dayswork.dll`. A deploy build was attempted, but copying to the Mods folder failed because `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork\Dayswork.Core.dll` was locked by another process.
+**Context**: CONSTRUCTION — Code Generation deployment follow-up for U-20 review fix
+
+---
+
+## Code Generation — U-20 Deployment Retry Approved
+**Timestamp**: 2026-05-25T06:12:00Z
+**User Input**: "ready"
+**AI Response**: Retried the deploy-enabled build after the user confirmed the game was closed. `dotnet build Dayswork.sln` succeeded, copied the mod into `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`, and the deployed `Dayswork.dll` now matches the workspace build output timestamp and file length exactly.
+**Context**: CONSTRUCTION — Code Generation deployment retry for U-20 review fix
+
+---
+
+## Code Generation — U-20 UI Review Feedback Received
+**Timestamp**: 2026-05-25T06:28:00Z
+**User Input**: "UI feedback:\n\nFirst page:\n* When selecting the tasks, the grey text overlapping the tasks is hard to read. The tasks also go behing the cancel and next buttons. Let's make this scrollable so the text doesn't go behind. Does the UI support tooltips? \n\nSecond page:\n* Similar to the first page, the output destinations go behind the back and next buttons, and off of the UI screen. let's make this scrollable too \n\nFourth page:\n* Everything fits in the UI which is good, but what happens when the review contract is so large the UI goes off the screen? We should make this scrollable as well"
+**AI Response**: Reviewed the three affected menus and confirmed there was no reusable scroll widget already in the mod. Chose a targeted review-polish pass: add a scroll window and hover text to Screen 1, make Screen 2's output destination list scrollable with wrapped destination labels, and convert Screen 4's review body into a fixed-height scroll region while keeping the navigation buttons pinned.
+**Context**: CONSTRUCTION — Code Generation review feedback for U-20 menu layout polish
+
+---
+
+## Code Generation — U-20 UI Review Polish Applied
+**Timestamp**: 2026-05-25T06:28:00Z
+**User Input**: "UI feedback:\n\nFirst page:\n* When selecting the tasks, the grey text overlapping the tasks is hard to read. The tasks also go behing the cancel and next buttons. Let's make this scrollable so the text doesn't go behind. Does the UI support tooltips? \n\nSecond page:\n* Similar to the first page, the output destinations go behind the back and next buttons, and off of the UI screen. let's make this scrollable too \n\nFourth page:\n* Everything fits in the UI which is good, but what happens when the review contract is so large the UI goes off the screen? We should make this scrollable as well"
+**AI Response**: Applied the review-polish changes in `TaskSelectionMenu.cs`, `ZoneAndChestMenu.cs`, `SummaryMenu.cs`, and `i18n/default.json`. Screen 1 now uses taller rows, a scrollable task list, darker secondary text, and hover text tooltips for the row state. Screen 2 now keeps the work-scope controls pinned while the output destination list scrolls, wraps long destination labels, and shows hover text with the full destination. Screen 4 now uses a fixed-height scrollable review body so large contracts stay on-screen. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` errors / `0` warnings, and a deploy-enabled `dotnet build Dayswork.sln` also passed and copied the updated mod into `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — Code Generation UI review polish applied for U-20
+
+---
+
+## Code Generation — U-20 UI Review Polish Verified
+**Timestamp**: 2026-05-25T06:32:00Z
+**User Input**: "UI feedback:\n\nFirst page:\n* When selecting the tasks, the grey text overlapping the tasks is hard to read. The tasks also go behing the cancel and next buttons. Let's make this scrollable so the text doesn't go behind. Does the UI support tooltips? \n\nSecond page:\n* Similar to the first page, the output destinations go behind the back and next buttons, and off of the UI screen. let's make this scrollable too \n\nFourth page:\n* Everything fits in the UI which is good, but what happens when the review contract is so large the UI goes off the screen? We should make this scrollable as well"
+**AI Response**: Ran `dotnet test Dayswork.sln /p:EnableModDeploy=false` after the UI review-polish pass. Result: `246` passed, `1` expected skip, `0` failed.
+**Context**: CONSTRUCTION — Code Generation UI review polish verification for U-20
+
+---
+
+## Code Generation — U-20 Scrollbar Review Feedback Received
+**Timestamp**: 2026-05-25T06:45:00Z
+**User Input**: "Are we able to add a scrollbar instead of the scroll message?\n\nFirst page:\n* Let's return the original shape of the task boxes.\n* Instead of having the included message with the price in the box, just have it on the tooltip like it is now\n\nSecond page:\n* Move the select work scope and clear work scope buttons next to each other instead of on top, they're taking up too much space\n\nFourth page:\n* The message \"At least one selected outdoor service still needs an outdoor work area.\" doesn't need to be repeated for each service. Same with the animal service needing a barn or coop message"
+**AI Response**: Reviewed the three menus again and chose a shared follow-up solution: add a reusable scrollbar helper with draw/click/drag behavior, restore the compact task-row layout on Screen 1 while keeping the pricing/scope state only in tooltips, move the Screen 2 work-scope buttons into a single row, and deduplicate Screen 4 validation messages by validation code.
+**Context**: CONSTRUCTION — Code Generation scrollbar/layout review feedback for U-20
+
+---
+
+## Code Generation — U-20 Scrollbar Review Polish Applied
+**Timestamp**: 2026-05-25T06:45:00Z
+**User Input**: "Are we able to add a scrollbar instead of the scroll message?\n\nFirst page:\n* Let's return the original shape of the task boxes.\n* Instead of having the included message with the price in the box, just have it on the tooltip like it is now\n\nSecond page:\n* Move the select work scope and clear work scope buttons next to each other instead of on top, they're taking up too much space\n\nFourth page:\n* The message \"At least one selected outdoor service still needs an outdoor work area.\" doesn't need to be repeated for each service. Same with the animal service needing a barn or coop message"
+**AI Response**: Added `Dayswork/UI/MenuScrollBar.cs` and updated `TaskSelectionMenu.cs`, `ZoneAndChestMenu.cs`, and `SummaryMenu.cs` to use real scrollbars instead of the mouse-wheel hint. Screen 1 now has the original compact row shape again and keeps the included-price/state text in the tooltip only. Screen 2 now places the work-scope buttons side-by-side and keeps the scrollable output list below them. Screen 4 now deduplicates repeated validation messages by code. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` errors / `0` warnings, `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with `246` passed / `1` expected skip / `0` failed, and `dotnet build Dayswork.sln` passed and deployed the updated mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — Code Generation scrollbar/layout review polish applied for U-20
+
+---
+
+## Code Generation — U-20 Dependency Question Answered
+**Timestamp**: 2026-05-25T06:58:00Z
+**User Input**: "does smapi, stardew, or any of our other mod dependencies expose a way to add scroll bars so we don't need to build our own?"
+**AI Response**: Inspected the current dependency surface and local Stardew docs. Findings: SMAPI does not provide a general-purpose scrollbar widget for custom menus; our active runtime dependencies are Mail Framework Mod and optional Generic Mod Config Menu, neither of which provides a reusable scrollbar control for arbitrary `IClickableMenu` screens; Stardew itself exposes vanilla scrollbar textures/patterns in menu implementations (for example `ShopMenu` XML docs reference scrollbar foreground/background textures), but not a plug-and-play public scrollbar component we can drop into our menus. Recommendation: keep a local helper seam for behavior, but re-skin or align it to vanilla assets/patterns if we want a more native look.
+**Context**: CONSTRUCTION — Code Generation dependency/API review for U-20 menu polish
+
+---
+
+## Code Generation — U-20 Vanilla Scrollbar + Output Page Request
+**Timestamp**: 2026-05-25T07:08:00Z
+**User Input**: "OK, let's use the game's scrollbar visuals and interaction pattern. Also, put the output destinations on their own page since this work scope & output page is congested. With that work, we can lower the select work scop and clear work scope buttons away from the title of the page a little bit."
+**AI Response**: Split the congested scope/output screen into separate work-scope and output-destinations menus, rewired the coordinator flow to insert the new output page before schedule selection, and updated the shared scrollbar helper to use Stardew's shop-style scrollbar assets/pattern via `ShopMenu.ShopCachedTheme`. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` errors / `0` warnings, `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with `246` passed / `1` expected skip / `0` failed, and `dotnet build Dayswork.sln` passed and deployed the updated mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — Code Generation vanilla scrollbar/output-page review polish for U-20
+
+---
