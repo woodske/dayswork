@@ -82,4 +82,20 @@ public sealed class ContractStoreStateTests
                 store.Cancel(contract.Id);
                 return store.Get(contract.Id).Status == ContractStatus.Cancelled;
             });
+
+    [Property(Arbitrary = new[] { typeof(U19PersistenceGen) }, MaxTest = 300)]
+    public Property ReplaceTermsSnapshot_PreservesNonTermsFields() =>
+        Prop.ForAll(
+            U19PersistenceGen.CurrentSchemaContract(),
+            U19PersistenceGen.TermsSnapshot(),
+            (contract, replacementTerms) =>
+            {
+                var store = MakeStore();
+                store.Add(contract);
+                store.ReplaceTermsSnapshot(contract.Id, replacementTerms);
+                var stored = store.Get(contract.Id);
+                return ContractStructuralComparer.ContractsEqual(
+                    contract with { TermsSnapshot = replacementTerms },
+                    stored);
+            });
 }

@@ -10,6 +10,7 @@ public interface IContractStore
     void Cancel(ContractId id);
     void Pause(ContractId id);
     void Resume(ContractId id);
+    void ReplaceTermsSnapshot(ContractId id, ContractTermsSnapshot terms);
     IReadOnlyList<Contract> List();
     IReadOnlyList<Contract> ListActiveForDate(int day, Season season, int year);
     void Hydrate(IReadOnlyList<Contract> contracts);

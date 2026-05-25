@@ -64,6 +64,12 @@ public sealed class ContractStore : IContractStore
         _contracts[id] = existing with { Status = ContractStatus.Active };
     }
 
+    public void ReplaceTermsSnapshot(ContractId id, ContractTermsSnapshot terms)
+    {
+        var existing = Get(id);
+        _contracts[id] = existing with { TermsSnapshot = terms };
+    }
+
     public IReadOnlyList<Contract> List() =>
         _contracts.Values.ToList().AsReadOnly();
 

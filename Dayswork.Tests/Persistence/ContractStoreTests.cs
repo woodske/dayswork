@@ -1,5 +1,6 @@
 using Dayswork.Core.Domain;
 using Dayswork.Core.Persistence;
+using Dayswork.Tests.Persistence.Generators;
 using Xunit;
 
 namespace Dayswork.Tests.Persistence;
@@ -171,6 +172,29 @@ public sealed class ContractStoreTests
         var contract = MakeContract(ContractStatus.Cancelled);
         _store.Add(contract);
         Assert.Throws<InvalidOperationException>(() => _store.Resume(contract.Id));
+    }
+
+    [Fact]
+    public void ReplaceTermsSnapshot_UpdatesOnlyTermsSnapshot()
+    {
+        var originalTerms = U19PersistenceGen.CreateExampleCurrentSchemaContract().TermsSnapshot!;
+        var replacementTerms = U19PersistenceGen.CreateAlternateTermsSnapshot();
+        var contract = MakeContract() with { TermsSnapshot = originalTerms };
+
+        _store.Add(contract);
+        _store.ReplaceTermsSnapshot(contract.Id, replacementTerms);
+
+        var stored = _store.Get(contract.Id);
+        Assert.True(ContractStructuralComparer.ContractsEqual(
+            contract with { TermsSnapshot = replacementTerms },
+            stored));
+    }
+
+    [Fact]
+    public void ReplaceTermsSnapshot_UnknownId_Throws()
+    {
+        var terms = U19PersistenceGen.CreateAlternateTermsSnapshot();
+        Assert.Throws<KeyNotFoundException>(() => _store.ReplaceTermsSnapshot(ContractId.New(), terms));
     }
 
     // ── List ───────────────────────────────────────────────────────────────

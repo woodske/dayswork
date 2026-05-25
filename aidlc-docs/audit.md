@@ -3115,3 +3115,195 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — Code Generation approval gate for U-18
 
 ---
+
+## Code Generation — U-18 APPROVED
+**Timestamp**: 2026-05-24T23:33:10.1684222Z
+**User Input**: "continue"
+**AI Response**: Logged approval of U-18 Code Generation. The pricing-redesign construction workflow is moving to the next retrofit unit, U-19 — Contract Snapshot Persistence + Legacy Cleanup.
+**Context**: CONSTRUCTION — transition from Code Generation for U-18 to Functional Design for U-19
+
+---
+
+## Functional Design — U-19 Plan Created
+**Timestamp**: 2026-05-24T23:33:10.1684222Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-19-contract-snapshot-persistence-legacy-cleanup-functional-design-plan.md`. The plan focuses the persistence retrofit on the remaining design choices that still matter: authoritative saved scope/terms shape, typed scope serialization, schema versioning and legacy-drop behavior, malformed current-schema load rules, explicit terms-snapshot replacement, bridge handling for temporary legacy financial fields, recurring snapshot refresh timing, and logging policy.
+**Context**: CONSTRUCTION — Functional Design planning for U-19
+
+---
+
+## Functional Design — U-19 Input Prompt
+**Timestamp**: 2026-05-24T23:33:10.1684222Z
+**User Input**: "continue"
+**AI Response**: Requesting that the user fill in the `[Answer]:` tags in `aidlc-docs/construction/plans/u-19-contract-snapshot-persistence-legacy-cleanup-functional-design-plan.md` before the U-19 functional-design artifacts are generated.
+**Context**: CONSTRUCTION — Functional Design answer gate for U-19
+
+---
+
+## Functional Design — U-19 Answers Received
+**Timestamp**: 2026-05-24T23:36:14.3018935Z
+**User Input**: "continue, use recommended for everything"
+**AI Response**: Applied the recommended option to every open U-19 functional-design question: persist both scope and terms for all current-schema contracts, serialize typed scope explicitly, bump to schema version 2 and treat v1 as legacy pre-release data, skip malformed current-schema contracts individually, add `ReplaceTermsSnapshot(...)`, keep legacy financial fields temporarily as a bridge, refresh recurring snapshots immediately after approved edits and successful rebuilds, and keep maintainer-facing diagnostics with no player-facing explanation.
+**Context**: CONSTRUCTION — Functional Design answer intake for U-19
+
+---
+
+## Functional Design — U-19 Answer Analysis Complete
+**Timestamp**: 2026-05-24T23:36:14.3018935Z
+**User Input**: "continue, use recommended for everything"
+**AI Response**: Analyzed the U-19 answers and found no ambiguity because every question explicitly selected the recommended path. No clarification round was needed.
+**Context**: CONSTRUCTION — Functional Design answer validation for U-19
+
+---
+
+## Functional Design — U-19 Artifacts Generated
+**Timestamp**: 2026-05-24T23:36:14.3018935Z
+**User Input**: "continue, use recommended for everything"
+**AI Response**: Generated `aidlc-docs/construction/u-19-contract-snapshot-persistence-legacy-cleanup/functional-design/business-logic-model.md`, `domain-entities.md`, and `business-rules.md`. The artifacts define the schema-v2 persistence model, typed scope and terms-snapshot save shapes, load-time compatibility projections for older domain fields, contract-store snapshot replacement semantics, recurring snapshot refresh timing, and legacy/malformed-load rules.
+**Context**: CONSTRUCTION — Functional Design generation complete for U-19
+
+---
+
+## Functional Design — U-19 Review Prompt
+**Timestamp**: 2026-05-24T23:36:14.3018935Z
+**User Input**: "continue, use recommended for everything"
+**AI Response**: Presenting the U-19 functional-design artifacts for review before proceeding to NFR Requirements for the persistence retrofit unit.
+**Context**: CONSTRUCTION — Functional Design approval gate for U-19
+
+---
+
+## Functional Design — U-19 APPROVED
+**Timestamp**: 2026-05-25T03:13:44.7407345Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-19 functional-design artifacts. Proceeding to NFR Requirements for the persistence retrofit unit.
+**Context**: CONSTRUCTION — transition from Functional Design to NFR Requirements for U-19
+
+---
+
+## NFR Requirements — U-19 Plan Created
+**Timestamp**: 2026-05-25T03:13:44.7407345Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-19-contract-snapshot-persistence-legacy-cleanup-nfr-requirements-plan.md`. The plan focuses the persistence retrofit on the remaining non-functional choices that still matter: synchronous save/load responsiveness, strict schema-v2 determinism, resilience for mixed legacy/malformed/current saves, bridge reliability for temporary legacy fields, and the regression/property-test bar.
+**Context**: CONSTRUCTION — NFR Requirements planning for U-19
+
+---
+
+## NFR Requirements — U-19 Input Prompt
+**Timestamp**: 2026-05-25T03:13:44.7407345Z
+**User Input**: "continue"
+**AI Response**: Requesting that the user fill in the `[Answer]:` tags in `aidlc-docs/construction/plans/u-19-contract-snapshot-persistence-legacy-cleanup-nfr-requirements-plan.md` before the U-19 NFR requirements artifacts are generated.
+**Context**: CONSTRUCTION — NFR Requirements answer gate for U-19
+
+---
+
+## NFR Requirements — U-19 Answers Received
+**Timestamp**: 2026-05-25T03:33:01.4684023Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-19-contract-snapshot-persistence-legacy-cleanup-nfr-requirements-plan.md` and extracted these decisions: keep persistence synchronous and lightweight, require strict schema-v2 determinism, preserve valid redesigned contracts inside mixed payloads whenever possible, keep the bridge hardening bar minimal because there are no active legacy consumers yet, and apply strong example-based plus FsCheck-backed persistence coverage.
+**Context**: CONSTRUCTION — NFR Requirements answer intake for U-19
+
+---
+
+## NFR Requirements — U-19 Answer Analysis Complete
+**Timestamp**: 2026-05-25T03:33:01.4684023Z
+**User Input**: "done"
+**AI Response**: Analyzed the U-19 NFR answers and found no blocking ambiguity. The one non-recommended answer explicitly selected the minimal bridge-quality bar and included rationale that there are no active legacy consumers yet, so no clarification round was needed.
+**Context**: CONSTRUCTION — NFR Requirements answer validation for U-19
+
+---
+
+## NFR Requirements — U-19 Artifacts Generated
+**Timestamp**: 2026-05-25T03:33:01.4684023Z
+**User Input**: "done"
+**AI Response**: Generated `aidlc-docs/construction/u-19-contract-snapshot-persistence-legacy-cleanup/nfr-requirements/nfr-requirements.md` and `tech-stack-decisions.md`. The artifacts define the save/load latency target, strict determinism bar, mixed-payload resilience requirement, intentionally minimal bridge-hardening expectation, and the strong example/property-test obligations for schema-v2 persistence.
+**Context**: CONSTRUCTION — NFR Requirements generation complete for U-19
+
+---
+
+## NFR Requirements — U-19 Review Prompt
+**Timestamp**: 2026-05-25T03:33:01.4684023Z
+**User Input**: "done"
+**AI Response**: Presenting the U-19 NFR requirements artifacts for review before proceeding to NFR Design for the persistence retrofit unit.
+**Context**: CONSTRUCTION — NFR Requirements approval gate for U-19
+
+---
+
+## NFR Requirements — U-19 APPROVED
+**Timestamp**: 2026-05-25T03:38:20.9369878Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-19 NFR requirements artifacts. Proceeding to NFR Design for the persistence retrofit unit.
+**Context**: CONSTRUCTION — transition from NFR Requirements to NFR Design for U-19
+
+---
+
+## NFR Design — U-19 Plan Created
+**Timestamp**: 2026-05-25T03:38:20.9369878Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-19-contract-snapshot-persistence-legacy-cleanup-nfr-design-plan.md`. All NFR-design patterns were determined directly from the approved NFR requirements and functional design, so no additional question round was needed. The plan locks explicit ownership for version-gating, per-contract exception barriers, canonical serializer ordering, narrow immutable terms replacement, local compatibility projection, and dedicated persistence property-test support.
+**Context**: CONSTRUCTION — NFR Design planning for U-19
+
+---
+
+## NFR Design — U-19 Artifacts Generated
+**Timestamp**: 2026-05-25T03:38:20.9369878Z
+**User Input**: "continue"
+**AI Response**: Generated `aidlc-docs/construction/u-19-contract-snapshot-persistence-legacy-cleanup/nfr-design/nfr-design-patterns.md` and `logical-components.md`. The artifacts define the persistence retrofit's version-gated envelope branching, per-contract isolation, canonical schema-v2 ordering, explicit DTO/projection layer, narrow immutable `ReplaceTermsSnapshot(...)` seam, minimal/local compatibility bridge, and dedicated persistence test-side support.
+**Context**: CONSTRUCTION — NFR Design generation complete for U-19
+
+---
+
+## NFR Design — U-19 Review Prompt
+**Timestamp**: 2026-05-25T03:38:20.9369878Z
+**User Input**: "continue"
+**AI Response**: Presenting the U-19 NFR design artifacts for review before proceeding to Code Generation for the persistence retrofit unit.
+**Context**: CONSTRUCTION — NFR Design approval gate for U-19
+
+---
+
+## NFR Design — U-19 APPROVED
+**Timestamp**: 2026-05-25T03:41:08.6977116Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-19 NFR design artifacts. Proceeding to Code Generation planning for the persistence retrofit unit.
+**Context**: CONSTRUCTION — transition from NFR Design to Code Generation planning for U-19
+
+---
+
+## Code Generation — U-19 Plan Created
+**Timestamp**: 2026-05-25T03:41:08.6977116Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-19-contract-snapshot-persistence-legacy-cleanup-code-generation-plan.md`. The plan keeps U-19 focused on the schema-v2 persistence retrofit: explicit current-schema DTOs, narrow `ReplaceTermsSnapshot(...)` store support, serializer-owned version branching and compatibility projection, adapter decoupling from `DaysworkSaveDataV1`, strong v2 example/property coverage, and final verification/docs.
+**Context**: CONSTRUCTION — Code Generation Part 1 planning for U-19
+
+---
+
+## Code Generation — U-19 Plan Review Prompt
+**Timestamp**: 2026-05-25T03:41:08.6977116Z
+**User Input**: "continue"
+**AI Response**: Presenting the U-19 code generation plan for review before executing Part 2 of the persistence retrofit unit.
+**Context**: CONSTRUCTION — Code Generation approval gate for U-19
+
+---
+
+## Code Generation — U-19 APPROVED
+**Timestamp**: 2026-05-25T03:55:00Z
+**User Input**: "continue"
+**AI Response**: Logged approval of the U-19 code generation plan and started Part 2 execution for the persistence retrofit unit.
+**Context**: CONSTRUCTION — transition from Code Generation Part 1 review to Part 2 execution for U-19
+
+---
+
+## Code Generation — U-19 Artifacts Generated
+**Timestamp**: 2026-05-25T04:18:00Z
+**User Input**: "continue"
+**AI Response**: Completed U-19 Part 2. Added the schema-v2 DTO layer, extended `IContractStore`/`ContractStore` with `ReplaceTermsSnapshot(...)`, rewrote `SaveDataSerializer` around schema-v2 version branching and compatibility projection, moved `ContractPersistenceAdapter` to raw `JToken` payload handoff, added dedicated U-19 persistence generators/comparers/example tests/property tests, and wrote `aidlc-docs/construction/u-19-contract-snapshot-persistence-legacy-cleanup/code/code-summary.md`. Verification succeeded with `dotnet build Dayswork.sln /p:EnableModDeploy=false` (`0` errors, `0` warnings) and `dotnet test Dayswork.sln` (`238` passed, `1` expected skip, `0` failed).
+**Context**: CONSTRUCTION — Code Generation Part 2 complete for U-19
+
+---
+
+## Code Generation — U-19 Review Prompt
+**Timestamp**: 2026-05-25T04:18:00Z
+**User Input**: "continue"
+**AI Response**: Presenting the completed U-19 generated code and code summary for review before proceeding to the next stage.
+**Context**: CONSTRUCTION — Code Generation approval gate for U-19
+
+---
