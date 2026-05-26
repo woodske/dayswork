@@ -13,11 +13,15 @@ internal interface IMailDispatcher
     // directly.
     void QueueSettlement(IReadOnlyList<ItemStack> items, IReadOnlyList<OverflowCategory> categories, int refundGold);
 
-    // One same-day, text-only notice that the recurring contract's daily deposit was unaffordable
-    // (FR-PAY-04, FD-Q5=A). Sent each unaffordable morning.
-    void QueueCannotAffordNotice(Contract contract, int shortfall);
+    // One same-day, text-only notice that the recurring contract's fixed daily price was
+    // unaffordable. Sent each unaffordable morning.
+    void QueueCannotAffordNotice(Contract contract, int dailyPrice, int shortfall);
 
-    // One same-day festival courtesy letter (DEV-U15-02). Text-only for a recurring contract;
-    // carries the refunded deposit gold for a one-time contract skipped by a festival.
+    // One same-day, text-only notice that a recurring contract's saved scope/settings no longer
+    // produce a valid rebuilt contract for today and must be reviewed on the board.
+    void QueueNeedsAttentionNotice(Contract contract);
+
+    // One same-day festival courtesy letter. Text-only for a recurring contract; carries the
+    // refunded one-time contract price for a one-time contract skipped by a festival.
     void QueueFestivalNotice(Contract contract, int refundGold);
 }

@@ -3787,3 +3787,123 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — Approval prompt for completed U-22 Code Generation
 
 ---
+
+## Code Generation — U-22 Review Approved
+**Timestamp**: 2026-05-26T04:22:29Z
+**User Input**: "approved and continue"
+**AI Response**: Treated the response as approval to move from U-22 Code Generation into U-23 Functional Design. Loaded the functional-design stage rules, U-23 unit definition, story map, current recurring/calendar requirements, and the brownfield recurring-day-start seams (`RecurringContractScheduler`, `CalendarHandlers`, `ContractStore`, `ContractPersistenceAdapter`, and `MailDispatcher`). Created `aidlc-docs/construction/plans/u-23-recurring-billing-calendar-refresh-functional-design-plan.md` and updated `aidlc-state.md` so the current stage now points at the U-23 functional-design question file.
+**Context**: CONSTRUCTION — Transition from U-22 Code Generation review to U-23 Functional Design planning
+
+---
+
+## Functional Design — U-23 Question File Prepared
+**Timestamp**: 2026-05-26T04:22:30Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-23 functional-design question file. The user is being asked to fill in the `[Answer]:` tags for the remaining recurring-lifecycle design choices covering 6am rebuild/charge sequencing, rebuild-failure handling, festival-day terms refresh, rain/low-work messaging, edit-before-6am activation, and after-6am pause/cancel semantics.
+**Context**: CONSTRUCTION — Prompt for U-23 Functional Design answers
+
+---
+
+## Functional Design — U-23 Answers Applied
+**Timestamp**: 2026-05-26T05:34:30Z
+**User Input**: "done"
+**AI Response**: Read the completed U-23 functional-design question file, confirmed all eight answers were explicit and non-ambiguous (`FD-Q1=A` through `FD-Q8=A`), applied them to the recurring-lifecycle design, and generated the U-23 functional-design artifacts at `aidlc-docs/construction/u-23-recurring-billing-calendar-refresh/functional-design/` (`business-logic-model.md`, `domain-entities.md`, `business-rules.md`, and `frontend-components.md`). The approved design now rebuilds recurring terms from saved scope/current config at each eligible 6am before any charge, keeps valid refreshed terms persisted across normal, festival, and cannot-afford skip paths, treats rebuild-invalid contracts as same-day needs-attention skips without auto-pause, keeps ordinary rain and low-work mornings silent, and leaves after-6am pause/cancel changes future-facing with no same-day rollback or refund.
+**Context**: CONSTRUCTION — Functional Design completion for U-23 Recurring Billing + Calendar Refresh
+
+---
+
+## Functional Design — U-23 Review Prompt
+**Timestamp**: 2026-05-26T05:34:31Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-23 functional-design review gate. The user is being asked to review the generated artifacts in `aidlc-docs/construction/u-23-recurring-billing-calendar-refresh/functional-design/` and either request changes or continue to NFR Requirements.
+**Context**: CONSTRUCTION — Approval prompt for U-23 Functional Design
+
+---
+
+## Functional Design — U-23 Review Approved
+**Timestamp**: 2026-05-26T05:47:00Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-23 Functional Design into U-23 NFR Requirements. Loaded the NFR Requirements stage rules, the approved U-23 functional-design artifacts, and the prior NFR-plan pattern so the next question file could stay focused on the real quality risks for the recurring retrofit. Created `aidlc-docs/construction/plans/u-23-recurring-billing-calendar-refresh-nfr-requirements-plan.md` covering 6am recurring-pass performance, deterministic rebuild/charge/notice outcomes, per-contract isolation during mixed morning results, same-day notice visibility reliability, and regression/property-test rigor, then updated `aidlc-state.md` to the U-23 NFR Requirements answer gate.
+**Context**: CONSTRUCTION — Transition from U-23 Functional Design review to U-23 NFR Requirements planning
+
+---
+
+## NFR Requirements — U-23 Question File Prepared
+**Timestamp**: 2026-05-26T05:47:01Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-23 NFR-requirements question file. The user is being asked to fill in the `[Answer]:` tags for the remaining recurring-lifecycle quality-bar choices covering 6am performance, determinism, mixed-contract isolation, same-day notice visibility, and test rigor.
+**Context**: CONSTRUCTION — Prompt for U-23 NFR Requirements answers
+
+---
+
+## NFR Requirements — U-23 Answers Applied
+**Timestamp**: 2026-05-26T06:06:20Z
+**User Input**: "done"
+**AI Response**: Read the completed U-23 NFR-requirements question file, confirmed all five answers were explicit and non-ambiguous (`NFR-Q1=A` through `NFR-Q5=A`), and generated the U-23 NFR artifacts at `aidlc-docs/construction/u-23-recurring-billing-calendar-refresh/nfr-requirements/` (`nfr-requirements.md` and `tech-stack-decisions.md`). The approved quality bar now requires a lightweight synchronous 6am recurring pass, strict deterministic rebuild/charge/notice outcomes, strong per-contract isolation even though v1 still enforces a single active contract, reliable same-day visibility for the supported recurring notices, and strong example plus FsCheck regression coverage for festival, affordability, persistence, and notice-precedence behavior.
+**Context**: CONSTRUCTION — NFR Requirements completion for U-23 Recurring Billing + Calendar Refresh
+
+---
+
+## NFR Requirements — U-23 Review Prompt
+**Timestamp**: 2026-05-26T06:06:21Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-23 NFR-requirements review gate. The user is being asked to review the generated artifacts in `aidlc-docs/construction/u-23-recurring-billing-calendar-refresh/nfr-requirements/` and either request changes or continue to NFR Design.
+**Context**: CONSTRUCTION — Approval prompt for U-23 NFR Requirements
+
+---
+
+## NFR Requirements — U-23 Review Approved
+**Timestamp**: 2026-05-26T06:20:35Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-23 NFR Requirements into U-23 NFR Design. Loaded the NFR Design stage rules, the approved U-23 NFR-requirements and functional-design artifacts, and the prior NFR-design-plan pattern. Evaluated the resilience, scalability, performance, security, and logical-component categories, determined that the approved U-23 quality bar already fixed the pattern set cleanly, created `aidlc-docs/construction/plans/u-23-recurring-billing-calendar-refresh-nfr-design-plan.md`, generated the U-23 NFR design artifacts at `aidlc-docs/construction/u-23-recurring-billing-calendar-refresh/nfr-design/`, and updated `aidlc-state.md` to the U-23 NFR Design review gate.
+**Context**: CONSTRUCTION — Transition from U-23 NFR Requirements review to U-23 NFR Design completion
+
+---
+
+## NFR Design — U-23 Review Prompt
+**Timestamp**: 2026-05-26T06:20:36Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-23 NFR-design review gate. The user is being asked to review the generated artifacts in `aidlc-docs/construction/u-23-recurring-billing-calendar-refresh/nfr-design/` and either request changes or continue to Code Generation.
+**Context**: CONSTRUCTION — Approval prompt for U-23 NFR Design
+
+---
+
+## NFR Design — U-23 Review Approved
+**Timestamp**: 2026-05-26T06:34:15Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-23 NFR Design into U-23 Code Generation planning. Loaded the Code Generation stage rules, the approved U-23 functional-design, NFR-requirements, and NFR-design artifacts, inspected the live recurring scheduler, same-day mail, and store seams (`RecurringContractScheduler`, `IMailDispatcher`, and `IContractStore`), created `aidlc-docs/construction/plans/u-23-recurring-billing-calendar-refresh-code-generation-plan.md`, and updated `aidlc-state.md` to the U-23 Code Generation planning review gate.
+**Context**: CONSTRUCTION — Transition from U-23 NFR Design review to U-23 Code Generation planning
+
+---
+
+## Code Generation — U-23 Plan Review Prompt
+**Timestamp**: 2026-05-26T06:34:16Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-23 code-generation planning review gate. The user is being asked to review `aidlc-docs/construction/plans/u-23-recurring-billing-calendar-refresh-code-generation-plan.md` and either request changes or continue to Code Generation Part 2.
+**Context**: CONSTRUCTION — Approval prompt for U-23 Code Generation plan
+
+---
+
+## Code Generation — U-23 Plan Approved
+**Timestamp**: 2026-05-26T16:46:46Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to execute U-23 Code Generation Part 2. Began the recurring billing/calendar retrofit by loading the approved U-23 plan plus the live scheduler, mail, persistence, config, and recurring test seams; then implemented the rebuild-first fixed-price recurring day-start path, same-day recurring notice updates, dedicated U-23 regression/property coverage, verification, and documentation updates.
+**Context**: CONSTRUCTION — U-23 Code Generation execution authorized
+
+---
+
+## Code Generation — U-23 Execution Complete
+**Timestamp**: 2026-05-26T16:46:47Z
+**User Input**: "continue"
+**AI Response**: Completed U-23 Code Generation. Added new recurring day-start outcome/domain types and `RecurringDayStartDecisionEngine` in `Dayswork.Core`; refactored `RecurringContractScheduler` to rebuild recurring terms from saved typed scope plus current config before any eligible charge, persist valid refreshed `TermsSnapshot` data, skip festivals with no charge, skip invalid rebuilds with same-day needs-attention mail, and skip valid-but-unaffordable days with refreshed terms preserved and same-day cannot-afford mail; updated `IMailDispatcher`, `MailDispatcher`, `ModEntry`, and the recurring i18n strings to match the new fixed-price lifecycle; added dedicated U-23 example/FsCheck coverage under `Dayswork.Tests/U23`; wrote `aidlc-docs/construction/u-23-recurring-billing-calendar-refresh/code/code-summary.md`; and marked all 20 steps complete in `aidlc-docs/construction/plans/u-23-recurring-billing-calendar-refresh-code-generation-plan.md`. Verification succeeded with `dotnet build Dayswork.sln /p:EnableModDeploy=false` (`0` errors / `0` warnings) and `dotnet test Dayswork.sln` (`269` passed / `1` expected skip / `0` failed).
+**Context**: CONSTRUCTION — Code Generation completion for U-23 Recurring Billing + Calendar Refresh
+
+---
+
+## Code Generation — U-23 Review Prompt
+**Timestamp**: 2026-05-26T16:46:48Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-23 code-generation review gate. The user is being asked to review the generated code in `C:\Users\kwood\Repos\dayswork` and the summary at `aidlc-docs/construction/u-23-recurring-billing-calendar-refresh/code/code-summary.md`, then either request changes or continue to the next retrofit unit.
+**Context**: CONSTRUCTION — Approval prompt for completed U-23 Code Generation
+
+---

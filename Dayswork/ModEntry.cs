@@ -43,6 +43,7 @@ public sealed class ModEntry : Mod
             new ContractPriceCalculator(configResolver),
             new PriceBreakdownBuilder(configResolver),
             new WorkerEnergyProfileBuilder(configResolver));
+        var recurringDecisionEngine = new RecurringDayStartDecisionEngine(contractTermsBuilder);
         var store       = new ContractStore(logWarning);
         var serializer  = new SaveDataSerializer(logWarning);
 
@@ -80,7 +81,7 @@ public sealed class ModEntry : Mod
         Orchestrator = orchestrator;
         var calendarHandlers = new CalendarHandlers(orchestrator);
         var scheduler       = new RecurringContractScheduler(
-            store, orchestrator, calendarHandlers, rateCalc, depositCalc, configManager, mailDispatcher);
+            store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, mailDispatcher);
         var gmcmRegistrar = new GMCMRegistrar(helper, this.ModManifest, configManager);
 
         // ── Event registrations ──────────────────────────────────────────────

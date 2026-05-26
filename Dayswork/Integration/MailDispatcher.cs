@@ -11,8 +11,9 @@ using StardewValley;
 namespace Dayswork.Integration;
 
 // M-16 MailDispatcher (Patterns P + U). Sends the single per-shift settlement letter (overflow items
-// + refund gold), plus the text-only cannot-afford and festival notices. All user-visible text is
-// routed through I18nHelper (UX-U15-01). No new Harmony patches (NFR-MAINT-04).
+    // + refund gold), plus the text-only cannot-afford / needs-attention / festival notices.
+    // All user-visible text is routed through I18nHelper (UX-U15-01). No new Harmony patches
+    // (NFR-MAINT-04).
 //
 // Refund gold rides the letter as a credit-on-collection callback (DEV-U15-04 / BR-REF-04):
 // settlement refunds arrive next morning; one-time festival refunds ride the same-day no-worker
@@ -101,13 +102,13 @@ internal sealed class MailDispatcher : IMailDispatcher
             Game1.player.Money += refundGold;
     }
 
-    public void QueueCannotAffordNotice(Contract contract, int shortfall)
+    public void QueueCannotAffordNotice(Contract contract, int dailyPrice, int shortfall)
     {
         var sender = I18nHelper.Get("mail.sender");
-        var body   = I18nHelper.Get("mail.cannot_afford.body", new { shortfall });
+        var body   = I18nHelper.Get("mail.cannot_afford.body", new { price = dailyPrice, shortfall });
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][mail] queue cannot-afford notice shortfall={shortfall}.",
+            $"[Dayswork][mail] queue cannot-afford notice price={dailyPrice} shortfall={shortfall}.",
             LogLevel.Debug);
         if (!TrySendViaMfm(
             $"Dayswork.CannotAfford.{CurrentDay()}.{Guid.NewGuid():N}",
@@ -118,6 +119,26 @@ internal sealed class MailDispatcher : IMailDispatcher
             DeliveryTiming.Today))
             ModEntry.ModMonitor.Log(
                 "[Dayswork] Cannot-afford notice could not be sent (Mail Framework Mod unavailable).",
+                LogLevel.Warn);
+    }
+
+    public void QueueNeedsAttentionNotice(Contract contract)
+    {
+        var sender = I18nHelper.Get("mail.sender");
+        var body = I18nHelper.Get("mail.needs_attention.body");
+
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][mail] queue needs-attention notice contract={contract.Id.Value}.",
+            LogLevel.Debug);
+        if (!TrySendViaMfm(
+            $"Dayswork.NeedsAttention.{CurrentDay()}.{Guid.NewGuid():N}",
+            sender,
+            body,
+            new List<Item>(),
+            0,
+            DeliveryTiming.Today))
+            ModEntry.ModMonitor.Log(
+                "[Dayswork] Needs-attention notice could not be sent (Mail Framework Mod unavailable).",
                 LogLevel.Warn);
     }
 
