@@ -48,6 +48,11 @@ internal static class RuntimeConfigSnapshotMapper
             HardCapTime = Math.Clamp(config.HardCapTime, 1000, 2600),
             StuckInitialWaitMinutes = Math.Max(1, config.StuckInitialWaitMinutes),
             StuckPostTeleportWaitMinutes = Math.Max(1, config.StuckPostTeleportWaitMinutes),
+            WorkerWalkPixelsPerTick = config.WorkerWalkPixelsPerTick > 0
+                ? config.WorkerWalkPixelsPerTick
+                : defaults.WorkerWalkPixelsPerTick,
+            WorkerActionAnimationMs = Math.Max(1, config.WorkerActionAnimationMs),
+            WorkerEntranceHoldTicks = Math.Max(0, config.WorkerEntranceHoldTicks),
             OutdoorBandThresholds = normalizedThresholds,
             OutdoorServiceBandPrices = NormalizeNonNegativeDictionary(
                 config.OutdoorServiceBandPrices,
@@ -119,6 +124,9 @@ internal static class RuntimeConfigSnapshotMapper
             normalized.HardCapTime,
             normalized.StuckInitialWaitMinutes,
             normalized.StuckPostTeleportWaitMinutes,
+            normalized.WorkerWalkPixelsPerTick,
+            normalized.WorkerActionAnimationMs,
+            normalized.WorkerEntranceHoldTicks,
             outdoorBandThresholds,
             outdoorServiceBandPrices,
             animalBuildingPrices,

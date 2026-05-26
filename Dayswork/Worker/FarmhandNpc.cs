@@ -30,6 +30,15 @@ internal sealed class FarmhandNpc : NPC
         this.HideShadow = false;
     }
 
+    private int _staminaRemaining;
+    private int _staminaCapacity;
+
+    public void SetStamina(int remaining, int capacity)
+    {
+        _staminaRemaining = Math.Max(0, remaining);
+        _staminaCapacity = Math.Max(0, capacity);
+    }
+
     public void StopTaskAnimation()
     {
         this.Sprite.ClearAnimation();
@@ -52,4 +61,23 @@ internal sealed class FarmhandNpc : NPC
             3 => 12,
             _ => 0,
         };
+
+    public override void drawAboveAlwaysFrontLayer(SpriteBatch b)
+    {
+        base.drawAboveAlwaysFrontLayer(b);
+
+        if (_staminaCapacity <= 0)
+            return;
+
+        var local = Game1.GlobalToLocal(Game1.viewport, this.Position + new Vector2(0f, -44f));
+        const int barWidth = 40;
+        const int barHeight = 6;
+        var barX = (int)local.X - (barWidth / 2) + 32;
+        var barY = (int)local.Y;
+        var fillWidth = Math.Clamp((int)Math.Round((double)_staminaRemaining / _staminaCapacity * (barWidth - 2)), 0, barWidth - 2);
+
+        b.Draw(Game1.staminaRect, new Rectangle(barX, barY, barWidth, barHeight), Color.Black * 0.8f);
+        b.Draw(Game1.staminaRect, new Rectangle(barX + 1, barY + 1, barWidth - 2, barHeight - 2), new Color(50, 34, 18));
+        b.Draw(Game1.staminaRect, new Rectangle(barX + 1, barY + 1, fillWidth, barHeight - 2), new Color(145, 214, 68));
+    }
 }

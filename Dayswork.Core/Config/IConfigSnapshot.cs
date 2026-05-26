@@ -11,6 +11,9 @@ public interface IConfigSnapshot
     int HardCapTime { get; }
     int StuckInitialWaitMinutes { get; }
     int StuckPostTeleportWaitMinutes { get; }
+    float WorkerWalkPixelsPerTick { get; }
+    int WorkerActionAnimationMs { get; }
+    int WorkerEntranceHoldTicks { get; }
     IReadOnlyDictionary<OutdoorBandSize, int> OutdoorBandThresholds { get; }
     IReadOnlyDictionary<OutdoorPriceKey, int> OutdoorServiceBandPrices { get; }
     IReadOnlyDictionary<AnimalBuildingPriceKey, int> AnimalBuildingPrices { get; }

@@ -3603,3 +3603,75 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — Code Generation vanilla scrollbar/output-page review polish for U-20
 
 ---
+
+## Functional Design — U-21 Transition Started
+**Timestamp**: 2026-05-25T18:20:46Z
+**User Input**: "approved"
+**AI Response**: Treated the approval as acceptance of the U-20 code-generation review gate and advanced the workflow to U-21. Loaded the Functional Design stage rules plus the relevant U-21 requirements, story map, application-design/runtime artifacts, created `aidlc-docs/construction/plans/u-21-worker-energy-shift-runtime-refresh-functional-design-plan.md`, and updated `aidlc-state.md` so the current stage now points at the U-21 functional-design question file.
+**Context**: CONSTRUCTION — Transition from U-20 Code Generation review to U-21 Functional Design planning
+
+---
+
+## Functional Design — U-21 Answers Applied
+**Timestamp**: 2026-05-25T19:18:13Z
+**User Input**: "done"
+**AI Response**: Read the completed U-21 functional-design question file and found all nine answers were unambiguous (`A` throughout), so no clarification round was needed. Generated the U-21 functional-design artifacts at `aidlc-docs/construction/u-21-worker-energy-shift-runtime-refresh/functional-design/` (`business-logic-model.md`, `domain-entities.md`, `business-rules.md`, and `frontend-components.md`), marked the U-21 plan checklist complete, and updated `aidlc-state.md` to the Functional Design review gate for U-21.
+**Context**: CONSTRUCTION — Functional Design completion for U-21 Worker Energy + Shift Runtime Refresh
+
+---
+
+## NFR Requirements — U-21 Transition Started
+**Timestamp**: 2026-05-25T19:24:03Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-21 Functional Design into U-21 NFR Requirements. Loaded the NFR Requirements stage rules plus the approved U-21 functional-design artifacts, created `aidlc-docs/construction/plans/u-21-worker-energy-shift-runtime-refresh-nfr-requirements-plan.md`, and updated `aidlc-state.md` so the current stage now points at the U-21 NFR-requirements question file.
+**Context**: CONSTRUCTION — Transition from U-21 Functional Design review to U-21 NFR Requirements planning
+
+---
+
+## NFR Requirements — U-21 Answers Applied
+**Timestamp**: 2026-05-25T19:28:00Z
+**User Input**: "done"
+**AI Response**: Read the completed U-21 NFR-requirements question file and found all five answers were unambiguous (`A` throughout), so no clarification round was needed. Generated the U-21 NFR-requirements artifacts at `aidlc-docs/construction/u-21-worker-energy-shift-runtime-refresh/nfr-requirements/` (`nfr-requirements.md` and `tech-stack-decisions.md`), marked the U-21 NFR plan checklist complete, and updated `aidlc-state.md` to the NFR Requirements review gate for U-21.
+**Context**: CONSTRUCTION — NFR Requirements completion for U-21 Worker Energy + Shift Runtime Refresh
+
+---
+
+## NFR Design — U-21 Transition And Completion
+**Timestamp**: 2026-05-25T19:31:08Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-21 NFR Requirements into U-21 NFR Design. Loaded the NFR Design stage rules plus the approved U-21 NFR requirements and functional-design artifacts, determined no additional question round was needed because the approved choices already fixed the pattern set cleanly, created `aidlc-docs/construction/plans/u-21-worker-energy-shift-runtime-refresh-nfr-design-plan.md`, generated the U-21 NFR design artifacts at `aidlc-docs/construction/u-21-worker-energy-shift-runtime-refresh/nfr-design/` (`nfr-design-patterns.md` and `logical-components.md`), and updated `aidlc-state.md` to the NFR Design review gate for U-21.
+**Context**: CONSTRUCTION — NFR Design completion for U-21 Worker Energy + Shift Runtime Refresh
+
+---
+
+## Code Generation — U-21 Planning Started
+**Timestamp**: 2026-05-26T00:38:02Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-21 NFR Design into U-21 Code Generation planning. Loaded the Code Generation stage rules plus the approved U-21 functional-design, NFR-requirements, and NFR-design artifacts; inspected the live runtime files (`ShiftContext`, `ShiftStateMachine`, `ShiftOrchestrator`, `FarmhandNpc`, `WorkerMovementDriver`, `ToolSwapAnimator`, and scheduler call sites) so the plan would name the real seam changes; created `aidlc-docs/construction/plans/u-21-worker-energy-shift-runtime-refresh-code-generation-plan.md`; and updated `aidlc-state.md` to the U-21 Code Generation planning review gate.
+**Context**: CONSTRUCTION — Transition from U-21 NFR Design review to U-21 Code Generation planning
+
+---
+
+## Code Generation — U-21 Plan Review Prompt
+**Timestamp**: 2026-05-26T00:39:58Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-21 code-generation planning review gate. The user is being asked to review `aidlc-docs/construction/plans/u-21-worker-energy-shift-runtime-refresh-code-generation-plan.md` and either request changes or continue to Code Generation Part 2.
+**Context**: CONSTRUCTION — Approval prompt for U-21 Code Generation plan
+
+---
+
+## Code Generation — U-21 Runtime Refresh Implemented
+**Timestamp**: 2026-05-26T00:55:53Z
+**User Input**: "continue"
+**AI Response**: Executed the approved U-21 code-generation plan end to end. Added pure Core runtime seams for `WorkerEnergyState`, `WorkerEnergyLedger`, `WorkUnitBoundaryClassifier`, `WorkerPacingProfile`, and `ShiftStopReason`; refactored `ShiftContext` and `ShiftStateMachine` away from active refund-hour accounting; rewired `ShiftOrchestrator` to consume saved contract energy terms, spend stamina per labor beat, respect boundary-stop semantics (including tree stage boundaries), and remove refund settlement from normal/sleep/stuck wrap-up paths; added explicit pacing to `WorkerMovementDriver` and `ToolSwapAnimator`; added an overhead stamina bar to `FarmhandNpc`; updated runtime config mapping for pacing values; and added dedicated U-21 example/FsCheck coverage. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` errors / `0` warnings, and `dotnet test Dayswork.sln` passed with `255` tests passing and `1` expected skip.
+**Context**: CONSTRUCTION — Code Generation completion for U-21 Worker Energy + Shift Runtime Refresh
+
+---
+
+## Code Generation — U-21 Review Prompt
+**Timestamp**: 2026-05-26T00:55:53Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-21 code-generation review gate. The user is being asked to review the generated code in the workspace and the summary at `aidlc-docs/construction/u-21-worker-energy-shift-runtime-refresh/code/code-summary.md`, then either request changes or continue to the next stage.
+**Context**: CONSTRUCTION — Approval prompt for completed U-21 Code Generation
+
+---

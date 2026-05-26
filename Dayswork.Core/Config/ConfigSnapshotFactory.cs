@@ -13,6 +13,9 @@ public static class ConfigSnapshotFactory
         int hardCapTime,
         int stuckInitialWaitMinutes,
         int stuckPostTeleportWaitMinutes,
+        float workerWalkPixelsPerTick,
+        int workerActionAnimationMs,
+        int workerEntranceHoldTicks,
         IReadOnlyDictionary<OutdoorBandSize, int> outdoorBandThresholds,
         IReadOnlyDictionary<OutdoorPriceKey, int> outdoorServiceBandPrices,
         IReadOnlyDictionary<AnimalBuildingPriceKey, int> animalBuildingPrices,
@@ -34,6 +37,15 @@ public static class ConfigSnapshotFactory
 
         if (stuckPostTeleportWaitMinutes < 1)
             throw new ArgumentOutOfRangeException(nameof(stuckPostTeleportWaitMinutes), "StuckPostTeleportWaitMinutes must be at least 1.");
+
+        if (workerWalkPixelsPerTick <= 0)
+            throw new ArgumentOutOfRangeException(nameof(workerWalkPixelsPerTick), "WorkerWalkPixelsPerTick must be greater than zero.");
+
+        if (workerActionAnimationMs < 1)
+            throw new ArgumentOutOfRangeException(nameof(workerActionAnimationMs), "WorkerActionAnimationMs must be at least 1.");
+
+        if (workerEntranceHoldTicks < 0)
+            throw new ArgumentOutOfRangeException(nameof(workerEntranceHoldTicks), "WorkerEntranceHoldTicks must be non-negative.");
 
         if (workerDailyEnergyCapacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(workerDailyEnergyCapacity), "WorkerDailyEnergyCapacity must be greater than zero.");
@@ -73,6 +85,9 @@ public static class ConfigSnapshotFactory
             hardCapTime,
             stuckInitialWaitMinutes,
             stuckPostTeleportWaitMinutes,
+            workerWalkPixelsPerTick,
+            workerActionAnimationMs,
+            workerEntranceHoldTicks,
             new ReadOnlyDictionary<OutdoorBandSize, int>(normalizedThresholds),
             new ReadOnlyDictionary<OutdoorPriceKey, int>(normalizedOutdoorPrices),
             new ReadOnlyDictionary<AnimalBuildingPriceKey, int>(normalizedAnimalPrices),

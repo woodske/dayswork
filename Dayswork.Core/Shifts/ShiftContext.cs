@@ -1,4 +1,5 @@
 using Dayswork.Core.Domain;
+using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
 
 namespace Dayswork.Core.Shifts;
@@ -9,8 +10,9 @@ public sealed class ShiftContext
     public IReadOnlyList<Zone> Zones { get; }
     public IReadOnlySet<TaskKind> EnabledTasks { get; }
     public IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations { get; }
-    public int DepositAmount { get; }
-    public int HourlyRate { get; }
+    public ContractTermsSnapshot ContractTerms { get; }
+    public WorkerEnergyState EnergyState { get; set; }
+    public WorkerPacingProfile PacingProfile { get; }
     public ToolSnapshot ToolSnapshot { get; }
     public ShiftStateMachine StateMachine { get; } = new();
     public IReadOnlyList<WorkBatch> Batches { get; }
@@ -32,14 +34,16 @@ public sealed class ShiftContext
     // seeded with mail-bound items at planning, appended on chest-full/missing and on
     // sleep-stop interruption, flushed to one settlement letter at exit or sleep.
     public List<OverflowItem> Overflow { get; } = new();
+    public ShiftStopReason? PendingStopReason { get; set; }
 
     public ShiftContext(
         ContractId contractId,
         IReadOnlyList<Zone> zones,
         IReadOnlySet<TaskKind> enabledTasks,
         IReadOnlyDictionary<TaskKind, DestinationKey> taskDestinations,
-        int depositAmount,
-        int hourlyRate,
+        ContractTermsSnapshot contractTerms,
+        WorkerEnergyState energyState,
+        WorkerPacingProfile pacingProfile,
         ToolSnapshot toolSnapshot,
         IEnumerable<WorkItem> workList,
         int shiftStartTime,
@@ -50,28 +54,13 @@ public sealed class ShiftContext
         Zones            = zones;
         EnabledTasks     = enabledTasks;
         TaskDestinations = taskDestinations;
-        DepositAmount    = depositAmount;
-        HourlyRate       = hourlyRate;
+        ContractTerms    = contractTerms;
+        EnergyState      = energyState;
+        PacingProfile    = pacingProfile;
         ToolSnapshot     = toolSnapshot;
         Batches          = batches ?? Array.Empty<WorkBatch>();
         CurrentBatchIndex = currentBatchIndex;
         WorkList         = new Queue<WorkItem>(workList);
         ShiftStartTime   = shiftStartTime;
-    }
-
-    public int ComputeRefund()
-    {
-        var endTime      = ShiftEndTime ?? ShiftStartTime;
-        var workedMins   = Math.Max(0, HhmmToMinutes(endTime) - HhmmToMinutes(ShiftStartTime));
-        var hoursWorked  = workedMins / 60;
-        var billed       = hoursWorked * HourlyRate;
-        return Math.Clamp(DepositAmount - billed, 0, DepositAmount);
-    }
-
-    private static int HhmmToMinutes(int hhmm)
-    {
-        var hours   = hhmm / 100;
-        var minutes = hhmm % 100;
-        return hours * 60 + minutes;
     }
 }

@@ -68,7 +68,7 @@ internal sealed class RecurringContractScheduler
                 // One-time: deposit already paid at hire. Mark Executed before spawning so a reload on
                 // the same day cannot re-fire.
                 _store.Update(contract.Id, contract with { Status = ContractStatus.Executed });
-                _orchestrator.StartShift(contract, contract.DepositAmount, contract.HourlyRate, config);
+                _orchestrator.StartShift(contract, config);
             }
             else
             {
@@ -114,7 +114,7 @@ internal sealed class RecurringContractScheduler
         }
 
         Game1.player.Money -= deposit;
-        _orchestrator.StartShift(contract, deposit, rate, config);
+        _orchestrator.StartShift(contract, config);
     }
 
     private static GameDate CurrentGameDate()

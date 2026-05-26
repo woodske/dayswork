@@ -10,6 +10,9 @@ public sealed record ConfigSnapshot(
     int HardCapTime,
     int StuckInitialWaitMinutes,
     int StuckPostTeleportWaitMinutes,
+    float WorkerWalkPixelsPerTick,
+    int WorkerActionAnimationMs,
+    int WorkerEntranceHoldTicks,
     IReadOnlyDictionary<OutdoorBandSize, int> OutdoorBandThresholds,
     IReadOnlyDictionary<OutdoorPriceKey, int> OutdoorServiceBandPrices,
     IReadOnlyDictionary<AnimalBuildingPriceKey, int> AnimalBuildingPrices,
@@ -26,6 +29,9 @@ public sealed record ConfigSnapshot(
         && HardCapTime == other.HardCapTime
         && StuckInitialWaitMinutes == other.StuckInitialWaitMinutes
         && StuckPostTeleportWaitMinutes == other.StuckPostTeleportWaitMinutes
+        && WorkerWalkPixelsPerTick.Equals(other.WorkerWalkPixelsPerTick)
+        && WorkerActionAnimationMs == other.WorkerActionAnimationMs
+        && WorkerEntranceHoldTicks == other.WorkerEntranceHoldTicks
         && WorkerDailyEnergyCapacity == other.WorkerDailyEnergyCapacity
         && DictionaryEquals(TaskIncrements, other.TaskIncrements)
         && DictionaryEquals(OutdoorBandThresholds, other.OutdoorBandThresholds)
@@ -42,6 +48,9 @@ public sealed record ConfigSnapshot(
         hash.Add(HardCapTime);
         hash.Add(StuckInitialWaitMinutes);
         hash.Add(StuckPostTeleportWaitMinutes);
+        hash.Add(WorkerWalkPixelsPerTick);
+        hash.Add(WorkerActionAnimationMs);
+        hash.Add(WorkerEntranceHoldTicks);
         hash.Add(WorkerDailyEnergyCapacity);
         hash.Add(TaskIncrements.Count);
         hash.Add(OutdoorBandThresholds.Count);

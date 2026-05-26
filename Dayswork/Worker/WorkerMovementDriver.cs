@@ -1,4 +1,5 @@
 using Dayswork.Core.Domain;
+using Dayswork.Core.Energy;
 using Microsoft.Xna.Framework;
 using StardewValley;
 using StardewValley.Pathfinding;
@@ -8,15 +9,20 @@ namespace Dayswork.Worker;
 internal sealed class WorkerMovementDriver
 {
     private const float TileSize = 64f;
-    private const float BaseWalkPixelsPerTick = 4f;
     private const float WalkFrameIntervalMs = 120f;
 
     private readonly Queue<Vector2> _waypoints = new();
     private FarmhandNpc? _worker;
+    private float _walkPixelsPerTick = 2f;
 
     public bool HasArrived { get; private set; } = true;
     public bool NavigationFailed { get; private set; }
     public bool UsedDirectFallback { get; private set; }
+
+    public void SetPacingProfile(WorkerPacingProfile profile)
+    {
+        _walkPixelsPerTick = profile.WalkPixelsPerTick;
+    }
 
     public void StartNavigation(TileCoord destination, GameLocation location, FarmhandNpc worker)
     {
@@ -135,7 +141,7 @@ internal sealed class WorkerMovementDriver
 
     private void StepToward(Vector2 target, Vector2 delta, float distance)
     {
-        var step = Math.Min(BaseWalkPixelsPerTick, distance);
+        var step = Math.Min(_walkPixelsPerTick, distance);
         _worker!.Position += Vector2.Normalize(delta) * step;
         var direction = FacingFrom(delta);
         _worker.faceDirection(direction);

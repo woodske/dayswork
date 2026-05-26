@@ -22,6 +22,9 @@ public sealed class ModConfig
     public int HardCapTime { get; set; } = DefaultSnapshot.HardCapTime;
     public int StuckInitialWaitMinutes { get; set; } = DefaultSnapshot.StuckInitialWaitMinutes;
     public int StuckPostTeleportWaitMinutes { get; set; } = DefaultSnapshot.StuckPostTeleportWaitMinutes;
+    public float WorkerWalkPixelsPerTick { get; set; } = DefaultSnapshot.WorkerWalkPixelsPerTick;
+    public int WorkerActionAnimationMs { get; set; } = DefaultSnapshot.WorkerActionAnimationMs;
+    public int WorkerEntranceHoldTicks { get; set; } = DefaultSnapshot.WorkerEntranceHoldTicks;
     public Dictionary<string, int> OutdoorBandThresholds { get; set; } = CreateOutdoorBandThresholdDefaults();
     public Dictionary<string, int> OutdoorServiceBandPrices { get; set; } = CreateOutdoorServiceBandPriceDefaults();
     public Dictionary<string, int> AnimalBuildingPrices { get; set; } = CreateAnimalBuildingPriceDefaults();

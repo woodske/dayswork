@@ -4,6 +4,7 @@ public sealed class ShiftStateMachine : IShiftStateMachine
 {
     public ShiftPhase Phase { get; private set; } = ShiftPhase.WaitingForSpawn;
     public ShiftIntent? CurrentIntent { get; private set; }
+    public ShiftStopReason StopReason { get; private set; } = ShiftStopReason.None;
 
     // Legal successors: each phase maps to the set of phases that may follow it.
     // Done maps to the empty set — any transition out of Done is illegal.
@@ -44,6 +45,23 @@ public sealed class ShiftStateMachine : IShiftStateMachine
 
         Phase = newPhase;
         CurrentIntent = intent;
+    }
+
+    public void BeginWrapUp(ShiftIntent intent, ShiftStopReason stopReason)
+    {
+        if (stopReason == ShiftStopReason.None)
+            throw new ArgumentOutOfRangeException(nameof(stopReason), "Wrap-up requires a concrete stop reason.");
+
+        RegisterStopReason(stopReason);
+        Transition(ShiftPhase.Depositing, intent);
+    }
+
+    public void RegisterStopReason(ShiftStopReason stopReason)
+    {
+        if (stopReason == ShiftStopReason.None || StopReason != ShiftStopReason.None)
+            return;
+
+        StopReason = stopReason;
     }
 
     public void SetIntent(ShiftIntent intent)

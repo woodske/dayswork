@@ -76,6 +76,9 @@ public static class ConfigSnapshotGen
             from hardCap in Gen.Choose(1000, 2600)
             from stuckInit in Gen.Choose(1, 120)
             from stuckPost in Gen.Choose(1, 120)
+            from walkPixels in Gen.Choose(1, 6).Select(x => (float)x)
+            from actionAnimationMs in Gen.Choose(100, 1500)
+            from entranceHoldTicks in Gen.Choose(0, 300)
             from thresholds in thresholdGen
             from outdoorPrices in outdoorPriceGen
             from animalPrices in animalPriceGen
@@ -89,6 +92,9 @@ public static class ConfigSnapshotGen
                 hardCap,
                 stuckInit,
                 stuckPost,
+                walkPixels,
+                actionAnimationMs,
+                entranceHoldTicks,
                 thresholds,
                 outdoorPrices,
                 animalPrices,

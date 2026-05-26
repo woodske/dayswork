@@ -143,7 +143,7 @@ public sealed class ModEntry : Mod
 
         helper.ConsoleCommands.Add(
             "dayswork_end_shift",
-            "Ends the current worker shift immediately. Worker deposits buffered items and exits. Partial refund applies.",
+            "Ends the current worker shift immediately. Worker deposits buffered items and exits.",
             (_, _) => Orchestrator.EndShiftEarly());
 
         helper.ConsoleCommands.Add(

@@ -23,6 +23,9 @@ public class ConfigSnapshotGenSmokeTests
             && s.HardCapTime <= 2600
             && s.StuckInitialWaitMinutes >= 1
             && s.StuckPostTeleportWaitMinutes >= 1
+            && s.WorkerWalkPixelsPerTick > 0
+            && s.WorkerActionAnimationMs >= 1
+            && s.WorkerEntranceHoldTicks >= 0
             && s.OutdoorBandThresholds.Count == Enum.GetValues<OutdoorBandSize>().Length
             && s.OutdoorBandThresholds[OutdoorBandSize.Small] > 0
             && s.OutdoorBandThresholds[OutdoorBandSize.Small] <= s.OutdoorBandThresholds[OutdoorBandSize.Medium]

@@ -37,6 +37,9 @@ public class RuntimeConfigSnapshotMapperTests
             HardCapTime = 999,
             StuckInitialWaitMinutes = 0,
             StuckPostTeleportWaitMinutes = -2,
+            WorkerWalkPixelsPerTick = 0,
+            WorkerActionAnimationMs = 0,
+            WorkerEntranceHoldTicks = -4,
             WorkerDailyEnergyCapacity = 0,
             OutdoorBandThresholds = new Dictionary<string, int>
             {
@@ -56,6 +59,9 @@ public class RuntimeConfigSnapshotMapperTests
         Assert.Equal(1000, normalized.HardCapTime);
         Assert.Equal(1, normalized.StuckInitialWaitMinutes);
         Assert.Equal(1, normalized.StuckPostTeleportWaitMinutes);
+        Assert.Equal(defaults.WorkerWalkPixelsPerTick, normalized.WorkerWalkPixelsPerTick);
+        Assert.Equal(1, normalized.WorkerActionAnimationMs);
+        Assert.Equal(0, normalized.WorkerEntranceHoldTicks);
         Assert.Equal(defaults.WorkerDailyEnergyCapacity, normalized.WorkerDailyEnergyCapacity);
         Assert.Equal(defaults.OutdoorBandThresholds["Small"], normalized.OutdoorBandThresholds["Small"]);
         Assert.Equal(defaults.WorkActionCosts["AxeSwing"], normalized.WorkActionCosts["AxeSwing"]);
@@ -72,6 +78,9 @@ public class RuntimeConfigSnapshotMapperTests
             StuckInitialWaitMinutes = 0,
             StuckPostTeleportWaitMinutes = 0,
             AverageSpeedConstant = -1,
+            WorkerWalkPixelsPerTick = 0,
+            WorkerActionAnimationMs = 0,
+            WorkerEntranceHoldTicks = -2,
             WorkerDailyEnergyCapacity = 0,
         });
 
@@ -82,6 +91,9 @@ public class RuntimeConfigSnapshotMapperTests
         Assert.Equal(1, snapshot.StuckInitialWaitMinutes);
         Assert.Equal(1, snapshot.StuckPostTeleportWaitMinutes);
         Assert.Equal(defaults.AverageSpeedConstant, snapshot.AverageSpeedConstant);
+        Assert.Equal(defaults.WorkerWalkPixelsPerTick, snapshot.WorkerWalkPixelsPerTick);
+        Assert.Equal(1, snapshot.WorkerActionAnimationMs);
+        Assert.Equal(0, snapshot.WorkerEntranceHoldTicks);
         Assert.Equal(defaults.WorkerDailyEnergyCapacity, snapshot.WorkerDailyEnergyCapacity);
         Assert.Equal(defaults.WorkActionCosts["AxeSwing"], snapshot.WorkActionCosts[WorkActionKind.AxeSwing]);
     }

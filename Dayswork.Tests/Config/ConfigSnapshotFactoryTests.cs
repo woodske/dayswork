@@ -21,6 +21,9 @@ public class ConfigSnapshotFactoryTests
             hardCapTime: 2000,
             stuckInitialWaitMinutes: 10,
             stuckPostTeleportWaitMinutes: 10,
+            workerWalkPixelsPerTick: defaults.WorkerWalkPixelsPerTick,
+            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
+            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
             outdoorBandThresholds: defaults.OutdoorBandThresholds,
             outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
             animalBuildingPrices: defaults.AnimalBuildingPrices,
@@ -34,6 +37,9 @@ public class ConfigSnapshotFactoryTests
         Assert.Equal(2000, snapshot.HardCapTime);
         Assert.Equal(10, snapshot.StuckInitialWaitMinutes);
         Assert.Equal(10, snapshot.StuckPostTeleportWaitMinutes);
+        Assert.Equal(defaults.WorkerWalkPixelsPerTick, snapshot.WorkerWalkPixelsPerTick);
+        Assert.Equal(defaults.WorkerActionAnimationMs, snapshot.WorkerActionAnimationMs);
+        Assert.Equal(defaults.WorkerEntranceHoldTicks, snapshot.WorkerEntranceHoldTicks);
         Assert.Equal(defaults.WorkerDailyEnergyCapacity, snapshot.WorkerDailyEnergyCapacity);
     }
 
@@ -52,6 +58,9 @@ public class ConfigSnapshotFactoryTests
             hardCapTime: 2000,
             stuckInitialWaitMinutes: 10,
             stuckPostTeleportWaitMinutes: 10,
+            workerWalkPixelsPerTick: defaults.WorkerWalkPixelsPerTick,
+            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
+            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
             outdoorBandThresholds: defaults.OutdoorBandThresholds,
             outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
             animalBuildingPrices: defaults.AnimalBuildingPrices,
@@ -78,6 +87,9 @@ public class ConfigSnapshotFactoryTests
             hardCapTime: 2000,
             stuckInitialWaitMinutes: 10,
             stuckPostTeleportWaitMinutes: 10,
+            workerWalkPixelsPerTick: defaults.WorkerWalkPixelsPerTick,
+            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
+            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
             outdoorBandThresholds: defaults.OutdoorBandThresholds,
             outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
             animalBuildingPrices: defaults.AnimalBuildingPrices,
@@ -102,6 +114,9 @@ public class ConfigSnapshotFactoryTests
             hardCapTime: invalidHardCapTime,
             stuckInitialWaitMinutes: 10,
             stuckPostTeleportWaitMinutes: 10,
+            workerWalkPixelsPerTick: defaults.WorkerWalkPixelsPerTick,
+            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
+            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
             outdoorBandThresholds: defaults.OutdoorBandThresholds,
             outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
             animalBuildingPrices: defaults.AnimalBuildingPrices,
@@ -124,11 +139,41 @@ public class ConfigSnapshotFactoryTests
             hardCapTime: 2000,
             stuckInitialWaitMinutes: 10,
             stuckPostTeleportWaitMinutes: 10,
+            workerWalkPixelsPerTick: defaults.WorkerWalkPixelsPerTick,
+            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
+            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
             outdoorBandThresholds: defaults.OutdoorBandThresholds,
             outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
             animalBuildingPrices: defaults.AnimalBuildingPrices,
             greenhouseServicePrices: defaults.GreenhouseServicePrices,
             workerDailyEnergyCapacity: 0,
+            workActionCosts: defaults.WorkActionCosts));
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1f)]
+    public void Create_throws_when_worker_walk_pixels_per_tick_is_not_positive(float invalidValue)
+    {
+        var increments = Enum.GetValues<TaskKind>()
+            .ToDictionary(kind => kind, kind => 10);
+        var defaults = ConfigDefaults.Build();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => ConfigSnapshotFactory.Create(
+            baseRate: 50,
+            taskIncrements: increments,
+            averageSpeedConstant: 0.3,
+            hardCapTime: 2000,
+            stuckInitialWaitMinutes: 10,
+            stuckPostTeleportWaitMinutes: 10,
+            workerWalkPixelsPerTick: invalidValue,
+            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
+            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
+            outdoorBandThresholds: defaults.OutdoorBandThresholds,
+            outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
+            animalBuildingPrices: defaults.AnimalBuildingPrices,
+            greenhouseServicePrices: defaults.GreenhouseServicePrices,
+            workerDailyEnergyCapacity: defaults.WorkerDailyEnergyCapacity,
             workActionCosts: defaults.WorkActionCosts));
     }
 }

@@ -1,4 +1,5 @@
 using Dayswork.Core.Domain;
+using Dayswork.Core.Energy;
 using Microsoft.Xna.Framework;
 using StardewValley;
 
@@ -6,12 +7,16 @@ namespace Dayswork.Worker;
 
 internal sealed class ToolSwapAnimator
 {
-    private const double WorkAnimationMs = 400d;
-
     private FarmhandNpc? _worker;
     private double _swingMsRemaining;
+    private double _workAnimationMs = 650d;
 
     public bool IsSwinging => _swingMsRemaining > 0;
+
+    public void SetPacingProfile(WorkerPacingProfile profile)
+    {
+        _workAnimationMs = profile.ActionAnimationMs;
+    }
 
     public void SetWorker(FarmhandNpc? worker)
     {
@@ -45,7 +50,7 @@ internal sealed class ToolSwapAnimator
         _worker.FaceTaskDirection(facingDirection);
         _worker.Sprite.setCurrentAnimation(WorkFramesFor(facingDirection));
         SpawnToolSwing(tool, facingDirection);
-        _swingMsRemaining = WorkAnimationMs;
+        _swingMsRemaining = _workAnimationMs;
     }
 
     public void StopSwing()
