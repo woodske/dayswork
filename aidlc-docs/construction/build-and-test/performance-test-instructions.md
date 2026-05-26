@@ -1,29 +1,40 @@
-# Performance Test Instructions — Dayswork SMAPI Mod
+# Performance Test Instructions — Dayswork Fixed-Price Redesign
 
-## Status: N/A for v1
+## Scope
 
-Dayswork is a single-player Stardew Valley SMAPI mod. There is no server, no concurrent user
-load, and no network layer. Formal load/stress/throughput testing is not applicable.
+Formal load or concurrency testing is still not applicable. U-24 performance verification is about making sure the redesign stays lightweight inside the game loop and the day-start recurring pass.
 
-## Relevant Performance Considerations
+## Areas to Watch
 
-Performance concerns for a SMAPI mod are in-game frame-rate impact and tick-budget usage:
+### Live preview responsiveness
 
-### Tick Budget
-- SMAPI mods run on the game's update loop (~60 ticks/second).
-- Dayswork's worker tick does: one pathfinding step, one task check, one action attempt.
-- Heavy scanning (zone tile iteration) only occurs at shift-start, not every tick.
-- No observable frame drops expected at normal farm sizes.
+- task toggles should refresh preview immediately
+- scope edits should recompute synchronously without visible menu lag
+- review page scrolling should remain responsive for large contracts
 
-### Scanning Performance (informal)
-To spot-check scan time, search the SMAPI log for `[Dayswork][scan]` summary lines.
-Each line reports `scannedTiles`, `acceptedItems`, and detected/accepted counts per task kind.
-A typical farm zone of ~500 tiles scans in well under one game tick.
+### Runtime pacing
 
-### If Performance Issues Are Observed
-1. Enable SMAPI `Trace` logging: type `log level trace` in the SMAPI console.
-2. Look for repeated `[Dayswork][scan]` entries that should only appear once per shift.
-3. Look for `[Dayswork][tick]` entries that fire more than once per game update — this
-   would indicate an event subscription bug.
-4. Profile with a .NET profiler attached to the `Stardew Valley.exe` process if deeper
-   analysis is needed (JetBrains dotTrace or Visual Studio Diagnostic Tools).
+- worker stamina updates should stay in sync with visible labor beats
+- slower pacing should feel intentional, not laggy
+- the overhead stamina bar should update immediately when a work beat spends energy
+
+### Recurring day-start pass
+
+- 6am recurring rebuild/charge logic should not cause visible hitching when the day starts
+- festival, cannot-afford, and needs-attention notice selection should stay synchronous
+
+## Informal Verification
+
+1. Turn on SMAPI trace logging if a slowdown is suspected.
+2. Exercise a large review contract with many pricing lines and confirm the menu remains usable.
+3. Run a recurring contract over multiple mornings and watch for hitching at day start.
+4. Observe a long worker shift and confirm the stamina bar and action cadence stay visually aligned.
+
+## Escalation Guidance
+
+If a performance issue is observed:
+
+1. capture the exact screen or phase where it happens
+2. note whether the issue is preview-time, day-start, or live-runtime
+3. gather SMAPI logs
+4. profile the game process only if the lightweight evidence is not enough

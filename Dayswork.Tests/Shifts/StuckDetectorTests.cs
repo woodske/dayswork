@@ -116,6 +116,18 @@ public sealed class StuckDetectorTests
     }
 
     [Fact]
+    public void Progress_After_Becoming_Stuck_Clears_The_Stuck_State_Immediately()
+    {
+        var det = new StuckDetector(10);
+        det.RecordTick(false, 10);
+        Assert.True(det.ShouldFireStuck());
+
+        det.RecordTick(true, 1);
+
+        Assert.False(det.ShouldFireStuck());
+    }
+
+    [Fact]
     public void Constructor_Rejects_Non_Positive_Threshold()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new StuckDetector(0));

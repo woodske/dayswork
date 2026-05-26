@@ -53,6 +53,17 @@ public class CapabilityEvaluatorTests
         Assert.False(_sut.CanChop(snap, AxeTarget.FruitTree));
     }
 
+    [Fact]
+    public void CanChop_DoesNotDependOn_NonAxe_ToolLevels()
+    {
+        var basicSupport = new ToolSnapshot(ToolLevel.Steel, ToolLevel.Basic, ToolLevel.Basic);
+        var upgradedSupport = new ToolSnapshot(ToolLevel.Steel, ToolLevel.Iridium, ToolLevel.Iridium);
+
+        Assert.Equal(
+            _sut.CanChop(basicSupport, AxeTarget.LargeStump),
+            _sut.CanChop(upgradedSupport, AxeTarget.LargeStump));
+    }
+
     // ── CanBreak table (FR-SKIP-02, FR-TOOL-02) ─────────────────────────────
     // 15 cases: 5 PickaxeLevel × 3 PickTarget values
 
@@ -76,5 +87,16 @@ public class CapabilityEvaluatorTests
     {
         var snap = new ToolSnapshot(ToolLevel.Basic, pickLevel, ToolLevel.Basic);
         Assert.Equal(expected, _sut.CanBreak(snap, target));
+    }
+
+    [Fact]
+    public void CanBreak_DoesNotDependOn_NonPickaxe_ToolLevels()
+    {
+        var basicSupport = new ToolSnapshot(ToolLevel.Basic, ToolLevel.Steel, ToolLevel.Basic);
+        var upgradedSupport = new ToolSnapshot(ToolLevel.Iridium, ToolLevel.Steel, ToolLevel.Iridium);
+
+        Assert.Equal(
+            _sut.CanBreak(basicSupport, PickTarget.LargeBoulder),
+            _sut.CanBreak(upgradedSupport, PickTarget.LargeBoulder));
     }
 }

@@ -162,4 +162,19 @@ public sealed class DepositPlannerTests
         Assert.All(trip.Items, item => Assert.Equal(TaskKind.CutTrees, item.SourceTask));
         Assert.Equal(3, trip.Items.Sum(item => item.Quantity));
     }
+
+    [Fact]
+    public void MailFallback_Preserves_Provenance_For_NextMorning_Overflow()
+    {
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)430", 1, TaskKind.CollectAnimalProducts, OutputScopeProvenance.AnimalBuilding("Barn")),
+        };
+
+        var plan = new DepositPlanner().Plan(snapshot, new Dictionary<TaskKind, DestinationKey>(), BinTile, Start, Manhattan);
+
+        var mailed = Assert.Single(plan.PreMailedOverflow);
+        Assert.Equal(OutputScopeFamily.AnimalBuilding, mailed.Provenance.Family);
+        Assert.Equal("Barn", mailed.Provenance.ScopeName);
+    }
 }

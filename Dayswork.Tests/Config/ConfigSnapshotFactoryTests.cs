@@ -44,7 +44,7 @@ public class ConfigSnapshotFactoryTests
     }
 
     [Fact]
-    public void Create_throws_when_task_increment_is_missing()
+    public void Create_throws_when_compatibility_task_increment_is_missing()
     {
         var increments = Enum.GetValues<TaskKind>()
             .Where(kind => kind != TaskKind.ClearGrass)
@@ -74,7 +74,7 @@ public class ConfigSnapshotFactoryTests
     [Theory]
     [InlineData(-1)]
     [InlineData(0)]
-    public void Create_throws_when_average_speed_constant_is_not_positive(double invalidValue)
+    public void Create_throws_when_compatibility_average_speed_constant_is_not_positive(double invalidValue)
     {
         var increments = Enum.GetValues<TaskKind>()
             .ToDictionary(kind => kind, kind => 10);

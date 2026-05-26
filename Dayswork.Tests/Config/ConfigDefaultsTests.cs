@@ -15,7 +15,7 @@ public class ConfigDefaultsTests
     }
 
     [Fact]
-    public void Build_BaseRate_is_50()
+    public void Build_LegacyBaseRateCompatibilityDefault_is_50()
     {
         Assert.Equal(50, ConfigDefaults.Build().BaseRate);
     }
@@ -31,13 +31,13 @@ public class ConfigDefaultsTests
     [InlineData(TaskKind.ClearRocks,            20)]
     [InlineData(TaskKind.ClearWeeds,            20)]
     [InlineData(TaskKind.ClearGrass,            20)]
-    public void Build_TaskIncrements_match_spec_rate_table(TaskKind kind, int expected)
+    public void Build_LegacyTaskIncrements_match_compatibility_rate_table(TaskKind kind, int expected)
     {
         Assert.Equal(expected, ConfigDefaults.Build().TaskIncrements[kind]);
     }
 
     [Fact]
-    public void Build_TaskIncrements_covers_every_TaskKind_value()
+    public void Build_LegacyTaskIncrements_cover_every_TaskKind_value()
     {
         var snapshot = ConfigDefaults.Build();
         var allKinds = Enum.GetValues<TaskKind>();
@@ -47,7 +47,7 @@ public class ConfigDefaultsTests
     }
 
     [Fact]
-    public void Build_AverageSpeedConstant_is_positive()
+    public void Build_LegacyAverageSpeedConstantCompatibilityDefault_is_positive()
     {
         Assert.True(ConfigDefaults.Build().AverageSpeedConstant > 0);
     }

@@ -1,3 +1,4 @@
+using Dayswork.Core.Guards;
 using Dayswork.Guards;
 using Dayswork.Integration;
 using HarmonyLib;
@@ -130,23 +131,24 @@ internal static class BulletinBoardPatch
     [HarmonyPostfix]
     private static void ReceiveLeftClick_Postfix(Billboard __instance, int x, int y)
     {
-        if (MultiplayerGuard.IsMultiplayer())
-        {
-            ModEntry.ModMonitor.Log(
-                I18nHelper.Get("multiplayer.refused_log_message"),
-                LogLevel.Warn);
-            return;
-        }
+        var action = BulletinBoardInteractionPolicy.Evaluate(
+            MultiplayerGuard.IsMultiplayer(),
+            _hireButton is not null && _hireButton.bounds.Contains(x, y),
+            _manageButton is not null && _manageButton.bounds.Contains(x, y));
 
-        if (_hireButton is not null && _hireButton.bounds.Contains(x, y))
+        switch (action)
         {
-            ModEntry.Coordinator.OpenHiringFlow();
-            return;
-        }
-
-        if (_manageButton is not null && _manageButton.bounds.Contains(x, y))
-        {
-            ModEntry.Coordinator.OpenManageFlow();
+            case BulletinBoardInteractionAction.BlockedByMultiplayer:
+                ModEntry.ModMonitor.Log(
+                    I18nHelper.Get("multiplayer.refused_log_message"),
+                    LogLevel.Warn);
+                return;
+            case BulletinBoardInteractionAction.OpenHire:
+                ModEntry.Coordinator.OpenHiringFlow();
+                return;
+            case BulletinBoardInteractionAction.OpenManage:
+                ModEntry.Coordinator.OpenManageFlow();
+                return;
         }
     }
 }

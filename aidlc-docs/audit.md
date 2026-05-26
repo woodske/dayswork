@@ -3907,3 +3907,115 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — Approval prompt for completed U-23 Code Generation
 
 ---
+
+## Code Generation — U-23 Review Approved
+**Timestamp**: 2026-05-26T17:16:15Z
+**User Input**: "approved and continue"
+**AI Response**: Marked the U-23 code-generation review gate approved, treated the response as authorization to advance to the next retrofit unit, and began U-24 Functional Design planning. Loaded the U-24 unit definition, story map, functional-design stage rules, the U-23 completion summary, and the current GMCM/config/i18n/lint seams so the next question file would stay focused on the real final-sweep decisions rather than reopening already-approved pricing/runtime behavior.
+**Context**: CONSTRUCTION — Transition from U-23 Code Generation review to U-24 Functional Design planning
+
+---
+
+## Functional Design — U-24 Question File Prepared
+**Timestamp**: 2026-05-26T17:16:16Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Created `aidlc-docs/construction/plans/u-24-config-regression-documentation-cleanup-functional-design-plan.md` and updated `aidlc-state.md` so the current stage now points at the U-24 functional-design question file. The user is being asked to fill in the `[Answer]:` tags for the remaining cleanup decisions covering the redesign-era GMCM surface, config-shape cleanup strategy, regression-test depth, i18n/lint enforcement boundary, build/test documentation refresh strategy, and how to present accepted deviations/verification caveats.
+**Context**: CONSTRUCTION — Prompt for U-24 Functional Design answers
+
+---
+
+## Functional Design — U-24 Answers Applied
+**Timestamp**: 2026-05-26T17:33:56Z
+**User Input**: "done"
+**AI Response**: Read the completed U-24 functional-design question file and found all six answers explicit and non-ambiguous (`FD-Q1=A`, `FD-Q2=C`, `FD-Q3=A`, `FD-Q4=A`, `FD-Q5=A`, `FD-Q6=A`), so no clarification round was needed. Generated the U-24 functional-design artifacts at `aidlc-docs/construction/u-24-config-regression-documentation-cleanup/functional-design/` (`business-logic-model.md`, `business-rules.md`, `domain-entities.md`, and `frontend-components.md`), marked the question-plan checklist complete, and updated `aidlc-state.md` to the U-24 Functional Design review gate. The design now locks a redesign-only GMCM/config surface, an intentional clean-break saved config shape, targeted regression coverage, a strict player-visible i18n/lint boundary, a full build/test doc rewrite to the fixed-price/worker-energy model, and a consolidated reviewer-facing deviations/caveats note.
+**Context**: CONSTRUCTION — Functional Design completion for U-24 Config, Regression, and Documentation Cleanup
+
+---
+
+## Functional Design — U-24 Review Prompt
+**Timestamp**: 2026-05-26T17:33:57Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-24 functional-design review gate. The user is being asked to review the generated artifacts in `aidlc-docs/construction/u-24-config-regression-documentation-cleanup/functional-design/` and either request changes or continue to NFR Requirements.
+**Context**: CONSTRUCTION — Approval prompt for U-24 Functional Design
+
+---
+
+## Functional Design — U-24 Review Approved
+**Timestamp**: 2026-05-26T17:48:40Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-24 Functional Design into U-24 NFR Requirements planning. Loaded the NFR-requirements stage rules plus the approved U-24 functional-design artifacts, then shaped the upcoming question file around the final cleanup quality decisions still open: GMCM/config responsiveness, deterministic redesign-era config resolution, resilience expectations for stale or malformed clean-break config input, documentation freshness/consistency, and the final regression/property-test bar.
+**Context**: CONSTRUCTION — Transition from U-24 Functional Design review to U-24 NFR Requirements planning
+
+---
+
+## NFR Requirements — U-24 Question File Prepared
+**Timestamp**: 2026-05-26T17:48:40Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Created `aidlc-docs/construction/plans/u-24-config-regression-documentation-cleanup-nfr-requirements-plan.md` and updated `aidlc-state.md` so the current stage now points at the U-24 NFR-requirements question file. The user is being asked to fill in the `[Answer]:` tags for the remaining quality-bar decisions covering GMCM/config responsiveness, deterministic redesign-era config resolution, resilience for stale or malformed clean-break config input, the freshness/consistency target for the rewritten build-and-test docs and deviations note, and the final regression/property-test rigor for the cleanup sweep.
+**Context**: CONSTRUCTION — Prompt for U-24 NFR Requirements answers
+
+---
+
+## NFR Requirements — U-24 Answers Applied
+**Timestamp**: 2026-05-26T17:57:11Z
+**User Input**: "done"
+**AI Response**: Read the completed U-24 NFR-requirements question file and found all five answers explicit and non-ambiguous (`NFR-Q1=A`, `NFR-Q2=A`, `NFR-Q3=A`, `NFR-Q4=A`, `NFR-Q5=A`), so no clarification round was needed. Generated `aidlc-docs/construction/u-24-config-regression-documentation-cleanup/nfr-requirements/nfr-requirements.md` and `tech-stack-decisions.md`, marked the plan checklist complete in `aidlc-docs/construction/plans/u-24-config-regression-documentation-cleanup-nfr-requirements-plan.md`, and updated `aidlc-state.md` to the U-24 NFR-requirements review gate. The resulting quality bar keeps the redesign-era GMCM/config experience immediate, requires strict deterministic config resolution, mandates per-key fallback reliability for malformed clean-break config input, treats stale redesign docs as regression failures, and carries strong targeted example plus FsCheck coverage for the cleanup sweep.
+**Context**: CONSTRUCTION — NFR Requirements completion for U-24 Config, Regression, and Documentation Cleanup
+
+---
+
+## NFR Requirements — U-24 Review Approved
+**Timestamp**: 2026-05-26T18:01:37Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-24 NFR Requirements into U-24 NFR Design. Loaded the NFR-design stage rules plus the approved U-24 NFR-requirements artifacts, evaluated all NFR-design question categories, and determined that no additional question round was needed because the approved cleanup quality bar already fixed the resilience, performance, determinism, and logical-component pattern set cleanly.
+**Context**: CONSTRUCTION — Transition from U-24 NFR Requirements review to U-24 NFR Design
+
+---
+
+## NFR Design — U-24 Completion
+**Timestamp**: 2026-05-26T18:01:37Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-24-config-regression-documentation-cleanup-nfr-design-plan.md`, generated the U-24 NFR-design artifacts at `aidlc-docs/construction/u-24-config-regression-documentation-cleanup/nfr-design/` (`nfr-design-patterns.md` and `logical-components.md`), and updated `aidlc-state.md` to the U-24 NFR-design review gate. The resulting design keeps the cleanup on the existing config/runtime publication shell, centers deterministic redesign-only authority in `RuntimeConfigSnapshotMapper` plus `ConfigValueResolver`/`ConfigDefaults`, preserves the existing player-visible i18n lint gate, rewrites the build/test docs as a redesign-native coherence surface, and adds dedicated final-cleanup regression support without introducing any new config, UI, or documentation framework.
+**Context**: CONSTRUCTION — NFR Design completion for U-24 Config, Regression, and Documentation Cleanup
+
+---
+
+## NFR Design — U-24 Review Approved
+**Timestamp**: 2026-05-26T18:05:48Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-24 NFR Design into U-24 Code Generation planning. Loaded the Code Generation stage rules, the approved U-24 functional/NFR artifacts, the unit/story map, and the live cleanup seams (`GMCMRegistrar`, `ModConfig`, `RuntimeConfigSnapshotMapper`, lint/tests, and build/test docs) so the plan could target the real final-cleanup work rather than restating design intent.
+**Context**: CONSTRUCTION — Transition from U-24 NFR Design review to U-24 Code Generation planning
+
+---
+
+## Code Generation — U-24 Plan Review Prompt
+**Timestamp**: 2026-05-26T18:05:48Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Created `aidlc-docs/construction/plans/u-24-config-regression-documentation-cleanup-code-generation-plan.md` and updated `aidlc-state.md` to the U-24 Code Generation plan-review gate. The user is being asked to review the 19-step plan covering redesign-only saved-config cleanup, deterministic mapper/fallback updates, GMCM + i18n replacement, targeted regression/lint coverage, full build/test document rewrite with a reviewer-facing deviations note, and final verification/code-summary closeout.
+**Context**: CONSTRUCTION — Approval prompt for U-24 Code Generation plan
+
+---
+
+## Code Generation — U-24 Plan Approved
+**Timestamp**: 2026-05-26T18:33:17Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval for the full U-24 code-generation plan and began Part 2 execution. Reloaded the approved plan, the code-generation stage rules, and the live config/GMCM/test/documentation seams, then started the redesign-only config cleanup with immediate plan-checkbox tracking enabled for each completed step.
+**Context**: CONSTRUCTION — Approval to execute U-24 Code Generation Part 2
+
+---
+
+## Code Generation — U-24 Execution Complete
+**Timestamp**: 2026-05-26T18:49:33Z
+**User Input**: "continue"
+**AI Response**: Completed all 19 steps in the approved U-24 code-generation plan. The player-facing `ModConfig` surface is now redesign-only, `RuntimeConfigSnapshotMapper` publishes redesign-era settings while internalizing the remaining legacy hourly bridge defaults, GMCM was rebuilt around pricing/stamina/worker-behavior sections, player-visible GMCM copy was fully refreshed in `default.json`, and targeted cleanup coverage was expanded across config mapping, fallback behavior, routing, capability, stuck recovery, multiplayer bulletin-board interaction, and hit-reaction logic. The build/test documentation set was fully rewritten to the fixed-price/worker-energy model, including a new reviewer-facing `redesign-deviations-and-caveats.md` note. Verification completed green: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` errors / `0` warnings, and `dotnet test Dayswork.sln` passed with `286` tests passing and `1` expected skip. Wrote the final unit summary at `aidlc-docs/construction/u-24-config-regression-documentation-cleanup/code/code-summary.md`, marked the U-24 plan complete, and updated `aidlc-state.md` to the code-review gate.
+**Context**: CONSTRUCTION — Code Generation completion for U-24 Config, Regression, and Documentation Cleanup
+
+---
+
+## Code Generation — U-24 Review Prompt
+**Timestamp**: 2026-05-26T18:49:33Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-24 code-generation review gate. The user is being asked to review the generated application code in the workspace plus the documentation at `aidlc-docs/construction/u-24-config-regression-documentation-cleanup/code/`, and either request changes or continue to the next stage.
+**Context**: CONSTRUCTION — Approval prompt for U-24 Code Generation
+
+---

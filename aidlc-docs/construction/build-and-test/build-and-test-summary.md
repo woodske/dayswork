@@ -1,108 +1,67 @@
-# Build and Test Summary — Dayswork SMAPI Mod
+# Build and Test Summary — Dayswork Fixed-Price Redesign
 
 ## Build Status
 
 | Item | Detail |
-|------|--------|
-| **Build Tool** | .NET 6 SDK / MSBuild |
-| **Build Command** | `dotnet build Dayswork.sln` |
-| **Build Status** | **Success** — 0 errors, 0 warnings |
-| **Build Marker** | `build=U17-Step18` |
-| **Deployed To** | `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork\` |
+|---|---|
+| Build tool | .NET 6 SDK / MSBuild |
+| Compile command | `dotnet build Dayswork.sln /p:EnableModDeploy=false` |
+| Test command | `dotnet test Dayswork.sln` |
+| Build status | Success |
+| Build marker | `build=U24-Step19` |
+| Live deploy behavior | `dotnet test Dayswork.sln` currently builds with deploy enabled for the mod project before the test project runs |
 
-### Build Artifacts
-
-| Artifact | Location |
-|----------|----------|
-| `Dayswork.dll` | `Mods/Dayswork/Dayswork.dll` |
-| `Dayswork.Core.dll` | `Mods/Dayswork/Dayswork.Core.dll` |
-| `manifest.json` | `Mods/Dayswork/manifest.json` |
-| `i18n/default.json` | `Mods/Dayswork/i18n/default.json` |
-
----
-
-## Test Execution Summary
-
-### Unit Tests
+## Verified Totals
 
 | Metric | Result |
-|--------|--------|
-| **Command** | `dotnet test Dayswork.sln` |
-| **Total** | 212 |
-| **Passed** | **211** |
-| **Failed** | 0 |
-| **Skipped** | 1 (intentional — seed-logging smoke demo) |
-| **Duration** | ~5 seconds |
-| **Status** | **PASS** |
+|---|---|
+| Passed | 286 |
+| Failed | 0 |
+| Skipped | 1 expected skip |
+| Total | 287 |
 
-#### Coverage by Area
+The expected skip remains `Dayswork.Tests.Smoke.SeedLoggingDemoTests.PBT08_seed_and_shrunk_input_logged_on_failure`.
 
-| Area | Tests |
-|------|-------|
-| Config mutation / reset / publish | `Dayswork.Tests.Config` |
-| Config → snapshot mapping, range clamping | `Dayswork.Tests.Config.Mapping` |
-| Shift cost & refund computation | `Dayswork.Tests.Shifts` |
-| Hiring scheduler guard chain | `Dayswork.Tests.Scheduling` |
-| Deposit hours policy | `Dayswork.Tests.Deposits` |
-| Mail dispatcher (settlement, overflow, notices) | `Dayswork.Tests.Mail` |
-| i18n lint gate (no hardcoded user-visible strings) | `Dayswork.Tests.Lint` |
-| PBT seed-logging demo | `Dayswork.Tests.Smoke` (1 skip) |
+## U-24 Coverage Added or Refreshed
 
-### Integration Tests
+- redesign-only `ModConfig` surface and deterministic runtime snapshot mapping
+- GMCM pricing, stamina, and worker-behavior publication
+- `ConfigValueResolver` narrow fallback behavior
+- task-owned output routing and preserved scope provenance
+- capability snapshot invariants
+- stuck recovery reset behavior
+- multiplayer bulletin-board interaction policy
+- worker hit-reaction trigger policy
+- player-visible i18n lint boundary
 
-| Metric | Result |
-|--------|--------|
-| **Method** | Manual in-game playtesting (SMAPI mod — no automated integration test runner) |
-| **Scenarios** | 7 defined in `integration-test-instructions.md` |
-| **Status** | See playtest checklist below |
+## Final Automated Regression Checklist
 
-#### Playtest Checklist
+- [x] No hourly/deposit-era knobs remain in `ModConfig` or GMCM
+- [x] GMCM shows only `Pricing`, `Worker Stamina`, and `Worker Behavior`
+- [x] `RuntimeConfigSnapshotMapper` publishes deterministic redesign-era snapshots
+- [x] Internal legacy hourly/deposit compatibility values are derived only behind non-player-facing seams
+- [x] Output routing and overflow behavior still pass automated coverage
+- [x] Tool snapshot and skip rules still pass automated coverage
+- [x] Stuck recovery, hit-reaction logic, and multiplayer refusal still pass automated coverage
+- [x] The hardcoded-string lint gate still passes
+- [x] Build/test docs now describe fixed pricing and worker stamina instead of deposits/refunds
 
-- [ ] Mod loads with no SMAPI errors (with and without GMCM installed)
-- [ ] GMCM config screen shows all fields with correct labels and tooltips
-- [ ] Config changes persist after closing/reopening the menu
-- [ ] One-time contract: hire → work → deposit to chest → settlement mail next morning
-- [ ] Recurring contract: deposit deducted each day; festival-skip mail arrives same morning
-- [ ] Animal tasks: pet+collect per animal before moving to the next
-- [ ] Big rocks: multiple hits required; correct stone yield from game data
-- [ ] Greenhouse crops: each tile harvested once; produce goes to worker buffer, not player inventory
+## Manual Playtest Checklist
 
-### Performance Tests
+- [ ] Bulletin board entry works in single-player and stays blocked in multiplayer
+- [ ] One-time review/purchase flow shows fixed pricing and typed scope correctly
+- [ ] Recurring day-start billing, festival skip, and notice behavior match the redesign
+- [ ] Worker stamina, pacing, wrap-up, and scope-driven execution all behave correctly in-game
+- [ ] Output destinations, overflow mail, and greenhouse/animal scope behavior all remain clear
 
-| Status | Detail |
-|--------|--------|
-| **N/A** | Single-player SMAPI mod — no server/load testing applicable |
-| **Informal check** | SMAPI `[Dayswork][scan]` log lines confirm sub-tick scan times at normal farm sizes |
+## Units Delivered in This Redesign Pass
 
-### Additional Tests
-
-| Test Type | Status |
-|-----------|--------|
-| Contract tests | N/A — no microservice API contracts |
-| Security tests | N/A — no network surface or user authentication |
-| E2E tests | Covered by manual integration playtest scenarios |
-
----
-
-## Units Delivered
-
-| Unit | Description | Status |
-|------|-------------|--------|
-| U-13 | Worker AI — pathfinding, priority, capability, stuck detection | Complete |
-| U-13B | Worker Actor + Task Visuals — NPC-backed worker, tool animations | Complete |
-| U-14 | Output Pipeline — multi-destination deposit, overflow/tool-missing mail | Complete |
-| U-15 | Recurring Lifecycle + Calendar Handlers — recurring contracts, festival/rain/sleep | Complete |
-| U-16 | Animals & Buildings — building navigation, animal tasks, indoor deposit | Complete |
-| U-17 | GMCM + i18n Polish — mutable config, GMCM registration, i18n lint gate | Complete |
-
----
-
-## Overall Status
-
-| Category | Status |
-|----------|--------|
-| **Build** | **Success** |
-| **Unit Tests** | **Pass** (211/211, 1 expected skip) |
-| **Integration / Playtest** | In progress — see checklist above |
-| **Performance** | N/A |
-| **Ready for Operations** | Yes, pending playtest sign-off |
+| Unit | Focus |
+|---|---|
+| U-18 | Contract terms foundation |
+| U-19 | Contract snapshot persistence |
+| U-20 | Hiring flow preview refresh |
+| U-21 | Worker energy and shift runtime refresh |
+| U-22 | Scope-driven runtime alignment |
+| U-23 | Recurring billing and calendar refresh |
+| U-24 | Config, regression, and documentation cleanup |

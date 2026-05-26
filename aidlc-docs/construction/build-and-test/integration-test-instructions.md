@@ -1,159 +1,91 @@
-# Integration Test Instructions — Dayswork SMAPI Mod
+# Integration Test Instructions — Dayswork Fixed-Price Redesign
 
 ## Overview
 
-Dayswork is a Stardew Valley SMAPI mod. There is no service mesh, no docker-compose, and no
-API server to spin up. Integration testing is done by running the mod inside the actual game
-with SMAPI and exercising end-to-end flows manually. SMAPI's console log is the primary
-observation surface.
+Dayswork is still verified in the live game through SMAPI-driven manual playtesting. There is no separate service stack or automated end-to-end harness. The integration goal for the redesign is to confirm the fixed-price contract flow, typed scope execution, recurring lifecycle, and worker stamina behavior all match the approved rules in a real save.
 
 ## Environment Setup
 
-1. **Build and deploy** the mod (see `build-instructions.md`).
-2. **Install required dependencies** in the game's `Mods/` folder:
-   - Mail Framework Mod `>= 1.20.0`
-3. **Optionally install** Generic Mod Config Menu `>= 1.14.0` to exercise the GMCM surface.
-4. **Launch the game** via SMAPI (`StardewModdingAPI.exe`).
-5. **Open a save** — use a farm with a mix of zones: crops, fruit trees, grass, rocks, animal buildings.
+1. Build and deploy the mod.
+2. Install Mail Framework Mod.
+3. Optionally install GMCM for settings verification.
+4. Launch Stardew Valley through SMAPI.
+5. Open a farm save that has:
+   - outdoor crop zones
+   - at least one barn or coop
+   - a greenhouse
+   - assignable chests and a reachable shipping bin
 
-## Integration Test Scenarios
+## Manual Scenarios
 
----
+### Scenario 1 — Mod load and bulletin board entry
 
-### Scenario 1: Mod Loads Without Errors
+Verify:
 
-**Purpose**: Verify all integration seams (GMCM, MFM) initialise cleanly.
+- the mod loads without SMAPI errors
+- the bulletin board shows the hire/manage entry in single-player
+- the multiplayer refusal path still logs the friendly refusal message instead of opening the flow
 
-**Steps**:
-1. Launch game with SMAPI.
-2. Check SMAPI console for `[Dayswork]` log lines.
+### Scenario 2 — GMCM redesign surface
 
-**Expected**:
-- No `[ERROR]` or exception stack traces in SMAPI console.
-- If GMCM is installed: `[Dayswork]` line confirming GMCM registration (or no crash).
-- If GMCM is absent: mod still loads (optional dependency — silent no-op).
+Verify:
 
----
+- GMCM shows only `Pricing`, `Worker Stamina`, and `Worker Behavior`
+- outdoor thresholds, fixed-price tables, stamina, and pacing values persist after reopening the menu
+- no hourly/deposit-era labels are still visible
 
-### Scenario 2: GMCM Config Screen
+### Scenario 3 — One-time contract review and purchase
 
-**Purpose**: Verify all config fields appear and save correctly.
+Verify:
 
-**Steps**:
-1. Open the in-game Options menu → Mod Options → Dayswork.
-2. Observe all sections: **Rates** and **Worker Settings**.
-3. Change `Base Rate` to a non-default value.
-4. Close the menu (saves automatically).
-5. Reopen the menu.
+- the flow is now `Tasks -> Work Scope -> Output Destinations -> Schedule -> Review Contract`
+- review pricing reflects outdoor bands, animal buildings, and greenhouse packages correctly
+- one-time contracts charge the fixed price immediately
+- invalid preview states block confirmation only on the review page
 
-**Expected**:
-- All fields show with correct labels and tooltips (from `i18n/default.json`).
-- Changed value persists after reopen.
-- No crash on save or reopen.
+### Scenario 4 — Recurring 6am lifecycle
 
----
+Verify:
 
-### Scenario 3: One-Time Contract — Hire, Work, Settle
+- recurring contracts rebuild terms at day start before an eligible charge
+- festival days skip the worker and charge nothing
+- rain and low-work days keep the same recurring price and stay quiet unless another notice reason applies
+- edit-before-6am changes affect that same morning's rebuild path
 
-**Purpose**: Verify the full one-time contract flow from hire to settlement mail.
+### Scenario 5 — Worker stamina and pacing
 
-**Steps**:
-1. Go to the bulletin board on a non-festival weekday with enough gold.
-2. Define a zone covering crops ready to harvest.
-3. Hire a worker.
-4. Progress time until the worker completes work.
-5. Sleep.
+Verify:
 
-**Expected**:
-- Worker navigates to and harvests crops within the zone.
-- Produces are deposited to the assigned chest (or overflow-mailed if chest full).
-- Settlement mail arrives the next morning with any refund gold.
-- No orphaned work items or crashes on sleep/save.
+- the worker shows a visible stamina bar overhead
+- movement and action pacing feel slower and readable
+- stamina spends on labor beats rather than walking
+- when stamina reaches zero, the worker finishes the current work unit, deposits output, and leaves
+- the worker also stops at the hard-cap time only after finishing the current work unit
 
----
+### Scenario 6 — Scope-driven execution
 
-### Scenario 4: Recurring Contract — Multi-Day Deposit Deduction
+Verify:
 
-**Purpose**: Verify recurring contracts deduct on each new day and skip festivals.
+- outdoor services only work inside selected outdoor scope
+- selected barns/coops cover their animals even when those animals roam outside
+- greenhouse work runs as its own crop scope
+- output routing remains task-owned while overflow explanations still mention the right scope family
 
-**Steps**:
-1. Hire a worker on a recurring contract.
-2. Advance one full day.
-3. Advance to a festival day.
+### Scenario 7 — Final regression surfaces
 
-**Expected**:
-- Day 1: Deposit deducted, work performed.
-- Festival day: No deposit deducted, festival-skip mail arrives **same day** (in morning mailbox).
+Verify:
 
----
+- chest routing, shipping bin routing, and next-morning overflow mail still behave correctly
+- tool snapshot and skip rules still respect the player's tool levels at shift start
+- stuck recovery still resolves or aborts safely
+- worker hit reactions still emote instead of taking damage or breaking the shift
 
-### Scenario 5: Animal Tasks (U-16)
+## Logs
 
-**Purpose**: Verify per-animal pet+collect sequencing inside buildings.
+Primary log location:
 
-**Steps**:
-1. Assign the worker a zone that includes a barn or coop.
-2. Ensure animals are ready to pet and have products to collect.
-3. Watch the worker.
-
-**Expected**:
-- Worker enters the building.
-- For each animal: pet the animal, then collect its product — before moving to the next animal.
-- Products deposited to assigned chest, not dropped in player inventory.
-
----
-
-### Scenario 6: Big Rock Multi-Hit (U-16)
-
-**Purpose**: Verify boulders/large rocks take multiple hits and yield correct stone counts.
-
-**Steps**:
-1. Assign a zone containing a large boulder.
-2. Observe the worker.
-
-**Expected**:
-- Worker strikes the boulder multiple times (not one-shot).
-- Stone collected matches the rock's real drop count from game data.
-- Rock is removed from the map after health reaches zero.
-
----
-
-### Scenario 7: Greenhouse Crop Harvest (U-16)
-
-**Purpose**: Verify greenhouse crops harvest correctly without an infinite loop.
-
-**Steps**:
-1. Assign a zone that includes the greenhouse.
-2. Ensure at least one crop is harvestable.
-3. Let the worker operate.
-
-**Expected**:
-- Worker harvests each ready crop exactly once.
-- Crops go into the worker buffer (not the player's inventory).
-- Regrowable crops remain (dirt cleared for non-regrowable crops).
-- No repeated harvest invocations on the same tile.
-
----
-
-## Checking SMAPI Logs
-
-SMAPI writes a detailed log at:
-```
+```text
 %AppData%\StardewValley\ErrorLogs\SMAPI-latest.txt
 ```
 
-Filter for `[Dayswork]` entries. Trace-level scan entries are logged at `Trace` verbosity
-and are visible when SMAPI is launched with `--log-level Trace` or via `log level trace`
-in the SMAPI console.
-
-## Pass Criteria
-
-| Scenario | Pass Condition |
-|----------|---------------|
-| 1 — Mod Loads | No errors in SMAPI console |
-| 2 — GMCM Screen | All fields display; values persist |
-| 3 — One-Time Contract | Work done; chest deposited; settlement mail correct |
-| 4 — Recurring + Festival | Daily deduction works; festival skip mail same-day |
-| 5 — Animal Sequencing | Pet+collect per animal before moving to next |
-| 6 — Big Rock Multi-Hit | Multiple hits; correct stone yield |
-| 7 — Greenhouse Harvest | Each tile harvested once; buffer not player inventory |
+Look for `[Dayswork]` lines when validating recurring notices, runtime scope skips, deposit behavior, and stuck recovery.

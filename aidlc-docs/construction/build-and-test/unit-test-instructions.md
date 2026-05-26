@@ -1,69 +1,74 @@
-# Unit Test Execution — Dayswork SMAPI Mod
+# Unit Test Instructions — Dayswork Fixed-Price Redesign
 
-## Overview
+## Main Test Command
 
-Unit tests live in `Dayswork.Tests/` and run entirely without Stardew Valley or SMAPI present.
-Current baseline: **211 passed, 1 expected skip, 0 failures**.
-
-The 1 skip is intentional: `PBT08_seed_and_shrunk_input_logged_on_failure` is a
-seed-logging smoke test that only shows meaningful output on failure — it is marked
-`[Fact(Skip = "...")]` by design.
-
-## Run Unit Tests
-
-### Execute All Tests
+Run the full automated suite with:
 
 ```bash
 dotnet test Dayswork.sln
 ```
 
-Expected output:
-```
-Passed!  - Failed: 0, Passed: 211, Skipped: 1, Total: 212, Duration: ~5s - Dayswork.Tests.dll (net6.0)
+Current verified baseline at U-24 closeout:
+
+```text
+Passed!  - Failed: 0, Passed: 286, Skipped: 1, Total: 287
 ```
 
-### Run a Specific Test Class
+## Focus Areas
+
+### Config and normalization
+
+- redesign-only `ModConfig` shape
+- deterministic `RuntimeConfigSnapshotMapper` publication
+- `ConfigValueResolver` narrow fallback behavior
+- fixed-price thresholds, package tables, and worker action-cost snapshots
+
+### Pricing and contract terms
+
+- fixed-price scope breakdown generation
+- greenhouse, outdoor, and animal-building pricing splits
+- worker energy profile snapshots
+- recurring rebuild determinism
+
+### Runtime and output pipeline
+
+- task-owned destination routing
+- overflow categorization and next-morning mail behavior
+- tool snapshot and skip rules
+- worker energy ledger, stop reasons, and work-unit boundaries
+- stuck detection and wrap-up guarantees
+
+### Final cleanup regressions
+
+- redesign GMCM publication
+- multiplayer bulletin-board refusal behavior
+- hit-reaction trigger logic
+- i18n lint boundary
+
+## Useful Filters
+
+Run a focused slice with:
 
 ```bash
 dotnet test Dayswork.sln --filter "FullyQualifiedName~Config"
+dotnet test Dayswork.sln --filter "FullyQualifiedName~U24"
+dotnet test Dayswork.sln --filter "FullyQualifiedName~Overflow"
 ```
 
-### Run with Verbose Output
+## Failure Handling
 
-```bash
-dotnet test Dayswork.sln --logger "console;verbosity=detailed"
-```
-
-## Test Coverage by Area
-
-| Namespace | What It Covers |
-|-----------|---------------|
-| `Dayswork.Tests.Config` | `ModConfigManager` — defaults, mutation, reset, save/publish |
-| `Dayswork.Tests.Config.Mapping` | `RuntimeConfigSnapshotMapper` — range clamping, default equivalence, invalid input |
-| `Dayswork.Tests.Shifts` | `ShiftContext` — cost computation, refund logic, HHMM→minutes conversion |
-| `Dayswork.Tests.Scheduling` | `HiringScheduler` guard chain — affordability, festival, rain surcharge |
-| `Dayswork.Tests.Deposits` | `DepositHoursPolicy` — flat-hour policy vs raw estimation |
-| `Dayswork.Tests.Mail` | `MailDispatcher` — settlement, overflow, festival/cannot-afford notice queuing |
-| `Dayswork.Tests.Lint` | `HardcodedUserFacingStringLintTests` — scans Dayswork source for literals outside `I18nHelper` callsites |
-| `Dayswork.Tests.Smoke` | Property-based testing seed-logging demo (1 intentional skip) |
-
-## Fixing Failing Tests
-
-If `dotnet test` reports failures:
-
-1. Note the test name and failure message in the console output.
-2. Run the specific failing test with verbose output:
-   ```bash
-   dotnet test Dayswork.sln --filter "FullyQualifiedName~<TestName>" --logger "console;verbosity=detailed"
-   ```
-3. Identify whether the failure is in production code or the test fixture.
-4. Fix the issue, rebuild (`dotnet build Dayswork.sln /p:EnableModDeploy=false`), and rerun tests.
-5. Do **not** commit with any non-skip failures.
+1. Reproduce the failure with a focused `--filter`.
+2. Decide whether the break is in production behavior, test expectations, or stale redesign documentation.
+3. Fix the issue.
+4. Rerun `dotnet build Dayswork.sln /p:EnableModDeploy=false`.
+5. Rerun `dotnet test Dayswork.sln`.
 
 ## Lint Gate
 
-The `Dayswork.Tests/Lint/HardcodedUserFacingStringLintTests` suite performs source-level
-scanning for hardcoded user-visible English strings outside approved `I18nHelper` callsites.
+`Dayswork.Tests/Lint/HardcodedUserFacingStringLintTests.cs` remains part of the standard suite.
 
-If the lint test fails, locate the flagged file and key, add the string to the i18n JSON at
-`Dayswork/i18n/default.json`, and replace the literal with `I18nHelper.Get("your.key")`.
+If it fails:
+
+1. Move the player-visible string into `Dayswork/i18n/default.json`.
+2. Replace the hardcoded literal with `I18nHelper.Get(...)`.
+3. Rerun the suite.

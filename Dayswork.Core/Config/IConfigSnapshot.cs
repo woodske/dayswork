@@ -5,6 +5,7 @@ using Dayswork.Core.Energy;
 
 public interface IConfigSnapshot
 {
+    // Compatibility-only hourly/deposit-era pricing values retained behind internal seams.
     int BaseRate { get; }
     IReadOnlyDictionary<TaskKind, int> TaskIncrements { get; }
     double AverageSpeedConstant { get; }

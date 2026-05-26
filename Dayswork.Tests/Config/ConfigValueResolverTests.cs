@@ -28,6 +28,61 @@ public sealed class ConfigValueResolverTests
     }
 
     [Fact]
+    public void ResolveOutdoorBandThreshold_FallsBackToDefault_WhenKeyMissing()
+    {
+        var defaults = (ConfigSnapshot)ConfigDefaults.Build();
+        var missingThresholds = defaults with
+        {
+            OutdoorBandThresholds = new ReadOnlyDictionary<OutdoorBandSize, int>(
+                new Dictionary<OutdoorBandSize, int>()),
+        };
+
+        var resolver = new ConfigValueResolver();
+        var actual = resolver.ResolveOutdoorBandThreshold(missingThresholds, OutdoorBandSize.Medium);
+
+        Assert.True(actual.UsedDefault);
+        Assert.Equal(defaults.OutdoorBandThresholds[OutdoorBandSize.Medium], actual.Value);
+    }
+
+    [Fact]
+    public void ResolveAnimalBuildingPrice_FallsBackToDefault_WhenKeyMissing()
+    {
+        var defaults = (ConfigSnapshot)ConfigDefaults.Build();
+        var missingPrices = defaults with
+        {
+            AnimalBuildingPrices = new ReadOnlyDictionary<AnimalBuildingPriceKey, int>(
+                new Dictionary<AnimalBuildingPriceKey, int>()),
+        };
+
+        var resolver = new ConfigValueResolver();
+        var key = new AnimalBuildingPriceKey(TaskKind.PetAnimals, AnimalBuildingTier.DeluxeBarn);
+
+        var actual = resolver.ResolveAnimalBuildingPrice(missingPrices, key);
+
+        Assert.True(actual.UsedDefault);
+        Assert.Equal(defaults.AnimalBuildingPrices[key], actual.Value);
+    }
+
+    [Fact]
+    public void ResolveGreenhouseServicePrice_FallsBackToDefault_WhenKeyMissing()
+    {
+        var defaults = (ConfigSnapshot)ConfigDefaults.Build();
+        var missingPrices = defaults with
+        {
+            GreenhouseServicePrices = new ReadOnlyDictionary<GreenhousePriceKey, int>(
+                new Dictionary<GreenhousePriceKey, int>()),
+        };
+
+        var resolver = new ConfigValueResolver();
+        var key = new GreenhousePriceKey(TaskKind.CollectFruit);
+
+        var actual = resolver.ResolveGreenhouseServicePrice(missingPrices, key);
+
+        Assert.True(actual.UsedDefault);
+        Assert.Equal(defaults.GreenhouseServicePrices[key], actual.Value);
+    }
+
+    [Fact]
     public void ResolveWorkerDailyEnergyCapacity_FallsBackToDefault_WhenInvalid()
     {
         var defaults = (ConfigSnapshot)ConfigDefaults.Build();

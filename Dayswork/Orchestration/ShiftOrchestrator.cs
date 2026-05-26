@@ -1093,15 +1093,10 @@ internal sealed class ShiftOrchestrator
         if (_farmhand is null || _ctx is null) return;
 
         bool isSwinging = Game1.player.UsingTool && Game1.player.CurrentTool is MeleeWeapon;
-
-        if (isSwinging && !_playerWasSwinging)
-        {
-            // Fresh swing — check if player is within range.
-            float dist = Math.Abs(_farmhand.TilePoint.X - Game1.player.TilePoint.X)
-                       + Math.Abs(_farmhand.TilePoint.Y - Game1.player.TilePoint.Y);
-            if (dist <= HitRangeTiles)
-                _farmhand.doEmote(EmoteExclamation); // one emote per swing — debounced by flag
-        }
+        float dist = Math.Abs(_farmhand.TilePoint.X - Game1.player.TilePoint.X)
+                   + Math.Abs(_farmhand.TilePoint.Y - Game1.player.TilePoint.Y);
+        if (HitReactionPolicy.ShouldTriggerEmote(isSwinging, _playerWasSwinging, dist, HitRangeTiles))
+            _farmhand.doEmote(EmoteExclamation);
 
         _playerWasSwinging = isSwinging;
     }

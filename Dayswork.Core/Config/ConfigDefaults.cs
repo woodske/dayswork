@@ -8,6 +8,7 @@ public static class ConfigDefaults
 {
     public static IConfigSnapshot Build()
     {
+        // Compatibility-only defaults retained for the legacy hourly/deposit bridge.
         var increments = new Dictionary<TaskKind, int>
         {
             [TaskKind.WaterCrops]            = 20,
@@ -66,7 +67,7 @@ public static class ConfigDefaults
         return ConfigSnapshotFactory.Create(
             baseRate: 50,
             taskIncrements: new ReadOnlyDictionary<TaskKind, int>(increments),
-            averageSpeedConstant: 0.3,  // pricing-min per raw tile per task; see U-05 HoursEstimator
+            averageSpeedConstant: 0.3,
             hardCapTime: 2000,
             stuckInitialWaitMinutes: 10,
             stuckPostTeleportWaitMinutes: 10,

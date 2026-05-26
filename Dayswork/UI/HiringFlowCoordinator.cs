@@ -229,6 +229,8 @@ internal sealed class HiringFlowCoordinator
     private (int depositAmount, int hourlyRate) BuildCompatibilityFinancialBridge(ContractDraft draft)
     {
         var compatibilityZones = LegacyScopeBootstrapper.ProjectCompatibilityZones(draft.ScopeSelection);
+        // Transitional persistence fields still expect the legacy hourly model, but the inputs now
+        // come only from internal compatibility defaults on the runtime snapshot, never from GMCM.
         var rate = _rateCalc.Calculate(draft.EnabledTasks, _configManager.CurrentSnapshot, isRaining: false);
         var hours = DepositHoursPolicy.EstimateBillableHours(
             compatibilityZones,
