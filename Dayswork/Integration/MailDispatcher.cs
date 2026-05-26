@@ -57,7 +57,7 @@ internal sealed class MailDispatcher : IMailDispatcher
         }
     }
 
-    public void QueueSettlement(IReadOnlyList<ItemStack> items, IReadOnlySet<OverflowReason> reasons, int refundGold)
+    public void QueueSettlement(IReadOnlyList<ItemStack> items, IReadOnlyList<OverflowCategory> categories, int refundGold)
     {
         bool hasItems = items.Count > 0;
         bool hasGold  = refundGold > 0;
@@ -73,10 +73,10 @@ internal sealed class MailDispatcher : IMailDispatcher
         }
 
         var sender = I18nHelper.Get("mail.sender");
-        var body   = BuildSettlementBody(reasons, refundGold, attachments.Count > 0);
+        var body   = BuildSettlementBody(categories, refundGold, attachments.Count > 0);
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][mail] queue settlement letter attachments={attachments.Count} refund={refundGold} reasons={string.Join(",", reasons.OrderBy(r => r))}.",
+            $"[Dayswork][mail] queue settlement letter attachments={attachments.Count} refund={refundGold} categories={string.Join(",", categories.Select(category => $"{category.Reason}:{category.ScopeFamily}:{category.ScopeName}"))}.",
             LogLevel.Debug);
         if (TrySendViaMfm(
             $"Dayswork.Settlement.{CurrentDay()}.{Guid.NewGuid():N}",
@@ -202,11 +202,11 @@ internal sealed class MailDispatcher : IMailDispatcher
 
     // Settlement body: the overflow reason lines (when items are attached) plus a refund line (when
     // gold is returned). "^" is the vanilla letter line-break token, honored by MFM. (FD-Q6=A reused.)
-    private static string BuildSettlementBody(IReadOnlySet<OverflowReason> reasons, int refundGold, bool hasItems)
+    private static string BuildSettlementBody(IReadOnlyList<OverflowCategory> categories, int refundGold, bool hasItems)
     {
         var sb = new StringBuilder();
         if (hasItems)
-            sb.Append(BuildOverflowBody(reasons));
+            sb.Append(BuildOverflowBody(categories));
 
         if (refundGold > 0)
         {
@@ -216,25 +216,35 @@ internal sealed class MailDispatcher : IMailDispatcher
         return sb.ToString();
     }
 
-    private static string BuildOverflowBody(IReadOnlySet<OverflowReason> reasons)
+    private static string BuildOverflowBody(IReadOnlyList<OverflowCategory> categories)
     {
         var sb = new StringBuilder();
         sb.Append(I18nHelper.Get("mail.overflow.intro"));
-        foreach (var reason in Enum.GetValues<OverflowReason>())
+        foreach (var category in categories)
         {
-            if (!reasons.Contains(reason)) continue;
             sb.Append("^");
-            sb.Append(reason switch
+            sb.Append(category.Reason switch
             {
-                OverflowReason.ChestFull       => I18nHelper.Get("mail.overflow.chest_full"),
-                OverflowReason.ChestMissing    => I18nHelper.Get("mail.overflow.chest_missing"),
-                OverflowReason.NoChestAssigned => I18nHelper.Get("mail.overflow.no_chest_assigned"),
-                OverflowReason.NotDelivered    => I18nHelper.Get("mail.overflow.not_delivered"),
+                OverflowReason.ChestFull => I18nHelper.Get("mail.overflow.chest_full", new { scope = DescribeScope(category) }),
+                OverflowReason.ChestMissing => I18nHelper.Get("mail.overflow.chest_missing", new { scope = DescribeScope(category) }),
+                OverflowReason.NoChestAssigned => I18nHelper.Get("mail.overflow.no_chest_assigned", new { scope = DescribeScope(category) }),
+                OverflowReason.NotDelivered => I18nHelper.Get("mail.overflow.not_delivered", new { scope = DescribeScope(category) }),
                 _ => string.Empty,
             });
         }
         return sb.ToString();
     }
+
+    private static string DescribeScope(OverflowCategory category) =>
+        category.ScopeFamily switch
+        {
+            OutputScopeFamily.Outdoor => I18nHelper.Get("mail.overflow.scope.outdoor"),
+            OutputScopeFamily.Greenhouse => I18nHelper.Get("mail.overflow.scope.greenhouse"),
+            OutputScopeFamily.AnimalBuilding when !string.IsNullOrWhiteSpace(category.ScopeName) =>
+                I18nHelper.Get("mail.overflow.scope.animal_building_named", new { location = category.ScopeName }),
+            OutputScopeFamily.AnimalBuilding => I18nHelper.Get("mail.overflow.scope.animal_buildings"),
+            _ => I18nHelper.Get("mail.overflow.scope.general"),
+        };
 
     private static int CurrentDay() => Game1.Date.TotalDays;
 }

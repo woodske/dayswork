@@ -2,6 +2,21 @@ namespace Dayswork.Core.Domain;
 
 public static class TaskKindSets
 {
+    public static IReadOnlyList<TaskKind> OutdoorCropServices { get; } = new[]
+    {
+        TaskKind.WaterCrops,
+        TaskKind.HarvestCrops,
+        TaskKind.CollectFruit,
+    };
+
+    public static IReadOnlyList<TaskKind> OutdoorClearingServices { get; } = new[]
+    {
+        TaskKind.CutTrees,
+        TaskKind.ClearRocks,
+        TaskKind.ClearWeeds,
+        TaskKind.ClearGrass,
+    };
+
     public static IReadOnlyList<TaskKind> OutdoorServices { get; } = new[]
     {
         TaskKind.WaterCrops,
@@ -32,6 +47,23 @@ public static class TaskKindSets
         TaskKind.WaterCrops => true,
         TaskKind.HarvestCrops => true,
         TaskKind.CollectFruit => true,
+        TaskKind.CutTrees => true,
+        TaskKind.ClearRocks => true,
+        TaskKind.ClearWeeds => true,
+        TaskKind.ClearGrass => true,
+        _ => false,
+    };
+
+    public static bool IsOutdoorCropService(TaskKind kind) => kind switch
+    {
+        TaskKind.WaterCrops => true,
+        TaskKind.HarvestCrops => true,
+        TaskKind.CollectFruit => true,
+        _ => false,
+    };
+
+    public static bool IsOutdoorClearingService(TaskKind kind) => kind switch
+    {
         TaskKind.CutTrees => true,
         TaskKind.ClearRocks => true,
         TaskKind.ClearWeeds => true,

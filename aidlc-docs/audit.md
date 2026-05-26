@@ -3675,3 +3675,115 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **Context**: CONSTRUCTION — Approval prompt for completed U-21 Code Generation
 
 ---
+
+## Code Generation — U-21 Review Approved
+**Timestamp**: 2026-05-26T02:22:09Z
+**User Input**: "approved and continue"
+**AI Response**: Marked the U-21 code-generation review gate approved, treated the response as authorization to advance to the next retrofit unit, and began U-22 Functional Design planning. Loaded the approved U-22 unit/story-map/requirements/application-design context plus the current animal, greenhouse, chest-resolution, deposit-planning, mail, and scope/output UI seams so the next question file would stay focused on typed-scope runtime alignment rather than pricing changes.
+**Context**: CONSTRUCTION — Transition from U-21 Code Generation review to U-22 Functional Design planning
+
+---
+
+## Functional Design — U-22 Question File Prepared
+**Timestamp**: 2026-05-26T02:22:10Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Created `aidlc-docs/construction/plans/u-22-scope-driven-runtime-alignment-functional-design-plan.md` and updated `aidlc-state.md` so the current stage points at the new functional-design question file. The user is being asked to fill in the `[Answer]:` tags for the U-22 decisions covering runtime scope authority, animal-building ownership, greenhouse execution, output-destination granularity, overflow/mail handling under typed scopes, legacy runtime fallback, and any needed scope-page wording.
+**Context**: CONSTRUCTION — Prompt for U-22 Functional Design answers
+
+---
+
+## Functional Design — U-22 Answers Applied
+**Timestamp**: 2026-05-26T02:31:33Z
+**User Input**: "done"
+**AI Response**: Read the completed U-22 functional-design question file and found the answers coherent with no clarification round required. The approved shape keeps `Contract.ScopeSelection` as the only supported runtime scope source, explicitly drops any need for an older-contract fallback path because the project is not yet live, keeps barns/coops as building-owned animal scopes, treats greenhouse work as its own crop batch ahead of outdoor crop/clearing work, preserves task-owned destinations, and upgrades overflow/unassigned-output mail to carry scope-aware categories. Generated the U-22 functional-design artifacts at `aidlc-docs/construction/u-22-scope-driven-runtime-alignment/functional-design/`, marked the plan checklist complete, and updated `aidlc-state.md` to the U-22 Functional Design review gate.
+**Context**: CONSTRUCTION — Functional Design completion for U-22 Scope-Driven Runtime Alignment
+
+---
+
+## Functional Design — U-22 Review Prompt
+**Timestamp**: 2026-05-26T02:31:34Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-22 functional-design review gate. The user is being asked to review the generated artifacts in `aidlc-docs/construction/u-22-scope-driven-runtime-alignment/functional-design/` and either request changes or continue to the next stage.
+**Context**: CONSTRUCTION — Approval prompt for U-22 Functional Design
+
+---
+
+## Functional Design — U-22 Review Approved
+**Timestamp**: 2026-05-26T02:38:34Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-22 Functional Design into U-22 NFR Requirements. Loaded the NFR Requirements stage rules plus the approved U-22 functional-design artifacts, identified the main NFR surface as lightweight scope planning, deterministic scope/mail shaping, safe unsupported-contract handling, and provenance-aware regression rigor, created `aidlc-docs/construction/plans/u-22-scope-driven-runtime-alignment-nfr-requirements-plan.md`, and updated `aidlc-state.md` so the current stage now points at the U-22 NFR-requirements question file.
+**Context**: CONSTRUCTION — Transition from U-22 Functional Design review to U-22 NFR Requirements planning
+
+---
+
+## NFR Requirements — U-22 Question File Prepared
+**Timestamp**: 2026-05-26T02:38:35Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-22 NFR-requirements question file. The user is being asked to fill in the `[Answer]:` tags for the U-22 quality-bar choices covering lightweight scope intake, determinism for normalized scope and scope-aware overflow categorization, fail-fast handling for unsupported contracts without typed scope, clarity expectations for richer overflow letters, and the desired example/property-test rigor.
+**Context**: CONSTRUCTION — Prompt for U-22 NFR Requirements answers
+
+---
+
+## NFR Requirements — U-22 Answers Applied
+**Timestamp**: 2026-05-26T02:42:21Z
+**User Input**: "done"
+**AI Response**: Read the completed U-22 NFR-requirements question file and found all five answers unambiguous (`A` throughout), so no clarification round was needed. Generated the U-22 NFR-requirements artifacts at `aidlc-docs/construction/u-22-scope-driven-runtime-alignment/nfr-requirements/` (`nfr-requirements.md` and `tech-stack-decisions.md`), marked the U-22 NFR plan checklist complete, and updated `aidlc-state.md` to the NFR Requirements review gate for U-22.
+**Context**: CONSTRUCTION — NFR Requirements completion for U-22 Scope-Driven Runtime Alignment
+
+---
+
+## NFR Requirements — U-22 Review Prompt
+**Timestamp**: 2026-05-26T02:42:22Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-22 NFR-requirements review gate. The user is being asked to review the generated artifacts in `aidlc-docs/construction/u-22-scope-driven-runtime-alignment/nfr-requirements/` and either request changes or continue to the next stage.
+**Context**: CONSTRUCTION — Approval prompt for U-22 NFR Requirements
+
+---
+
+## NFR Requirements — U-22 Review Approved
+**Timestamp**: 2026-05-26T02:52:44Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-22 NFR Requirements into U-22 NFR Design. Loaded the NFR Design stage rules plus the approved U-22 NFR-requirements and functional-design artifacts, confirmed that the approved quality bar already fixed the resilience, performance, determinism, security, and logical-component pattern set cleanly, created `aidlc-docs/construction/plans/u-22-scope-driven-runtime-alignment-nfr-design-plan.md`, generated the U-22 NFR design artifacts at `aidlc-docs/construction/u-22-scope-driven-runtime-alignment/nfr-design/`, and updated `aidlc-state.md` to the U-22 NFR Design review gate.
+**Context**: CONSTRUCTION — NFR Design completion for U-22 Scope-Driven Runtime Alignment
+
+---
+
+## NFR Design — U-22 Review Prompt
+**Timestamp**: 2026-05-26T02:52:45Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-22 NFR-design review gate. The user is being asked to review the generated artifacts in `aidlc-docs/construction/u-22-scope-driven-runtime-alignment/nfr-design/` and either request changes or continue to the next stage.
+**Context**: CONSTRUCTION — Approval prompt for U-22 NFR Design
+
+---
+
+## NFR Design — U-22 Review Approved
+**Timestamp**: 2026-05-26T03:02:01Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to move from U-22 NFR Design into U-22 Code Generation planning. Loaded the Code Generation stage rules plus the approved U-22 functional-design, NFR-requirements, and NFR-design artifacts; inspected the live runtime scope, batch, routing, mail, and UI seams (`ShiftOrchestrator`, `ShiftPlanBuilder`, `WorkScopeClassifier`, `DepositPlanner`, `MailDispatcher`, `IMailDispatcher`, `AnimalTaskHandler`, and `ZoneAndChestMenu`) so the plan could name the real retrofit cuts; created `aidlc-docs/construction/plans/u-22-scope-driven-runtime-alignment-code-generation-plan.md`; and updated `aidlc-state.md` to the U-22 Code Generation planning review gate.
+**Context**: CONSTRUCTION — Transition from U-22 NFR Design review to U-22 Code Generation planning
+
+---
+
+## Code Generation — U-22 Plan Review Prompt
+**Timestamp**: 2026-05-26T03:02:02Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-22 code-generation planning review gate. The user is being asked to review `aidlc-docs/construction/plans/u-22-scope-driven-runtime-alignment-code-generation-plan.md` and either request changes or continue to Code Generation Part 2.
+**Context**: CONSTRUCTION — Approval prompt for U-22 Code Generation plan
+
+---
+
+## Code Generation — U-22 Plan Approved
+**Timestamp**: 2026-05-26T04:22:27Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to execute U-22 Code Generation Part 2. Implemented the typed-scope runtime cutover across `Dayswork.Core`, `ShiftOrchestrator`, and the mail/routing seams; added the new provenance and overflow-categorization model; aligned animal-building, greenhouse, and outdoor batch execution to the approved design; refreshed the scope-page wording; and expanded regression/property coverage with a dedicated `Dayswork.Tests/U22` area. Verification succeeded with `dotnet build Dayswork.sln /p:EnableModDeploy=false` and `dotnet test Dayswork.sln`.
+**Context**: CONSTRUCTION — U-22 Code Generation execution and verification
+
+---
+
+## Code Generation — U-22 Review Prompt
+**Timestamp**: 2026-05-26T04:22:28Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the U-22 code-generation review gate. The user is being asked to review the generated application changes in `C:\Users\kwood\Repos\dayswork` and the documentation summary in `aidlc-docs/construction/u-22-scope-driven-runtime-alignment/code/`, then either request changes or continue to the next stage.
+**Context**: CONSTRUCTION — Approval prompt for completed U-22 Code Generation
+
+---

@@ -186,7 +186,8 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
             b,
             I18nHelper.Get("ui.zone_chest.animal_section_label"),
             FormatAnimalScopeSummary(),
-            new Vector2(xPositionOnScreen + 48, yPositionOnScreen + 280));
+            new Vector2(xPositionOnScreen + 48, yPositionOnScreen + 280),
+            I18nHelper.Get("ui.zone_chest.animal_scope_detail"));
 
         DrawScopeSection(
             b,
@@ -196,17 +197,20 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
                 : I18nHelper.Get(
                     "ui.zone_chest.greenhouse_selected",
                     new { location = _draft.PreviewState.ScopeSummary.Greenhouse.LocationName }),
-            new Vector2(xPositionOnScreen + 48, yPositionOnScreen + 370));
+            new Vector2(xPositionOnScreen + 48, yPositionOnScreen + 400),
+            I18nHelper.Get("ui.zone_chest.greenhouse_scope_detail"));
 
         DrawButton(b, _confirmBtn, enabled: true);
         DrawButton(b, _backBtn, enabled: true);
         drawMouse(b);
     }
 
-    private void DrawScopeSection(SpriteBatch b, string label, string value, Vector2 position)
+    private void DrawScopeSection(SpriteBatch b, string label, string value, Vector2 position, string? detail = null)
     {
         Utility.drawTextWithShadow(b, label, Game1.smallFont, position, Game1.textColor);
         Utility.drawTextWithShadow(b, value, Game1.smallFont, position + new Vector2(0, 22), SecondaryTextColor);
+        if (!string.IsNullOrWhiteSpace(detail))
+            Utility.drawTextWithShadow(b, detail, Game1.smallFont, position + new Vector2(0, 44), SecondaryTextColor * 0.9f);
     }
 
     private bool HasSelectedScope() =>

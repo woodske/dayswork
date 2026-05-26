@@ -11,4 +11,9 @@ namespace Dayswork.Core.Shifts;
 /// like trees, rocks, and weeds, NavTile is a reachable orthogonal neighbour and
 /// TaskTile is the tile the action targets.
 /// </summary>
-public sealed record WorkItem(TileCoord NavTile, TileCoord TaskTile, TaskKind Task, string LocationName = "Farm");
+public sealed record WorkItem(
+    TileCoord NavTile,
+    TileCoord TaskTile,
+    TaskKind Task,
+    string LocationName = "Farm",
+    OutputScopeProvenance? Provenance = null);

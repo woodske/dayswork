@@ -11,13 +11,13 @@ public sealed record ItemStack(string QualifiedItemId, int Quantity);
 public sealed record DepositTrip(
     DestinationKey Destination,
     TileCoord Tile,
-    IReadOnlyList<ItemStack> Items);
+    IReadOnlyList<RoutedItemStack> Items);
 
 // The complete routing result for a shift's buffer (Pattern M).
 // Conservation invariant: items across Trips[*].Items ∪ PreMailedOverflow == input snapshot.
 public sealed record DepositPlan(
     IReadOnlyList<DepositTrip> Trips,
-    IReadOnlyList<ItemStack> PreMailedOverflow);
+    IReadOnlyList<RoutedItemStack> PreMailedOverflow);
 
 // Why an item ended up mailed rather than deposited. Drives the overflow letter body (FD-Q6=A).
 public enum OverflowReason
@@ -29,4 +29,4 @@ public enum OverflowReason
 }
 
 // An undeliverable item plus the reason; the union becomes the single overflow letter (Pattern O).
-public sealed record OverflowItem(ItemStack Stack, OverflowReason Reason);
+public sealed record OverflowItem(RoutedItemStack Stack, OverflowReason Reason);

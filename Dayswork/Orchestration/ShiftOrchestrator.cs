@@ -2,6 +2,7 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
+using Dayswork.Core.Pricing;
 using Dayswork.Core.Shifts;
 using Dayswork.Integration;
 using Dayswork.Worker;
@@ -39,6 +40,7 @@ internal sealed class ShiftOrchestrator
     private readonly ToolSwapAnimator     _toolAnimator;
     private readonly ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
     private readonly ShiftPlanBuilder     _shiftPlanBuilder = new();
+    private readonly IWorkScopeClassifier _scopeClassifier;
     private IConfigSnapshot               _config;
     private readonly WorkerMovementDriver _nav;
     private readonly WorkAreaScanner      _workAreaScanner;
@@ -50,6 +52,7 @@ internal sealed class ShiftOrchestrator
     private readonly IMailDispatcher      _mailDispatcher;
     private readonly WorkerEnergyLedger _energyLedger = new();
     private readonly WorkUnitBoundaryClassifier _boundaryClassifier = new();
+    private readonly OverflowCategorizer _overflowCategorizer = new();
 
     private ShiftContext? _ctx;
     private FarmhandNpc?  _farmhand;
@@ -69,6 +72,7 @@ internal sealed class ShiftOrchestrator
     private TaskKind  _pendingTask;
     private TileCoord _pendingNavTile;
     private TileCoord _pendingTaskTile;
+    private OutputScopeProvenance _pendingOutputProvenance = OutputScopeProvenance.Unknown;
     private bool      _waitingForDebrisBeforeDeposit;
     private bool      _pendingBuildingEntry;
     private bool      _pendingBuildingExit;
@@ -99,6 +103,7 @@ internal sealed class ShiftOrchestrator
     public ShiftOrchestrator(
         ToolLevelReader toolReader,
         IConfigSnapshot config,
+        IWorkScopeClassifier scopeClassifier,
         ToolSwapAnimator toolAnimator,
         WorkerMovementDriver nav,
         WorkAreaScanner workAreaScanner,
@@ -111,6 +116,7 @@ internal sealed class ShiftOrchestrator
     {
         _toolReader        = toolReader;
         _config            = config;
+        _scopeClassifier   = scopeClassifier;
         _toolAnimator      = toolAnimator;
         _nav               = nav;
         _workAreaScanner   = workAreaScanner;
@@ -359,12 +365,22 @@ internal sealed class ShiftOrchestrator
 
         var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
+        var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
+        if (runtimeScopeSelection is null)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Contract {contract.Id.Value} has no authoritative typed scope selection; refusing to start runtime execution.",
+                LogLevel.Warn);
+            return;
+        }
+
+        var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks);
 
         _farmExitTile = FindFarmExitTile(farm);
-        var batches = BuildInitialBatches(contract, farm, snapshot);
+        var batches = BuildInitialBatches(contract, workScopes, farm, snapshot);
 
         if (batches.Count == 0 ||
-            batches.All(batch => batch.Kind == BatchKind.OutdoorFarm &&
+            batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing &&
                                  batch.TileWork.Count == 0 &&
                                  batch.AnimalWork.Count == 0 &&
                                  !batch.FeedBuilding))
@@ -398,10 +414,11 @@ internal sealed class ShiftOrchestrator
         _currentAnimalWork = null;
         _pendingDebrisSweeps.Clear();
         _pendingBeatOutcome = null;
+        _pendingOutputProvenance = OutputScopeProvenance.Unknown;
 
         _ctx = new ShiftContext(
             contractId:       contract.Id,
-            zones:            contract.Zones,
+            workScopes:       workScopes,
             enabledTasks:     contract.EnabledTasks,
             taskDestinations: contract.TaskDestinations,
             contractTerms:    contractTerms,
@@ -416,46 +433,100 @@ internal sealed class ShiftOrchestrator
         BeginCurrentBatch();
     }
 
-    private IReadOnlyList<WorkBatch> BuildInitialBatches(Contract contract, Farm farm, ToolSnapshot snapshot)
+    private static ContractScopeSelection? NormalizeRuntimeScopeSelection(
+        ContractScopeSelection? selection,
+        Farm farm)
     {
-        var normalizedZones = contract.Zones
-            .Select(zone => zone.LocationName == "Farm"
-                ? zone
-                : zone with { LocationName = BuildingLocationResolver.NormalizeLocationName(farm, zone.LocationName) })
+        if (selection is null)
+            return null;
+
+        var outdoorZones = selection.OutdoorZones
+            .Select(zone => zone with { LocationName = "Farm" })
             .ToList();
 
-        ModEntry.ModMonitor.Log(
-            "[Dayswork][shift-plan] zones=" +
-            string.Join("; ", contract.Zones.Zip(normalizedZones, (raw, normalized) =>
-                $"{raw.LocationName}->{normalized.LocationName}")),
-            LogLevel.Info);
+        var animalBuildings = selection.AnimalBuildings
+            .Select(building => building with
+            {
+                LocationName = BuildingLocationResolver.NormalizeLocationName(farm, building.LocationName),
+            })
+            .Where(building => !string.IsNullOrWhiteSpace(building.LocationName))
+            .Distinct()
+            .OrderBy(building => building.LocationName, StringComparer.Ordinal)
+            .ThenBy(building => building.Tier)
+            .ToList();
 
-        var skeletons = _shiftPlanBuilder.BuildBatchPlan(normalizedZones, contract.EnabledTasks, IsAnimalHouseLocation);
-        var selectedAnimalHomes = skeletons
-            .Where(batch => batch.Kind == BatchKind.AnimalBuilding)
-            .Select(batch => batch.LocationName)
+        var greenhouse = selection.Greenhouse is null
+            ? null
+            : new GreenhouseSelection(BuildingLocationResolver.NormalizeLocationName(farm, selection.Greenhouse.LocationName));
+
+        return new ContractScopeSelection(outdoorZones, animalBuildings, greenhouse);
+    }
+
+    private IReadOnlyList<WorkBatch> BuildInitialBatches(
+        Contract contract,
+        WorkScopeSet workScopes,
+        Farm farm,
+        ToolSnapshot snapshot)
+    {
+        var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks);
+        var selectedAnimalHomes = workScopes.AnimalBuildings
+            .Select(building => building.LocationName)
             .ToHashSet(StringComparer.Ordinal);
-
-        var outdoorZones = normalizedZones
-            .Where(zone => zone.LocationName == "Farm")
-            .ToList();
+        var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
+        var outdoorProvenance = OutputScopeProvenance.Outdoor();
+        var greenhouseLocation = workScopes.GreenhouseWork?.LocationName ?? "Greenhouse";
 
         var batches = new List<WorkBatch>(skeletons.Count);
         foreach (var batch in skeletons)
         {
-            if (batch.Kind != BatchKind.OutdoorFarm)
+            switch (batch.Kind)
             {
-                batches.Add(batch);
-                continue;
-            }
+                case BatchKind.AnimalBuilding:
+                case BatchKind.Greenhouse:
+                    batches.Add(batch);
+                    break;
 
-            var tileWork = outdoorZones.Count == 0
-                ? Array.Empty<WorkItem>()
-                : _workAreaScanner.ScanZones(farm, outdoorZones, contract.EnabledTasks, snapshot, _farmExitTile);
-            var animalWork = BuildAnimalWork(farm, selectedAnimalHomes, contract.EnabledTasks);
-            batches.Add(batch with { TileWork = tileWork, AnimalWork = animalWork });
+                case BatchKind.OutdoorAnimals:
+                {
+                    var batchTasks = batch.Tasks.ToHashSet();
+                    var tileWork = batchTasks.Contains(TaskKind.CollectAnimalProducts)
+                        ? _workAreaScanner.ScanWholeLocation(
+                            farm,
+                            batchTasks,
+                            snapshot,
+                            _farmExitTile,
+                            OutputScopeProvenance.AnimalBuilding(string.Empty))
+                        : Array.Empty<WorkItem>();
+                    var animalWork = BuildAnimalWork(farm, selectedAnimalHomes, batchTasks);
+                    batches.Add(batch with { TileWork = tileWork, AnimalWork = animalWork });
+                    break;
+                }
+
+                case BatchKind.OutdoorCrops:
+                case BatchKind.OutdoorClearing:
+                {
+                    var batchTasks = batch.Tasks.ToHashSet();
+                    var tileWork = outdoorZones.Count == 0
+                        ? Array.Empty<WorkItem>()
+                        : _workAreaScanner.ScanZones(
+                            farm,
+                            outdoorZones,
+                            batchTasks,
+                            snapshot,
+                            _farmExitTile,
+                            outdoorProvenance);
+                    batches.Add(batch with { TileWork = tileWork });
+                    break;
+                }
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(batch.Kind), batch.Kind, null);
+            }
         }
 
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][shift-plan] runtime batches={string.Join(", ", batches.Select(batch => $"{batch.Kind}:{batch.LocationName}:{string.Join("/", batch.Tasks)}"))} greenhouse={greenhouseLocation} outdoorTiles={outdoorZones.Count}.",
+            LogLevel.Info);
         return batches;
     }
 
@@ -470,11 +541,15 @@ internal sealed class ShiftOrchestrator
         var work = new List<AnimalWorkItem>();
         foreach (var (animalRef, liveAnimal) in _animalHandler.EnumerateAnimals(location, selectedAnimalHomes))
         {
+            var provenance = string.IsNullOrWhiteSpace(animalRef.HomeLocation)
+                ? OutputScopeProvenance.AnimalBuilding(string.Empty)
+                : OutputScopeProvenance.AnimalBuilding(animalRef.HomeLocation);
+
             if (enabledTasks.Contains(TaskKind.PetAnimals) && _animalHandler.ShouldPet(liveAnimal))
-                work.Add(new AnimalWorkItem(location.Name, animalRef, TaskKind.PetAnimals));
+                work.Add(new AnimalWorkItem(location.Name, animalRef, TaskKind.PetAnimals, provenance));
 
             if (enabledTasks.Contains(TaskKind.CollectAnimalProducts) && _animalHandler.HasToolHarvestReady(liveAnimal))
-                work.Add(new AnimalWorkItem(location.Name, animalRef, TaskKind.CollectAnimalProducts));
+                work.Add(new AnimalWorkItem(location.Name, animalRef, TaskKind.CollectAnimalProducts, provenance));
         }
 
         return work
@@ -506,7 +581,7 @@ internal sealed class ShiftOrchestrator
         }
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
-        if (batch.Kind != BatchKind.OutdoorFarm)
+        if (BatchRequiresInteriorEntry(batch))
         {
             if (!_buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out var interior))
             {
@@ -527,22 +602,22 @@ internal sealed class ShiftOrchestrator
         }
 
         _currentLocation = Game1.getFarm();
-        batch = RefreshOutdoorAnimalWork(batch, _currentLocation);
+        if (batch.Kind == BatchKind.OutdoorAnimals)
+            batch = RefreshOutdoorAnimalWork(batch, _currentLocation);
         QueueBatchWork(batch, _currentLocation);
         StartNextAnimalOrTileOrAdvance();
     }
 
     private WorkBatch RefreshOutdoorAnimalWork(WorkBatch batch, GameLocation farm)
     {
-        if (_ctx is null || batch.Kind != BatchKind.OutdoorFarm)
+        if (_ctx is null || batch.Kind != BatchKind.OutdoorAnimals)
             return batch;
 
-        var selectedAnimalHomes = _ctx.Batches
-            .Where(candidate => candidate.Kind == BatchKind.AnimalBuilding)
+        var selectedAnimalHomes = _ctx.WorkScopes.AnimalBuildings
             .Select(candidate => candidate.LocationName)
             .ToHashSet(StringComparer.Ordinal);
 
-        var refreshedAnimalWork = BuildAnimalWork(farm, selectedAnimalHomes, _ctx.EnabledTasks);
+        var refreshedAnimalWork = BuildAnimalWork(farm, selectedAnimalHomes, batch.Tasks.ToHashSet());
         ModEntry.ModMonitor.Log(
             $"[Dayswork][outdoor-animals] refreshed homes={selectedAnimalHomes.Count} animalWork={refreshedAnimalWork.Count}.",
             refreshedAnimalWork.Count == 0 ? LogLevel.Debug : LogLevel.Info);
@@ -562,21 +637,44 @@ internal sealed class ShiftOrchestrator
         _pendingBuildingEntry = false;
         _pendingBuildingInterior = null;
 
-        var tileWork = _indoorScanner.ScanInterior(interior, _ctx.EnabledTasks, _ctx.ToolSnapshot);
-        if (batch.FeedBuilding)
+        IReadOnlyList<WorkItem> tileWork;
+        IReadOnlyList<AnimalWorkItem> animalWork;
+        var batchTasks = batch.Tasks.ToHashSet();
+
+        if (batch.Kind == BatchKind.AnimalBuilding)
         {
-            _currentFeedPlan = _animalHandler.CreateFeedWork(interior);
-            tileWork = _currentFeedPlan.WorkItems.Concat(tileWork).ToList();
-            _hayInHand = 0;
+            tileWork = _indoorScanner.ScanInterior(
+                interior,
+                batchTasks,
+                _ctx.ToolSnapshot,
+                OutputScopeProvenance.AnimalBuilding(batch.LocationName));
+            if (batch.FeedBuilding)
+            {
+                _currentFeedPlan = _animalHandler.CreateFeedWork(interior);
+                tileWork = _currentFeedPlan.WorkItems.Concat(tileWork).ToList();
+                _hayInHand = 0;
+            }
+            else
+            {
+                _currentFeedPlan = null;
+                _hayInHand = 0;
+            }
+
+            var selectedHome = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
+            animalWork = BuildAnimalWork(interior, selectedHome, batchTasks);
         }
         else
         {
             _currentFeedPlan = null;
             _hayInHand = 0;
+            tileWork = _indoorScanner.ScanInterior(
+                interior,
+                batchTasks,
+                _ctx.ToolSnapshot,
+                OutputScopeProvenance.Greenhouse(batch.LocationName));
+            animalWork = Array.Empty<AnimalWorkItem>();
         }
 
-        var selectedHome = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
-        var animalWork = BuildAnimalWork(interior, selectedHome, _ctx.EnabledTasks);
         QueueBatchWork(batch with { TileWork = tileWork, AnimalWork = animalWork }, interior);
         StartNextAnimalOrTileOrAdvance();
     }
@@ -647,6 +745,7 @@ internal sealed class ShiftOrchestrator
             _pendingTask = next.Task;
             _pendingNavTile = navTile.Value;
             _pendingTaskTile = _animalHandler.CurrentTile(animal);
+            _pendingOutputProvenance = next.Provenance;
             _toolAnimator.StopSwing();
             _toolAnimator.OnTaskChanged(_pendingTask, next.Task);
             EnsureWorkingIntent(new IntentMoveToTile(navTile.Value));
@@ -663,6 +762,7 @@ internal sealed class ShiftOrchestrator
         _pendingTask = next.Task;
         _pendingNavTile = next.NavTile;
         _pendingTaskTile = next.TaskTile;
+        _pendingOutputProvenance = next.Provenance ?? OutputScopeProvenance.Unknown;
         _currentAnimalWork = null;
         _toolAnimator.StopSwing();
         _toolAnimator.OnTaskChanged(previousTask, next.Task);
@@ -676,7 +776,7 @@ internal sealed class ShiftOrchestrator
             return;
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
-        if (batch.Kind != BatchKind.OutdoorFarm)
+        if (BatchRequiresInteriorEntry(batch))
         {
             var interior = _currentLocation;
             if (interior is not null && interior != Game1.getFarm())
@@ -703,7 +803,7 @@ internal sealed class ShiftOrchestrator
             return;
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
-        if (batch.Kind != BatchKind.OutdoorFarm)
+        if (BatchRequiresInteriorEntry(batch))
         {
             _buildingNavigator.ExitToFarm(_farmhand, _pendingBuildingOutdoorDoor);
             _currentLocation = Game1.getFarm();
@@ -1183,7 +1283,7 @@ internal sealed class ShiftOrchestrator
         if (_toolAnimator.IsSwinging)
             return;
 
-        _animalHandler.TryCollect(animal, _ctx!.Buffer);
+        _animalHandler.TryCollect(animal, _ctx!.Buffer, _currentAnimalWork?.Provenance ?? _pendingOutputProvenance);
         _actionPending = false;
         _currentAnimalWork = null;
         FinishResolvedAnimalWork(location);
@@ -1260,7 +1360,7 @@ internal sealed class ShiftOrchestrator
         }
     }
 
-    private void DepositIntoChest(Chest chest, ItemStack stack)
+    private void DepositIntoChest(Chest chest, RoutedItemStack stack)
     {
         var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
         if (item is null)
@@ -1272,7 +1372,8 @@ internal sealed class ShiftOrchestrator
         {
             // Chest full (FR-OUT-02): mail the remainder (ChestFull).
             _ctx!.Overflow.Add(new OverflowItem(
-                new ItemStack(stack.QualifiedItemId, leftover.Stack), OverflowReason.ChestFull));
+                new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance),
+                OverflowReason.ChestFull));
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][deposit] chest full; {leftover.Stack}x {stack.QualifiedItemId} → mail.",
                 LogLevel.Debug);
@@ -1455,6 +1556,7 @@ internal sealed class ShiftOrchestrator
             : null;
 
         var exitTile = batch is not null &&
+                       BatchRequiresInteriorEntry(batch) &&
                        _buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out _)
             ? outdoorDoor
             : _farmExitTile;
@@ -1462,6 +1564,9 @@ internal sealed class ShiftOrchestrator
         _buildingNavigator.ExitToFarm(_farmhand, exitTile);
         _currentLocation = farm;
     }
+
+    private static bool BatchRequiresInteriorEntry(WorkBatch batch) =>
+        batch.Kind is BatchKind.AnimalBuilding or BatchKind.Greenhouse;
 
     // ── Overflow / mail helpers (Pattern O) ───────────────────────────────────
 
@@ -1474,9 +1579,9 @@ internal sealed class ShiftOrchestrator
         IReadOnlyList<ItemStack> items = _ctx.Overflow.Count > 0
             ? ConsolidateOverflow(_ctx.Overflow)
             : Array.Empty<ItemStack>();
-        var reasons = _ctx.Overflow.Select(o => o.Reason).ToHashSet();
+        var categories = _overflowCategorizer.Categorize(_ctx.Overflow);
 
-        _mailDispatcher.QueueSettlement(items, reasons, refundGold);
+        _mailDispatcher.QueueSettlement(items, categories, refundGold);
         _ctx.Overflow.Clear();
     }
 
@@ -1486,7 +1591,10 @@ internal sealed class ShiftOrchestrator
         foreach (var o in overflow)
             totals[o.Stack.QualifiedItemId] =
                 totals.TryGetValue(o.Stack.QualifiedItemId, out var e) ? e + o.Stack.Quantity : o.Stack.Quantity;
-        return totals.Select(kv => new ItemStack(kv.Key, kv.Value)).ToList();
+        return totals
+            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => new ItemStack(kv.Key, kv.Value))
+            .ToList();
     }
 
     // Moves everything still undelivered (buffer + in-flight trip + queued trips) into the overflow
@@ -1497,7 +1605,8 @@ internal sealed class ShiftOrchestrator
 
         foreach (var b in _ctx.Buffer.TakeAll())
             _ctx.Overflow.Add(new OverflowItem(
-                new ItemStack(b.QualifiedItemId, b.Quantity), OverflowReason.NotDelivered));
+                new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance),
+                OverflowReason.NotDelivered));
 
         if (_currentTrip is not null)
         {
@@ -1641,14 +1750,14 @@ internal sealed class ShiftOrchestrator
             if (!inventoryBefore.TryGetValue(item, out var oldStack))
             {
                 // Brand-new slot added by harvest — take the whole stack.
-                _ctx!.Buffer.Add(item.QualifiedItemId, item.Stack, TaskKind.HarvestCrops);
+                _ctx!.Buffer.Add(item.QualifiedItemId, item.Stack, TaskKind.HarvestCrops, _pendingOutputProvenance);
                 Game1.player.removeItemFromInventory(item);
             }
             else if (item.Stack > oldStack)
             {
                 // Existing slot grew (stacked onto items the player already had).
                 var gain = item.Stack - oldStack;
-                _ctx!.Buffer.Add(item.QualifiedItemId, gain, TaskKind.HarvestCrops);
+                _ctx!.Buffer.Add(item.QualifiedItemId, gain, TaskKind.HarvestCrops, _pendingOutputProvenance);
                 item.Stack -= gain;
                 if (item.Stack <= 0)
                     Game1.player.removeItemFromInventory(item);
@@ -1665,7 +1774,7 @@ internal sealed class ShiftOrchestrator
             dirt.state.Value = HoeDirt.watered;
 
         // Also collect any debris-spawned items (in case harvest used the debris path).
-        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
+        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
         return new LaborBeatOutcome(true, true);
     }
 
@@ -1676,7 +1785,7 @@ internal sealed class ShiftOrchestrator
             return new LaborBeatOutcome(true, true);
         var before = new HashSet<Debris>(loc.debris);
         tree.shake(tileVec, false);
-        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
+        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
         return new LaborBeatOutcome(true, true);
     }
 
@@ -1687,7 +1796,7 @@ internal sealed class ShiftOrchestrator
             !WorkAreaScanner.IsAnimalProductForageObject(obj))
             return new LaborBeatOutcome(true, true);
 
-        _ctx!.Buffer.Add(obj.QualifiedItemId, Math.Max(1, obj.Stack), TaskKind.CollectAnimalProducts);
+        _ctx!.Buffer.Add(obj.QualifiedItemId, Math.Max(1, obj.Stack), TaskKind.CollectAnimalProducts, _pendingOutputProvenance);
         loc.removeObject(tileVec, false);
         return new LaborBeatOutcome(true, true);
     }
@@ -1722,7 +1831,7 @@ internal sealed class ShiftOrchestrator
         obj.performToolAction(scythe);
         if (loc.objects.ContainsKey(tileVec))
             loc.removeObject(tileVec, false);
-        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
+        CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
         return new LaborBeatOutcome(true, true);
     }
 
@@ -1753,7 +1862,7 @@ internal sealed class ShiftOrchestrator
             // spawn all loot drops, then returns true. Never call destroy() again.
             var beforeClump = new HashSet<Debris>(loc.debris);
             var destroyed   = clump.performToolAction(pickaxe, 0, clump.Tile);
-            CollectNewDebrisAtTile(beforeClump, loc, _pendingTask, clump.Tile);
+            CollectNewDebrisAtTile(beforeClump, loc, _pendingTask, clump.Tile, _pendingOutputProvenance);
 
             if (destroyed)
                 loc.resourceClumps.Remove(clump);
@@ -1772,10 +1881,10 @@ internal sealed class ShiftOrchestrator
         ModEntry.ModMonitor.Log(
             $"[Dayswork][action] clear rock at ({tile.X},{tile.Y}) performToolAction={actionRemoved} removed={removed}.",
             LogLevel.Debug);
-        var collectedDebris = CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
+        var collectedDebris = CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
         if (!collectedDebris && removed && TryGetRemovedStandardStoneDrop(obj, out var itemId, out var stack))
         {
-            _ctx.Buffer.Add(itemId, stack, _pendingTask);
+            _ctx.Buffer.Add(itemId, stack, _pendingTask, _pendingOutputProvenance);
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][debris] collected {stack}x {itemId} from removed standard stone object task={_pendingTask}.",
                 LogLevel.Debug);
@@ -1799,9 +1908,9 @@ internal sealed class ShiftOrchestrator
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][action] cut tree at ({tile.X},{tile.Y}) remove={removeTree} health={tree.health.Value:0.##} stump={tree.stump.Value}.",
                 LogLevel.Debug);
-            CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
+            CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
             if (!wasStump && !removeTree)
-                QueueDelayedDebrisSweep(loc, tileVec, before, _pendingTask);
+                QueueDelayedDebrisSweep(loc, tileVec, before, _pendingTask, _pendingOutputProvenance);
 
             if (!wasStump && tree.stump.Value)
                 return new LaborBeatOutcome(true, false);
@@ -1813,7 +1922,7 @@ internal sealed class ShiftOrchestrator
         {
             var beforeClump = new HashSet<Debris>(loc.debris);
             var destroyed   = clump.performToolAction(axe, 0, clump.Tile);
-            CollectNewDebrisAtTile(beforeClump, loc, _pendingTask, clump.Tile);
+            CollectNewDebrisAtTile(beforeClump, loc, _pendingTask, clump.Tile, _pendingOutputProvenance);
             if (destroyed)
                 loc.resourceClumps.Remove(clump);
             return new LaborBeatOutcome(destroyed, destroyed);
@@ -1825,7 +1934,7 @@ internal sealed class ShiftOrchestrator
             obj.performToolAction(axe);
             if (loc.objects.ContainsKey(tileVec))
                 loc.removeObject(tileVec, false);
-            CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec);
+            CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
             return new LaborBeatOutcome(true, true);
         }
 
@@ -1836,20 +1945,23 @@ internal sealed class ShiftOrchestrator
         HashSet<Debris> before,
         GameLocation loc,
         TaskKind sourceTask,
-        Vector2 tileVec) =>
+        Vector2 tileVec,
+        OutputScopeProvenance provenance) =>
         CollectNewDebris(
             before,
             loc,
             sourceTask,
             new Vector2(tileVec.X * 64f + 32f, tileVec.Y * 64f + 32f),
-            ImmediateDebrisSweepRadiusTiles);
+            ImmediateDebrisSweepRadiusTiles,
+            provenance);
 
     private bool CollectNewDebris(
         HashSet<Debris> before,
         GameLocation loc,
         TaskKind sourceTask,
         Vector2? origin = null,
-        int radiusTiles = int.MaxValue)
+        int radiusTiles = int.MaxValue,
+        OutputScopeProvenance? provenance = null)
     {
         bool collected = false;
         foreach (var d in loc.debris.ToList())
@@ -1859,7 +1971,7 @@ internal sealed class ShiftOrchestrator
                 !TryGetDebrisItem(d, out var itemId, out var stack))
                 continue;
 
-            _ctx!.Buffer.Add(itemId, stack, sourceTask);
+            _ctx!.Buffer.Add(itemId, stack, sourceTask, provenance ?? OutputScopeProvenance.Unknown);
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][debris] collected {stack}x {itemId} from game debris task={sourceTask} chunks={d.Chunks.Count} debrisType={d.debrisType.Value} chunkType={d.chunkType.Value}.",
                 LogLevel.Debug);
@@ -1907,7 +2019,12 @@ internal sealed class ShiftOrchestrator
         return false;
     }
 
-    private void QueueDelayedDebrisSweep(GameLocation loc, Vector2 tileVec, HashSet<Debris> baseline, TaskKind sourceTask)
+    private void QueueDelayedDebrisSweep(
+        GameLocation loc,
+        Vector2 tileVec,
+        HashSet<Debris> baseline,
+        TaskKind sourceTask,
+        OutputScopeProvenance provenance)
     {
         var origin = new Vector2(tileVec.X * 64f + 32f, tileVec.Y * 64f + 32f);
         _pendingDebrisSweeps.Add(new PendingDebrisSweep(
@@ -1916,7 +2033,8 @@ internal sealed class ShiftOrchestrator
             baseline,
             DelayedTreeDebrisSweepTicks,
             DelayedTreeDebrisSweepRadiusTiles,
-            sourceTask));
+            sourceTask,
+            provenance));
     }
 
     private void ProcessPendingDebrisSweeps()
@@ -1924,7 +2042,7 @@ internal sealed class ShiftOrchestrator
         for (var i = _pendingDebrisSweeps.Count - 1; i >= 0; i--)
         {
             var sweep = _pendingDebrisSweeps[i];
-            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles);
+            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles, sweep.Provenance);
             sweep.TicksRemaining--;
             if (sweep.TicksRemaining <= 0)
                 _pendingDebrisSweeps.RemoveAt(i);
@@ -1934,7 +2052,7 @@ internal sealed class ShiftOrchestrator
     private void FlushPendingDebrisSweeps()
     {
         foreach (var sweep in _pendingDebrisSweeps)
-            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles);
+            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles, sweep.Provenance);
 
         _pendingDebrisSweeps.Clear();
     }
@@ -2004,7 +2122,8 @@ internal sealed class ShiftOrchestrator
             HashSet<Debris> baseline,
             int ticksRemaining,
             int radiusTiles,
-            TaskKind sourceTask)
+            TaskKind sourceTask,
+            OutputScopeProvenance provenance)
         {
             Location = location;
             Origin = origin;
@@ -2012,6 +2131,7 @@ internal sealed class ShiftOrchestrator
             TicksRemaining = ticksRemaining;
             RadiusTiles = radiusTiles;
             SourceTask = sourceTask;
+            Provenance = provenance;
         }
 
         public GameLocation Location { get; }
@@ -2020,6 +2140,7 @@ internal sealed class ShiftOrchestrator
         public int TicksRemaining { get; set; }
         public int RadiusTiles { get; }
         public TaskKind SourceTask { get; }
+        public OutputScopeProvenance Provenance { get; }
     }
 
     private sealed record LaborBeatOutcome(bool UnitResolved, bool TaskFullyComplete);

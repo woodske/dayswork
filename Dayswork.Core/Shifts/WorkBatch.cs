@@ -5,8 +5,10 @@ namespace Dayswork.Core.Shifts;
 public enum BatchKind
 {
     AnimalBuilding,
-    Interior,
-    OutdoorFarm,
+    OutdoorAnimals,
+    Greenhouse,
+    OutdoorCrops,
+    OutdoorClearing,
 }
 
 public enum AnimalProductKind
@@ -18,11 +20,16 @@ public enum AnimalProductKind
 
 public sealed record AnimalRef(long Id, string HomeLocation, string DisplayName);
 
-public sealed record AnimalWorkItem(string LocationName, AnimalRef Animal, TaskKind Task);
+public sealed record AnimalWorkItem(
+    string LocationName,
+    AnimalRef Animal,
+    TaskKind Task,
+    OutputScopeProvenance Provenance);
 
 public sealed record WorkBatch(
     string LocationName,
     BatchKind Kind,
+    IReadOnlyList<TaskKind> Tasks,
     IReadOnlyList<WorkItem> TileWork,
     IReadOnlyList<AnimalWorkItem> AnimalWork,
     bool FeedBuilding);

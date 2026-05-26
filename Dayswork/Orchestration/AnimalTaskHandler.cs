@@ -169,7 +169,7 @@ internal sealed class AnimalTaskHandler
     public bool HasToolHarvestReady(FarmAnimal animal) =>
         !string.IsNullOrWhiteSpace(animal.currentProduce.Value);
 
-    public bool TryCollect(FarmAnimal animal, ItemBuffer buffer)
+    public bool TryCollect(FarmAnimal animal, ItemBuffer buffer, OutputScopeProvenance? provenance = null)
     {
         if (!HasToolHarvestReady(animal))
             return false;
@@ -182,7 +182,7 @@ internal sealed class AnimalTaskHandler
         if (item is SObject obj)
             obj.Quality = Math.Max(0, animal.produceQuality.Value);
 
-        buffer.Add(item.QualifiedItemId, Math.Max(1, item.Stack), TaskKind.CollectAnimalProducts);
+        buffer.Add(item.QualifiedItemId, Math.Max(1, item.Stack), TaskKind.CollectAnimalProducts, provenance);
         animal.HandleStatsOnProduceCollected(item, (uint)Math.Max(1, item.Stack));
         animal.currentProduce.Value = string.Empty;
         animal.daysSinceLastLay.Value = 0;

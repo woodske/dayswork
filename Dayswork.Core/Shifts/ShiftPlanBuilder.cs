@@ -5,54 +5,63 @@ namespace Dayswork.Core.Shifts;
 public sealed class ShiftPlanBuilder
 {
     public IReadOnlyList<WorkBatch> BuildBatchPlan(
-        IReadOnlyList<Zone> zones,
-        IReadOnlySet<TaskKind> enabledTasks,
-        Func<string, bool> isAnimalHouse)
+        WorkScopeSet scopes,
+        IReadOnlySet<TaskKind> enabledTasks)
     {
-        if (zones is null) throw new ArgumentNullException(nameof(zones));
+        if (scopes is null) throw new ArgumentNullException(nameof(scopes));
         if (enabledTasks is null) throw new ArgumentNullException(nameof(enabledTasks));
-        if (isAnimalHouse is null) throw new ArgumentNullException(nameof(isAnimalHouse));
 
-        var byLocation = new Dictionary<string, BatchKind>(StringComparer.Ordinal);
-        var locationOrder = new List<string>();
+        var batches = new List<WorkBatch>();
 
-        foreach (var zone in zones)
+        var animalTasks = Order(enabledTasks.Where(TaskKindSets.IsAnimalService));
+        var outdoorAnimalTasks = animalTasks
+            .Where(task => task != TaskKind.FeedAnimals)
+            .ToList();
+        if (animalTasks.Count > 0)
         {
-            var locationName = string.IsNullOrWhiteSpace(zone.LocationName)
-                ? "Farm"
-                : zone.LocationName;
-
-            if (!byLocation.ContainsKey(locationName))
-                locationOrder.Add(locationName);
-
-            if (locationName == "Farm")
+            foreach (var building in scopes.AnimalBuildings
+                         .OrderBy(scope => scope.LocationName, StringComparer.Ordinal)
+                         .ThenBy(scope => scope.Tier))
             {
-                byLocation[locationName] = BatchKind.OutdoorFarm;
-                continue;
+                batches.Add(CreateSkeleton(
+                    building.LocationName,
+                    BatchKind.AnimalBuilding,
+                    animalTasks,
+                    feedBuilding: animalTasks.Contains(TaskKind.FeedAnimals)));
             }
 
-            byLocation[locationName] = isAnimalHouse(locationName)
-                ? BatchKind.AnimalBuilding
-                : BatchKind.Interior;
+            if (outdoorAnimalTasks.Count > 0)
+                batches.Add(CreateSkeleton("Farm", BatchKind.OutdoorAnimals, outdoorAnimalTasks, feedBuilding: false));
         }
 
-        var batches = locationOrder
-            .Select(location => CreateSkeleton(location, byLocation[location], enabledTasks))
-            .OrderBy(batch => batch.Kind)
-            .ThenBy(batch => locationOrder.IndexOf(batch.LocationName))
-            .ToList();
+        var greenhouseTasks = Order(enabledTasks.Where(TaskKindSets.IsGreenhouseService));
+        if (scopes.GreenhouseWork is not null && greenhouseTasks.Count > 0)
+            batches.Add(CreateSkeleton(scopes.GreenhouseWork.LocationName, BatchKind.Greenhouse, greenhouseTasks, feedBuilding: false));
+
+        var outdoorCropTasks = Order(enabledTasks.Where(TaskKindSets.IsOutdoorCropService));
+        if (scopes.OutdoorWork is not null && outdoorCropTasks.Count > 0)
+            batches.Add(CreateSkeleton("Farm", BatchKind.OutdoorCrops, outdoorCropTasks, feedBuilding: false));
+
+        var outdoorClearingTasks = Order(enabledTasks.Where(TaskKindSets.IsOutdoorClearingService));
+        if (scopes.OutdoorWork is not null && outdoorClearingTasks.Count > 0)
+            batches.Add(CreateSkeleton("Farm", BatchKind.OutdoorClearing, outdoorClearingTasks, feedBuilding: false));
 
         return batches;
     }
 
+    private static IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> tasks) =>
+        new TaskPriorityOrderer().Order(tasks);
+
     private static WorkBatch CreateSkeleton(
         string locationName,
         BatchKind kind,
-        IReadOnlySet<TaskKind> enabledTasks) =>
+        IReadOnlyList<TaskKind> tasks,
+        bool feedBuilding) =>
         new(
             locationName,
             kind,
+            tasks,
             Array.Empty<WorkItem>(),
             Array.Empty<AnimalWorkItem>(),
-            kind == BatchKind.AnimalBuilding && enabledTasks.Contains(TaskKind.FeedAnimals));
+            feedBuilding);
 }

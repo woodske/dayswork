@@ -7,7 +7,7 @@ namespace Dayswork.Core.Shifts;
 public sealed class ShiftContext
 {
     public ContractId ContractId { get; }
-    public IReadOnlyList<Zone> Zones { get; }
+    public WorkScopeSet WorkScopes { get; }
     public IReadOnlySet<TaskKind> EnabledTasks { get; }
     public IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations { get; }
     public ContractTermsSnapshot ContractTerms { get; }
@@ -38,7 +38,7 @@ public sealed class ShiftContext
 
     public ShiftContext(
         ContractId contractId,
-        IReadOnlyList<Zone> zones,
+        WorkScopeSet workScopes,
         IReadOnlySet<TaskKind> enabledTasks,
         IReadOnlyDictionary<TaskKind, DestinationKey> taskDestinations,
         ContractTermsSnapshot contractTerms,
@@ -51,7 +51,7 @@ public sealed class ShiftContext
         int currentBatchIndex = 0)
     {
         ContractId       = contractId;
-        Zones            = zones;
+        WorkScopes       = workScopes;
         EnabledTasks     = enabledTasks;
         TaskDestinations = taskDestinations;
         ContractTerms    = contractTerms;

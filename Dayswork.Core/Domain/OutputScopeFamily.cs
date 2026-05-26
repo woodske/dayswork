@@ -1,0 +1,9 @@
+namespace Dayswork.Core.Domain;
+
+public enum OutputScopeFamily
+{
+    Unknown,
+    Outdoor,
+    AnimalBuilding,
+    Greenhouse,
+}

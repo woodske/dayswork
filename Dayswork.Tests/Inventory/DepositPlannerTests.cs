@@ -27,6 +27,9 @@ public sealed class DepositPlannerTests
         return map;
     }
 
+    private static BufferedItem Buffered(string itemId, int quantity, TaskKind task, OutputScopeProvenance? provenance = null) =>
+        new(itemId, quantity, task, provenance ?? OutputScopeProvenance.Unknown);
+
     // PBT-U14-01: conservation — every buffered item appears exactly once across trips ∪ pre-mail.
     [Property(MaxTest = 1000, Replay = "")]
     public Property Conservation_Holds()
@@ -108,8 +111,8 @@ public sealed class DepositPlannerTests
         var far  = new ChestRef("Farm", new TileCoord(50, 0));
         var snapshot = new List<BufferedItem>
         {
-            new("(O)388", 1, TaskKind.CutTrees),
-            new("(O)390", 1, TaskKind.ClearRocks),
+            Buffered("(O)388", 1, TaskKind.CutTrees),
+            Buffered("(O)390", 1, TaskKind.ClearRocks),
         };
         var assignments = new Dictionary<TaskKind, DestinationKey>
         {
@@ -128,7 +131,7 @@ public sealed class DepositPlannerTests
     [Fact]
     public void Unassigned_Task_Output_Goes_To_PreMail()
     {
-        var snapshot = new List<BufferedItem> { new("(O)709", 5, TaskKind.CutTrees) };
+        var snapshot = new List<BufferedItem> { Buffered("(O)709", 5, TaskKind.CutTrees) };
         var assignments = new Dictionary<TaskKind, DestinationKey>(); // empty → CutTrees unassigned
 
         var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
@@ -136,5 +139,27 @@ public sealed class DepositPlannerTests
         Assert.Empty(plan.Trips);
         Assert.Single(plan.PreMailedOverflow);
         Assert.Equal(5, plan.PreMailedOverflow[0].Quantity);
+    }
+
+    [Fact]
+    public void Provenance_Does_Not_Change_TaskOwned_Destination_Resolution()
+    {
+        var chest = new ChestRef("Farm", new TileCoord(4, 4));
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)388", 1, TaskKind.CutTrees, OutputScopeProvenance.Outdoor()),
+            Buffered("(O)388", 2, TaskKind.CutTrees, OutputScopeProvenance.Greenhouse("Greenhouse")),
+        };
+        var assignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.CutTrees] = new ChestDestination(chest),
+        };
+
+        var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
+
+        var trip = Assert.Single(plan.Trips);
+        Assert.Equal(chest.Tile, trip.Tile);
+        Assert.All(trip.Items, item => Assert.Equal(TaskKind.CutTrees, item.SourceTask));
+        Assert.Equal(3, trip.Items.Sum(item => item.Quantity));
     }
 }

@@ -36,8 +36,9 @@ public sealed class ModEntry : Mod
         var configResolver = new ConfigValueResolver();
         var rateCalc    = new RateCalculator();
         var depositCalc = new DepositCalculator();
+        var workScopeClassifier = new WorkScopeClassifier();
         var contractTermsBuilder = new ContractTermsBuilder(
-            new WorkScopeClassifier(),
+            workScopeClassifier,
             new OutdoorServiceBandClassifier(configResolver),
             new ContractPriceCalculator(configResolver),
             new PriceBreakdownBuilder(configResolver),
@@ -66,6 +67,7 @@ public sealed class ModEntry : Mod
         var orchestrator    = new ShiftOrchestrator(
             toolReader,
             config,
+            workScopeClassifier,
             toolAnimator,
             movementDriver,
             workAreaScanner,

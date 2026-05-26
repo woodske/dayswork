@@ -11,7 +11,7 @@ internal interface IMailDispatcher
     // (DEV-U15-04). Sends nothing when there are no items and no refund. Guarantees no item loss:
     // if the mail backend is unavailable, items fall back to the shipping bin and gold is credited
     // directly.
-    void QueueSettlement(IReadOnlyList<ItemStack> items, IReadOnlySet<OverflowReason> reasons, int refundGold);
+    void QueueSettlement(IReadOnlyList<ItemStack> items, IReadOnlyList<OverflowCategory> categories, int refundGold);
 
     // One same-day, text-only notice that the recurring contract's daily deposit was unaffordable
     // (FR-PAY-04, FD-Q5=A). Sent each unaffordable morning.

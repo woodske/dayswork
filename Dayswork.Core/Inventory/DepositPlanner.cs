@@ -13,8 +13,8 @@ public sealed class DepositPlanner : IDepositPlanner
         Func<TileCoord, TileCoord, int> distance)
     {
         // Walkable destinations grouped by key → (representative tile, item id → qty).
-        var walkable = new Dictionary<DestinationKey, (TileCoord Tile, Dictionary<string, int> Items)>();
-        var preMail  = new Dictionary<string, int>();
+        var walkable = new Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int> Items)>();
+        var preMail  = new Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int>();
 
         foreach (var item in snapshot)
         {
@@ -28,7 +28,7 @@ public sealed class DepositPlanner : IDepositPlanner
                     AddToGroup(walkable, dest, shippingBinTile, item);
                     break;
                 default: // MailDestination or unresolved ⇒ mail next morning (FD-Q2=A / FR-OUT-04)
-                    Accumulate(preMail, item.QualifiedItemId, item.Quantity);
+                    Accumulate(preMail, (item.QualifiedItemId, item.SourceTask, item.Provenance), item.Quantity);
                     break;
             }
         }
@@ -50,26 +50,33 @@ public sealed class DepositPlanner : IDepositPlanner
             : MailDestination.Instance;
 
     private static void AddToGroup(
-        Dictionary<DestinationKey, (TileCoord Tile, Dictionary<string, int> Items)> walkable,
+        Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int> Items)> walkable,
         DestinationKey dest,
         TileCoord tile,
         BufferedItem item)
     {
         if (!walkable.TryGetValue(dest, out var group))
         {
-            group = (tile, new Dictionary<string, int>());
+            group = (tile, new Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int>());
             walkable[dest] = group;
         }
-        Accumulate(group.Items, item.QualifiedItemId, item.Quantity);
+        Accumulate(group.Items, (item.QualifiedItemId, item.SourceTask, item.Provenance), item.Quantity);
     }
 
-    private static void Accumulate(Dictionary<string, int> map, string id, int qty) =>
-        map[id] = map.TryGetValue(id, out var existing) ? existing + qty : qty;
+    private static void Accumulate(
+        Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int> map,
+        (string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance) key,
+        int qty) =>
+        map[key] = map.TryGetValue(key, out var existing) ? existing + qty : qty;
 
-    // Deterministic stack list (sorted by id) so planner output is stable regardless of dict order.
-    private static IReadOnlyList<ItemStack> ToStacks(Dictionary<string, int> map) =>
-        map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
-           .Select(kv => new ItemStack(kv.Key, kv.Value))
+    // Deterministic stack list so planner output is stable regardless of dict order.
+    private static IReadOnlyList<RoutedItemStack> ToStacks(
+        Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int> map) =>
+        map.OrderBy(kv => kv.Key.ItemId, StringComparer.Ordinal)
+           .ThenBy(kv => kv.Key.SourceTask)
+           .ThenBy(kv => kv.Key.Provenance.Family)
+           .ThenBy(kv => kv.Key.Provenance.ScopeName, StringComparer.Ordinal)
+           .Select(kv => new RoutedItemStack(kv.Key.ItemId, kv.Value, kv.Key.SourceTask, kv.Key.Provenance))
            .ToList();
 
     private static IReadOnlyList<DepositTrip> OrderNearestNeighbor(

@@ -18,7 +18,7 @@ public static class DepositInputGen
         from id in Gen.Elements(ItemIds)
         from qty in Gen.Choose(1, 999)
         from task in Gen.Elements(AllTasks)
-        select new BufferedItem(id, qty, task);
+        select new BufferedItem(id, qty, task, OutputScopeProvenance.Unknown);
 
     public static Gen<IReadOnlyList<BufferedItem>> BufferedItems() =>
         Gen.ListOf(BufferedItem()).Select(l => (IReadOnlyList<BufferedItem>)l.ToList());

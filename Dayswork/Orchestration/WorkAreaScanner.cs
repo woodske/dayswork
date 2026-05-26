@@ -34,7 +34,8 @@ internal sealed class WorkAreaScanner
         IEnumerable<Zone> zones,
         IReadOnlySet<TaskKind> enabled,
         ToolSnapshot snapshot,
-        TileCoord origin)
+        TileCoord origin,
+        OutputScopeProvenance? provenance = null)
     {
         var seenWorkItems = new HashSet<(TaskKind Task, TileCoord Tile)>();
         var rawItems = new List<WorkItem>();
@@ -85,7 +86,7 @@ internal sealed class WorkAreaScanner
                 }
 
                 Increment(acceptedByKind, task.Value);
-                rawItems.Add(new WorkItem(navTile.Value, taskTile, task.Value, location.Name));
+                rawItems.Add(new WorkItem(navTile.Value, taskTile, task.Value, location.Name, provenance));
                 ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: loc={location.Name} nav=({navTile.Value.X},{navTile.Value.Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
             }
         }
@@ -94,6 +95,22 @@ internal sealed class WorkAreaScanner
             detectedByKind, acceptedByKind, capabilitySkippedTiles, noNavigationTiles, duplicateTiles);
 
         return GreedyNearestNeighbour(rawItems, origin);
+    }
+
+    public IReadOnlyList<WorkItem> ScanWholeLocation(
+        GameLocation location,
+        IReadOnlySet<TaskKind> enabled,
+        ToolSnapshot snapshot,
+        TileCoord origin,
+        OutputScopeProvenance? provenance = null)
+    {
+        var layer = location.Map.Layers[0];
+        var wholeLocation = new Zone(
+            location.Name,
+            new TileCoord(0, 0),
+            new TileCoord(Math.Max(0, layer.LayerWidth - 1), Math.Max(0, layer.LayerHeight - 1)));
+
+        return ScanZones(location, new[] { wholeLocation }, enabled, snapshot, origin, provenance);
     }
 
     public TaskKind? DetectTask(
