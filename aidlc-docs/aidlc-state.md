@@ -100,9 +100,33 @@
 | Extension | Enabled | Mode | Decided At |
 |---|---|---|---|
 | Security Baseline | No | — | Requirements Analysis (Q28: B — no network/PII/auth surface) |
-| Property-Based Testing | Yes | Partial — enforces PBT-02, PBT-03, PBT-07, PBT-08, PBT-09; remainder advisory | Requirements Analysis (Q29: B) |
+| Property-Based Testing | Yes | Full — all PBT rules blocking where applicable | Worker Routing Requirements Analysis (Q7: A) |
 
 **PBT framework**: FsCheck (per PBT-09 recommendation for C#/.NET; integrates with xUnit chosen in Q4).
+
+## Active Change — Worker Routing and Dynamic Task Selection
+- **Requested At**: 2026-05-27T02:57:38Z
+- **Current Phase**: CONSTRUCTION
+- **Current Stage**: NFR Design (Review Required) — review [nfr-design](construction/u-wr-worker-routing-dynamic-task-selection/nfr-design/)
+- **Request Type**: Worker pathing bug fix / runtime routing enhancement
+- **Scope Estimate**: Multiple runtime components (`WorkAreaScanner`, `AnimalTaskHandler`, `ShiftOrchestrator`, worker navigation helpers) plus focused tests
+- **Complexity Estimate**: Moderate because approach-tile selection, animal routing, feed/hopper ordering, and blocked-task retry behavior interact
+- **Extension Status**: Security Baseline disabled; Property-Based Testing enabled in full mode for applicable later stages
+- **Requirements Analysis**: Approved 2026-05-27T03:16:44Z
+- **User Stories Assessment**: Execute — see [worker-routing-user-stories-assessment.md](inception/plans/worker-routing-user-stories-assessment.md)
+- **User Stories Plan Answers**: Complete; no ambiguity detected
+- **User Stories Generation**: Complete; S-08, S-16, S-19, and persona confirmation updated
+- **User Stories Approval**: Approved 2026-05-27T03:36:10Z
+- **Workflow Plan**: Complete; execute Functional Design, NFR Requirements, NFR Design, Code Generation, and Build/Test; skip Application Design, Units Generation, and Infrastructure Design
+- **Workflow Plan Approval**: Approved 2026-05-27T03:41:01Z
+- **Functional Design**: Complete; route-cost model, active-batch selector rules, deferral/retry lifecycle, runtime domain entities, and PBT-01 properties documented
+- **Functional Design Approval**: Approved 2026-05-27T03:51:36Z with user response `continue`
+- **NFR Requirements Planning**: Complete; all six answers received and validated with no ambiguities
+- **NFR Requirements**: Complete; exact path-cost performance envelope, immediate route invalidation, synchronous runtime constraint, bounded deferral guard, narrow maintainer logging, and FsCheck/xUnit test-quality bar documented
+- **NFR Requirements Approval**: Approved 2026-05-27T03:57:38Z with user response `continue`
+- **NFR Design Planning**: Question plan created; awaiting answers for selector extraction, route-cost oracle, deferral/retry component pattern, route-cache lifetime, and test seam priority
+- **NFR Design Planning Answers**: Complete; all five answers received and validated with no ambiguities
+- **NFR Design**: Complete; selected small pure route selector, movement-aligned route-cost oracle, orchestrator-owned bounded retry coordination, per-selection route evaluation, and selector-first FsCheck seam documented
 
 ## Stage Progress
 ### INCEPTION PHASE
@@ -115,9 +139,9 @@
 - [x] Units Generation — approved 2026-05-18
 
 ### CONSTRUCTION PHASE (per-unit loop)
-- [ ] Functional Design — **EXECUTE** (per unit)
-- [ ] NFR Requirements — **EXECUTE** (per unit)
-- [ ] NFR Design — **EXECUTE** (per unit)
+- [x] Functional Design — **EXECUTE** (per unit)
+- [x] NFR Requirements — **EXECUTE** (per unit)
+- [ ] NFR Design — **EXECUTE** (per unit; U-WR review required)
 - [ ] Infrastructure Design — **SKIP** (no cloud / container / IaC; SMAPI is the platform)
 - [ ] Code Generation — **EXECUTE** (per unit, always)
 - [x] Build and Test — **EXECUTE** (after all units complete)

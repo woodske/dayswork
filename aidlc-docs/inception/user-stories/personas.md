@@ -1,6 +1,6 @@
 # Personas — Dayswork
 
-Three personas were chosen during planning (see [story-generation-plan.md](../plans/story-generation-plan.md)): one unified human player, the worker NPC modelled as a system actor, and the mod maintainer for testability/translation framing.
+Three personas were chosen during planning (see [story-generation-plan.md](../plans/story-generation-plan.md)): one unified human player, the worker NPC modelled as a system actor, and the mod maintainer for testability/translation framing. The worker-routing update reviewed these personas and confirmed that no new persona is needed.
 
 ---
 
@@ -42,7 +42,7 @@ Three personas were chosen during planning (see [story-generation-plan.md](../pl
 | Attribute | Detail |
 |---|---|
 | **Persona type** | Developer / operator. The solo author (Bindicle) at v1, plus any future open-source contributors after the MIT release on Nexus. |
-| **Context** | Experienced software engineer. New to C# and SMAPI (per NFR-ONBOARD-02). Uses Visual Studio 2026. Targets .NET 6 / SMAPI 4.x / SV 1.6.x. Adopts xUnit + FsCheck for testing under Partial-mode PBT enforcement. |
+| **Context** | Experienced software engineer. New to C# and SMAPI (per NFR-ONBOARD-02). Uses Visual Studio 2026. Targets .NET 6 / SMAPI 4.x / SV 1.6.x. Adopts xUnit + FsCheck for testing, with full PBT enforcement for the worker-routing change. |
 | **Motivations** | Ship a quality MIT-licensed Nexus mod with low ongoing support burden. Allow future contributors to make changes confidently. Keep upgrade-day painless when SMAPI or SV releases a new version. |
 | **Pain points** | Stardew tightly couples business logic with the game runtime. Without separation, every test requires launching the game. Localization that lives in code can't be updated by the community without a PR. |
 | **Goals** | (1) Pure business logic (contract pricing, energy accounting, zone-tile intersection, save-data DTOs) is isolated and unit-testable without the game. (2) All user-visible strings are routed through SMAPI's i18n so translators contribute without touching C#. |

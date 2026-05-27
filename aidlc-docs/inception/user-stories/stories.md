@@ -8,7 +8,7 @@
 
 **Acceptance criteria format**: **Gherkin** (Given/When/Then) for behaviors involving state transitions; **bullets** for UI/visual rules and simple presence checks.
 
-**Traceability**: Each story lists the FR-IDs from [requirements.md](../requirements/requirements.md) that it implements. All v1 FRs are covered across the story set; no prioritization markers per Q8 of the planning document.
+**Traceability**: Each story lists the FR-IDs from [requirements.md](../requirements/requirements.md) that it implements. Worker-routing updates also reference [worker-routing-requirements.md](../requirements/worker-routing-requirements.md). All v1 FRs are covered across the story set; no prioritization markers per Q8 of the planning document.
 
 ---
 
@@ -176,30 +176,55 @@ The morning after a successful hire, the farmhand executes the contract.
 
 ---
 
-### S-08 — Execute prioritized work across zones, buildings, and animals
+### S-08 — Execute prioritized local work across zones, buildings, and animals
 
 **As** P-02 the Farmhand,
-**I want** to perform tasks in a fixed priority order across the selected contract scope,
-**so that** time-sensitive work (feeding/petting animals) happens before disruptive work (cutting trees).
+**I want** to respect the broad contract work order while choosing the closest reachable work inside the active batch,
+**so that** time-sensitive work still happens first and I do not walk past obvious nearby chores.
 
-**Implements**: FR-WORK-03, FR-TASK-03 through FR-TASK-12, FR-SKIP-04, FR-SKIP-05, FR-WORK-14
+**Implements**: FR-WORK-03, FR-TASK-03 through FR-TASK-12, FR-SKIP-04, FR-SKIP-05, FR-WORK-14, FR-WR-01, FR-WR-02, FR-WR-03, FR-WR-04, FR-WR-05, FR-WR-07, FR-WR-08
 
 **Acceptance criteria (state — Gherkin):**
 - **Given** a zone contains animals, mature crops, and trees
   **When** the farmhand enters the zone
-  **Then** the task queue is built in priority order: Feed animals → Pet animals → Collect animal products → Water crops → Harvest crops → Collect fruit → Clear weeds → Clear grass → Clear rocks → Cut trees.
+  **Then** broad batch order is preserved: animal building work, outdoor animal work, greenhouse work, outdoor crop work, then outdoor clearing work.
+- **Given** the farmhand is inside an active broad batch with multiple reachable tasks
+  **When** the next task is selected
+  **Then** the farmhand chooses the task with the shortest reachable route from its current tile, using task priority only as the equal-distance tie-breaker.
 - **Given** the player selected a barn or coop for animal care
   **When** animals from that building are outdoors on the farm
   **Then** the farmhand still seeks them out and services them as part of the selected building's work.
+- **Given** two animals in the active animal batch need attention
+  **When** one animal is closer by reachable route than the other
+  **Then** the farmhand services the closer reachable animal before walking to the farther one.
+- **Given** an adjacent-interaction task such as a weed, tree, fruit tree, rock, or animal product has more than one valid stand tile
+  **When** the farmhand chooses where to stand
+  **Then** the stand tile is the reachable side with the shortest route from the farmhand's current tile, not a fixed top-first side.
+- **Given** the farmhand is already standing on a valid interaction tile for the next task
+  **When** the task is selected
+  **Then** the farmhand performs the task from that tile instead of walking around to another side of the same object.
+- **Given** an egg or other animal-product floor item has one blocked side and another reachable side
+  **When** `CollectAnimalProducts` is enabled and the product is in the active batch
+  **Then** the farmhand collects the product from the reachable side rather than abandoning it because the preferred side is blocked.
 - **Given** a tile contains a trellis crop surrounded by other trellis tiles
   **When** the farmhand reaches an adjacent tile
   **Then** the harvest is performed from the adjacent reachable side; if all adjacent tiles are unreachable, the crop is silently skipped (FR-SKIP-04).
 - **Given** a crop is not yet ready to harvest
   **When** the harvest queue evaluates that tile
   **Then** the tile is silently skipped (FR-SKIP-05).
+- **Given** feed work is blocked by eggs or other animal products and `CollectAnimalProducts` is not enabled
+  **When** the farmhand evaluates the feed route
+  **Then** the farmhand does not silently collect those products as unpaid work, and feeding may remain incomplete if no enabled work clears the path.
+- **Given** feed work is blocked by eggs or other animal products and `CollectAnimalProducts` is enabled
+  **When** enabled product collection clears the path later in the same animal-building batch
+  **Then** the farmhand retries the deferred feed work before leaving that batch.
 - **Given** the worker is on the "Clear grass" task and the silo is full
   **When** grass is cut
   **Then** hay is dropped on the ground at the worker's current tile and is never mailed (FR-TASK-09).
+
+**Acceptance criteria (UI/visual — bullets):**
+- The farmhand should visibly behave like it is choosing sensible nearby work inside the current work area.
+- The farmhand should not appear to walk around an object just to use a different side when its current side is already valid.
 
 ---
 
@@ -393,7 +418,7 @@ The day doesn't always run smoothly. These stories cover days when normal flow b
 **I want** to recover from being stuck by trying a teleport before giving up,
 **so that** a transient pathfinding glitch doesn't ruin the shift, but a player who fenced me in deliberately can still end the contract.
 
-**Implements**: FR-WORK-11, FR-WORK-12, FR-WORK-13, NFR-SAFE-01
+**Implements**: FR-WORK-11, FR-WORK-12, FR-WORK-13, NFR-SAFE-01, FR-WR-06, FR-WR-08
 
 **Acceptance criteria (state — Gherkin):**
 - **Given** the farmhand has made no movement and completed no task ticks for the configured stuck threshold (default: 10 in-game minutes)
@@ -405,6 +430,15 @@ The day doesn't always run smoothly. These stories cover days when normal flow b
 - **Given** the player has tuned thresholds in GMCM
   **When** the next shift begins
   **Then** the new thresholds take effect (FR-WORK-13).
+- **Given** a task's selected route is blocked but there is other work remaining in the same active batch
+  **When** navigation to that task fails
+  **Then** the task is deferred temporarily and the farmhand attempts other available work in the batch before retrying it.
+- **Given** a deferred task may have become reachable because other enabled work changed the world
+  **When** the farmhand reaches the retry point for that batch
+  **Then** the task is rechecked using current passability and can be completed if a route is now available.
+- **Given** a deferred task is still unreachable after retry
+  **When** no further work in the batch can change that route
+  **Then** the task is skipped for the day without trapping the farmhand in an infinite loop.
 
 ---
 
@@ -448,7 +482,7 @@ These stories anchor the architectural choices that keep the mod testable and tr
 **I want** contract pricing, energy-cost accounting, zone-tile intersection, capability evaluation, and save-data DTOs to live in plain C# classes with no SMAPI or game-engine dependencies,
 **so that** I can unit-test them with xUnit and property-test them with FsCheck without launching Stardew Valley.
 
-**Implements**: NFR-MAINT-01, NFR-MAINT-02, NFR-MAINT-03, NFR-MAINT-04
+**Implements**: NFR-MAINT-01, NFR-MAINT-02, NFR-MAINT-03, NFR-MAINT-04, NFR-WR-02, NFR-WR-04
 
 **Acceptance criteria (UI/visual — bullets):**
 - Solution layout has at least two projects: the SMAPI mod (`Dayswork`) and a test project (`Dayswork.Tests`) using xUnit + FsCheck.
@@ -465,6 +499,15 @@ These stories anchor the architectural choices that keep the mod testable and tr
 - **Given** save-data DTOs
   **When** FsCheck generates valid contract states
   **Then** `deserialize(serialize(state)) == state` holds for all generated inputs (PBT-02 round-trip).
+- **Given** the worker route-ordering helper
+  **When** FsCheck generates valid current positions, candidate tasks, candidate interaction tiles, and deterministic tie conditions
+  **Then** the selected task is always the reachable candidate with the shortest route length, and equal route lengths resolve by task priority and stable ordering (PBT-03 invariant).
+- **Given** the blocked-task deferral helper
+  **When** FsCheck generates finite batches with reachable, temporarily blocked, and permanently blocked work
+  **Then** deferred work is retried after progress opportunities and the selection process always terminates without cycling forever (PBT-03 invariant).
+- **Given** the user-reported routing regressions
+  **When** example-based tests run
+  **Then** they pin the cases for wrong-side walking, one-side-blocked egg collection, near animal before far animal, hopper blocked by eggs, and retry after clearing work.
 - **Given** the seed value
   **When** a property test fails
   **Then** the seed and the shrunk minimal failing input are logged so the case can be replayed deterministically (PBT-08).

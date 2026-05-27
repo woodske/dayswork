@@ -4055,3 +4055,242 @@ Files changed: `Dayswork/Integration/MailFramework/PendingSettlementRecord.cs` (
 **Context**: CONSTRUCTION — Build and Test completion
 
 ---
+
+## Workspace Detection
+**Timestamp**: 2026-05-27T02:57:38Z
+**User Input**: "The pathing of the worker is very inefficient right now. Here are some examples:
+* The worker will sometimes stand next to a task, like a weed, and instead of doing the task, they'll walk around to the other side of the same object to do the task instead of where they are standing (I think the work prefers going from the top)
+* I've seen workers abandon tasks like collecting an egg because the top of the egg is inaccessible, even though the other three sides are accessible.
+* the worker will inefficiently walk to barn animals inside and outside, they'll pass several animals that need attention to do work on a far away animal, then come back to do the others
+* the worker may abandon tasks like feeding animals because it can't path to the hopper due to too many eggs in the coop
+
+Here's what I want, let me know if there are any issues with this:
+When doing tasks, the worker should always take the shortest path to the task. That means it should see if the other angels (top, bottom, right, left) are quicker to navigate to the task and perform the task. If the worker needs to travel far to the next task, it should see if there's a closer task available (like if there is a closer animal than the next target). In cases where a task is blocked, it should be re-checked in case doing other tasks cleared a path (like the worker couldn't get to the hopper, but the hopper was clear after collected eggs. Same with if an egg is buried in the back, does collecting other eggs make a path?)"
+**AI Response**: Loaded the AIDLC common workflow rules, extension opt-in prompts, welcome message, workspace-detection rules, existing state, and audit tail. Detected an existing C#/.NET SMAPI brownfield workspace with prior AIDLC state and reverse-engineering/application-design artifacts, plus enabled partial Property-Based Testing extension and disabled Security Baseline extension. Proceeding to targeted Requirements Analysis for worker task routing/pathing improvements.
+**Context**: INCEPTION — Workspace Detection for worker routing/pathing improvement
+
+---
+
+## Requirements Analysis — Worker Routing Questions
+**Timestamp**: 2026-05-27T03:01:51Z
+**User Input**: "(none — requirements question file initiated)"
+**AI Response**: Loaded the Requirements Analysis rule, adaptive-depth guidance, existing inception/application-design context, current extension configuration, and the enabled Property-Based Testing rules in partial mode. Security Baseline full rules were not loaded or enforced because `aidlc-state.md` marks that extension disabled. Inspected worker routing hot spots including `ShiftOrchestrator`, `WorkAreaScanner`, `WorkerMovementDriver`, `AnimalTaskHandler`, `IndoorWorkScanner`, `ShiftPlanBuilder`, and related tests. Created `aidlc-docs/inception/requirements/worker-routing-requirement-verification-questions.md` with targeted questions covering shortest-route approach tile selection, task/batch priority overrides, blocked-task retry behavior, feeding when animal products block navigation, tie-breakers, and extension configuration confirmation. Updated `aidlc-state.md` with an Active Change entry for the worker routing enhancement.
+**Context**: INCEPTION — Requirements Analysis question gate for worker routing/pathing improvement
+
+---
+
+## Requirements Analysis — Worker Routing Answers Received
+**Timestamp**: 2026-05-27T03:06:09Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/requirements/worker-routing-requirement-verification-questions.md` and validated that all seven answers were present with no blocking contradictions. Captured the decisions as: shortest actual reachable route to valid approach tiles, nearest task inside the active broad batch, temporary blocked-task deferral and retry, no animal-product collection unless enabled by contract, deterministic task-priority tie-breaks, Security Baseline disabled, and full Property-Based Testing enforcement. No clarification round was required.
+**Context**: INCEPTION — Requirements Analysis answer validation for worker routing/pathing improvement
+
+---
+
+## Requirements Analysis — Worker Routing Completion Prompt
+**Timestamp**: 2026-05-27T03:06:28Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Created `aidlc-docs/inception/requirements/worker-routing-requirements.md`, updated `aidlc-state.md` to the Worker Routing Requirements Analysis review gate, and recorded the extension update that Property-Based Testing is now fully enforced where applicable. The user is being asked to review the worker-routing requirements and either request changes or approve progression to User Stories.
+**Context**: INCEPTION — Requirements Analysis completion and approval prompt for worker routing/pathing improvement
+
+---
+
+## Requirements Analysis — Worker Routing Approved
+**Timestamp**: 2026-05-27T03:16:44Z
+**User Input**: "continue"
+**AI Response**: Treated the response as explicit approval of `aidlc-docs/inception/requirements/worker-routing-requirements.md` and moved into User Stories planning. Loaded the User Stories rule file, worker-routing requirements, content validation rules, and existing Dayswork personas/stories/story-generation-plan style. Determined that User Stories should execute because the change directly affects player-visible worker behavior and has multiple observable runtime scenarios.
+**Context**: INCEPTION — Transition from Worker Routing Requirements Analysis to User Stories Planning
+
+---
+
+## User Stories — Worker Routing Planning Questions
+**Timestamp**: 2026-05-27T03:18:01Z
+**User Input**: "(none — story planning question file initiated)"
+**AI Response**: Created `aidlc-docs/inception/plans/worker-routing-user-stories-assessment.md` documenting that user stories are justified for this direct user-experience change. Created `aidlc-docs/inception/plans/worker-routing-story-generation-plan.md` with a hybrid user-journey/regression-scenario recommendation, story breakdown options, mandatory story artifacts, execution checklist, and four planning questions covering incorporation into the existing story set, persona handling, acceptance-criteria style, and maintainer/testability coverage under full PBT enforcement. Updated `aidlc-state.md` to the User Stories Planning answer gate.
+**Context**: INCEPTION — User Stories Part 1 planning gate for worker routing/pathing improvement
+
+---
+
+## User Stories — Worker Routing Plan Answers Received
+**Timestamp**: 2026-05-27T03:22:46Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/plans/worker-routing-story-generation-plan.md` and validated the four planning answers. The selected approach is to revise existing stories in place, especially S-08 and S-16, without adding new story IDs; keep existing personas unchanged; use mixed Gherkin and bullet acceptance criteria; and add explicit maintainer acceptance criteria for example tests and property-based route-ordering invariants. No contradictions or unresolved ambiguities were found.
+**Context**: INCEPTION — User Stories Part 1 answer validation for worker routing/pathing improvement
+
+---
+
+## User Stories — Worker Routing Plan Approval Prompt
+**Timestamp**: 2026-05-27T03:22:46Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Updated `aidlc-docs/inception/plans/worker-routing-story-generation-plan.md` with the planning answer summary, marked completed planning-analysis checkboxes, and updated `aidlc-state.md` to the User Stories Planning review gate. The user is being asked to approve the story generation approach or request changes before story generation begins.
+**Context**: INCEPTION — Approval prompt for Worker Routing User Stories plan
+
+---
+
+## User Stories — Worker Routing Plan Approved
+**Timestamp**: 2026-05-27T03:23:47Z
+**User Input**: "approve and continue"
+**AI Response**: Treated the response as explicit approval of `aidlc-docs/inception/plans/worker-routing-story-generation-plan.md` and began User Stories Part 2 generation. Loaded the approved plan, located existing S-08, S-16, S-19, and persona sections, and prepared a narrow in-place update with no new story IDs.
+**Context**: INCEPTION — User Stories Part 2 approval for worker routing/pathing improvement
+
+---
+
+## User Stories — Worker Routing Generation Complete
+**Timestamp**: 2026-05-27T03:24:50Z
+**User Input**: "approve and continue"
+**AI Response**: Updated `aidlc-docs/inception/user-stories/stories.md` in place: S-08 now covers active-batch nearest reachable task selection, shortest-route approach tiles, local animal work, product/egg reachability, feed/hopper retry behavior, and player-visible sensible routing; S-16 now covers blocked-task deferral, retry after world changes, and no infinite retry loops; S-19 now includes maintainer acceptance criteria for example regression tests and FsCheck route-ordering / blocked-deferral invariants. Updated `aidlc-docs/inception/user-stories/personas.md` to confirm the existing personas remain sufficient and to reflect full PBT enforcement for the worker-routing change. Marked the worker-routing story plan mandatory artifacts and execution checklist complete, and updated `aidlc-state.md` to the User Stories review gate.
+**Context**: INCEPTION — User Stories generation completion for worker routing/pathing improvement
+
+---
+
+## User Stories — Worker Routing Review Prompt
+**Timestamp**: 2026-05-27T03:24:50Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the User Stories review gate. The user is being asked to review `aidlc-docs/inception/user-stories/stories.md` and `aidlc-docs/inception/user-stories/personas.md`, then either request changes or approve progression to Workflow Planning.
+**Context**: INCEPTION — Approval prompt for generated worker routing user stories
+
+---
+
+## User Stories — Worker Routing Approved
+**Timestamp**: 2026-05-27T03:36:10Z
+**User Input**: "approve and continue"
+**AI Response**: Treated the response as explicit approval of the generated worker-routing story updates and moved into Workflow Planning. Loaded the Workflow Planning rule, content-validation rules, approved worker-routing requirements, worker-routing story plan, updated story/persona sections, and existing application-design context for worker orchestration components.
+**Context**: INCEPTION — Transition from Worker Routing User Stories to Workflow Planning
+
+---
+
+## Workflow Planning — Worker Routing Complete
+**Timestamp**: 2026-05-27T03:36:46Z
+**User Input**: "approve and continue"
+**AI Response**: Created `aidlc-docs/inception/plans/worker-routing-execution-plan.md` as the worker-routing-specific execution plan, preserving the historical pricing-redesign `execution-plan.md`. The plan marks Workspace Detection, Requirements Analysis, User Stories, and Workflow Planning complete; skips Reverse Engineering refresh, Application Design, Units Generation, and Infrastructure Design; executes Functional Design, NFR Requirements, NFR Design, Code Generation, and Build/Test for a single U-WR unit. Mermaid syntax was validated by inspection and a text alternative was included. Updated `aidlc-state.md` to the Workflow Planning review gate.
+**Context**: INCEPTION — Workflow Planning completion for worker routing/pathing improvement
+
+---
+
+## Workflow Planning — Worker Routing Review Prompt
+**Timestamp**: 2026-05-27T03:36:46Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the Workflow Planning review gate. The user is being asked to review `aidlc-docs/inception/plans/worker-routing-execution-plan.md`, then either request changes, add skipped stages, or approve progression to Functional Design.
+**Context**: INCEPTION — Approval prompt for Worker Routing execution plan
+
+---
+
+## Workflow Planning — Worker Routing Approved
+**Timestamp**: 2026-05-27T03:41:01Z
+**User Input**: "approve and continue"
+**AI Response**: Treated the response as explicit approval of `aidlc-docs/inception/plans/worker-routing-execution-plan.md` and moved into Functional Design for the single U-WR unit. Loaded the Functional Design rule, approved execution plan, approved worker-routing requirements, and full Property-Based Testing rules.
+**Context**: Transition from INCEPTION Workflow Planning to CONSTRUCTION Functional Design
+
+---
+
+## Functional Design — U-WR Planning Questions
+**Timestamp**: 2026-05-27T03:41:01Z
+**User Input**: "(none — functional design question file initiated)"
+**AI Response**: Created `aidlc-docs/construction/plans/u-wr-worker-routing-dynamic-task-selection-functional-design-plan.md` with unit context, design approach, mandatory artifacts, PBT-01 planning, and six decision questions covering route-cost measurement, combined active-batch selection, deferred retry limits, progress definition, equal-route tie-breaks, and core property-based testing invariants. Updated `aidlc-state.md` to the Functional Design Planning answer gate.
+**Context**: CONSTRUCTION — Functional Design planning gate for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Functional Design — U-WR Answers Received
+**Timestamp**: 2026-05-27T03:48:06Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-wr-worker-routing-dynamic-task-selection-functional-design-plan.md` and validated all six answers. Decisions selected actual path-length route cost, one nearest-reachable active-batch candidate pool with hopper-before-trough gating, retry while progress exists, progress defined as task/world-state change rather than movement, existing task-priority then stable-order tie-breaks, and route-selection minimum-cost behavior as the core PBT invariant. No contradictions or unresolved ambiguities were found.
+**Context**: CONSTRUCTION — Functional Design answer validation for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Functional Design — U-WR Complete
+**Timestamp**: 2026-05-27T03:48:06Z
+**User Input**: "done"
+**AI Response**: Generated U-WR functional design artifacts under `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/functional-design/`: `business-logic-model.md`, `business-rules.md`, and `domain-entities.md`. The design defines the actual route-cost selector, active-batch candidate pool, feed/product boundary, blocked-work deferral lifecycle, runtime domain entities, no-UI scope, and PBT-01 testable properties. Updated the functional design plan checkboxes and `aidlc-state.md` to the Functional Design review gate.
+**Context**: CONSTRUCTION — Functional Design completion for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Functional Design — U-WR Review Prompt
+**Timestamp**: 2026-05-27T03:48:06Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the Functional Design review gate. The user is being asked to review the artifacts under `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/functional-design/`, then either request changes or continue to NFR Requirements.
+**Context**: CONSTRUCTION — Approval prompt for U-WR Functional Design
+
+---
+
+## Functional Design — U-WR Approved
+**Timestamp**: 2026-05-27T03:51:36Z
+**User Input**: "continue"
+**AI Response**: Treated the response as explicit approval of the U-WR Functional Design artifacts and moved into NFR Requirements. Loaded the NFR Requirements rule, current AI-DLC state, worker-routing execution plan, functional design artifacts, content-validation rules, question-format guide, and full Property-Based Testing rules.
+**Context**: CONSTRUCTION — Transition from U-WR Functional Design to NFR Requirements
+
+---
+
+## NFR Requirements — U-WR Planning Questions
+**Timestamp**: 2026-05-27T03:51:36Z
+**User Input**: "(none — NFR requirements question file initiated)"
+**AI Response**: Created `aidlc-docs/construction/plans/u-wr-worker-routing-dynamic-task-selection-nfr-requirements-plan.md` with NFR assessment checklist, content-validation note, six decision questions with `[Answer]:` tags, and PBT-09 planning for FsCheck-based property testing. Updated `aidlc-state.md` to the NFR Requirements planning answer gate.
+**Context**: CONSTRUCTION — NFR Requirements planning gate for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## NFR Requirements — U-WR Answers Received
+**Timestamp**: 2026-05-27T03:55:13Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-wr-worker-routing-dynamic-task-selection-nfr-requirements-plan.md` and validated all six answers. Decisions selected exact route-cost evaluation for all valid candidates and interaction tiles, immediate recomputation after progress events, synchronous deterministic SMAPI shift-loop execution, no-progress retry termination plus a finite max-pass guard, narrow maintainer/debug logging only for exceptional routing outcomes, and xUnit plus FsCheck coverage focused on reported regressions and selector invariants. No contradictions or unresolved ambiguities were found.
+**Context**: CONSTRUCTION — NFR Requirements answer validation for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## NFR Requirements — U-WR Complete
+**Timestamp**: 2026-05-27T03:55:13Z
+**User Input**: "done"
+**AI Response**: Generated U-WR NFR Requirements artifacts under `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/nfr-requirements/`: `nfr-requirements.md` and `tech-stack-decisions.md`. The requirements define exact route-cost performance constraints, immediate invalidation, synchronous deterministic execution, bounded deferral reliability, narrow observability, no persistence/UI/security surface, and the xUnit/FsCheck testing quality bar. Verified that `Dayswork.Tests.csproj` already references `FsCheck.Xunit` 2.16.5. Updated the NFR requirements plan checklist and `aidlc-state.md` to the NFR Requirements review gate.
+**Context**: CONSTRUCTION — NFR Requirements completion for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## NFR Requirements — U-WR Review Prompt
+**Timestamp**: 2026-05-27T03:55:13Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the NFR Requirements review gate. The user is being asked to review the artifacts under `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/nfr-requirements/`, then either request changes or continue to NFR Design.
+**Context**: CONSTRUCTION — Approval prompt for U-WR NFR Requirements
+
+---
+
+## NFR Requirements — U-WR Approved
+**Timestamp**: 2026-05-27T03:57:38Z
+**User Input**: "continue"
+**AI Response**: Treated the response as explicit approval of the U-WR NFR Requirements artifacts and moved into NFR Design. Loaded the NFR Design rule, approved NFR requirements, tech-stack decisions, functional design context, and current timestamp.
+**Context**: CONSTRUCTION — Transition from U-WR NFR Requirements to NFR Design
+
+---
+
+## NFR Design — U-WR Planning Questions
+**Timestamp**: 2026-05-27T03:57:38Z
+**User Input**: "(none — NFR design question file initiated)"
+**AI Response**: Created `aidlc-docs/construction/plans/u-wr-worker-routing-dynamic-task-selection-nfr-design-plan.md` with an NFR design checklist, category applicability review, content-validation note, five decision questions with `[Answer]:` tags, and PBT planning for selector and conditional deferral test seams. Updated `aidlc-state.md` to the NFR Design planning answer gate.
+**Context**: CONSTRUCTION — NFR Design planning gate for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## NFR Design — U-WR Answers Received
+**Timestamp**: 2026-05-27T04:01:16Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-wr-worker-routing-dynamic-task-selection-nfr-design-plan.md` and validated all five answers. Decisions selected a small pure selector helper over already-evaluated candidate route results, a narrow route-cost oracle on `WorkerMovementDriver`, retry orchestration kept in `ShiftOrchestrator` with isolated pass accounting and defensive guard, no cross-selection route cache, and a selector/ranking seam as the priority for property-based testing. No contradictions or unresolved ambiguities were found.
+**Context**: CONSTRUCTION — NFR Design answer validation for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## NFR Design — U-WR Complete
+**Timestamp**: 2026-05-27T04:01:16Z
+**User Input**: "done"
+**AI Response**: Generated U-WR NFR Design artifacts under `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/nfr-design/`: `nfr-design-patterns.md` and `logical-components.md`. The design documents the candidate-adapter/pure-selector pattern, movement-aligned route-cost oracle, per-selection route evaluation, active-batch retry with progress gate and finite guard, revalidation before dispatch, quiet maintainer diagnostics, selector-first test strategy, and logical component boundaries. Updated the NFR design plan checklist and `aidlc-state.md` to the NFR Design review gate.
+**Context**: CONSTRUCTION — NFR Design completion for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## NFR Design — U-WR Review Prompt
+**Timestamp**: 2026-05-27T04:01:16Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the NFR Design review gate. The user is being asked to review the artifacts under `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/nfr-design/`, then either request changes or continue to Code Generation.
+**Context**: CONSTRUCTION — Approval prompt for U-WR NFR Design
+
+---
