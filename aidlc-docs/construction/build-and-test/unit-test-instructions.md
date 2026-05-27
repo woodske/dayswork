@@ -10,10 +10,10 @@ dotnet test Dayswork.sln
 
 Expected result for the current U-WR review build:
 
-- Passed: `316`
+- Passed: `318`
 - Failed: `0`
 - Skipped: `1`
-- Total: `317`
+- Total: `319`
 
 The skipped test is the existing PBT seed/shrinking demonstration:
 
@@ -49,6 +49,7 @@ The default `dotnet test Dayswork.sln` path may copy the mod to the configured S
   - chest deposit reachable adjacent stand-tile selection
   - sheep shears audio cue uses vanilla `scissors`
   - debris item-id normalization rejects incomplete IDs like bare `(O)` before they can enter the worker buffer
+  - session reset handler clears stale in-memory worker state on title-return and before save-load hydration
 - Existing project coverage:
   - pricing
   - persistence

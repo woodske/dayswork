@@ -92,9 +92,24 @@ Expected results:
 - Full chest leftovers are mailed with `ChestFull` reason.
 - No items are lost.
 
+### Scenario 6: Exit To Title Or Desktop Mid-Shift
+
+Setup:
+
+- Start a worker shift and let the worker make visible progress so buffer, stamina, and location state are non-default.
+- Use `Exit to Title`, then reload the same save. Optionally repeat by exiting the game entirely and relaunching.
+
+Expected results:
+
+- The previous in-memory worker does not continue from the old mid-shift position.
+- The old shift's buffered items, stamina, deferred work, and navigation state do not carry across the session boundary.
+- Reload follows the save's real morning/day-start state, so any worker spawn is a fresh day-start execution rather than a resumed in-memory shift.
+- No stale worker UI/runtime state survives after returning to the title screen.
+
 ## Logs To Check
 
 - SMAPI console/log for `[Dayswork][routing]`, `[Dayswork][building]`, `[Dayswork][deposit]`, `[Dayswork][exit]`, and `[Dayswork][debris]` diagnostics.
+- For title-return repros, look for `[Dayswork] Resetting in-memory worker runtime for session boundary ReturnedToTitle.` and `... SaveLoaded.`
 - Warnings should be narrow and explain skipped blocked work or unreachable deposit destinations.
 
 ## Cleanup

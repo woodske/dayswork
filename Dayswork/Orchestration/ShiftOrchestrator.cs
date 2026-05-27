@@ -17,7 +17,7 @@ using StardewValley.Tools;
 
 namespace Dayswork.Orchestration;
 
-internal sealed class ShiftOrchestrator
+internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 {
     // Shipping bin tile on Standard Farm.
     private static readonly TileCoord ShippingBinTile = new(71, 13);
@@ -357,6 +357,37 @@ internal sealed class ShiftOrchestrator
             _ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
 
         QueueWrapUpNow(ShiftStopReason.Cancelled);
+    }
+
+    public void ResetForSessionBoundary(SessionResetBoundary boundary)
+    {
+        var hadRuntimeState = _ctx is not null ||
+                              _farmhand is not null ||
+                              _currentLocation is not null ||
+                              _depositTrips.Count > 0 ||
+                              _pendingDebrisSweeps.Count > 0 ||
+                              _animalWork.Count > 0 ||
+                              _deferredTileWork.Count > 0 ||
+                              _deferredAnimalWork.Count > 0 ||
+                              _currentTrip is not null ||
+                              _currentTileWork is not null ||
+                              _currentAnimalWork is not null;
+
+        if (hadRuntimeState)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Resetting in-memory worker runtime for session boundary {boundary}.",
+                LogLevel.Info);
+        }
+
+        ClearWorker();
+        _ctx = null;
+        _tickCount = 0;
+        _farmExitTile = default;
+        _lastSampledGameTime = 0;
+        _lastTilePos = default;
+        _playerWasSwinging = false;
+        _stuck = new StuckDetector(_config.StuckInitialWaitMinutes);
     }
 
     public void StartShift(Contract contract, IConfigSnapshot runtimeConfig)
@@ -1987,21 +2018,33 @@ internal sealed class ShiftOrchestrator
         if (_farmhand is not null)
         {
             _farmhand.controller = null;
-            (_farmhand.currentLocation ?? _currentLocation ?? Game1.getFarm()).characters.Remove(_farmhand);
-            Game1.getFarm().characters.Remove(_farmhand);
+            (_farmhand.currentLocation ?? _currentLocation)?.characters.Remove(_farmhand);
+            if (Context.IsWorldReady)
+                Game1.getFarm().characters.Remove(_farmhand);
         }
 
         _toolAnimator.SetWorker(null);
         _farmhand = null;
         _currentLocation = null;
+        _actionPending = false;
         _morningEntranceHoldTicks = 0;
+        _pendingTask = default;
+        _pendingNavTile = default;
+        _pendingTaskTile = default;
+        _pendingOutputProvenance = OutputScopeProvenance.Unknown;
         _waitingForDebrisBeforeDeposit = false;
         _pendingBuildingEntry = false;
         _pendingBuildingExit = false;
+        _pendingBuildingOutdoorDoor = default;
         _pendingBuildingInterior = null;
+        _pendingInteriorExitTile = default;
         _currentFeedPlan = null;
         _hayInHand = 0;
         _animalWork.Clear();
+        _deferredTileWork.Clear();
+        _deferredAnimalWork.Clear();
+        _activeBatchSelectionAttempts = 0;
+        _currentTileWork = null;
         _currentAnimalWork = null;
         _pendingBeatOutcome = null;
         _pendingDebrisSweeps.Clear();

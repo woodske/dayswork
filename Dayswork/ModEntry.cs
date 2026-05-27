@@ -79,6 +79,7 @@ public sealed class ModEntry : Mod
             depositPlanner,
             mailDispatcher);
         Orchestrator = orchestrator;
+        var sessionResetHandler = new SessionResetHandler(orchestrator);
         var calendarHandlers = new CalendarHandlers(orchestrator);
         var scheduler       = new RecurringContractScheduler(
             store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, mailDispatcher);
@@ -91,6 +92,8 @@ public sealed class ModEntry : Mod
             mailDispatcher.SetApi(helper.ModRegistry.GetApi("DIGUS.MailFrameworkMod"));
             gmcmRegistrar.RegisterIfAvailable();
         };
+        helper.Events.GameLoop.ReturnedToTitle += sessionResetHandler.OnReturnedToTitle;
+        helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += mailDispatcher.OnSaveLoaded;
         // Stop and settle any in-flight shift (sleep-stop + mailed refund) BEFORE contracts persist and

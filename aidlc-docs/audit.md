@@ -4594,3 +4594,25 @@ ocassionally an errored out item spawns on the ground in the outdoor work tiles.
 **Context**: CONSTRUCTION — Build and Test review fix for intermittent outdoor Error Item diagnostics
 
 ---
+
+## Build and Test — Session Reset Review Change Requested
+**Timestamp**: 2026-05-27T21:13:37Z
+**User Input**:
+```text
+The worker does not reset when I use exit to title to go back to the stardew valley title page. When I do and re-load the game, the worker continues right where they left off (and doesn't spawn a worker UI). The expectation is that when I exit to title, the mod gracefully exits and resets everything (buffer, energy, location, etc). It should start fresh when I re-load the game. The same should happen when I exit to desktop, there should be no current day state saved or persited.
+```
+**AI Response**: Accepted the report as additional Build and Test review feedback and began tracing worker lifecycle teardown across `ReturnedToTitle`, `SaveLoaded`, `Saving`, and day-start scheduling. Initial investigation found that `ModEntry` registers save, day-start, and tick handlers, but no `ReturnedToTitle` or pre-load reset hook exists, so stale in-memory `ShiftOrchestrator` state can survive title-screen transitions even when the game itself discards the unsaved day. The current review focus is to add an explicit non-settling session reset boundary so exit-to-title and fresh reloads start from clean runtime state instead of resuming a prior in-memory shift.
+**Context**: CONSTRUCTION — Build and Test review investigation for exit-to-title / reload worker reset bug
+
+---
+
+## Build and Test — Session Reset Review Fix Complete
+**Timestamp**: 2026-05-27T21:20:59Z
+**User Input**:
+```text
+The worker does not reset when I use exit to title to go back to the stardew valley title page. When I do and re-load the game, the worker continues right where they left off (and doesn't spawn a worker UI). The expectation is that when I exit to title, the mod gracefully exits and resets everything (buffer, energy, location, etc). It should start fresh when I re-load the game. The same should happen when I exit to desktop, there should be no current day state saved or persited.
+```
+**AI Response**: Confirmed the stale worker came from in-memory `ShiftOrchestrator` state surviving session transitions because `ModEntry` had no `ReturnedToTitle` or pre-hydration `SaveLoaded` reset hook. Added `SessionResetHandler` plus `SessionResetBoundary` / `ISessionBoundaryResettable`, wired the handler in `ModEntry` so `ReturnedToTitle` and `SaveLoaded` both trigger a non-settling runtime reset before persistence hydration/day-start logic, and extended `ShiftOrchestrator.ClearWorker()` plus `ResetForSessionBoundary(...)` to clear the worker, shift context, deferred work, navigation/deposit state, pending task/debris state, and title-safe world references without mailing or persisting the discarded day. Added focused coverage in `Dayswork.Tests/Orchestration/SessionResetHandlerTests.cs`, refreshed the U-WR code summary plus Build and Test unit/integration/summary artifacts, and updated `aidlc-state.md`. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings / 0 errors, `dotnet test Dayswork.sln /p:EnableModDeploy=false` completed with 318 passed / 1 expected skip / 0 failed, and deploy-enabled `dotnet build Dayswork.sln` completed with 0 warnings / 0 errors and refreshed `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — Build and Test review fix for exit-to-title / reload worker reset bug
+
+---

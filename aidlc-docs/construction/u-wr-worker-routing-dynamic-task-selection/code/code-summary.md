@@ -16,8 +16,10 @@ U-WR changes the worker's within-batch routing from fixed queue/side preference 
 | `Dayswork/Orchestration/WorkAreaScanner.cs` | Preserves all potential interaction tiles for tile work and keeps scan order stable for dynamic selection instead of Manhattan pre-ordering. |
 | `Dayswork/Orchestration/AnimalTaskHandler.cs` | Exposes multiple animal interaction tiles and gives hopper/trough feed work multiple stand candidates. |
 | `Dayswork/Orchestration/DebrisItemIdResolver.cs` | Normalizes raw debris item IDs to qualified IDs and resolves them through Stardew's item registry before buffering worker drops. |
+| `Dayswork/Orchestration/SessionResetHandler.cs` | Adds a narrow session-boundary reset hook so title-return and save-load lifecycle events clear stale in-memory worker runtime. |
 | `Dayswork/Orchestration/ShiftOrchestrator.cs` | Builds a fresh active-batch candidate pool, selects nearest reachable work with deterministic tie-breaks, defers navigation failures, retries after progress, skips blocked remainder on no reachable progress, revalidates before dispatch, updates stuck recovery to use the same active-batch selector, routes chest deposits to reachable adjacent stand tiles, and warns when worker-created debris carries an invalid item ID. |
 | `Dayswork/Orchestration/BuildingWorkNavigator.cs` | Exposes interior exit approach candidates and a nearest-reachable selector so building completion walks to a reachable exit approach tile before transitioning outside. |
+| `Dayswork/ModEntry.cs` | Registers session reset handlers before persistence/mail save-load hydration so stale worker runtime is cleared at the start of each loaded session. |
 
 ## Created Application/Test Files
 
@@ -29,6 +31,7 @@ U-WR changes the worker's within-batch routing from fixed queue/side preference 
 | `Dayswork.Tests/UWR/WorkerRouteSelectorTests.cs` | Deterministic selector examples. |
 | `Dayswork.Tests/UWR/WorkerRoutingRegressionTests.cs` | Focused examples for wrong-side routing, blocked-side product collection, near animal selection, feed retry after product progress, disabled product boundary, and no-progress blocked termination. |
 | `Dayswork.Tests/Orchestration/DebrisItemIdResolverTests.cs` | Focused examples for collectible item-ID normalization, including rejection of incomplete bare type prefixes like `(O)`. |
+| `Dayswork.Tests/Orchestration/SessionResetHandlerTests.cs` | Focused examples proving the save-load and returned-to-title hooks both request a runtime session reset. |
 | `Dayswork.Tests/UWR/BuildingExitRoutingTests.cs` | Focused examples for selecting a reachable interior exit approach tile before the farm transition. |
 | `Dayswork.Tests/UWR/DepositRoutingTests.cs` | Focused examples for selecting a reachable adjacent stand tile before chest deposits. |
 
@@ -68,6 +71,12 @@ U-WR changes the worker's within-batch routing from fixed queue/side preference 
 - Likely cause addressed: Stardew's outdoor debris paths, especially tree seed or other probabilistic tree-drop creation, can create in-world debris directly from item ID strings. If a malformed ID slips through, `Debris.InitializeItem(...)` turns it into a visible Error Item. Dayswork previously trusted any non-empty debris ID when buffering nearby drops, so there was no narrow diagnostic when that happened.
 - Fix: worker debris intake now normalizes raw debris IDs to a complete qualified shape, resolves them through `ItemRegistry`, buffers only valid resolved items, and logs a focused `[Dayswork][debris] worker-created debris could not be resolved...` warning with task/location context when a nearby worker-created debris item has an invalid ID. This keeps valid drops flowing normally while giving the next repro an actionable source breadcrumb instead of silently accepting malformed IDs.
 
+## Session Reset Review Fix
+
+- Play-test feedback: using `Exit to Title` and reloading could resume the previous in-memory worker exactly where they left off, without a fresh day-start spawn/UI, even though Stardew itself had discarded the unsaved day state.
+- Cause addressed: the mod had no explicit session-boundary reset hook. `Saving`-time sleep settlement handles real save writes, but `Exit to Title` is a memory/session transition, not a sleep save, so stale `ShiftOrchestrator` runtime state could survive inside the still-running mod process until the next save load.
+- Fix: `ModEntry` now wires a `SessionResetHandler` to `ReturnedToTitle` and to `SaveLoaded` before persistence/mail hydration. That handler tells `ShiftOrchestrator` to perform a non-settling runtime reset, clearing the in-memory worker, buffer-bearing shift context, deferred work, navigation state, pending deposit/debris state, and stale title-screen carryover before a new session begins. Reloaded saves now start from their actual saved day state instead of resuming a discarded in-memory shift.
+
 ## PBT Compliance
 
 | Rule | Result |
@@ -92,6 +101,9 @@ U-WR changes the worker's within-batch routing from fixed queue/side preference 
 - Outdoor Error Item review fix compile check: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` warnings and `0` errors after adding debris item-ID normalization and warning diagnostics.
 - Outdoor Error Item review fix full test rerun: `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with `316` passed, `1` expected skip, `0` failed after adding debris item-ID normalization and warning diagnostics.
 - Outdoor Error Item review fix deploy build: `dotnet build Dayswork.sln` passed with `0` warnings and `0` errors and refreshed `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+- Session reset review fix compile check: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` warnings and `0` errors after wiring session-boundary runtime reset hooks.
+- Session reset review fix full test rerun: `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with `318` passed, `1` expected skip, `0` failed after adding session reset handler coverage.
+- Session reset review fix deploy build: `dotnet build Dayswork.sln` passed with `0` warnings and `0` errors and refreshed `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
 
 ## Caveats
 
