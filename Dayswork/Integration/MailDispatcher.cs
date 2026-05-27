@@ -6,6 +6,7 @@ using Dayswork.Core.Domain;
 using Dayswork.Core.Inventory;
 using Dayswork.Integration.MailFramework;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
 using StardewValley;
 
 namespace Dayswork.Integration;
@@ -21,7 +22,11 @@ namespace Dayswork.Integration;
 // credited directly so nothing is lost (SAFE-U15-01 / REL-U15-04).
 internal sealed class MailDispatcher : IMailDispatcher
 {
+    private const string PendingSettlementsKey = "Dayswork.PendingSettlements";
+
     private MailFrameworkModApiAdapter? _mfm;
+    private readonly IDataHelper _dataHelper;
+    private readonly List<PendingSettlementRecord> _pendingSettlements = new();
 
     private enum DeliveryTiming
     {
@@ -29,8 +34,9 @@ internal sealed class MailDispatcher : IMailDispatcher
         Tomorrow,
     }
 
-    internal MailDispatcher(object? mfm = null)
+    internal MailDispatcher(IDataHelper dataHelper, object? mfm = null)
     {
+        _dataHelper = dataHelper;
         if (mfm is not null)
             SetApi(mfm);
     }
@@ -56,6 +62,35 @@ internal sealed class MailDispatcher : IMailDispatcher
                 $"[Dayswork] Mail Framework Mod API shape was not recognized: {ex.Message}",
                 LogLevel.Warn);
         }
+    }
+
+    // Re-registers any settlement letters that were queued during the previous session's Saving
+    // event but were lost from MFM's registry because MFM (a required dependency) saves its state
+    // before Dayswork's Saving handler fires. Called at SaveLoaded, after GameLaunched has already
+    // wired up the MFM API, so _mfm is available here.
+    //
+    // MFM also fires its SaveLoaded handler BEFORE ours (dependency load order), so its own
+    // morning delivery check runs before we re-register the letter. To guarantee the player
+    // receives the settlement on the correct morning we push the letter directly into
+    // Game1.mailbox — MFM will still serve the items and callback when the letter is opened.
+    internal void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
+    {
+        var saved = _dataHelper.ReadSaveData<List<PendingSettlementRecord>>(PendingSettlementsKey)
+            ?? new List<PendingSettlementRecord>();
+
+        _pendingSettlements.Clear();
+        foreach (var record in saved)
+        {
+            if (Game1.player?.mailReceived.Contains(record.Id) == true)
+                continue;
+
+            _pendingSettlements.Add(record);
+            ReRegisterWithMfm(record);
+            AddToMailboxToday(record.Id);
+        }
+
+        // Write back immediately to prune any already-delivered entries from saved data.
+        _dataHelper.WriteSaveData(PendingSettlementsKey, _pendingSettlements);
     }
 
     public void QueueSettlement(IReadOnlyList<ItemStack> items, IReadOnlyList<OverflowCategory> categories, int refundGold)
@@ -180,12 +215,15 @@ internal sealed class MailDispatcher : IMailDispatcher
         if (_mfm is null) return false;
         try
         {
+            var earliest = EarliestDeliveryDay(timing);
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][mail] register MFM letter id={id} attachments={attachments.Count} refund={refundGold} timing={timing}.",
                 LogLevel.Debug);
-            _mfm.RegisterLetter(id, synopsis, text, attachments, EarliestDeliveryDay(timing), refundGold);
+            _mfm.RegisterLetter(id, synopsis, text, attachments, earliest, refundGold);
             if (timing == DeliveryTiming.Today)
                 AddToMailboxToday(id);
+            else
+                PersistPendingSettlement(id, synopsis, text, attachments, earliest, refundGold);
             return true;
         }
         catch (Exception ex)
@@ -195,8 +233,58 @@ internal sealed class MailDispatcher : IMailDispatcher
         }
     }
 
-    private static int EarliestDeliveryDay(DeliveryTiming timing) =>
-        timing == DeliveryTiming.Today ? CurrentDay() : CurrentDay() + 1;
+    private void PersistPendingSettlement(
+        string id, string sender, string body,
+        List<Item> attachments, int earliestDeliveryDay, int refundGold)
+    {
+        _pendingSettlements.RemoveAll(r => Game1.player?.mailReceived.Contains(r.Id) == true);
+        _pendingSettlements.Add(new PendingSettlementRecord
+        {
+            Id = id,
+            Sender = sender,
+            Body = body,
+            EarliestDeliveryDay = earliestDeliveryDay,
+            RefundGold = refundGold,
+            Items = attachments.Select(i => new PendingSettlementItemRecord
+            {
+                QualifiedItemId = i.QualifiedItemId,
+                Quantity = i.Stack,
+            }).ToList(),
+        });
+        _dataHelper.WriteSaveData(PendingSettlementsKey, _pendingSettlements);
+    }
+
+    private void ReRegisterWithMfm(PendingSettlementRecord record)
+    {
+        if (_mfm is null) return;
+        try
+        {
+            var attachments = record.Items
+                .Select(i => ItemRegistry.Create(i.QualifiedItemId, i.Quantity))
+                .OfType<Item>()
+                .ToList();
+
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][mail] re-register pending settlement id={record.Id} attachments={attachments.Count} refund={record.RefundGold}.",
+                LogLevel.Debug);
+            _mfm.RegisterLetter(
+                record.Id, record.Sender, record.Body,
+                attachments, record.EarliestDeliveryDay, record.RefundGold);
+        }
+        catch (Exception ex)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Failed to re-register pending settlement with MFM: {ex.Message}",
+                LogLevel.Warn);
+        }
+    }
+
+    // Both Today and Tomorrow map to CurrentDay() because the date counter has already
+    // advanced to the new day by the time GameLoop.Saving fires (SDV increments the date
+    // before writing the save). A "+1" would overshoot by one and deliver mail a full extra
+    // morning late. For Today letters the distinction from Tomorrow is handled by
+    // AddToMailboxToday, not by the delivery-day value.
+    private static int EarliestDeliveryDay(DeliveryTiming timing) => CurrentDay();
 
     // Morning skip notices are queued after the day's mailbox has usually been prepared. Adding the
     // MFM letter id to today's mailbox makes "no worker today" mail readable before the day is over.

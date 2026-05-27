@@ -64,7 +64,7 @@ public sealed class ModEntry : Mod
         // initialize (GameLaunched), NOT in Entry() — so construct the dispatcher now and inject the
         // API on GameLaunched below. If it's ever null, MailDispatcher logs and falls back so no
         // items are lost (REL-U14-05).
-        var mailDispatcher  = new MailDispatcher();
+        var mailDispatcher  = new MailDispatcher(helper.Data);
         var orchestrator    = new ShiftOrchestrator(
             toolReader,
             config,
@@ -92,6 +92,7 @@ public sealed class ModEntry : Mod
             gmcmRegistrar.RegisterIfAvailable();
         };
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
+        helper.Events.GameLoop.SaveLoaded   += mailDispatcher.OnSaveLoaded;
         // Stop and settle any in-flight shift (sleep-stop + mailed refund) BEFORE contracts persist and
         // before the day rolls over — handler order is authoritative (Pattern S / REL-U15-02).
         helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;

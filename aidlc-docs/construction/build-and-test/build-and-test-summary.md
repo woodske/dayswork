@@ -8,8 +8,18 @@
 | Compile command | `dotnet build Dayswork.sln /p:EnableModDeploy=false` |
 | Test command | `dotnet test Dayswork.sln` |
 | Build status | Success |
-| Build marker | `build=U24-Step19` |
+| Build marker | `build=U24-Step19` (post-playtest patch applied) |
 | Live deploy behavior | `dotnet test Dayswork.sln` currently builds with deploy enabled for the mod project before the test project runs |
+
+## Post-U-24 Playtest Bug Fix
+
+**Settlement mail not appearing next day** — fixed.
+
+Root cause: MFM (a required dependency, loads before Dayswork) saves its letter registry during `GameLoop.Saving` before Dayswork's `Saving` handler fires. Letters registered by `QueueSettlement` during sleep were in MFM's in-memory collection but not in its save file, so they were lost on session reload.
+
+Fix: `MailDispatcher` now writes pending Tomorrow-delivery settlement data to `"Dayswork.PendingSettlements"` in Dayswork's own SMAPI save key. A new `OnSaveLoaded` handler re-registers surviving pending letters with MFM at load time (after `GameLaunched` has set up the MFM API). Letters already in `player.mailReceived` are pruned from the list on load.
+
+Files changed: `Dayswork/Integration/MailFramework/PendingSettlementRecord.cs` (new), `Dayswork/Integration/MailDispatcher.cs`, `Dayswork/ModEntry.cs`.
 
 ## Verified Totals
 
@@ -65,3 +75,12 @@ The expected skip remains `Dayswork.Tests.Smoke.SeedLoggingDemoTests.PBT08_seed_
 | U-22 | Scope-driven runtime alignment |
 | U-23 | Recurring billing and calendar refresh |
 | U-24 | Config, regression, and documentation cleanup |
+
+## Overall Status
+
+| Category | Status |
+|---|---|
+| Automated build | Pass |
+| Automated unit/property/lint tests | Pass |
+| Manual integration playtest | Pending reviewer playtest sign-off |
+| Ready to proceed to Operations placeholder | Yes, if the reviewer accepts the current build/test package and remaining manual checks |

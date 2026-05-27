@@ -3100,6 +3100,18 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 
 ---
 
+## Post-U-24 Bug Fix — Settlement Mail Persistence
+**Timestamp**: 2026-05-26T00:00:00Z
+**User Input**: "Mail is not showing up the next day with items the worker has in their buffer after I go to sleep"
+**AI Response**: Root cause identified and fixed. When the player sleeps, `GameLoop.Saving` fires. MFM (a required dependency, loaded before Dayswork) saves its letter registry first. Dayswork's `CalendarHandlers.OnSavingHook` then runs, calling `SettleShiftMail` → `QueueSettlement` → `TrySendViaMfm` → `_mfm.RegisterLetter()`. MFM adds the letter to its in-memory collection but has already written its save file, so the letter is lost on session reload and never delivered.
+
+Fix: `MailDispatcher` now writes pending settlement data to `"Dayswork.PendingSettlements"` in Dayswork's own SMAPI save key whenever a Tomorrow letter is registered. A new `OnSaveLoaded` handler re-registers any surviving pending settlements with MFM at load time (after `GameLaunched` has already wired up the MFM API), before MFM begins its morning delivery checks. Settlements already in `player.mailReceived` are pruned from the saved list on load.
+
+Files changed: `Dayswork/Integration/MailFramework/PendingSettlementRecord.cs` (new), `Dayswork/Integration/MailDispatcher.cs` (persistence logic), `Dayswork/ModEntry.cs` (constructor + SaveLoaded registration). Build: 0 errors, 0 warnings. Tests: 286 passed / 1 expected skip / 0 failed — unchanged from U-24 baseline.
+**Context**: Manual playtest bug fix — overflow mail path
+
+---
+
 ## Code Generation — U-18 Generated
 **Timestamp**: 2026-05-24T23:18:04Z
 **User Input**: "approved"
@@ -4017,5 +4029,29 @@ the worker isn't pathing to the hopper, they're going to the corner then attempt
 **User Input**: "(none — approval prompt initiated)"
 **AI Response**: Prepared the U-24 code-generation review gate. The user is being asked to review the generated application code in the workspace plus the documentation at `aidlc-docs/construction/u-24-config-regression-documentation-cleanup/code/`, and either request changes or continue to the next stage.
 **Context**: CONSTRUCTION — Approval prompt for U-24 Code Generation
+
+---
+
+## Code Generation — U-24 Review Approved
+**Timestamp**: 2026-05-26T21:01:38Z
+**User Input**: "continue"
+**AI Response**: Treated the response as approval to leave U-24 Code Generation and enter the final Build and Test stage. Loaded the Build and Test stage rules, verified the U-24 cleanup already produced the redesign-native build/test instruction set under `aidlc-docs/construction/build-and-test/`, and used the latest verified automated results (`dotnet build Dayswork.sln /p:EnableModDeploy=false`, `dotnet test Dayswork.sln`) as the authoritative build/test baseline for the handoff.
+**Context**: CONSTRUCTION — Transition from U-24 Code Generation review to Build and Test
+
+---
+
+## Build and Test Stage
+**Timestamp**: 2026-05-26T21:01:38Z
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+- redesign-deviations-and-caveats.md
+**AI Response**: Finalized the Build and Test stage by validating the existing redesign-native instruction files, tightening the summary with overall status, and updating `aidlc-state.md` to the Build and Test review gate. The package now covers compile-only and deployed builds, full automated unit/property/lint execution, manual in-game integration scenarios for the fixed-price/worker-stamina redesign, informal performance checks, and a bounded reviewer-facing note for accepted deviations and caveats. Verified automated baseline remains green: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` errors / `0` warnings and `dotnet test Dayswork.sln` passed with `286` passed / `1` expected skip / `0` failed.
+**Context**: CONSTRUCTION — Build and Test completion
 
 ---
