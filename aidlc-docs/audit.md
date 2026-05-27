@@ -4294,3 +4294,219 @@ When doing tasks, the worker should always take the shortest path to the task. T
 **Context**: CONSTRUCTION — Approval prompt for U-WR NFR Design
 
 ---
+
+## NFR Design — U-WR Approved
+**Timestamp**: 2026-05-27T14:57:55Z
+**User Input**: "continue"
+**AI Response**: Treated the response as explicit approval of the U-WR NFR Design artifacts and moved into Code Generation planning. Loaded the Code Generation rule, approved NFR design patterns, logical components, and current timestamp; then inspected routing/orchestration source files and story/requirement traces needed to produce a concrete generation plan.
+**Context**: CONSTRUCTION — Transition from U-WR NFR Design to Code Generation Planning
+
+---
+
+## Code Generation — U-WR Plan Created
+**Timestamp**: 2026-05-27T14:57:55Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/plans/u-wr-worker-routing-dynamic-task-selection-code-generation-plan.md` with an 18-step code generation sequence covering pure selector model and properties, movement-aligned route-cost oracle, all-side tile/animal/feed candidates, active-batch route-ranked selection, blocked-work deferral/retry, target revalidation, stuck-recovery integration, example and property tests, code summary, local verification, and state/audit updates. Updated `aidlc-state.md` to the Code Generation plan review gate.
+**Context**: CONSTRUCTION — Code Generation Part 1 planning for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Plan Review Prompt
+**Timestamp**: 2026-05-27T14:57:55Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the Code Generation plan approval gate. The user is being asked to review `aidlc-docs/construction/plans/u-wr-worker-routing-dynamic-task-selection-code-generation-plan.md`, then either request changes or approve the plan so Code Generation Part 2 can begin.
+**Context**: CONSTRUCTION — Approval prompt for U-WR Code Generation plan
+
+---
+
+## Code Generation — U-WR Plan Approved
+**Timestamp**: 2026-05-27T15:17:12Z
+**User Input**: "continue"
+**AI Response**: Treated the response as explicit approval of the U-WR Code Generation plan and began Code Generation Part 2. Loaded the approved plan, current orchestrator source, current git status, and timestamp before starting application code changes.
+**Context**: CONSTRUCTION — Code Generation Part 2 start for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 1 Complete
+**Timestamp**: 2026-05-27T15:17:12Z
+**User Input**: "continue"
+**AI Response**: Created `Dayswork.Core/Shifts/WorkerRouteSelector.cs` with pure evaluated-candidate selection by route cost, task-priority rank, and stable order. Added `ITaskPriorityOrderer.Rank(TaskKind)` and implemented it in `TaskPriorityOrderer` so runtime selection can use the existing task-priority authority. Marked Step 1 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 1 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 2 Complete
+**Timestamp**: 2026-05-27T15:17:12Z
+**User Input**: "continue"
+**AI Response**: Created `Dayswork.Tests/UWR/UWRPropertyGenerators.cs` and `Dayswork.Tests/UWR/WorkerRouteSelectorPropertyTests.cs`. The FsCheck tests cover minimum reachable route cost, deterministic task-priority/stable-order tie-breaks through an oracle, unreachable filtering, and zero-cost current-tile selection. Marked Step 2 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 2 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 3 Complete
+**Timestamp**: 2026-05-27T15:17:12Z
+**User Input**: "continue"
+**AI Response**: Created `Dayswork.Tests/UWR/WorkerRouteSelectorTests.cs` with example coverage for nearer route winning over priority, equal-cost task-priority tie-breaks, stable-order tie-breaks within the same task, and no reachable candidates. Marked Step 3 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 3 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 4 Complete
+**Timestamp**: 2026-05-27T15:17:12Z
+**User Input**: "continue"
+**AI Response**: Updated `Dayswork/Worker/WorkerMovementDriver.cs` with a narrow route-cost oracle from worker/source tile to destination tile. The method reuses the same map bounds, neighbor ordering, and `IsTilePassableForWorker` passability assumptions used by the fallback movement route, while preserving existing `StartNavigation` behavior. Marked Step 4 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 4 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 5 Complete
+**Timestamp**: 2026-05-27T15:17:12Z
+**User Input**: "continue"
+**AI Response**: Updated `Dayswork.Core/Shifts/WorkItem.cs` so work items can carry all valid interaction/navigation tiles while retaining existing call-site compatibility. Updated `Dayswork/Orchestration/WorkAreaScanner.cs` to enumerate all valid orthogonal stand tiles for adjacent-interaction work, include walkable task tiles for walkable tasks, preserve stable scan order, and stop returning Manhattan greedy order from the scanner. Marked Step 5 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 5 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 6 Complete
+**Timestamp**: 2026-05-27T15:17:12Z
+**User Input**: "continue"
+**AI Response**: Updated `Dayswork/Orchestration/AnimalTaskHandler.cs` so animal navigation exposes multiple potential interaction tiles and feed hopper/trough `WorkItem`s carry candidate stand tiles instead of only fixed preferred sides. Hopper-before-trough and existing auto-feed/no-silo behavior were preserved. Marked Step 6 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 6 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Steps 7-12 Complete
+**Timestamp**: 2026-05-27T15:28:28Z
+**User Input**: "continue"
+**AI Response**: Updated `Dayswork/Orchestration/ShiftOrchestrator.cs` to build a combined active-batch candidate pool from tile, animal, hopper, and trough work at each task boundary; evaluate route costs through `WorkerMovementDriver`; select work through `WorkerRouteSelector`; preserve broad batch order while reordering within a batch; defer navigation failures; retry deferred work after progress; skip blocked remainder on no reachable work; apply a defensive finite selection guard; revalidate selected tile and animal targets before execution; preserve product authorization and task-owned output provenance; integrate hopper-before-trough feed behavior; and update stuck recovery to resume through route-ranked selection. Marked Steps 7 through 12 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Steps 7-12 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Steps 13-14 Complete
+**Timestamp**: 2026-05-27T15:28:28Z
+**User Input**: "continue"
+**AI Response**: Created `Dayswork.Tests/UWR/WorkerRoutingRegressionTests.cs` with focused examples for zero-cost current-side selection, one-side-blocked egg/product collection, nearer animal work, feed retry after enabled product collection clears a route, disabled product collection leaving feed blocked, and no-reachable-work no-progress termination. Deferral remains integrated with live orchestrator state, so no separate deferral PBT was added. Marked Steps 13 and 14 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Steps 13-14 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 15 Complete
+**Timestamp**: 2026-05-27T15:31:40Z
+**User Input**: "continue"
+**AI Response**: Completed the preservation check. `git status --short`, duplicate-file pattern search, and changed-file inspection showed no duplicate source copies and no save schema, config, GMCM, mail, i18n, dependency, output-routing, or stamina-surface changes. Marked Step 15 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 15 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 16 Complete
+**Timestamp**: 2026-05-27T15:31:40Z
+**User Input**: "continue"
+**AI Response**: Created `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/code/code-summary.md` with modified and created application/test files, routing behavior summary, PBT compliance, example coverage, verification results, and caveats for in-game play-testing. Marked Step 16 complete in the code-generation plan and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 16 for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Step 17 Complete
+**Timestamp**: 2026-05-27T15:33:08Z
+**User Input**: "continue"
+**AI Response**: Ran local verification. `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with 0 warnings and 0 errors. `dotnet test Dayswork.sln` passed with 300 tests passed, 1 expected skip, and 0 failed. Recorded the verification results in `code-summary.md`, marked Step 17 complete in the code-generation plan, and updated `aidlc-state.md`.
+**Context**: CONSTRUCTION — Code Generation Step 17 verification for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Complete
+**Timestamp**: 2026-05-27T15:33:44Z
+**User Input**: "continue"
+**AI Response**: Completed U-WR Code Generation. Marked S-08, S-16, and S-19 implemented in the code-generation plan; marked Step 18 complete; updated `aidlc-state.md` to the Code Generation review gate. Generated code modifies `Dayswork.Core/Shifts/ITaskPriorityOrderer.cs`, `Dayswork.Core/Shifts/TaskPriorityOrderer.cs`, `Dayswork.Core/Shifts/WorkItem.cs`, `Dayswork/Worker/WorkerMovementDriver.cs`, `Dayswork/Orchestration/WorkAreaScanner.cs`, `Dayswork/Orchestration/AnimalTaskHandler.cs`, and `Dayswork/Orchestration/ShiftOrchestrator.cs`; creates `Dayswork.Core/Shifts/WorkerRouteSelector.cs` and U-WR tests under `Dayswork.Tests/UWR/`; and creates `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/code/code-summary.md`.
+**Context**: CONSTRUCTION — Code Generation completion for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Review Prompt
+**Timestamp**: 2026-05-27T15:33:44Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the Code Generation review gate. The user is being asked to review generated application code under the workspace root and documentation under `aidlc-docs/construction/u-wr-worker-routing-dynamic-task-selection/code/`, then either request changes or continue to Build and Test.
+**Context**: CONSTRUCTION — Approval prompt for U-WR Code Generation
+
+---
+
+## Code Generation — U-WR Review Change Requested
+**Timestamp**: 2026-05-27T15:48:25Z
+**User Input**: "Doing the barn and coop work looked really good and performed well, as soon as the worker started the outdoor tile work my framerate dropped to 1 fps"
+**AI Response**: Accepted the review feedback as a Code Generation change request. Diagnosed the likely outdoor-tile hot path as repeated exact route searches for each candidate stand tile, which is acceptable for small barn/coop batches but can become expensive for large outdoor tile batches. Proceeding to replace per-candidate route searches with a single per-selection route-cost map while preserving shortest-route selection semantics.
+**Context**: CONSTRUCTION — Code Generation review feedback for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Code Generation — U-WR Review Fix Complete
+**Timestamp**: 2026-05-27T15:51:43Z
+**User Input**: "Doing the barn and coop work looked really good and performed well, as soon as the worker started the outdoor tile work my framerate dropped to 1 fps"
+**AI Response**: Updated `Dayswork/Worker/WorkerMovementDriver.cs` to compute one exact route-cost map from the worker's current tile per selection boundary, and updated `Dayswork/Orchestration/ShiftOrchestrator.cs` to score all active-batch tile and animal candidates by route-cost lookup instead of running one path search per candidate stand tile. Updated `code-summary.md`, `aidlc-state.md`, and the U-WR code-generation plan. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings / 0 errors, and `dotnet test Dayswork.sln` completed with 300 passed / 1 expected skip / 0 failed.
+**Context**: CONSTRUCTION — Code Generation review fix for U-WR outdoor tile performance
+
+---
+
+## Code Generation — U-WR Review Prompt
+**Timestamp**: 2026-05-27T15:51:43Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the Code Generation review gate after the outdoor tile performance fix. The user is being asked to review or play-test the generated application changes, then either request changes or continue to Build and Test.
+**Context**: CONSTRUCTION — Approval prompt for U-WR Code Generation review fix
+
+---
+
+## Code Generation — U-WR Review Change Requested
+**Timestamp**: 2026-05-27T16:00:06Z
+**User Input**: "looks great, one small change, the worker when done with building tasks just warps out instead of walks out. this is a regression"
+**AI Response**: Accepted the review feedback as a Code Generation change request. Investigating the building-task completion handoff so the worker walks to the interior exit before returning to the farm instead of visibly warping out as a regression.
+**Context**: CONSTRUCTION — Code Generation review feedback for U-WR building exit behavior
+
+---
+
+## Code Generation — U-WR Building Exit Review Fix Complete
+**Timestamp**: 2026-05-27T16:05:08Z
+**User Input**: "looks great, one small change, the worker when done with building tasks just warps out instead of walks out. this is a regression"
+**AI Response**: Updated `Dayswork/Orchestration/BuildingWorkNavigator.cs` to expose interior exit approach candidates and a nearest-reachable selector, updated `Dayswork/Orchestration/ShiftOrchestrator.cs` to choose a reachable interior exit approach tile from the worker's current position before transitioning back to the farm, and added `Dayswork.Tests/UWR/BuildingExitRoutingTests.cs`. An initial build caught a missing xUnit using in the new test file; after fixing that, verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings / 0 errors, and `dotnet test Dayswork.sln` completed with 303 passed / 1 expected skip / 0 failed. Updated `code-summary.md`, `aidlc-state.md`, and the U-WR code-generation plan.
+**Context**: CONSTRUCTION — Code Generation review fix for U-WR building exit walk-out regression
+
+---
+
+## Code Generation — U-WR Review Prompt
+**Timestamp**: 2026-05-27T16:05:08Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the Code Generation review gate after the building exit walk-out fix. The user is being asked to review or play-test the generated application changes, then either request changes or continue to Build and Test.
+**Context**: CONSTRUCTION — Approval prompt for U-WR Code Generation review fix
+
+---
+
+## Code Generation — U-WR Review Change Requested
+**Timestamp**: 2026-05-27T16:12:30Z
+**User Input**: "small regression, the worker does not travel to the chest to deposit materials, they're just put in there automatically."
+**AI Response**: Accepted the review feedback as a Code Generation change request. Investigating the deposit trip flow so chest-destined materials are transferred only after the worker visibly reaches the assigned chest.
+**Context**: CONSTRUCTION — Code Generation review feedback for U-WR chest deposit behavior
+
+---
+
+## Code Generation — U-WR Chest Deposit Review Fix Complete
+**Timestamp**: 2026-05-27T16:17:49Z
+**User Input**: "small regression, the worker does not travel to the chest to deposit materials, they're just put in there automatically."
+**AI Response**: Updated `Dayswork/Orchestration/ShiftOrchestrator.cs` so chest deposit trips navigate to the nearest reachable stand tile adjacent to the assigned chest, and deposit navigation failure no longer transfers items automatically. Moved the shared nearest-reachable tile selection helper into `Dayswork.Core/Shifts/WorkerRouteSelector.cs` and added `Dayswork.Tests/UWR/DepositRoutingTests.cs`. The first full test run exposed that the initial test seam referenced `ShiftOrchestrator` and loaded missing game assemblies, plus two diagnostic strings tripped the i18n lint; both were corrected. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings / 0 errors, and `dotnet test Dayswork.sln` completed with 306 passed / 1 expected skip / 0 failed. Updated `code-summary.md`, `aidlc-state.md`, and the U-WR code-generation plan.
+**Context**: CONSTRUCTION — Code Generation review fix for U-WR chest deposit walk-to-chest regression
+
+---
+
+## Code Generation — U-WR Review Prompt
+**Timestamp**: 2026-05-27T16:17:49Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the Code Generation review gate after the chest deposit walk-to-chest fix. The user is being asked to review or play-test the generated application changes, then either request changes or continue to Build and Test.
+**Context**: CONSTRUCTION — Approval prompt for U-WR Code Generation review fix
+
+---
+
+## Code Generation — U-WR Approval
+**Timestamp**: 2026-05-27T16:48:47Z
+**User Input**: "looks good, changes are approved"
+**AI Response**: Recorded Code Generation approval for U-WR Worker Routing and Dynamic Task Selection and advanced the workflow to the Build and Test stage.
+**Context**: CONSTRUCTION — Code Generation approval and transition to Build and Test
+
+---

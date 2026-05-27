@@ -1,86 +1,74 @@
-# Build and Test Summary — Dayswork Fixed-Price Redesign
+# Build and Test Summary - U-WR Worker Routing and Dynamic Task Selection
 
 ## Build Status
 
-| Item | Detail |
-|---|---|
-| Build tool | .NET 6 SDK / MSBuild |
-| Compile command | `dotnet build Dayswork.sln /p:EnableModDeploy=false` |
-| Test command | `dotnet test Dayswork.sln` |
-| Build status | Success |
-| Build marker | `build=U24-Step19` (post-playtest patch applied) |
-| Live deploy behavior | `dotnet test Dayswork.sln` currently builds with deploy enabled for the mod project before the test project runs |
+- **Build tool**: .NET CLI / MSBuild
+- **Command**: `dotnet build Dayswork.sln /p:EnableModDeploy=false`
+- **Status**: Pass
+- **Warnings**: `0`
+- **Errors**: `0`
+- **Primary artifacts**:
+  - `Dayswork.Core/bin/Debug/net6.0/Dayswork.Core.dll`
+  - `Dayswork/bin/Debug/net6.0/Dayswork.dll`
+  - `Dayswork.Tests/bin/Debug/net6.0/Dayswork.Tests.dll`
 
-## Post-U-24 Playtest Bug Fix
+## Test Execution Summary
 
-**Settlement mail not appearing next day** — fixed.
+### Unit And Property Tests
 
-Root cause: MFM (a required dependency, loads before Dayswork) saves its letter registry during `GameLoop.Saving` before Dayswork's `Saving` handler fires. Letters registered by `QueueSettlement` during sleep were in MFM's in-memory collection but not in its save file, so they were lost on session reload.
+- **Command**: `dotnet test Dayswork.sln`
+- **Status**: Pass
+- **Passed**: `306`
+- **Failed**: `0`
+- **Skipped**: `1`
+- **Total**: `307`
 
-Fix: `MailDispatcher` now writes pending Tomorrow-delivery settlement data to `"Dayswork.PendingSettlements"` in Dayswork's own SMAPI save key. A new `OnSaveLoaded` handler re-registers surviving pending letters with MFM at load time (after `GameLaunched` has set up the MFM API). Letters already in `player.mailReceived` are pruned from the list on load.
+The skipped test is the existing seed/shrinking demonstration test and is expected.
 
-Files changed: `Dayswork/Integration/MailFramework/PendingSettlementRecord.cs` (new), `Dayswork/Integration/MailDispatcher.cs`, `Dayswork/ModEntry.cs`.
+### Integration Tests
 
-## Verified Totals
+- **Automated integration-like coverage**: Pass through `Dayswork.Tests`
+- **Manual SMAPI in-game coverage**: Recommended before release
+- **Key scenarios documented**:
+  - barn/coop nearby routing
+  - blocked egg/product side selection
+  - outdoor tile routing performance
+  - building exit walk-out
+  - chest deposit walk-to-chest
+  - missing/full chest overflow handling
 
-| Metric | Result |
-|---|---|
-| Passed | 286 |
-| Failed | 0 |
-| Skipped | 1 expected skip |
-| Total | 287 |
+### Performance Tests
 
-The expected skip remains `Dayswork.Tests.Smoke.SeedLoggingDemoTests.PBT08_seed_and_shrunk_input_logged_on_failure`.
+- **Automated FPS/load test**: N/A for this local SMAPI mod
+- **Manual performance play-test**: Documented in `performance-test-instructions.md`
+- **Known performance risk addressed**: Outdoor tile work no longer performs one path search per candidate stand tile; selection now uses one exact route-cost map per selection boundary.
 
-## U-24 Coverage Added or Refreshed
+### Contract Tests
 
-- redesign-only `ModConfig` surface and deterministic runtime snapshot mapping
-- GMCM pricing, stamina, and worker-behavior publication
-- `ConfigValueResolver` narrow fallback behavior
-- task-owned output routing and preserved scope provenance
-- capability snapshot invariants
-- stuck recovery reset behavior
-- multiplayer bulletin-board interaction policy
-- worker hit-reaction trigger policy
-- player-visible i18n lint boundary
+- **Status**: N/A
+- **Reason**: No external API contract or service boundary changed.
 
-## Final Automated Regression Checklist
+### Security Tests
 
-- [x] No hourly/deposit-era knobs remain in `ModConfig` or GMCM
-- [x] GMCM shows only `Pricing`, `Worker Stamina`, and `Worker Behavior`
-- [x] `RuntimeConfigSnapshotMapper` publishes deterministic redesign-era snapshots
-- [x] Internal legacy hourly/deposit compatibility values are derived only behind non-player-facing seams
-- [x] Output routing and overflow behavior still pass automated coverage
-- [x] Tool snapshot and skip rules still pass automated coverage
-- [x] Stuck recovery, hit-reaction logic, and multiplayer refusal still pass automated coverage
-- [x] The hardcoded-string lint gate still passes
-- [x] Build/test docs now describe fixed pricing and worker stamina instead of deposits/refunds
+- **Status**: N/A
+- **Reason**: Security Baseline extension is disabled for this change; no network, auth, secrets, or PII surface changed.
 
-## Manual Playtest Checklist
+### End-To-End Tests
 
-- [ ] Bulletin board entry works in single-player and stays blocked in multiplayer
-- [ ] One-time review/purchase flow shows fixed pricing and typed scope correctly
-- [ ] Recurring day-start billing, festival skip, and notice behavior match the redesign
-- [ ] Worker stamina, pacing, wrap-up, and scope-driven execution all behave correctly in-game
-- [ ] Output destinations, overflow mail, and greenhouse/animal scope behavior all remain clear
+- **Automated E2E status**: N/A
+- **Manual E2E status**: Recommended through SMAPI play-test scenarios in `integration-test-instructions.md`.
 
-## Units Delivered in This Redesign Pass
+## Generated Instruction Files
 
-| Unit | Focus |
-|---|---|
-| U-18 | Contract terms foundation |
-| U-19 | Contract snapshot persistence |
-| U-20 | Hiring flow preview refresh |
-| U-21 | Worker energy and shift runtime refresh |
-| U-22 | Scope-driven runtime alignment |
-| U-23 | Recurring billing and calendar refresh |
-| U-24 | Config, regression, and documentation cleanup |
+- `aidlc-docs/construction/build-and-test/build-instructions.md`
+- `aidlc-docs/construction/build-and-test/unit-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/integration-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/performance-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/build-and-test-summary.md`
 
 ## Overall Status
 
-| Category | Status |
-|---|---|
-| Automated build | Pass |
-| Automated unit/property/lint tests | Pass |
-| Manual integration playtest | Pending reviewer playtest sign-off |
-| Ready to proceed to Operations placeholder | Yes, if the reviewer accepts the current build/test package and remaining manual checks |
+- **Build**: Pass
+- **Automated tests**: Pass
+- **Manual play-test**: Recommended for live Stardew pathing confirmation
+- **Ready for Operations review**: Yes, pending user approval of Build and Test artifacts

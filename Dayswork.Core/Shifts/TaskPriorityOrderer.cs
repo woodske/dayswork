@@ -23,4 +23,7 @@ public sealed class TaskPriorityOrderer : ITaskPriorityOrderer
     /// <inheritdoc/>
     public IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> enabledTasks) =>
         enabledTasks.OrderBy(t => s_rank[t]).ToList();
+
+    /// <inheritdoc/>
+    public int Rank(TaskKind task) => s_rank[task];
 }

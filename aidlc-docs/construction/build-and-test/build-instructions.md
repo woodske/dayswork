@@ -1,83 +1,77 @@
-# Build Instructions — Dayswork Fixed-Price Redesign
+# Build Instructions - U-WR Worker Routing and Dynamic Task Selection
 
 ## Prerequisites
 
-- .NET 6 SDK
-- Stardew Valley 1.6 with a writable `Mods/` folder
-- Mail Framework Mod installed in the game `Mods/` folder
-- Generic Mod Config Menu installed only if you want to verify the redesign settings UI
+- **Build tool**: .NET SDK capable of building `net6.0` projects.
+- **Solution**: `Dayswork.sln`.
+- **Projects**:
+  - `Dayswork.Core`
+  - `Dayswork`
+  - `Dayswork.Tests`
+- **Game/mod dependencies**: Stardew Valley / SMAPI mod build references are resolved by the existing project configuration and NuGet restore.
+- **Workspace**: `C:\Users\kwood\Repos\dayswork`.
 
-## Main Build Commands
+## Build Steps
 
-### Compile only
+### 1. Restore Dependencies
 
-Use this when the game or SMAPI is still open:
+```powershell
+dotnet restore Dayswork.sln
+```
 
-```bash
+Expected result: all projects restore successfully, or report that dependencies are already up to date.
+
+### 2. Build Without Mod Deployment
+
+```powershell
 dotnet build Dayswork.sln /p:EnableModDeploy=false
 ```
 
 Expected result:
 
-```text
-Build succeeded.
-    0 Warning(s)
-    0 Error(s)
-```
+- `Dayswork.Core` builds successfully.
+- `Dayswork` builds successfully.
+- `Dayswork.Tests` builds successfully.
+- Build ends with `0 Warning(s)` and `0 Error(s)`.
 
-### Compile and deploy to the live mod folder
+Latest verified result for U-WR:
 
-Use this when Stardew Valley and SMAPI are closed:
+- Command: `dotnet build Dayswork.sln /p:EnableModDeploy=false`
+- Status: passed
+- Warnings: `0`
+- Errors: `0`
 
-```bash
+### 3. Optional Local Mod Deploy Build
+
+```powershell
 dotnet build Dayswork.sln
 ```
 
-This publishes the current mod build to:
+This uses the project default deploy setting and may copy the mod to the configured Stardew Valley `Mods\Dayswork` folder.
 
-```text
-X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork\
-```
+Use this only when you want the local game install refreshed for play-testing.
 
-## Redesign Build Notes
+## Build Artifacts
 
-- The saved `config.json` surface is redesign-only after U-24. Old hourly/deposit tuning fields are no longer part of the supported player-facing config shape.
-- GMCM now exposes only redesign-era pricing, worker stamina, and worker behavior settings.
-- Internal compatibility fields such as legacy hourly/deposit bridge values are still derived at runtime for transitional persistence paths, but they are not player-tunable.
-
-## Artifact Checks
-
-After a successful build, verify these files exist:
-
-| Artifact | Location |
-|---|---|
-| `Dayswork.dll` | `Dayswork/bin/Debug/net6.0/` |
-| `Dayswork.Core.dll` | `Dayswork.Core/bin/Debug/net6.0/` |
-| `manifest.json` | `Dayswork/bin/Debug/net6.0/` and deployed mod folder |
-| `i18n/default.json` | `Dayswork/bin/Debug/net6.0/i18n/` and deployed mod folder |
+- `Dayswork.Core/bin/Debug/net6.0/Dayswork.Core.dll`
+- `Dayswork/bin/Debug/net6.0/Dayswork.dll`
+- `Dayswork.Tests/bin/Debug/net6.0/Dayswork.Tests.dll`
 
 ## Troubleshooting
 
-### Deployed DLL is locked
+### Dependency Restore Fails
 
-Cause:
-Stardew Valley, SMAPI, or another process still has the mod loaded.
+- Confirm the .NET SDK is available with `dotnet --info`.
+- Rerun `dotnet restore Dayswork.sln`.
+- If NuGet/network access is unavailable, retry once connectivity or package cache access is restored.
 
-Fix:
-Close the game and SMAPI completely, then rerun `dotnet build Dayswork.sln`.
+### Mod Deploy Fails Because Game Files Are Locked
 
-### Mod loads but redesign settings are missing
+- Use `/p:EnableModDeploy=false` for compile-only validation.
+- Close Stardew Valley and SMAPI before running a deploy build.
 
-Cause:
-Generic Mod Config Menu is not installed, failed to load, or the deployed mod folder is stale.
+### Compilation Fails
 
-Fix:
-Install GMCM, rebuild, and confirm the live `Mods/Dayswork/` folder timestamp changed.
-
-### Build succeeds locally but the game still shows old behavior
-
-Cause:
-The compile-only build updated `bin/Debug` but did not deploy the new DLLs to the live mod folder.
-
-Fix:
-Run the full deploy build with the game closed, then relaunch Stardew Valley.
+- Review the first compiler error, not only the final summary.
+- Fix the source or test file reported by the compiler.
+- Rerun `dotnet build Dayswork.sln /p:EnableModDeploy=false`.

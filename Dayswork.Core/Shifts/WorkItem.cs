@@ -16,4 +16,11 @@ public sealed record WorkItem(
     TileCoord TaskTile,
     TaskKind Task,
     string LocationName = "Farm",
-    OutputScopeProvenance? Provenance = null);
+    OutputScopeProvenance? Provenance = null,
+    IReadOnlyList<TileCoord>? InteractionTiles = null)
+{
+    public IReadOnlyList<TileCoord> NavigationTiles =>
+        InteractionTiles is { Count: > 0 }
+            ? InteractionTiles
+            : new[] { NavTile };
+}

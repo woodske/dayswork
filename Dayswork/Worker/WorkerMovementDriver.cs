@@ -105,6 +105,68 @@ internal sealed class WorkerMovementDriver
         HasArrived = true;
     }
 
+    public bool TryGetRouteCost(
+        TileCoord destination,
+        GameLocation location,
+        FarmhandNpc worker,
+        out int routeCost) =>
+        TryGetRouteCost(
+            new TileCoord(worker.TilePoint.X, worker.TilePoint.Y),
+            destination,
+            location,
+            out routeCost);
+
+    public static bool TryGetRouteCost(
+        TileCoord source,
+        TileCoord destination,
+        GameLocation location,
+        out int routeCost)
+    {
+        var start = new Point(source.X, source.Y);
+        var end = new Point(destination.X, destination.Y);
+        if (TryFindRoute(start, end, location, out var route))
+        {
+            routeCost = route.Count;
+            return true;
+        }
+
+        routeCost = 0;
+        return false;
+    }
+
+    public static IReadOnlyDictionary<TileCoord, int> ComputeRouteCostsFrom(TileCoord source, GameLocation location)
+    {
+        var start = new Point(source.X, source.Y);
+        var queue = new Queue<Point>();
+        var visited = new HashSet<Point> { start };
+        var routeCosts = new Dictionary<TileCoord, int>
+        {
+            [source] = 0,
+        };
+
+        queue.Enqueue(start);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            var currentCoord = new TileCoord(current.X, current.Y);
+            var currentCost = routeCosts[currentCoord];
+
+            foreach (var next in Neighbours(current))
+            {
+                if (!visited.Add(next) ||
+                    !IsWithinMap(next, location) ||
+                    !IsTilePassableForWorker(next, location))
+                    continue;
+
+                routeCosts[new TileCoord(next.X, next.Y)] = currentCost + 1;
+                queue.Enqueue(next);
+            }
+        }
+
+        return routeCosts;
+    }
+
     public void Update()
     {
         if (_worker is null || HasArrived || NavigationFailed)
@@ -198,11 +260,32 @@ internal sealed class WorkerMovementDriver
         var start = worker.TilePoint;
         var end   = new Point(destination.X, destination.Y);
 
+        if (!TryFindRoute(start, end, location, out var route))
+            return false;
+
+        foreach (var tile in route)
+            _waypoints.Enqueue(ToPixel(tile));
+
+        return true;
+    }
+
+    private static bool TryFindRoute(
+        Point start,
+        Point end,
+        GameLocation location,
+        out IReadOnlyList<Point> route)
+    {
         if (start == end)
+        {
+            route = Array.Empty<Point>();
             return true;
+        }
 
         if (!IsWithinMap(end, location) || !IsTilePassableForWorker(end, location))
+        {
+            route = Array.Empty<Point>();
             return false;
+        }
 
         var queue = new Queue<Point>();
         var cameFrom = new Dictionary<Point, Point?>();
@@ -228,11 +311,12 @@ internal sealed class WorkerMovementDriver
         }
 
         if (!cameFrom.ContainsKey(end))
+        {
+            route = Array.Empty<Point>();
             return false;
+        }
 
-        foreach (var tile in ReconstructPath(end, cameFrom))
-            _waypoints.Enqueue(ToPixel(tile));
-
+        route = ReconstructPath(end, cameFrom).ToList();
         return true;
     }
 

@@ -46,6 +46,11 @@ internal sealed class BuildingWorkNavigator
 
     public TileCoord ResolveInteriorExitApproachTile(GameLocation interior)
     {
+        return ResolveInteriorExitApproachTiles(interior).First();
+    }
+
+    public IReadOnlyList<TileCoord> ResolveInteriorExitApproachTiles(GameLocation interior)
+    {
         var warp = ResolveInteriorEntryTile(interior);
         TileCoord[] candidates =
         {
@@ -56,13 +61,38 @@ internal sealed class BuildingWorkNavigator
             warp,
         };
 
+        var result = new List<TileCoord>();
         foreach (var candidate in candidates)
         {
-            if (WorkerMovementDriver.IsTilePassableForWorker(new Point(candidate.X, candidate.Y), interior))
-                return candidate;
+            if ((candidate == warp ||
+                 WorkerMovementDriver.IsTilePassableForWorker(new Point(candidate.X, candidate.Y), interior)) &&
+                !result.Contains(candidate))
+            {
+                result.Add(candidate);
+            }
         }
 
-        return warp;
+        return result.Count > 0 ? result : new[] { warp };
+    }
+
+    internal static TileCoord SelectNearestReachableExitApproachTile(
+        IEnumerable<TileCoord> candidates,
+        IReadOnlyDictionary<TileCoord, int> routeCosts,
+        TileCoord fallback)
+    {
+        var bestTile = fallback;
+        var bestCost = int.MaxValue;
+
+        foreach (var candidate in candidates)
+        {
+            if (!routeCosts.TryGetValue(candidate, out var cost) || cost >= bestCost)
+                continue;
+
+            bestTile = candidate;
+            bestCost = cost;
+        }
+
+        return bestTile;
     }
 
     public void Enter(FarmhandNpc worker, GameLocation interior, TileCoord interiorEntryTile)

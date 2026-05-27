@@ -1,40 +1,69 @@
-# Performance Test Instructions — Dayswork Fixed-Price Redesign
+# Performance Test Instructions - U-WR Worker Routing and Dynamic Task Selection
 
-## Scope
+## Purpose
 
-Formal load or concurrency testing is still not applicable. U-24 performance verification is about making sure the redesign stays lightweight inside the game loop and the day-start recurring pass.
+Validate that worker route selection remains responsive during large outdoor tile batches and does not repeat expensive route searches per candidate.
 
-## Areas to Watch
+## Performance Requirements
 
-### Live preview responsiveness
+- Outdoor tile work must not drop the game to the reported 1 FPS failure mode.
+- Route scoring should compute one exact route-cost map per active-batch selection.
+- Route costs should be recomputed only at task boundaries or world-state changes, not every frame.
+- Blocked work must terminate through bounded retry behavior, not loop indefinitely.
 
-- task toggles should refresh preview immediately
-- scope edits should recompute synchronously without visible menu lag
-- review page scrolling should remain responsive for large contracts
+## Manual Performance Test
 
-### Runtime pacing
+### 1. Prepare A Large Outdoor Batch
 
-- worker stamina updates should stay in sync with visible labor beats
-- slower pacing should feel intentional, not laggy
-- the overhead stamina bar should update immediately when a work beat spends energy
+- Use a farm area with many weeds, grass, rocks, crops, trees, or mixed targets.
+- Enable the relevant worker tasks in the contract.
+- Prefer a setup with some blockers so rerouting and retry behavior are exercised.
 
-### Recurring day-start pass
+### 2. Deploy And Run
 
-- 6am recurring rebuild/charge logic should not cause visible hitching when the day starts
-- festival, cannot-afford, and needs-attention notice selection should stay synchronous
+```powershell
+dotnet build Dayswork.sln
+```
 
-## Informal Verification
+Then start Stardew Valley through SMAPI and start the worker shift.
 
-1. Turn on SMAPI trace logging if a slowdown is suspected.
-2. Exercise a large review contract with many pricing lines and confirm the menu remains usable.
-3. Run a recurring contract over multiple mornings and watch for hitching at day start.
-4. Observe a long worker shift and confirm the stamina bar and action cadence stay visually aligned.
+### 3. Observe Runtime Behavior
 
-## Escalation Guidance
+Check:
 
-If a performance issue is observed:
+- FPS remains playable when outdoor tile work begins.
+- The game does not freeze or stutter heavily at each task boundary.
+- Worker movement remains visibly route-driven.
+- SMAPI log does not flood with repeated routing warnings.
 
-1. capture the exact screen or phase where it happens
-2. note whether the issue is preview-time, day-start, or live-runtime
-3. gather SMAPI logs
-4. profile the game process only if the lightweight evidence is not enough
+### 4. Stress Blocked Routes
+
+Add or preserve blockers around:
+
+- eggs/products in coops
+- feed hoppers or troughs
+- outdoor debris clusters
+- assigned output chests
+
+Expected results:
+
+- Worker performs reachable nearby work first.
+- Worker retries blocked work after progress.
+- Worker skips no-progress blocked remainder instead of looping.
+
+## Automated Performance Proxy
+
+Run:
+
+```powershell
+dotnet test Dayswork.sln
+```
+
+The automated tests do not measure FPS, but they protect the route-selection semantics and bounded retry examples that support the performance design.
+
+## If Performance Regresses
+
+1. Capture the SMAPI log around the slowdown.
+2. Note the active work type: barn, coop, greenhouse, outdoor crop, outdoor clearing, or deposit.
+3. Record whether the slowdown happens every frame or only at task boundaries.
+4. Recheck for accidental per-candidate or per-frame route search loops.

@@ -53,6 +53,7 @@ internal sealed class ShiftOrchestrator
     private readonly WorkerEnergyLedger _energyLedger = new();
     private readonly WorkUnitBoundaryClassifier _boundaryClassifier = new();
     private readonly OverflowCategorizer _overflowCategorizer = new();
+    private readonly WorkerRouteSelector _routeSelector = new();
 
     private ShiftContext? _ctx;
     private FarmhandNpc?  _farmhand;
@@ -84,6 +85,11 @@ internal sealed class ShiftOrchestrator
     private LaborBeatOutcome? _pendingBeatOutcome;
 
     private readonly Queue<AnimalWorkItem> _animalWork = new();
+    private readonly List<WorkItem> _deferredTileWork = new();
+    private readonly List<AnimalWorkItem> _deferredAnimalWork = new();
+    private int _activeBatchSelectionAttempts;
+    private int _activeBatchMaxSelectionAttempts = 4;
+    private WorkItem? _currentTileWork;
     private AnimalWorkItem? _currentAnimalWork;
 
     // Stuck detection. Replaced after first teleport recovery to switch threshold.
@@ -280,7 +286,7 @@ internal sealed class ShiftOrchestrator
             RequestBoundaryStop(ShiftStopReason.Exhausted);
     }
 
-    private void FinishResolvedAnimalWork(GameLocation location)
+    private void FinishResolvedAnimalWork(GameLocation location, bool madeProgress = true)
     {
         if (_ctx is null)
             return;
@@ -295,6 +301,9 @@ internal sealed class ShiftOrchestrator
             QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }
+
+        if (madeProgress)
+            RecordActiveBatchProgress();
 
         StartNextAnimalOrTileOrAdvance();
     }
@@ -411,7 +420,12 @@ internal sealed class ShiftOrchestrator
         _currentFeedPlan = null;
         _hayInHand = 0;
         _animalWork.Clear();
+        _deferredTileWork.Clear();
+        _deferredAnimalWork.Clear();
+        _currentTileWork = null;
         _currentAnimalWork = null;
+        _activeBatchSelectionAttempts = 0;
+        _activeBatchMaxSelectionAttempts = 4;
         _pendingDebrisSweeps.Clear();
         _pendingBeatOutcome = null;
         _pendingOutputProvenance = OutputScopeProvenance.Unknown;
@@ -567,7 +581,12 @@ internal sealed class ShiftOrchestrator
             return;
 
         _animalWork.Clear();
+        _deferredTileWork.Clear();
+        _deferredAnimalWork.Clear();
+        _currentTileWork = null;
         _currentAnimalWork = null;
+        _activeBatchSelectionAttempts = 0;
+        _activeBatchMaxSelectionAttempts = 4;
         _pendingBuildingEntry = false;
         _pendingBuildingExit = false;
         _pendingBuildingInterior = null;
@@ -689,6 +708,12 @@ internal sealed class ShiftOrchestrator
         foreach (var item in batch.AnimalWork)
             _animalWork.Enqueue(item);
 
+        _deferredTileWork.Clear();
+        _deferredAnimalWork.Clear();
+        _currentTileWork = null;
+        _currentAnimalWork = null;
+        _activeBatchSelectionAttempts = 0;
+        _activeBatchMaxSelectionAttempts = Math.Max(4, (batch.TileWork.Count + batch.AnimalWork.Count + 1) * 4);
         _currentLocation = location;
     }
 
@@ -706,19 +731,289 @@ internal sealed class ShiftOrchestrator
             return;
         }
 
-        if (_animalWork.Count > 0)
+        PruneStaleActiveWork(_currentLocation ?? Game1.getFarm());
+
+        if (_activeBatchSelectionAttempts++ > _activeBatchMaxSelectionAttempts)
         {
-            StartNextAnimalWork();
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][routing] active-batch selection guard fired; skipping remaining blocked work. tile={_ctx.WorkList.Count} animal={_animalWork.Count} deferredTile={_deferredTileWork.Count} deferredAnimal={_deferredAnimalWork.Count}.",
+                LogLevel.Warn);
+            ClearRemainingActiveBatchWork();
+            CompleteCurrentBatch();
             return;
         }
 
-        if (_ctx.WorkList.Count > 0)
+        if (TrySelectNextActiveWork(_currentLocation ?? Game1.getFarm(), out var candidate, out var selectedRoute))
         {
-            StartNextTileWork(_ctx.WorkList.Dequeue());
+            DispatchSelectedActiveWork(candidate, selectedRoute.InteractionTile);
             return;
+        }
+
+        if (_ctx.WorkList.Count > 0 ||
+            _animalWork.Count > 0 ||
+            _deferredTileWork.Count > 0 ||
+            _deferredAnimalWork.Count > 0)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][routing] no reachable active-batch work remains; skipping blocked work. tile={_ctx.WorkList.Count} animal={_animalWork.Count} deferredTile={_deferredTileWork.Count} deferredAnimal={_deferredAnimalWork.Count}.",
+                LogLevel.Debug);
+            ClearRemainingActiveBatchWork();
         }
 
         CompleteCurrentBatch();
+    }
+
+    private bool TrySelectNextActiveWork(
+        GameLocation location,
+        out ActiveWorkCandidate candidate,
+        out WorkerRouteCandidate selectedRoute)
+    {
+        var candidates = BuildActiveWorkCandidates(location);
+        var evaluated = new List<WorkerRouteCandidate>(candidates.Count);
+        var source = new TileCoord(_farmhand!.TilePoint.X, _farmhand.TilePoint.Y);
+        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
+
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            if (TryEvaluateCandidateRoute(candidates[i], i, routeCosts, out var routeCandidate))
+                evaluated.Add(routeCandidate);
+        }
+
+        var selected = _routeSelector.Select(evaluated);
+        if (selected is null)
+        {
+            candidate = default!;
+            selectedRoute = default!;
+            return false;
+        }
+
+        candidate = candidates[selected.CandidateId];
+        selectedRoute = selected;
+        return true;
+    }
+
+    private List<ActiveWorkCandidate> BuildActiveWorkCandidates(GameLocation location)
+    {
+        var candidates = new List<ActiveWorkCandidate>();
+        var stableOrder = 0;
+
+        foreach (var item in _ctx!.WorkList)
+        {
+            if (!IsTileWorkActionable(item, location))
+                continue;
+
+            candidates.Add(new ActiveWorkCandidate(
+                TileWork: item,
+                AnimalWork: null,
+                Task: item.Task,
+                TaskTile: item.TaskTile,
+                NavigationTiles: item.NavigationTiles,
+                StableOrder: stableOrder++));
+        }
+
+        foreach (var item in _animalWork)
+        {
+            var animal = _animalHandler.FindLiveAnimal(location, item.Animal);
+            if (animal is null || !IsAnimalWorkActionable(item, animal))
+                continue;
+
+            candidates.Add(new ActiveWorkCandidate(
+                TileWork: null,
+                AnimalWork: item,
+                Task: item.Task,
+                TaskTile: _animalHandler.CurrentTile(animal),
+                NavigationTiles: _animalHandler.CurrentNavigationTiles(animal, location),
+                StableOrder: stableOrder++));
+        }
+
+        return candidates;
+    }
+
+    private bool TryEvaluateCandidateRoute(
+        ActiveWorkCandidate candidate,
+        int candidateId,
+        IReadOnlyDictionary<TileCoord, int> routeCosts,
+        out WorkerRouteCandidate routeCandidate)
+    {
+        var bestCost = int.MaxValue;
+        TileCoord? bestTile = null;
+
+        foreach (var navTile in candidate.NavigationTiles.Distinct())
+        {
+            if (!routeCosts.TryGetValue(navTile, out var routeCost))
+                continue;
+
+            if (routeCost < bestCost)
+            {
+                bestCost = routeCost;
+                bestTile = navTile;
+            }
+        }
+
+        if (bestTile is null)
+        {
+            routeCandidate = default!;
+            return false;
+        }
+
+        routeCandidate = new WorkerRouteCandidate(
+            CandidateId: candidateId,
+            Task: candidate.Task,
+            PriorityRank: _priorityOrderer.Rank(candidate.Task),
+            StableOrder: candidate.StableOrder,
+            InteractionTile: bestTile.Value,
+            Reachable: true,
+            RouteCost: bestCost);
+        return true;
+    }
+
+    private void DispatchSelectedActiveWork(ActiveWorkCandidate candidate, TileCoord navTile)
+    {
+        var location = _currentLocation ?? Game1.getFarm();
+        if (candidate.TileWork is { } tileWork)
+        {
+            RemoveFirstQueued(_ctx!.WorkList, tileWork);
+            StartNextTileWork(tileWork with { NavTile = navTile });
+            return;
+        }
+
+        if (candidate.AnimalWork is { } animalWork)
+        {
+            RemoveFirstQueued(_animalWork, animalWork);
+            StartAnimalWork(animalWork, navTile, location);
+        }
+    }
+
+    private void StartAnimalWork(AnimalWorkItem next, TileCoord navTile, GameLocation location)
+    {
+        var animal = _animalHandler.FindLiveAnimal(location, next.Animal);
+        if (animal is null || !IsAnimalWorkActionable(next, animal))
+        {
+            StartNextAnimalOrTileOrAdvance();
+            return;
+        }
+
+        _currentAnimalWork = next;
+        _currentTileWork = null;
+        _pendingTask = next.Task;
+        _pendingNavTile = navTile;
+        _pendingTaskTile = _animalHandler.CurrentTile(animal);
+        _pendingOutputProvenance = next.Provenance;
+        _toolAnimator.StopSwing();
+        _toolAnimator.OnTaskChanged(_pendingTask, next.Task);
+        EnsureWorkingIntent(new IntentMoveToTile(navTile));
+        _nav.StartNavigation(navTile, location, _farmhand!);
+    }
+
+    private void PruneStaleActiveWork(GameLocation location)
+    {
+        RemoveWhere(_ctx!.WorkList, item => IsTileWorkStale(item, location));
+        RemoveWhere(_animalWork, item =>
+        {
+            var animal = _animalHandler.FindLiveAnimal(location, item.Animal);
+            return animal is null || !IsAnimalWorkActionable(item, animal);
+        });
+    }
+
+    private bool IsTileWorkActionable(WorkItem item, GameLocation location)
+    {
+        if (IsTileWorkStale(item, location))
+            return false;
+
+        if (item.Task != TaskKind.FeedAnimals)
+            return true;
+
+        if (_currentFeedPlan is null)
+            return false;
+
+        if (item.TaskTile == _currentFeedPlan.HopperTile)
+            return _hayInHand <= 0;
+
+        return _hayInHand > 0 && IsEmptyTrough(item.TaskTile, location);
+    }
+
+    private bool IsTileWorkStale(WorkItem item, GameLocation location)
+    {
+        if (item.Task != TaskKind.FeedAnimals)
+            return IsTaskComplete(item.TaskTile, item.Task, location);
+
+        if (_currentFeedPlan is null)
+            return true;
+
+        if (item.TaskTile == _currentFeedPlan.HopperTile)
+            return _hayInHand > 0;
+
+        if (_hayInHand <= 0)
+            return false;
+
+        return !IsEmptyTrough(item.TaskTile, location);
+    }
+
+    private static bool IsEmptyTrough(TileCoord tile, GameLocation location)
+    {
+        var tileVec = new Vector2(tile.X, tile.Y);
+        return !location.objects.ContainsKey(tileVec) &&
+               location.doesTileHaveProperty(tile.X, tile.Y, "Trough", "Back", false) is not null;
+    }
+
+    private bool IsAnimalWorkActionable(AnimalWorkItem item, FarmAnimal animal) =>
+        item.Task switch
+        {
+            TaskKind.PetAnimals => _animalHandler.ShouldPet(animal),
+            TaskKind.CollectAnimalProducts => _animalHandler.HasToolHarvestReady(animal),
+            _ => false,
+        };
+
+    private void RecordActiveBatchProgress()
+    {
+        foreach (var item in _deferredTileWork)
+            _ctx!.WorkList.Enqueue(item);
+        foreach (var item in _deferredAnimalWork)
+            _animalWork.Enqueue(item);
+
+        _deferredTileWork.Clear();
+        _deferredAnimalWork.Clear();
+        _activeBatchSelectionAttempts = 0;
+    }
+
+    private void ClearRemainingActiveBatchWork()
+    {
+        _ctx!.WorkList.Clear();
+        _animalWork.Clear();
+        _deferredTileWork.Clear();
+        _deferredAnimalWork.Clear();
+        _currentTileWork = null;
+        _currentAnimalWork = null;
+    }
+
+    private static bool RemoveFirstQueued<T>(Queue<T> queue, T value)
+    {
+        var removed = false;
+        var count = queue.Count;
+        for (var i = 0; i < count; i++)
+        {
+            var current = queue.Dequeue();
+            if (!removed && EqualityComparer<T>.Default.Equals(current, value))
+            {
+                removed = true;
+                continue;
+            }
+
+            queue.Enqueue(current);
+        }
+
+        return removed;
+    }
+
+    private static void RemoveWhere<T>(Queue<T> queue, Func<T, bool> predicate)
+    {
+        var count = queue.Count;
+        for (var i = 0; i < count; i++)
+        {
+            var current = queue.Dequeue();
+            if (!predicate(current))
+                queue.Enqueue(current);
+        }
     }
 
     private void StartNextAnimalWork()
@@ -763,6 +1058,7 @@ internal sealed class ShiftOrchestrator
         _pendingNavTile = next.NavTile;
         _pendingTaskTile = next.TaskTile;
         _pendingOutputProvenance = next.Provenance ?? OutputScopeProvenance.Unknown;
+        _currentTileWork = next;
         _currentAnimalWork = null;
         _toolAnimator.StopSwing();
         _toolAnimator.OnTaskChanged(previousTask, next.Task);
@@ -781,7 +1077,14 @@ internal sealed class ShiftOrchestrator
             var interior = _currentLocation;
             if (interior is not null && interior != Game1.getFarm())
             {
-                var exitTile = _buildingNavigator.ResolveInteriorExitApproachTile(interior);
+                var exitCandidates = _buildingNavigator.ResolveInteriorExitApproachTiles(interior);
+                var fallbackExitTile = exitCandidates[0];
+                var source = new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y);
+                var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, interior);
+                var exitTile = BuildingWorkNavigator.SelectNearestReachableExitApproachTile(
+                    exitCandidates,
+                    routeCosts,
+                    fallbackExitTile);
                 _pendingBuildingExit = true;
                 _pendingInteriorExitTile = exitTile;
                 _pendingTask = TaskKind.FeedAnimals;
@@ -1027,16 +1330,10 @@ internal sealed class ShiftOrchestrator
             return;
         }
 
-        // Find the next reachable task tile.
-        TileCoord? recoveryTile = null;
-        foreach (var item in _ctx.WorkList)
-        {
-            if (IsTileReachable(item.NavTile, location))
-            {
-                recoveryTile = item.NavTile;
-                break;
-            }
-        }
+        // Find the next reachable active-batch work tile.
+        TileCoord? recoveryTile = TrySelectNextActiveWork(location, out _, out var selectedRoute)
+            ? selectedRoute.InteractionTile
+            : null;
 
         if (recoveryTile is null)
         {
@@ -1065,15 +1362,8 @@ internal sealed class ShiftOrchestrator
 
         // Recovering → Working: continue from the teleport tile.
         _actionPending = false;
-        // The next work item drives the real nav; re-queue with the movement driver.
-        if (_ctx.WorkList.Count > 0)
-        {
-            StartNextTileWork(_ctx.WorkList.Dequeue());
-        }
-        else
-        {
-            QueueWrapUpNow(ShiftStopReason.Completed);
-        }
+        // The next work item drives the real nav through route-ranked active-batch selection.
+        StartNextAnimalOrTileOrAdvance();
     }
 
     private void HandleTeleportHome(Farm farm)
@@ -1129,9 +1419,21 @@ internal sealed class ShiftOrchestrator
             if (_currentAnimalWork is not null)
             {
                 ModEntry.ModMonitor.Log(
-                    $"[Dayswork][animal] navigation failed for {_currentAnimalWork.Animal.DisplayName} ({_currentAnimalWork.Task}); skipping.",
+                    $"[Dayswork][animal] navigation failed for {_currentAnimalWork.Animal.DisplayName} ({_currentAnimalWork.Task}); deferring within active batch.",
                     LogLevel.Debug);
+                _deferredAnimalWork.Add(_currentAnimalWork);
                 _currentAnimalWork = null;
+                StartNextAnimalOrTileOrAdvance();
+                return;
+            }
+
+            if (_currentTileWork is not null)
+            {
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][nav] failed task={_currentTileWork.Task} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_currentTileWork.TaskTile.X},{_currentTileWork.TaskTile.Y}); deferring within active batch.",
+                    LogLevel.Debug);
+                _deferredTileWork.Add(_currentTileWork);
+                _currentTileWork = null;
                 StartNextAnimalOrTileOrAdvance();
                 return;
             }
@@ -1159,9 +1461,24 @@ internal sealed class ShiftOrchestrator
 
             if (_currentAnimalWork is not null)
             {
+                var animal = _animalHandler.FindLiveAnimal(location, _currentAnimalWork.Animal);
+                if (animal is null || !IsAnimalWorkActionable(_currentAnimalWork, animal))
+                {
+                    _currentAnimalWork = null;
+                    StartNextAnimalOrTileOrAdvance();
+                    return;
+                }
+
                 _ctx!.StateMachine.SetIntent(_currentAnimalWork.Task == TaskKind.PetAnimals
                     ? new IntentPetAnimal(_currentAnimalWork.Animal)
                     : new IntentCollectFromAnimal(_currentAnimalWork.Animal));
+                return;
+            }
+
+            if (_currentTileWork is not null && !IsTileWorkActionable(_currentTileWork, location))
+            {
+                _currentTileWork = null;
+                StartNextAnimalOrTileOrAdvance();
                 return;
             }
 
@@ -1226,7 +1543,7 @@ internal sealed class ShiftOrchestrator
         {
             _actionPending = false;
             _currentAnimalWork = null;
-            FinishResolvedAnimalWork(location);
+            FinishResolvedAnimalWork(location, madeProgress: false);
             return;
         }
 
@@ -1257,7 +1574,7 @@ internal sealed class ShiftOrchestrator
         {
             _actionPending = false;
             _currentAnimalWork = null;
-            FinishResolvedAnimalWork(location);
+            FinishResolvedAnimalWork(location, madeProgress: false);
             return;
         }
 
@@ -1302,10 +1619,18 @@ internal sealed class ShiftOrchestrator
         if (!_nav.NavigationFailed && !_nav.HasArrived)
             return;
 
-        // Execute the trip we just walked to (chest liveness resolved here, on arrival).
         if (_currentTrip is not null)
         {
-            ExecuteTrip(_currentTrip, _currentLocation ?? farm);
+            if (_nav.NavigationFailed)
+            {
+                MarkDepositTripUndelivered(_currentTrip);
+            }
+            else
+            {
+                // Execute the trip we just walked to (chest liveness resolved here, on arrival).
+                ExecuteTrip(_currentTrip, _currentLocation ?? farm);
+            }
+
             CompleteDepositTripLocation(_currentTrip);
         }
         _currentTrip = null;
@@ -1353,6 +1678,16 @@ internal sealed class ShiftOrchestrator
                     bin.Add(item);
             }
         }
+    }
+
+    private void MarkDepositTripUndelivered(DepositTrip trip)
+    {
+        foreach (var stack in trip.Items)
+            _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
+
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][deposit] could not reach deposit destination at ({trip.Tile.X},{trip.Tile.Y}); mailing {trip.Items.Count} stack(s).",
+            LogLevel.Warn);
     }
 
     private void DepositIntoChest(Chest chest, RoutedItemStack stack)
@@ -1420,14 +1755,9 @@ internal sealed class ShiftOrchestrator
     private void AdvanceWorkList(GameLocation location)
     {
         _stuck.Reset(); // any advance = progress signal
-
-        if (_ctx!.WorkList.Count == 0)
-        {
-            StartNextAnimalOrTileOrAdvance();
-            return;
-        }
-
-        StartNextTileWork(_ctx.WorkList.Dequeue());
+        _currentTileWork = null;
+        RecordActiveBatchProgress();
+        StartNextAnimalOrTileOrAdvance();
     }
 
     private void BeginDeposit()
@@ -1507,7 +1837,7 @@ internal sealed class ShiftOrchestrator
                 var entryTile = _buildingNavigator.ResolveInteriorEntryTile(interior);
                 _buildingNavigator.Enter(_farmhand, interior, entryTile);
                 _currentLocation = interior;
-                _nav.StartNavigation(trip.Tile, interior, _farmhand);
+                StartChestDepositNavigation(trip, chestDest, interior);
                 return;
             }
 
@@ -1518,7 +1848,50 @@ internal sealed class ShiftOrchestrator
         }
 
         _currentLocation = farm;
+        if (trip.Destination is ChestDestination farmChest)
+        {
+            StartChestDepositNavigation(trip, farmChest, farm);
+            return;
+        }
+
         _nav.StartNavigation(trip.Tile, farm, _farmhand);
+    }
+
+    private void StartChestDepositNavigation(DepositTrip trip, ChestDestination chestDest, GameLocation location)
+    {
+        if (_farmhand is null)
+            return;
+
+        if (TrySelectChestDepositStandTile(chestDest.Ref.Tile, location, _farmhand, out var standTile))
+        {
+            _nav.StartNavigation(standTile, location, _farmhand);
+            return;
+        }
+
+        MarkDepositTripUndelivered(trip);
+        _currentTrip = null;
+    }
+
+    private static bool TrySelectChestDepositStandTile(
+        TileCoord chestTile,
+        GameLocation location,
+        FarmhandNpc worker,
+        out TileCoord standTile)
+    {
+        var source = new TileCoord(worker.TilePoint.X, worker.TilePoint.Y);
+        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
+        return WorkerRouteSelector.TrySelectNearestReachableTile(
+            DepositStandTilesAround(chestTile),
+            routeCosts,
+            out standTile);
+    }
+
+    private static IEnumerable<TileCoord> DepositStandTilesAround(TileCoord tile)
+    {
+        yield return new TileCoord(tile.X, tile.Y - 1);
+        yield return new TileCoord(tile.X + 1, tile.Y);
+        yield return new TileCoord(tile.X, tile.Y + 1);
+        yield return new TileCoord(tile.X - 1, tile.Y);
     }
 
     private void CompleteDepositTripLocation(DepositTrip trip)
@@ -2137,6 +2510,14 @@ internal sealed class ShiftOrchestrator
         public TaskKind SourceTask { get; }
         public OutputScopeProvenance Provenance { get; }
     }
+
+    private sealed record ActiveWorkCandidate(
+        WorkItem? TileWork,
+        AnimalWorkItem? AnimalWork,
+        TaskKind Task,
+        TileCoord TaskTile,
+        IReadOnlyList<TileCoord> NavigationTiles,
+        int StableOrder);
 
     private sealed record LaborBeatOutcome(bool UnitResolved, bool TaskFullyComplete);
 }

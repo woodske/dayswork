@@ -77,8 +77,8 @@ internal sealed class WorkAreaScanner
                     continue;
                 }
 
-                var navTile = FindNavigationTile(taskTile, task.Value, tileVec, location);
-                if (navTile is null)
+                var navTiles = FindNavigationTiles(taskTile, task.Value, tileVec, location).ToList();
+                if (navTiles.Count == 0)
                 {
                     noNavigationTiles++;
                     ModEntry.ModMonitor.Log($"[Dayswork][scan] no stand tile for {task.Value} at {location.Name} task ({taskTile.X},{taskTile.Y}) from scan ({x},{y}).", LogLevel.Trace);
@@ -86,15 +86,15 @@ internal sealed class WorkAreaScanner
                 }
 
                 Increment(acceptedByKind, task.Value);
-                rawItems.Add(new WorkItem(navTile.Value, taskTile, task.Value, location.Name, provenance));
-                ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: loc={location.Name} nav=({navTile.Value.X},{navTile.Value.Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
+                rawItems.Add(new WorkItem(navTiles[0], taskTile, task.Value, location.Name, provenance, navTiles));
+                ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}) candidates=[{string.Join("; ", navTiles.Select(tile => $"({tile.X},{tile.Y})"))}].", LogLevel.Trace);
             }
         }
 
         LogWorkScanSummary(location, enabled, zoneCount, scannedTiles, rawItems.Count,
             detectedByKind, acceptedByKind, capabilitySkippedTiles, noNavigationTiles, duplicateTiles);
 
-        return GreedyNearestNeighbour(rawItems, origin);
+        return rawItems;
     }
 
     public IReadOnlyList<WorkItem> ScanWholeLocation(
@@ -245,24 +245,44 @@ internal sealed class WorkAreaScanner
 
     public static TileCoord? FindNavigationTile(TileCoord taskTile, TaskKind task, Vector2 tileVec, GameLocation loc)
     {
+        foreach (var tile in FindNavigationTiles(taskTile, task, tileVec, loc))
+        {
+            if (IsTileReachable(tile, loc))
+                return tile;
+        }
+
+        return null;
+    }
+
+    public static IReadOnlyList<TileCoord> FindNavigationTiles(TileCoord taskTile, TaskKind task, Vector2 tileVec, GameLocation loc)
+    {
         if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is { } clump)
-            return FindOrthogonalNeighbour(clump, loc);
+            return OrthogonalInteractionTiles(clump, loc);
 
         if (!RequiresAdjacentNavigation(task) &&
             !IsTrellisCrop(tileVec, loc) &&
-            IsTileReachable(taskTile, loc))
-            return taskTile;
+            IsWithinMap(taskTile, loc))
+            return new[] { taskTile };
 
-        return FindOrthogonalNeighbour(taskTile, loc);
+        return OrthogonalInteractionTiles(taskTile, loc);
     }
 
     public static bool RequiresAdjacentNavigation(TaskKind task) =>
         task is TaskKind.CollectFruit
+             or TaskKind.CollectAnimalProducts
              or TaskKind.CutTrees
              or TaskKind.ClearRocks
              or TaskKind.ClearWeeds;
 
     public static TileCoord? FindOrthogonalNeighbour(TileCoord tile, GameLocation loc)
+    {
+        foreach (var candidate in FindOrthogonalNeighbours(tile, loc))
+            return candidate;
+
+        return null;
+    }
+
+    public static IEnumerable<TileCoord> FindOrthogonalNeighbours(TileCoord tile, GameLocation loc)
     {
         TileCoord[] candidates =
         {
@@ -274,14 +294,20 @@ internal sealed class WorkAreaScanner
 
         foreach (var c in candidates)
         {
-            if (IsTileReachable(c, loc))
-                return c;
+            if (IsWithinMap(c, loc) && IsTileReachable(c, loc))
+                yield return c;
         }
+    }
+
+    public static TileCoord? FindOrthogonalNeighbour(ResourceClump clump, GameLocation loc)
+    {
+        foreach (var candidate in FindOrthogonalNeighbours(clump, loc))
+            return candidate;
 
         return null;
     }
 
-    public static TileCoord? FindOrthogonalNeighbour(ResourceClump clump, GameLocation loc)
+    public static IEnumerable<TileCoord> FindOrthogonalNeighbours(ResourceClump clump, GameLocation loc)
     {
         var minX = (int)clump.Tile.X;
         var minY = (int)clump.Tile.Y;
@@ -303,11 +329,48 @@ internal sealed class WorkAreaScanner
 
         foreach (var c in candidates.Distinct())
         {
-            if (IsTileReachable(c, loc))
-                return c;
+            if (IsWithinMap(c, loc) && IsTileReachable(c, loc))
+                yield return c;
+        }
+    }
+
+    public static IReadOnlyList<TileCoord> OrthogonalInteractionTiles(TileCoord tile, GameLocation loc)
+    {
+        TileCoord[] candidates =
+        {
+            new(tile.X, tile.Y - 1),
+            new(tile.X + 1, tile.Y),
+            new(tile.X, tile.Y + 1),
+            new(tile.X - 1, tile.Y),
+        };
+
+        return candidates.Where(candidate => IsWithinMap(candidate, loc)).ToList();
+    }
+
+    public static IReadOnlyList<TileCoord> OrthogonalInteractionTiles(ResourceClump clump, GameLocation loc)
+    {
+        var minX = (int)clump.Tile.X;
+        var minY = (int)clump.Tile.Y;
+        var maxX = minX + clump.width.Value - 1;
+        var maxY = minY + clump.height.Value - 1;
+
+        var candidates = new List<TileCoord>();
+        for (var x = minX; x <= maxX; x++)
+        {
+            candidates.Add(new TileCoord(x, minY - 1));
+            candidates.Add(new TileCoord(x, maxY + 1));
         }
 
-        return null;
+        for (var y = minY; y <= maxY; y++)
+        {
+            candidates.Add(new TileCoord(minX - 1, y));
+            candidates.Add(new TileCoord(maxX + 1, y));
+        }
+
+        return candidates
+            .Distinct()
+            .Where(candidate => IsWithinMap(candidate, loc))
+            .ToList();
     }
 
     public static List<WorkItem> GreedyNearestNeighbour(List<WorkItem> items, TileCoord origin)
@@ -345,6 +408,15 @@ internal sealed class WorkAreaScanner
 
     private static bool IsTileReachable(TileCoord tile, GameLocation loc) =>
         WorkerMovementDriver.IsTilePassableForWorker(new Point(tile.X, tile.Y), loc);
+
+    private static bool IsWithinMap(TileCoord tile, GameLocation loc)
+    {
+        var layer = loc.Map.Layers[0];
+        return tile.X >= 0 &&
+               tile.Y >= 0 &&
+               tile.X < layer.LayerWidth &&
+               tile.Y < layer.LayerHeight;
+    }
 
     private static void Increment(Dictionary<TaskKind, int> counts, TaskKind kind) =>
         counts[kind] = counts.TryGetValue(kind, out var existing) ? existing + 1 : 1;

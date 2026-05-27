@@ -1,74 +1,69 @@
-# Unit Test Instructions — Dayswork Fixed-Price Redesign
+# Unit Test Execution - U-WR Worker Routing and Dynamic Task Selection
 
-## Main Test Command
+## Run Unit Tests
 
-Run the full automated suite with:
+### 1. Execute All Tests
 
-```bash
+```powershell
 dotnet test Dayswork.sln
 ```
 
-Current verified baseline at U-24 closeout:
+Expected result for the current U-WR code:
 
-```text
-Passed!  - Failed: 0, Passed: 286, Skipped: 1, Total: 287
+- Passed: `306`
+- Failed: `0`
+- Skipped: `1`
+- Total: `307`
+
+The skipped test is the existing PBT seed/shrinking demonstration:
+
+- `Dayswork.Tests.Smoke.SeedLoggingDemoTests.PBT08_seed_and_shrunk_input_logged_on_failure`
+
+### 2. Optional Compile-Only Test Build Without Mod Deployment
+
+If the game/mod folder is locked, run:
+
+```powershell
+dotnet test Dayswork.sln /p:EnableModDeploy=false
 ```
 
-## Focus Areas
+The default `dotnet test Dayswork.sln` path may copy the mod to the configured Stardew Valley `Mods\Dayswork` folder during the test build.
 
-### Config and normalization
+## Test Areas Covered
 
-- redesign-only `ModConfig` shape
-- deterministic `RuntimeConfigSnapshotMapper` publication
-- `ConfigValueResolver` narrow fallback behavior
-- fixed-price thresholds, package tables, and worker action-cost snapshots
+- Pure route selection:
+  - shortest reachable route wins
+  - equal-distance task priority
+  - stable-order tie-breaks
+  - unreachable candidate filtering
+- Worker routing regressions:
+  - wrong-side/current-side interaction
+  - one-side-blocked egg/product collection
+  - nearer animal before farther animal inside active batch
+  - feed retry after product collection clears blockers
+  - disabled product collection does not clear unpaid product blockers
+  - blocked active batch terminates without looping
+- Review fixes:
+  - outdoor tile route-cost map selection
+  - building exit reachable approach selection
+  - chest deposit reachable adjacent stand-tile selection
+- Existing project coverage:
+  - pricing
+  - persistence
+  - output routing
+  - config mapping
+  - UI view-model logic
+  - source lint checks
 
-### Pricing and contract terms
+## If Tests Fail
 
-- fixed-price scope breakdown generation
-- greenhouse, outdoor, and animal-building pricing splits
-- worker energy profile snapshots
-- recurring rebuild determinism
+1. Read the first failing test and stack trace.
+2. If the failure is in FsCheck, preserve the replay seed from the output.
+3. Fix the smallest relevant production or test seam.
+4. Rerun:
 
-### Runtime and output pipeline
-
-- task-owned destination routing
-- overflow categorization and next-morning mail behavior
-- tool snapshot and skip rules
-- worker energy ledger, stop reasons, and work-unit boundaries
-- stuck detection and wrap-up guarantees
-
-### Final cleanup regressions
-
-- redesign GMCM publication
-- multiplayer bulletin-board refusal behavior
-- hit-reaction trigger logic
-- i18n lint boundary
-
-## Useful Filters
-
-Run a focused slice with:
-
-```bash
-dotnet test Dayswork.sln --filter "FullyQualifiedName~Config"
-dotnet test Dayswork.sln --filter "FullyQualifiedName~U24"
-dotnet test Dayswork.sln --filter "FullyQualifiedName~Overflow"
+```powershell
+dotnet test Dayswork.sln
 ```
 
-## Failure Handling
-
-1. Reproduce the failure with a focused `--filter`.
-2. Decide whether the break is in production behavior, test expectations, or stale redesign documentation.
-3. Fix the issue.
-4. Rerun `dotnet build Dayswork.sln /p:EnableModDeploy=false`.
-5. Rerun `dotnet test Dayswork.sln`.
-
-## Lint Gate
-
-`Dayswork.Tests/Lint/HardcodedUserFacingStringLintTests.cs` remains part of the standard suite.
-
-If it fails:
-
-1. Move the player-visible string into `Dayswork/i18n/default.json`.
-2. Replace the hardcoded literal with `I18nHelper.Get(...)`.
-3. Rerun the suite.
+5. Update the build-and-test summary if final counts change.

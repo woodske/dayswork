@@ -99,18 +99,31 @@ internal sealed class AnimalTaskHandler
             return EmptyFeedWork(emptySlots);
         }
 
-        var hopperNav = FindPreferredStandTile(hopperTile, animalHouseLocation) ?? hopperTile;
+        var hopperNavTiles = StandTilesAround(hopperTile, animalHouseLocation);
+        var hopperNav = hopperNavTiles.FirstOrDefaultPassable(animalHouseLocation) ??
+                        hopperNavTiles.FirstOrDefaultNullable() ??
+                        hopperTile;
         var feedItems = new List<WorkItem>
         {
-            new(hopperNav, hopperTile, TaskKind.FeedAnimals, animalHouseLocation.Name),
+            new(hopperNav, hopperTile, TaskKind.FeedAnimals, animalHouseLocation.Name, null,
+                hopperNavTiles.Count > 0 ? hopperNavTiles : new[] { hopperTile }),
         };
 
         var feederItems = emptyTroughTiles
-            .Select(tile => new WorkItem(
-                FindPreferredFeedStandTile(tile, hopperTile, animalHouseLocation) ?? hopperNav,
-                tile,
-                TaskKind.FeedAnimals,
-                animalHouseLocation.Name))
+            .Select(tile =>
+            {
+                var standTiles = FeedStandTiles(tile, hopperTile, animalHouseLocation);
+                var navTile = standTiles.FirstOrDefaultPassable(animalHouseLocation, hopperTile) ??
+                              standTiles.FirstOrDefaultNullable() ??
+                              hopperNav;
+                return new WorkItem(
+                    navTile,
+                    tile,
+                    TaskKind.FeedAnimals,
+                    animalHouseLocation.Name,
+                    null,
+                    standTiles.Count > 0 ? standTiles : new[] { navTile });
+            })
             .ToList();
 
         feedItems.AddRange(feederItems);
@@ -207,11 +220,18 @@ internal sealed class AnimalTaskHandler
 
     public TileCoord? CurrentNavigationTile(FarmAnimal animal, GameLocation location)
     {
-        var current = CurrentTile(animal);
-        if (WorkerMovementDriver.IsTilePassableForWorker(new Point(current.X, current.Y), location))
-            return current;
+        return CurrentNavigationTiles(animal, location).FirstOrDefaultPassable(location);
+    }
 
-        return WorkAreaScanner.FindOrthogonalNeighbour(current, location);
+    public IReadOnlyList<TileCoord> CurrentNavigationTiles(FarmAnimal animal, GameLocation location)
+    {
+        var current = CurrentTile(animal);
+        var candidates = new List<TileCoord> { current };
+        candidates.AddRange(WorkAreaScanner.OrthogonalInteractionTiles(current, location));
+        return candidates
+            .Where(tile => IsWithinMap(tile, location))
+            .Distinct()
+            .ToList();
     }
 
     private static void AddIfSelected(
@@ -391,10 +411,65 @@ internal sealed class AnimalTaskHandler
 
         return candidates.FirstOrDefaultPassable(location);
     }
+
+    private static IReadOnlyList<TileCoord> FeedStandTiles(
+        TileCoord feedTile,
+        TileCoord hopperTile,
+        GameLocation location)
+    {
+        TileCoord[] candidates =
+        {
+            new(feedTile.X, feedTile.Y + 1),
+            new(feedTile.X + 1, feedTile.Y + 1),
+            new(feedTile.X - 1, feedTile.Y + 1),
+            new(feedTile.X + 1, feedTile.Y),
+            new(feedTile.X - 1, feedTile.Y),
+            new(feedTile.X, feedTile.Y - 1),
+        };
+
+        return candidates
+            .Where(candidate => candidate != hopperTile)
+            .Where(candidate => IsWithinMap(candidate, location))
+            .Distinct()
+            .ToList();
+    }
+
+    private static IReadOnlyList<TileCoord> StandTilesAround(TileCoord tile, GameLocation location)
+    {
+        TileCoord[] candidates =
+        {
+            new(tile.X, tile.Y + 1),
+            new(tile.X + 1, tile.Y),
+            new(tile.X - 1, tile.Y),
+            new(tile.X, tile.Y - 1),
+        };
+
+        return candidates
+            .Where(candidate => IsWithinMap(candidate, location))
+            .Distinct()
+            .ToList();
+    }
+
+    private static bool IsWithinMap(TileCoord tile, GameLocation location)
+    {
+        var layer = location.Map.Layers[0];
+        return tile.X >= 0 &&
+               tile.Y >= 0 &&
+               tile.X < layer.LayerWidth &&
+               tile.Y < layer.LayerHeight;
+    }
 }
 
 internal static class TileCoordPassabilityExtensions
 {
+    public static TileCoord? FirstOrDefaultNullable(this IEnumerable<TileCoord> candidates)
+    {
+        foreach (var candidate in candidates)
+            return candidate;
+
+        return null;
+    }
+
     public static TileCoord? FirstOrDefaultPassable(
         this IEnumerable<TileCoord> candidates,
         GameLocation location,

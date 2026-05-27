@@ -107,7 +107,7 @@
 ## Active Change — Worker Routing and Dynamic Task Selection
 - **Requested At**: 2026-05-27T02:57:38Z
 - **Current Phase**: CONSTRUCTION
-- **Current Stage**: NFR Design (Review Required) — review [nfr-design](construction/u-wr-worker-routing-dynamic-task-selection/nfr-design/)
+- **Current Stage**: Build and Test (In Progress) — generating build and test instructions for U-WR review
 - **Request Type**: Worker pathing bug fix / runtime routing enhancement
 - **Scope Estimate**: Multiple runtime components (`WorkAreaScanner`, `AnimalTaskHandler`, `ShiftOrchestrator`, worker navigation helpers) plus focused tests
 - **Complexity Estimate**: Moderate because approach-tile selection, animal routing, feed/hopper ordering, and blocked-task retry behavior interact
@@ -127,6 +127,14 @@
 - **NFR Design Planning**: Question plan created; awaiting answers for selector extraction, route-cost oracle, deferral/retry component pattern, route-cache lifetime, and test seam priority
 - **NFR Design Planning Answers**: Complete; all five answers received and validated with no ambiguities
 - **NFR Design**: Complete; selected small pure route selector, movement-aligned route-cost oracle, orchestrator-owned bounded retry coordination, per-selection route evaluation, and selector-first FsCheck seam documented
+- **NFR Design Approval**: Approved 2026-05-27T14:57:55Z with user response `continue`
+- **Code Generation Planning**: Approved 2026-05-27T15:17:12Z with user response `continue`
+- **Code Generation**: Complete; pure route selector, movement-aligned route-cost oracle, per-selection route-cost map, multi-interaction tile/animal/feed candidates, active-batch route-ranked selection, deferral/retry, target revalidation, stuck-recovery integration, xUnit examples, and FsCheck selector properties implemented
+- **Code Generation Review Feedback**: 2026-05-27 play-test feedback reported barn/coop routing was performant but outdoor tile work dropped framerate to 1 FPS. Review fix replaced repeated per-candidate route searches with one exact route-cost map per active-batch selection.
+- **Code Generation Review Feedback**: 2026-05-27 play-test feedback reported the worker visibly warped out after building tasks instead of walking to the exit. Review fix changed building completion to choose the nearest reachable interior exit approach tile before transitioning back to the farm.
+- **Code Generation Review Feedback**: 2026-05-27 play-test feedback reported chest-destined materials were deposited automatically without worker travel. Review fix changed chest deposit trips to choose a reachable adjacent stand tile and to mail undelivered items instead of transferring on deposit navigation failure.
+- **Code Generation Verification**: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with 0 warnings / 0 errors; `dotnet test Dayswork.sln` passed with 300 passed / 1 expected skip / 0 failed. Outdoor tile review feedback verification also passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` with 0 warnings / 0 errors and `dotnet test Dayswork.sln` with 300 passed / 1 expected skip / 0 failed. Building exit review feedback verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` with 0 warnings / 0 errors and `dotnet test Dayswork.sln` with 303 passed / 1 expected skip / 0 failed. Chest deposit review feedback verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` with 0 warnings / 0 errors and `dotnet test Dayswork.sln` with 306 passed / 1 expected skip / 0 failed.
+- **Code Generation Approval**: Approved 2026-05-27T16:48:47Z with user response `looks good, changes are approved`
 
 ## Stage Progress
 ### INCEPTION PHASE
@@ -141,10 +149,10 @@
 ### CONSTRUCTION PHASE (per-unit loop)
 - [x] Functional Design — **EXECUTE** (per unit)
 - [x] NFR Requirements — **EXECUTE** (per unit)
-- [ ] NFR Design — **EXECUTE** (per unit; U-WR review required)
+- [x] NFR Design — **EXECUTE** (per unit)
 - [ ] Infrastructure Design — **SKIP** (no cloud / container / IaC; SMAPI is the platform)
-- [ ] Code Generation — **EXECUTE** (per unit, always)
-- [x] Build and Test — **EXECUTE** (after all units complete)
+- [x] Code Generation — **EXECUTE** (per unit, always; U-WR approved 2026-05-27)
+- [ ] Build and Test — **EXECUTE** (after all units complete; U-WR in progress)
 
 ### OPERATIONS PHASE
 - [ ] Operations — **PLACEHOLDER** (v1 ships without deployment automation)

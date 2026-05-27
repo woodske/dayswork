@@ -1,91 +1,101 @@
-# Integration Test Instructions — Dayswork Fixed-Price Redesign
+# Integration Test Instructions - U-WR Worker Routing and Dynamic Task Selection
 
-## Overview
+## Purpose
 
-Dayswork is still verified in the live game through SMAPI-driven manual playtesting. There is no separate service stack or automated end-to-end harness. The integration goal for the redesign is to confirm the fixed-price contract flow, typed scope execution, recurring lifecycle, and worker stamina behavior all match the approved rules in a real save.
+Validate that the routing changes work across scanner, animal handling, movement, orchestration, output deposit, and live Stardew map collision behavior.
 
-## Environment Setup
+Automated tests cover the pure routing seams and focused regression logic. Full SMAPI/Stardew integration still requires in-game play-testing because building interiors, animal positions, placed objects, and map collision are runtime-owned.
 
-1. Build and deploy the mod.
-2. Install Mail Framework Mod.
-3. Optionally install GMCM for settings verification.
-4. Launch Stardew Valley through SMAPI.
-5. Open a farm save that has:
-   - outdoor crop zones
-   - at least one barn or coop
-   - a greenhouse
-   - assignable chests and a reachable shipping bin
+## Automated Integration-Like Coverage
 
-## Manual Scenarios
+Run:
 
-### Scenario 1 — Mod load and bulletin board entry
-
-Verify:
-
-- the mod loads without SMAPI errors
-- the bulletin board shows the hire/manage entry in single-player
-- the multiplayer refusal path still logs the friendly refusal message instead of opening the flow
-
-### Scenario 2 — GMCM redesign surface
-
-Verify:
-
-- GMCM shows only `Pricing`, `Worker Stamina`, and `Worker Behavior`
-- outdoor thresholds, fixed-price tables, stamina, and pacing values persist after reopening the menu
-- no hourly/deposit-era labels are still visible
-
-### Scenario 3 — One-time contract review and purchase
-
-Verify:
-
-- the flow is now `Tasks -> Work Scope -> Output Destinations -> Schedule -> Review Contract`
-- review pricing reflects outdoor bands, animal buildings, and greenhouse packages correctly
-- one-time contracts charge the fixed price immediately
-- invalid preview states block confirmation only on the review page
-
-### Scenario 4 — Recurring 6am lifecycle
-
-Verify:
-
-- recurring contracts rebuild terms at day start before an eligible charge
-- festival days skip the worker and charge nothing
-- rain and low-work days keep the same recurring price and stay quiet unless another notice reason applies
-- edit-before-6am changes affect that same morning's rebuild path
-
-### Scenario 5 — Worker stamina and pacing
-
-Verify:
-
-- the worker shows a visible stamina bar overhead
-- movement and action pacing feel slower and readable
-- stamina spends on labor beats rather than walking
-- when stamina reaches zero, the worker finishes the current work unit, deposits output, and leaves
-- the worker also stops at the hard-cap time only after finishing the current work unit
-
-### Scenario 6 — Scope-driven execution
-
-Verify:
-
-- outdoor services only work inside selected outdoor scope
-- selected barns/coops cover their animals even when those animals roam outside
-- greenhouse work runs as its own crop scope
-- output routing remains task-owned while overflow explanations still mention the right scope family
-
-### Scenario 7 — Final regression surfaces
-
-Verify:
-
-- chest routing, shipping bin routing, and next-morning overflow mail still behave correctly
-- tool snapshot and skip rules still respect the player's tool levels at shift start
-- stuck recovery still resolves or aborts safely
-- worker hit reactions still emote instead of taking damage or breaking the shift
-
-## Logs
-
-Primary log location:
-
-```text
-%AppData%\StardewValley\ErrorLogs\SMAPI-latest.txt
+```powershell
+dotnet test Dayswork.sln
 ```
 
-Look for `[Dayswork]` lines when validating recurring notices, runtime scope skips, deposit behavior, and stuck recovery.
+Relevant automated scenarios:
+
+- route-ranked active-batch selection
+- blocked candidate filtering and retry
+- feed/product blocker handling
+- building exit approach tile selection
+- chest deposit stand-tile selection
+- output routing and overflow behavior
+
+## Manual In-Game Integration Scenarios
+
+### Scenario 1: Barn/Coop Local Routing
+
+Setup:
+
+- Start a shift with barn or coop animal work enabled.
+- Include animals needing attention and placed products such as eggs where possible.
+
+Expected results:
+
+- Worker chooses a reachable side of eggs/products.
+- Worker does not abandon reachable eggs because the top side is blocked.
+- Worker handles nearer actionable animals before walking past them to far animals.
+- Feed work can proceed after enabled product collection clears blockers.
+
+### Scenario 2: Outdoor Tile Routing
+
+Setup:
+
+- Start a shift with a large outdoor batch: weeds, grass, rocks, crops, trees, or mixed clearing/crop work.
+
+Expected results:
+
+- Worker chooses nearer reachable tasks within the active broad batch.
+- FPS does not collapse when outdoor tile work begins.
+- Worker continues to recompute routes after completed work changes passability.
+
+### Scenario 3: Building Exit Walk-Out
+
+Setup:
+
+- Start barn, coop, or greenhouse work.
+- Let the worker finish all interior tasks.
+
+Expected results:
+
+- Worker walks to a reachable interior exit approach tile.
+- Worker transitions outside only after reaching the exit approach.
+- Worker does not visibly warp out from the final task location.
+
+### Scenario 4: Chest Deposit Travel
+
+Setup:
+
+- Assign at least one task output to a chest.
+- Run work that produces depositable materials.
+
+Expected results:
+
+- Worker walks to a reachable tile adjacent to the chest.
+- Items are transferred only after arrival.
+- If the chest cannot be reached, items are mailed as undelivered rather than inserted automatically.
+
+### Scenario 5: Missing or Full Chest
+
+Setup:
+
+- Assign outputs to a chest.
+- Move/destroy the chest or fill it before the deposit run.
+
+Expected results:
+
+- Missing chest items are mailed with `ChestMissing` reason.
+- Full chest leftovers are mailed with `ChestFull` reason.
+- No items are lost.
+
+## Logs To Check
+
+- SMAPI console/log for `[Dayswork][routing]`, `[Dayswork][building]`, `[Dayswork][deposit]`, and `[Dayswork][exit]` diagnostics.
+- Warnings should be narrow and explain skipped blocked work or unreachable deposit destinations.
+
+## Cleanup
+
+- Remove or reset any test chests, placed products, and farm blockers created for play-testing.
+- Rebuild or redeploy the mod only after source changes.

@@ -13,4 +13,10 @@ public interface ITaskPriorityOrderer
     /// Empty input returns an empty list.
     /// </summary>
     IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> enabledTasks);
+
+    /// <summary>
+    /// Returns the FR-WORK-03 priority rank for a task. Lower numbers run first
+    /// when route costs are tied.
+    /// </summary>
+    int Rank(TaskKind task);
 }
