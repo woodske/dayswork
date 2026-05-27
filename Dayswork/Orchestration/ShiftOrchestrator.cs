@@ -1586,7 +1586,7 @@ internal sealed class ShiftOrchestrator
                             : WorkerTool.None;
             _toolAnimator.PlaySwing(collectTool,
                 FacingToward(_farmhand!.TilePoint, _animalHandler.CurrentTile(animal), _farmhand.FacingDirection));
-            PlayAnimalCollectSound(location, animal);
+            PlayAnimalCollectSound(location, collectTool);
             SpendStaminaForBeat(WorkActionKind.CollectAnimalProduct);
             _actionPending = true;
             return;
@@ -1601,15 +1601,9 @@ internal sealed class ShiftOrchestrator
         FinishResolvedAnimalWork(location);
     }
 
-    private static void PlayAnimalCollectSound(GameLocation location, FarmAnimal animal)
+    private static void PlayAnimalCollectSound(GameLocation location, WorkerTool collectTool)
     {
-        var sound = AnimalTaskHandler.IsShearProduce(animal)
-            ? "Shears"
-            : AnimalTaskHandler.IsMilkProduce(animal)
-                ? "Milking"
-                : "dwop";
-
-        location.playSound(sound);
+        location.playSound(AnimalCollectAudioCue.ForTool(collectTool));
     }
 
     // ── Deposit / exit handlers ───────────────────────────────────────────────
@@ -2335,9 +2329,14 @@ internal sealed class ShiftOrchestrator
         foreach (var d in loc.debris.ToList())
         {
             if (before.Contains(d) ||
-                (origin.HasValue && !IsDebrisNear(d, origin.Value, radiusTiles)) ||
-                !TryGetDebrisItem(d, out var itemId, out var stack))
+                (origin.HasValue && !IsDebrisNear(d, origin.Value, radiusTiles)))
                 continue;
+
+            if (!TryGetDebrisItem(d, out var itemId, out var stack))
+            {
+                LogInvalidDebris(loc, sourceTask, origin, d);
+                continue;
+            }
 
             _ctx!.Buffer.Add(itemId, stack, sourceTask, provenance ?? OutputScopeProvenance.Unknown);
             ModEntry.ModMonitor.Log(
@@ -2353,15 +2352,13 @@ internal sealed class ShiftOrchestrator
     {
         if (debris.item is not null)
         {
-            itemId = debris.item.QualifiedItemId;
-            stack  = Math.Max(1, debris.item.Stack);
-            return true;
+            stack = Math.Max(1, debris.item.Stack);
+            return DebrisItemIdResolver.TryResolveCollectibleItemId(debris.item.QualifiedItemId, out itemId);
         }
 
         var debrisItemId = debris.itemId.Value;
-        if (!string.IsNullOrWhiteSpace(debrisItemId))
+        if (DebrisItemIdResolver.TryResolveCollectibleItemId(debrisItemId, out itemId))
         {
-            itemId = debrisItemId;
             stack = debris.debrisType.Value == Debris.DebrisType.RESOURCE
                 ? Math.Max(1, debris.Chunks.Count)
                 : 1;
@@ -2371,6 +2368,22 @@ internal sealed class ShiftOrchestrator
         itemId = "";
         stack = 0;
         return false;
+    }
+
+    private static void LogInvalidDebris(GameLocation loc, TaskKind sourceTask, Vector2? origin, Debris debris)
+    {
+        if (debris.item is null && string.IsNullOrWhiteSpace(debris.itemId.Value))
+            return;
+
+        var rawItemId = debris.item?.QualifiedItemId ?? debris.itemId.Value ?? "";
+        var rawDisplayName = debris.item?.DisplayName ?? "<none>";
+        var originText = origin.HasValue
+            ? $"({(int)(origin.Value.X / 64f)},{(int)(origin.Value.Y / 64f)})"
+            : "<none>";
+
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][debris] worker-created debris could not be resolved to a valid item id raw='{rawItemId}' display='{rawDisplayName}' loc={loc.Name} task={sourceTask} origin={originText} chunks={debris.Chunks.Count} debrisType={debris.debrisType.Value} chunkType={debris.chunkType.Value}.",
+            LogLevel.Warn);
     }
 
     private static bool TryGetRemovedStandardStoneDrop(StardewValley.Object obj, out string itemId, out int stack)

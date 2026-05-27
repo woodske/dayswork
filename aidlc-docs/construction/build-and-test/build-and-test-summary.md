@@ -18,10 +18,10 @@
 
 - **Command**: `dotnet test Dayswork.sln`
 - **Status**: Pass
-- **Passed**: `306`
+- **Passed**: `316`
 - **Failed**: `0`
 - **Skipped**: `1`
-- **Total**: `307`
+- **Total**: `317`
 
 The skipped test is the existing seed/shrinking demonstration test and is expected.
 
@@ -32,7 +32,9 @@ The skipped test is the existing seed/shrinking demonstration test and is expect
 - **Key scenarios documented**:
   - barn/coop nearby routing
   - blocked egg/product side selection
+  - sheep shears audio cue
   - outdoor tile routing performance
+  - intermittent outdoor Error Item debris diagnosis
   - building exit walk-out
   - chest deposit walk-to-chest
   - missing/full chest overflow handling

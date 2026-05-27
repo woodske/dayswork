@@ -4510,3 +4510,87 @@ When doing tasks, the worker should always take the shortest path to the task. T
 **Context**: CONSTRUCTION — Code Generation approval and transition to Build and Test
 
 ---
+
+## Build and Test Stage
+**Timestamp**: 2026-05-27T16:48:47Z
+**User Input**: "looks good, changes are approved"
+**Build Status**: Pass — `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings and 0 errors.
+**Test Status**: Pass — `dotnet test Dayswork.sln` completed with 306 passed, 1 expected skip, and 0 failed.
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+**AI Response**: Refreshed the Build and Test instruction artifacts for U-WR Worker Routing and Dynamic Task Selection, including manual SMAPI play-test scenarios for live worker routing, outdoor performance, building exit walk-out, and chest deposit travel. Updated `aidlc-state.md` to the Build and Test review gate.
+**Context**: CONSTRUCTION — Build and Test completion for U-WR Worker Routing and Dynamic Task Selection
+
+---
+
+## Build and Test Review Prompt
+**Timestamp**: 2026-05-27T16:48:47Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Prepared the Build and Test review gate. The user is being asked to review `aidlc-docs/construction/build-and-test/build-and-test-summary.md`, then either request changes or approve and continue to Operations.
+**Context**: CONSTRUCTION — Approval prompt for U-WR Build and Test
+
+---
+
+## Build and Test — Sheep Shears Audio Review Change Requested
+**Timestamp**: 2026-05-27T17:04:06Z
+**User Input**:
+```text
+I get this message in SMAPI when the worker uses shears on a sheep:
+
+[game] Can't get audio ID 'Shears' because it doesn't exist.
+
+I do not hear any audio from the shears
+```
+**AI Response**: Accepted the play-test feedback as a Build and Test review change request. Confirmed the worker's sheep collection path was calling `location.playSound("Shears")`, then checked Stardew Valley's local `Content/XACT/Sound Bank.xsb` and verified that `Shears` is not a cue while vanilla `scissors` is. Planned a narrow runtime fix plus automated regression coverage, with Security Baseline skipped per `aidlc-state.md` because it is disabled and Property-Based Testing left compliant/N/A for this small non-property cue-mapping change.
+**Context**: CONSTRUCTION — Build and Test review feedback for sheep shears audio cue
+
+---
+
+## Build and Test — Sheep Shears Audio Review Fix Complete
+**Timestamp**: 2026-05-27T17:06:50Z
+**User Input**:
+```text
+I get this message in SMAPI when the worker uses shears on a sheep:
+
+[game] Can't get audio ID 'Shears' because it doesn't exist.
+
+I do not hear any audio from the shears
+```
+**AI Response**: Replaced the invalid sheep harvest cue with vanilla `scissors` by adding `AnimalCollectAudioCue.ForTool(...)` in `Dayswork.Core`, routing `ShiftOrchestrator` through that helper, and adding `Dayswork.Tests/Orchestration/AnimalCollectSoundTests.cs` so cue selection is regression-tested without loading the live MonoGame/Stardew runtime. Updated the U-16 code-generation plan/code summary plus the Build and Test unit/integration/summary artifacts. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings / 0 errors, `dotnet test Dayswork.sln /p:EnableModDeploy=false` completed with 309 passed / 1 expected skip / 0 failed, and deploy-enabled `dotnet build Dayswork.sln` completed with 0 warnings / 0 errors and refreshed `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — Build and Test review fix for sheep shears audio cue
+
+---
+
+## Build and Test Review Prompt
+**Timestamp**: 2026-05-27T17:06:50Z
+**User Input**: "(none — approval prompt initiated)"
+**AI Response**: Refreshed the Build and Test review gate after the sheep shears audio review fix. The user is being asked to review `aidlc-docs/construction/build-and-test/build-and-test-summary.md`, then either request changes or approve and continue to Operations.
+**Context**: CONSTRUCTION — Approval prompt for U-WR Build and Test after sheep shears audio fix
+
+---
+
+## Build and Test — Outdoor Error Item Investigation Requested
+**Timestamp**: 2026-05-27T17:22:35Z
+**User Input**:
+```text
+ocassionally an errored out item spawns on the ground in the outdoor work tiles. I can't tell what causes it and it's not consistent. Investigate what could be the cause.
+```
+**AI Response**: Accepted the report as additional Build and Test review feedback and began tracing all outdoor item-spawn paths that can leave or buffer debris near worker task tiles. Initial investigation focused on `ShiftOrchestrator` debris collection, animal-product collection, and vanilla tree/grass/object drop behavior, with special attention to malformed qualified item IDs resembling the screenshot's `(O)`-style Error Item. Property-Based Testing remains compliant/N/A for the investigation itself; Security Baseline remains skipped because it is disabled in `aidlc-state.md`.
+**Context**: CONSTRUCTION — Build and Test review investigation for intermittent outdoor Error Item spawn
+
+---
+
+## Build and Test — Outdoor Error Item Review Fix Complete
+**Timestamp**: 2026-05-27T17:31:57Z
+**User Input**:
+```text
+ocassionally an errored out item spawns on the ground in the outdoor work tiles. I can't tell what causes it and it's not consistent. Investigate what could be the cause.
+```
+**AI Response**: Traced the intermittent outdoor Error Item report to malformed debris item IDs, with outdoor tree seed/drop creation the strongest runtime suspect because Stardew tree code creates ground debris directly from string item IDs and turns malformed values into visible Error Items. Added `CollectibleItemIdNormalizer` in `Dayswork.Core`, added runtime `DebrisItemIdResolver` plus `ShiftOrchestrator` warning diagnostics so nearby worker-created debris is normalized/resolved through `ItemRegistry` before buffering, and invalid IDs now emit a narrow `[Dayswork][debris] worker-created debris could not be resolved...` warning with task/location context instead of silently flowing through. Added regression coverage in `Dayswork.Tests/Orchestration/DebrisItemIdResolverTests.cs` for valid normalization and bare-prefix rejection, refreshed the U-WR code summary plus Build and Test unit/integration/summary artifacts, and updated `aidlc-state.md`. Verification passed sequentially: `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings / 0 errors, `dotnet test Dayswork.sln /p:EnableModDeploy=false` completed with 316 passed / 1 expected skip / 0 failed, and deploy-enabled `dotnet build Dayswork.sln` completed with 0 warnings / 0 errors and refreshed `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — Build and Test review fix for intermittent outdoor Error Item diagnostics
+
+---

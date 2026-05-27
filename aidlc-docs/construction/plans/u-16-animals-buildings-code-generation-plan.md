@@ -149,6 +149,8 @@ Steps 1–22 below. Approval of this plan authorizes Part 2 (execution).
 
 - [x] **Step 33 — Playtest fix: greenhouse crop harvest infinite loop + items going to player inventory.** Two bugs in `InvokeHarvest`: (1) `Crop.harvest()` does not clear `dirt.crop`, so `IsTaskComplete` (checking `hd.crop is null`) never returned true → infinite harvest loop on the same tile. (2) SDV 1.6 `Crop.harvest(null junimoHarvester)` adds produce directly to `Game1.player` (or creates debris the player magnet immediately collects), bypassing the worker buffer. Fix: reflected the actual game DLL (`Crop.RegrowsAfterHarvest()`, `HoeDirt.destroyCrop(bool)`, `HoeDirt.readyForHarvest()`) to use authoritative vanilla APIs; snapshot player inventory by object reference before calling `harvest()`; after the call, diff and redirect any new/increased stacks to the worker buffer then remove them from the player; call `dirt.destroyCrop(false)` when `!dirt.crop.RegrowsAfterHarvest()` (the correct caller-side cleanup). Updated `IsTaskComplete` for `HarvestCrops` to use `!hd.readyForHarvest()` (covers regrowable crops). Updated `WorkAreaScanner.DetectTask` to use `dirt.readyForHarvest()` and removed the now-dead hand-rolled `IsReadyToHarvest(Crop)` helper. Rebuild, test, auto-deploy, and update U-16 docs/state/audit.
 
+- [x] **Step 35 — Playtest fix: sheep shears audio cue.** Fix the invalid sheep harvest sound id reported by SMAPI: replace the nonexistent `Shears` cue with vanilla `scissors`, keep `Milking` for milk-pail harvests, add a narrow automated regression seam for cue selection, rebuild, test, and update U-16/build-and-test docs, state, and audit.
+
 ---
 
 ## Risk notes

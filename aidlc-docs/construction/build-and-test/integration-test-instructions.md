@@ -38,6 +38,7 @@ Expected results:
 - Worker does not abandon reachable eggs because the top side is blocked.
 - Worker handles nearer actionable animals before walking past them to far animals.
 - Feed work can proceed after enabled product collection clears blockers.
+- Sheep wool collection plays the vanilla `scissors` cue, and SMAPI logs no invalid audio-id warning.
 
 ### Scenario 2: Outdoor Tile Routing
 
@@ -50,6 +51,7 @@ Expected results:
 - Worker chooses nearer reachable tasks within the active broad batch.
 - FPS does not collapse when outdoor tile work begins.
 - Worker continues to recompute routes after completed work changes passability.
+- If an `Error Item` appears on an outdoor work tile, SMAPI logs a narrow `[Dayswork][debris] worker-created debris could not be resolved...` warning with task/location context so the offending drop source can be identified.
 
 ### Scenario 3: Building Exit Walk-Out
 
@@ -92,7 +94,7 @@ Expected results:
 
 ## Logs To Check
 
-- SMAPI console/log for `[Dayswork][routing]`, `[Dayswork][building]`, `[Dayswork][deposit]`, and `[Dayswork][exit]` diagnostics.
+- SMAPI console/log for `[Dayswork][routing]`, `[Dayswork][building]`, `[Dayswork][deposit]`, `[Dayswork][exit]`, and `[Dayswork][debris]` diagnostics.
 - Warnings should be narrow and explain skipped blocked work or unreachable deposit destinations.
 
 ## Cleanup

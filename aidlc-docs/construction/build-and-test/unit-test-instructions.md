@@ -8,12 +8,12 @@
 dotnet test Dayswork.sln
 ```
 
-Expected result for the current U-WR code:
+Expected result for the current U-WR review build:
 
-- Passed: `306`
+- Passed: `316`
 - Failed: `0`
 - Skipped: `1`
-- Total: `307`
+- Total: `317`
 
 The skipped test is the existing PBT seed/shrinking demonstration:
 
@@ -47,6 +47,8 @@ The default `dotnet test Dayswork.sln` path may copy the mod to the configured S
   - outdoor tile route-cost map selection
   - building exit reachable approach selection
   - chest deposit reachable adjacent stand-tile selection
+  - sheep shears audio cue uses vanilla `scissors`
+  - debris item-id normalization rejects incomplete IDs like bare `(O)` before they can enter the worker buffer
 - Existing project coverage:
   - pricing
   - persistence
