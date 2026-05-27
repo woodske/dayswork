@@ -2074,38 +2074,21 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     private LaborBeatOutcome InvokeTaskActionGuarded(TileCoord tile, TaskKind task, GameLocation location)
     {
-        // Vanilla game methods (crop.harvest, performToolAction, etc.) reach into
-        // Game1.player and set animation state as a side effect, even though the
-        // worker — not the player — is doing the work. Save and restore the player's
-        // sprite state so those side effects are invisible to the farmer.
-        var sprite                       = Game1.player.FarmerSprite;
-        var savedAnimation               = sprite.currentAnimation?.ToList();
-        var savedFrame                   = sprite.CurrentFrame;
-        var savedUsingTool               = Game1.player.UsingTool;
-        var savedCanMove                 = Game1.player.CanMove;
-        var savedPauseForSingleAnimation = sprite.pauseForSingleAnimation;
-        var savedCurrentSingleAnimation  = sprite.currentSingleAnimation;
+        // Some vanilla worker-facing callbacks still mutate Game1.player directly
+        // (crop harvest, HUD/item gain flows, etc.) even though the worker is taking
+        // the action. Snapshot the player's transient action state and restore it
+        // immediately after the worker beat so no farmer animation leaks through.
+        var playerState = new Game1WorkerActionPlayerState(Game1.player);
+        var savedState = WorkerActionPlayerStateSnapshot.Capture(playerState);
 
-        var outcome = InvokeTaskAction(tile, task, location);
-
-        // FarmerSprite.StopAnimation() is a no-op when pauseForSingleAnimation is true
-        // (which crop.harvest sets). Clear the flag before restoring so the sprite
-        // actually resets, then put everything back to the pre-call state.
-        sprite.pauseForSingleAnimation  = false;
-        sprite.currentSingleAnimation   = savedCurrentSingleAnimation;
-
-        if (savedAnimation is { Count: > 0 })
-            sprite.setCurrentAnimation(savedAnimation);
-        else
+        try
         {
-            sprite.ClearAnimation();
-            sprite.StopAnimation();
+            return InvokeTaskAction(tile, task, location);
         }
-        sprite.CurrentFrame              = savedFrame;
-        sprite.pauseForSingleAnimation   = savedPauseForSingleAnimation;
-        Game1.player.UsingTool           = savedUsingTool;
-        Game1.player.CanMove             = savedCanMove;
-        return outcome;
+        finally
+        {
+            savedState.Restore(playerState);
+        }
     }
 
     private LaborBeatOutcome InvokeTaskAction(TileCoord tile, TaskKind task, GameLocation location)
@@ -2232,7 +2215,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (!loc.objects.TryGetValue(tileVec, out var obj) || !obj.IsWeeds())
             return new LaborBeatOutcome(true, true);
         var before = new HashSet<Debris>(loc.debris);
-        var scythe = new MeleeWeapon("66") { lastUser = Game1.player };
+        var scythe = new MeleeWeapon("66") { lastUser = CreateWorkerActionFarmer(tile, loc) };
         obj.performToolAction(scythe);
         if (loc.objects.ContainsKey(tileVec))
             loc.removeObject(tileVec, false);
@@ -2245,7 +2228,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var tileVec = new Vector2(tile.X, tile.Y);
         if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not Grass grass)
             return new LaborBeatOutcome(true, true);
-        var scythe = new MeleeWeapon("66") { lastUser = Game1.player };
+        var scythe = new MeleeWeapon("66") { lastUser = CreateWorkerActionFarmer(tile, loc) };
         grass.performToolAction(scythe, 0, tileVec);
         if (loc.terrainFeatures.ContainsKey(tileVec))
             loc.terrainFeatures.Remove(tileVec);
@@ -2255,7 +2238,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private LaborBeatOutcome InvokeClearRock(TileCoord tile, GameLocation loc)
     {
         var tileVec = new Vector2(tile.X, tile.Y);
-        var pickaxe = new Pickaxe { UpgradeLevel = (int)_ctx!.ToolSnapshot.PickaxeLevel, lastUser = Game1.player };
+        var pickaxe = new Pickaxe { UpgradeLevel = (int)_ctx!.ToolSnapshot.PickaxeLevel, lastUser = CreateWorkerActionFarmer(tile, loc) };
 
         if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is { } clump)
         {
@@ -2301,7 +2284,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private LaborBeatOutcome InvokeCutTree(TileCoord tile, GameLocation loc)
     {
         var tileVec = new Vector2(tile.X, tile.Y);
-        var axe = new Axe { UpgradeLevel = (int)_ctx!.ToolSnapshot.AxeLevel, lastUser = Game1.player };
+        var axe = new Axe { UpgradeLevel = (int)_ctx!.ToolSnapshot.AxeLevel, lastUser = CreateWorkerActionFarmer(tile, loc) };
 
         if (loc.terrainFeatures.TryGetValue(tileVec, out var tf) && tf is Tree tree)
         {
@@ -2344,6 +2327,25 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         return new LaborBeatOutcome(true, true);
+    }
+
+    private Farmer CreateWorkerActionFarmer(TileCoord taskTile, GameLocation location)
+    {
+        var actionFarmer = Game1.player.CreateFakeEventFarmer();
+        actionFarmer.currentLocation = location;
+        actionFarmer.Position = _farmhand?.Position ?? Game1.player.Position;
+        actionFarmer.faceDirection(
+            FacingToward(
+                _farmhand?.TilePoint ?? Game1.player.TilePoint,
+                taskTile,
+                _farmhand?.FacingDirection ?? Game1.player.FacingDirection));
+        actionFarmer.CanMove = false;
+        actionFarmer.UsingTool = false;
+        actionFarmer.canReleaseTool = false;
+        actionFarmer.jitterStrength = 0f;
+        actionFarmer.FarmerSprite.pauseForSingleAnimation = false;
+        actionFarmer.FarmerSprite.StopAnimation();
+        return actionFarmer;
     }
 
     private bool CollectNewDebrisAtTile(

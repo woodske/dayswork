@@ -17,7 +17,8 @@ U-WR changes the worker's within-batch routing from fixed queue/side preference 
 | `Dayswork/Orchestration/AnimalTaskHandler.cs` | Exposes multiple animal interaction tiles and gives hopper/trough feed work multiple stand candidates. |
 | `Dayswork/Orchestration/DebrisItemIdResolver.cs` | Normalizes raw debris item IDs to qualified IDs and resolves them through Stardew's item registry before buffering worker drops. |
 | `Dayswork/Orchestration/SessionResetHandler.cs` | Adds a narrow session-boundary reset hook so title-return and save-load lifecycle events clear stale in-memory worker runtime. |
-| `Dayswork/Orchestration/ShiftOrchestrator.cs` | Builds a fresh active-batch candidate pool, selects nearest reachable work with deterministic tie-breaks, defers navigation failures, retries after progress, skips blocked remainder on no reachable progress, revalidates before dispatch, updates stuck recovery to use the same active-batch selector, routes chest deposits to reachable adjacent stand tiles, and warns when worker-created debris carries an invalid item ID. |
+| `Dayswork/Orchestration/ShiftOrchestrator.cs` | Builds a fresh active-batch candidate pool, selects nearest reachable work with deterministic tie-breaks, defers navigation failures, retries after progress, skips blocked remainder on no reachable progress, revalidates before dispatch, updates stuck recovery to use the same active-batch selector, routes chest deposits to reachable adjacent stand tiles, warns when worker-created debris carries an invalid item ID, and now routes tool callbacks through a hidden worker-action farmer so vanilla tool side effects do not target the real player. |
+| `Dayswork/Orchestration/WorkerActionPlayerStateSnapshot.cs` | Captures and restores the farmer's transient animation/tool state around worker beats so any direct `Game1.player` side effects are reset immediately after the worker action. |
 | `Dayswork/Orchestration/BuildingWorkNavigator.cs` | Exposes interior exit approach candidates and a nearest-reachable selector so building completion walks to a reachable exit approach tile before transitioning outside. |
 | `Dayswork/ModEntry.cs` | Registers session reset handlers before persistence/mail save-load hydration so stale worker runtime is cleared at the start of each loaded session. |
 
@@ -32,6 +33,7 @@ U-WR changes the worker's within-batch routing from fixed queue/side preference 
 | `Dayswork.Tests/UWR/WorkerRoutingRegressionTests.cs` | Focused examples for wrong-side routing, blocked-side product collection, near animal selection, feed retry after product progress, disabled product boundary, and no-progress blocked termination. |
 | `Dayswork.Tests/Orchestration/DebrisItemIdResolverTests.cs` | Focused examples for collectible item-ID normalization, including rejection of incomplete bare type prefixes like `(O)`. |
 | `Dayswork.Tests/Orchestration/SessionResetHandlerTests.cs` | Focused examples proving the save-load and returned-to-title hooks both request a runtime session reset. |
+| `Dayswork.Tests/Orchestration/WorkerActionPlayerStateSnapshotTests.cs` | Pure examples proving worker-beat player-state restoration re-applies the farmer's original animation/tool flags and clears unsaved animation state when none existed. |
 | `Dayswork.Tests/UWR/BuildingExitRoutingTests.cs` | Focused examples for selecting a reachable interior exit approach tile before the farm transition. |
 | `Dayswork.Tests/UWR/DepositRoutingTests.cs` | Focused examples for selecting a reachable adjacent stand tile before chest deposits. |
 
@@ -77,6 +79,12 @@ U-WR changes the worker's within-batch routing from fixed queue/side preference 
 - Cause addressed: the mod had no explicit session-boundary reset hook. `Saving`-time sleep settlement handles real save writes, but `Exit to Title` is a memory/session transition, not a sleep save, so stale `ShiftOrchestrator` runtime state could survive inside the still-running mod process until the next save load.
 - Fix: `ModEntry` now wires a `SessionResetHandler` to `ReturnedToTitle` and to `SaveLoaded` before persistence/mail hydration. That handler tells `ShiftOrchestrator` to perform a non-settling runtime reset, clearing the in-memory worker, buffer-bearing shift context, deferred work, navigation state, pending deposit/debris state, and stale title-screen carryover before a new session begins. Reloaded saves now start from their actual saved day state instead of resuming a discarded in-memory shift.
 
+## Farmer Animation Review Fix
+
+- Play-test feedback: tree cutting showed a visible farmer animation on every strike, and grass cutting showed player-side animation/feedback whenever hay was collected, even though the worker was the one acting.
+- Cause addressed: Dayswork was still assigning `Game1.player` as the `lastUser` for vanilla tool callbacks like tree, grass, weed, and rock actions. Those callbacks can animate or position feedback from the tool user, so the real player became the visual target. The existing worker-action guard also only restored a subset of the player's transient animation/tool state.
+- Fix: tool-based worker actions now use a hidden fake-event farmer positioned/faced like the worker, so vanilla tool callbacks target the worker-side proxy instead of the real farmer. The action guard also now snapshots and restores extra transient player state such as `canReleaseTool`, jitter, and action velocities, ensuring any remaining direct `Game1.player` mutation is cleared before the next frame draws the player.
+
 ## PBT Compliance
 
 | Rule | Result |
@@ -104,6 +112,9 @@ U-WR changes the worker's within-batch routing from fixed queue/side preference 
 - Session reset review fix compile check: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` warnings and `0` errors after wiring session-boundary runtime reset hooks.
 - Session reset review fix full test rerun: `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with `318` passed, `1` expected skip, `0` failed after adding session reset handler coverage.
 - Session reset review fix deploy build: `dotnet build Dayswork.sln` passed with `0` warnings and `0` errors and refreshed `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+- Farmer animation review fix compile check: `dotnet build Dayswork.sln /p:EnableModDeploy=false` passed with `0` warnings and `0` errors after routing worker tool callbacks through a hidden action proxy farmer and widening the worker-beat player-state snapshot.
+- Farmer animation review fix full test rerun: `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with `320` passed, `1` expected skip, `0` failed after adding worker action state snapshot coverage.
+- Farmer animation review fix deploy build: `dotnet build Dayswork.sln` passed with `0` warnings and `0` errors and refreshed `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
 
 ## Caveats
 

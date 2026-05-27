@@ -51,6 +51,7 @@ Expected results:
 - Worker chooses nearer reachable tasks within the active broad batch.
 - FPS does not collapse when outdoor tile work begins.
 - Worker continues to recompute routes after completed work changes passability.
+- Tree chopping and grass-cut hay collection do not trigger visible animation or floating hay/tool feedback on the real farmer; any worker-facing tool feedback stays with the worker action itself.
 - If an `Error Item` appears on an outdoor work tile, SMAPI logs a narrow `[Dayswork][debris] worker-created debris could not be resolved...` warning with task/location context so the offending drop source can be identified.
 
 ### Scenario 3: Building Exit Walk-Out

@@ -16,12 +16,12 @@
 
 ### Unit And Property Tests
 
-- **Command**: `dotnet test Dayswork.sln`
+- **Command**: `dotnet test Dayswork.sln /p:EnableModDeploy=false`
 - **Status**: Pass
-- **Passed**: `318`
+- **Passed**: `320`
 - **Failed**: `0`
 - **Skipped**: `1`
-- **Total**: `319`
+- **Total**: `321`
 
 The skipped test is the existing seed/shrinking demonstration test and is expected.
 
@@ -36,6 +36,7 @@ The skipped test is the existing seed/shrinking demonstration test and is expect
   - outdoor tile routing performance
   - intermittent outdoor Error Item debris diagnosis
   - exit-to-title / reload session reset
+  - farmer animation suppression during worker tree and grass actions
   - building exit walk-out
   - chest deposit walk-to-chest
   - missing/full chest overflow handling

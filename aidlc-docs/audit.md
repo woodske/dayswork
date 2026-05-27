@@ -4616,3 +4616,14 @@ The worker does not reset when I use exit to title to go back to the stardew val
 **Context**: CONSTRUCTION — Build and Test review fix for exit-to-title / reload worker reset bug
 
 ---
+
+## Build and Test — Farmer Animation Leak Review Fix Complete
+**Timestamp**: 2026-05-27T21:35:29Z
+**User Input**:
+```text
+Tree cutting and grass cutting by the worker shows some animation on the farmer. tree on every strike, grass whenever hay is collected. There should be no animations shown on the farmer whenever the worker takes an action.
+```
+**AI Response**: Confirmed the worker was still assigning `Game1.player` as the `lastUser` for vanilla tool actions like tree, grass, weed, and rock clearing, which let vanilla callbacks animate or position feedback from the real farmer. Added `WorkerActionPlayerStateSnapshot` plus a `Game1WorkerActionPlayerState` adapter to widen the transient player-state snapshot around worker beats, and changed `ShiftOrchestrator` tool actions to use a hidden fake-event farmer positioned and faced like the worker so tool callbacks no longer target the real player. Added focused pure coverage in `Dayswork.Tests/Orchestration/WorkerActionPlayerStateSnapshotTests.cs`, refreshed the U-WR code summary plus Build and Test unit/integration/summary artifacts, and updated `aidlc-state.md`. Verification passed sequentially: `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings / 0 errors, `dotnet test Dayswork.sln /p:EnableModDeploy=false` completed with 320 passed / 1 expected skip / 0 failed, and deploy-enabled `dotnet build Dayswork.sln` completed with 0 warnings / 0 errors and refreshed `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+**Context**: CONSTRUCTION — Build and Test review fix for farmer animation leak during worker tool actions
+
+---
