@@ -1325,8 +1325,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     }
 
     // Called by CalendarHandlers.OnSavingHook when the player sleeps. v1 treats sleep as a hard stop:
-    // no remaining tasks run headlessly, but collected/undelivered items and any refund are settled before
-    // contracts persist and the day rolls over.
+    // no remaining tasks run headlessly, but collected/undelivered items are settled (mailed) before
+    // contracts persist and the day rolls over. U-21 BR-SLEEP-02 removed refund semantics from this path.
     public void StopForSleepAndSettle()
     {
         if (_ctx is null)
@@ -1349,7 +1349,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         AppendUndeliveredToOverflow();
 
         _ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
-        SettleShiftMail(0);
+        SettleShiftMail();
 
         ClearWorker();
         _ctx = null;
@@ -1883,15 +1883,39 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
         // Shipping bin path.
         var farm = Game1.getFarm();
+        if (string.IsNullOrWhiteSpace(stack.QualifiedItemId))
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][deposit] Error Item suppressed at shipping bin: empty QualifiedItemId stack=x{stack.Quantity} task={stack.SourceTask}; not shipped.",
+                LogLevel.Error);
+            return;
+        }
         var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
         if (item is null)
             return;
+        if (IsDepositErrorItem(item))
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][deposit] Error Item suppressed at shipping bin: rawId='{stack.QualifiedItemId}' resolvedQualifiedId='{item.QualifiedItemId}' name='{item.Name}' stack=x{stack.Quantity} task={stack.SourceTask}; not shipped.",
+                LogLevel.Error);
+            return;
+        }
 
         if (playerHere)
             farm.shipItem(item, Game1.player);          // vanilla lid animation + backpackIN + delayed "Ship"
         else
             farm.getShippingBin(Game1.player).Add(item); // silent fallback
     }
+
+    // ItemRegistry.Create(badId) returns SDV's fallback Error Item (Name="Error Item",
+    // QualifiedItemId="(O)") rather than null when the id can't be resolved. This guard
+    // refuses to deposit Error Items into a chest/bin — those would otherwise survive into
+    // the player's world as "(O)" placeholders.
+    private static bool IsDepositErrorItem(Item item) =>
+        item is null
+        || string.IsNullOrEmpty(item.ItemId)
+        || item.QualifiedItemId == "(O)"
+        || string.Equals(item.Name, "Error Item", StringComparison.Ordinal);
 
     private void EndTripExecution()
     {
@@ -1923,9 +1947,23 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     private void DepositIntoChest(Chest chest, RoutedItemStack stack)
     {
+        if (string.IsNullOrWhiteSpace(stack.QualifiedItemId))
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][deposit] Error Item suppressed at chest: empty QualifiedItemId stack=x{stack.Quantity} task={stack.SourceTask}; not deposited.",
+                LogLevel.Error);
+            return;
+        }
         var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
         if (item is null)
             return;
+        if (IsDepositErrorItem(item))
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][deposit] Error Item suppressed at chest: rawId='{stack.QualifiedItemId}' resolvedQualifiedId='{item.QualifiedItemId}' name='{item.Name}' stack=x{stack.Quantity} task={stack.SourceTask}; not deposited.",
+                LogLevel.Error);
+            return;
+        }
 
         // addItem returns the remainder that did not fit (null if all fit).
         var leftover = chest.addItem(item);
@@ -1974,7 +2012,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             LogLevel.Info);
 
         // One settlement letter next morning for overflow items only; U-21 removes refund settlement.
-        SettleShiftMail(0);
+        SettleShiftMail();
 
         ClearWorker();
         _ctx.StateMachine.Transition(ShiftPhase.Done);
@@ -2169,9 +2207,10 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     // ── Overflow / mail helpers (Pattern O) ───────────────────────────────────
 
-    // One settlement letter per shift: overflow items (if any) + refund gold (if > 0). Sends nothing
-    // when there is neither (Pattern U / BR-REF-03).
-    private void SettleShiftMail(int refundGold)
+    // One settlement letter per shift carrying any overflow items. Sends nothing when there are
+    // no overflow items (Pattern U). U-21 BR-END-03 removed the shift-end refund settlement —
+    // the player already paid the contract price for the day.
+    private void SettleShiftMail()
     {
         if (_ctx is null) return;
 
@@ -2180,7 +2219,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             : Array.Empty<ItemStack>();
         var categories = _overflowCategorizer.Categorize(_ctx.Overflow);
 
-        _mailDispatcher.QueueSettlement(items, categories, refundGold);
+        _mailDispatcher.QueueSettlement(items, categories);
         _ctx.Overflow.Clear();
     }
 

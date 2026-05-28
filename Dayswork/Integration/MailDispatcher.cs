@@ -11,15 +11,16 @@ using StardewValley;
 
 namespace Dayswork.Integration;
 
-// M-16 MailDispatcher (Patterns P + U). Sends the single per-shift settlement letter (overflow items
-    // + refund gold), plus the text-only cannot-afford / needs-attention / festival notices.
-    // All user-visible text is routed through I18nHelper (UX-U15-01). No new Harmony patches
-    // (NFR-MAINT-04).
+// M-16 MailDispatcher (Patterns P + U). Sends the single per-shift settlement letter (overflow
+// items only — U-21 BR-END-03 removed shift-end refund settlement), plus the text-only
+// cannot-afford / needs-attention / festival notices. All user-visible text is routed through
+// I18nHelper (UX-U15-01). No new Harmony patches (NFR-MAINT-04).
 //
-// Refund gold rides the letter as a credit-on-collection callback (DEV-U15-04 / BR-REF-04):
-// settlement refunds arrive next morning; one-time festival refunds ride the same-day no-worker
-// notice. If the mail backend is unavailable, items fall back to the shipping bin and gold is
-// credited directly so nothing is lost (SAFE-U15-01 / REL-U15-04).
+// One-time contracts cancelled by a festival still issue a refund via QueueFestivalNotice
+// (BR-CAL-03); recurring contracts on festival days are not charged at all (no refund needed).
+// Refund gold rides the festival letter as a credit-on-collection callback (DEV-U15-04). If the
+// mail backend is unavailable, items fall back to the shipping bin and gold is credited directly
+// so nothing is lost (SAFE-U15-01 / REL-U15-04).
 internal sealed class MailDispatcher : IMailDispatcher
 {
     private const string PendingSettlementsKey = "Dayswork.PendingSettlements";
@@ -93,48 +94,41 @@ internal sealed class MailDispatcher : IMailDispatcher
         _dataHelper.WriteSaveData(PendingSettlementsKey, _pendingSettlements);
     }
 
-    public void QueueSettlement(IReadOnlyList<ItemStack> items, IReadOnlyList<OverflowCategory> categories, int refundGold)
+    public void QueueSettlement(IReadOnlyList<ItemStack> items, IReadOnlyList<OverflowCategory> categories)
     {
-        bool hasItems = items.Count > 0;
-        bool hasGold  = refundGold > 0;
-        if (!hasItems && !hasGold) return;
+        if (items.Count == 0) return;
 
-        var attachments = hasItems ? BuildItems(items) : new List<Item>();
-        if (attachments.Count == 0 && !hasGold)
+        var attachments = BuildItems(items);
+        if (attachments.Count == 0)
         {
             ModEntry.ModMonitor.Log(
-                "[Dayswork] Settlement mail had no valid item attachments and no refund; suppressing empty letter.",
+                "[Dayswork] Settlement mail had no valid item attachments; suppressing empty letter.",
                 LogLevel.Warn);
             return;
         }
 
         var sender = I18nHelper.Get("mail.sender");
-        var body   = BuildSettlementBody(categories, refundGold, attachments.Count > 0);
+        var body   = BuildSettlementBody(categories);
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][mail] queue settlement letter attachments={attachments.Count} refund={refundGold} categories={string.Join(",", categories.Select(category => $"{category.Reason}:{category.ScopeFamily}:{category.ScopeName}"))}.",
+            $"[Dayswork][mail] queue settlement letter attachments={attachments.Count} categories={string.Join(",", categories.Select(category => $"{category.Reason}:{category.ScopeFamily}:{category.ScopeName}"))}.",
             LogLevel.Debug);
         if (TrySendViaMfm(
             $"Dayswork.Settlement.{CurrentDay()}.{Guid.NewGuid():N}",
             sender,
             body,
             attachments,
-            refundGold,
+            refundGold: 0,
             DeliveryTiming.Tomorrow))
             return;
 
-        // Last-resort safety net (SAFE-U15-01 / REL-U15-04): never lose items or refunds.
+        // Last-resort safety net (SAFE-U15-01 / REL-U15-04): never lose items.
         ModEntry.ModMonitor.Log(
-            "[Dayswork] Settlement mail could not be sent via Mail Framework Mod; depositing items in the shipping bin and crediting the refund directly so nothing is lost.",
+            "[Dayswork] Settlement mail could not be sent via Mail Framework Mod; depositing items in the shipping bin so nothing is lost.",
             LogLevel.Warn);
-        if (attachments.Count > 0)
-        {
-            var bin = Game1.getFarm().getShippingBin(Game1.player);
-            foreach (var item in attachments)
-                bin.Add(item);
-        }
-        if (hasGold && Game1.player is not null)
-            Game1.player.Money += refundGold;
+        var bin = Game1.getFarm().getShippingBin(Game1.player);
+        foreach (var item in attachments)
+            bin.Add(item);
     }
 
     public void QueueCannotAffordNotice(Contract contract, int dailyPrice, int shortfall)
@@ -223,7 +217,7 @@ internal sealed class MailDispatcher : IMailDispatcher
             if (timing == DeliveryTiming.Today)
                 AddToMailboxToday(id);
             else
-                PersistPendingSettlement(id, synopsis, text, attachments, earliest, refundGold);
+                PersistPendingSettlement(id, synopsis, text, attachments, earliest);
             return true;
         }
         catch (Exception ex)
@@ -235,21 +229,37 @@ internal sealed class MailDispatcher : IMailDispatcher
 
     private void PersistPendingSettlement(
         string id, string sender, string body,
-        List<Item> attachments, int earliestDeliveryDay, int refundGold)
+        List<Item> attachments, int earliestDeliveryDay)
     {
         _pendingSettlements.RemoveAll(r => Game1.player?.mailReceived.Contains(r.Id) == true);
+
+        // Filter out anything that would round-trip as an Error Item next save load
+        // (empty/whitespace QualifiedItemId or already-an-Error-Item). Log loudly so we can
+        // identify the writer that fed us the bad attachment.
+        var records = new List<PendingSettlementItemRecord>(attachments.Count);
+        foreach (var i in attachments)
+        {
+            if (string.IsNullOrWhiteSpace(i.QualifiedItemId) || IsErrorItem(i))
+            {
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][mail] Error Item suppressed at PersistPendingSettlement: letterId={id} qualifiedId='{i.QualifiedItemId}' name='{i.Name}' stack=x{i.Stack}; not persisted.",
+                    LogLevel.Error);
+                continue;
+            }
+            records.Add(new PendingSettlementItemRecord
+            {
+                QualifiedItemId = i.QualifiedItemId,
+                Quantity = i.Stack,
+            });
+        }
+
         _pendingSettlements.Add(new PendingSettlementRecord
         {
             Id = id,
             Sender = sender,
             Body = body,
             EarliestDeliveryDay = earliestDeliveryDay,
-            RefundGold = refundGold,
-            Items = attachments.Select(i => new PendingSettlementItemRecord
-            {
-                QualifiedItemId = i.QualifiedItemId,
-                Quantity = i.Stack,
-            }).ToList(),
+            Items = records,
         });
         _dataHelper.WriteSaveData(PendingSettlementsKey, _pendingSettlements);
     }
@@ -259,17 +269,58 @@ internal sealed class MailDispatcher : IMailDispatcher
         if (_mfm is null) return;
         try
         {
-            var attachments = record.Items
-                .Select(i => ItemRegistry.Create(i.QualifiedItemId, i.Quantity))
-                .OfType<Item>()
-                .ToList();
+            var attachments = new List<Item>(record.Items.Count);
+            var suppressed = 0;
+            foreach (var rec in record.Items)
+            {
+                if (string.IsNullOrWhiteSpace(rec.QualifiedItemId))
+                {
+                    suppressed++;
+                    ModEntry.ModMonitor.Log(
+                        $"[Dayswork][mail] Error Item suppressed at ReRegisterWithMfm: empty QualifiedItemId letterId={record.Id} stack=x{rec.Quantity}; skipped.",
+                        LogLevel.Error);
+                    continue;
+                }
+
+                var item = ItemRegistry.Create(rec.QualifiedItemId, rec.Quantity);
+                if (item is null)
+                {
+                    suppressed++;
+                    ModEntry.ModMonitor.Log(
+                        $"[Dayswork][mail] ReRegisterWithMfm: ItemRegistry.Create returned null for '{rec.QualifiedItemId}' x{rec.Quantity} letterId={record.Id}; skipped.",
+                        LogLevel.Warn);
+                    continue;
+                }
+                if (IsErrorItem(item))
+                {
+                    suppressed++;
+                    ModEntry.ModMonitor.Log(
+                        $"[Dayswork][mail] Error Item suppressed at ReRegisterWithMfm: rawId='{rec.QualifiedItemId}' resolvedQualifiedId='{item.QualifiedItemId}' name='{item.Name}' letterId={record.Id} stack=x{rec.Quantity}; skipped.",
+                        LogLevel.Error);
+                    continue;
+                }
+                attachments.Add(item);
+            }
+
+            // Only the settlement (overflow-items) path persists; the festival refund letter
+            // uses DeliveryTiming.Today and is never persisted. So a pending record never carries
+            // a refund — if every attachment was suppressed, the letter has nothing to deliver.
+            if (attachments.Count == 0)
+            {
+                _pendingSettlements.Remove(record);
+                _dataHelper.WriteSaveData(PendingSettlementsKey, _pendingSettlements);
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][mail] dropped pending settlement id={record.Id}: all {suppressed} attachment(s) were invalid.",
+                    LogLevel.Warn);
+                return;
+            }
 
             ModEntry.ModMonitor.Log(
-                $"[Dayswork][mail] re-register pending settlement id={record.Id} attachments={attachments.Count} refund={record.RefundGold}.",
-                LogLevel.Debug);
+                $"[Dayswork][mail] re-register pending settlement id={record.Id} attachments={attachments.Count} suppressed={suppressed}.",
+                suppressed > 0 ? LogLevel.Warn : LogLevel.Debug);
             _mfm.RegisterLetter(
                 record.Id, record.Sender, record.Body,
-                attachments, record.EarliestDeliveryDay, record.RefundGold);
+                attachments, record.EarliestDeliveryDay, moneyReward: 0);
         }
         catch (Exception ex)
         {
@@ -299,31 +350,47 @@ internal sealed class MailDispatcher : IMailDispatcher
         var result = new List<Item>(stacks.Count);
         foreach (var s in stacks)
         {
-            var item = ItemRegistry.Create(s.QualifiedItemId, s.Quantity);
-            if (item is not null)
-                result.Add(item);
-            else
+            if (string.IsNullOrWhiteSpace(s.QualifiedItemId))
+            {
                 ModEntry.ModMonitor.Log(
-                    $"[Dayswork] Could not create mail item '{s.QualifiedItemId}' x{s.Quantity}; skipped.", LogLevel.Warn);
+                    $"[Dayswork][mail] Error Item suppressed at BuildItems: empty QualifiedItemId stack=x{s.Quantity}; skipped.",
+                    LogLevel.Error);
+                continue;
+            }
+
+            var item = ItemRegistry.Create(s.QualifiedItemId, s.Quantity);
+            if (item is null)
+            {
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork] Could not create mail item '{s.QualifiedItemId}' x{s.Quantity}; skipped.",
+                    LogLevel.Warn);
+                continue;
+            }
+            if (IsErrorItem(item))
+            {
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][mail] Error Item suppressed at BuildItems: rawId='{s.QualifiedItemId}' resolvedQualifiedId='{item.QualifiedItemId}' name='{item.Name}' stack=x{s.Quantity}; skipped.",
+                    LogLevel.Error);
+                continue;
+            }
+            result.Add(item);
         }
         return result;
     }
 
-    // Settlement body: the overflow reason lines (when items are attached) plus a refund line (when
-    // gold is returned). "^" is the vanilla letter line-break token, honored by MFM. (FD-Q6=A reused.)
-    private static string BuildSettlementBody(IReadOnlyList<OverflowCategory> categories, int refundGold, bool hasItems)
-    {
-        var sb = new StringBuilder();
-        if (hasItems)
-            sb.Append(BuildOverflowBody(categories));
+    // ItemRegistry.Create(badId) returns SDV's fallback Error Item (Name="Error Item",
+    // QualifiedItemId="(O)") rather than null when the id can't be resolved. .OfType<Item>()
+    // and `is not null` checks don't catch it — this helper does.
+    private static bool IsErrorItem(Item item) =>
+        item is null
+        || string.IsNullOrEmpty(item.ItemId)
+        || item.QualifiedItemId == "(O)"
+        || string.Equals(item.Name, "Error Item", StringComparison.Ordinal);
 
-        if (refundGold > 0)
-        {
-            if (sb.Length > 0) sb.Append("^");
-            sb.Append(I18nHelper.Get("mail.settlement.refund_line", new { refund = refundGold }));
-        }
-        return sb.ToString();
-    }
+    // Settlement body: the overflow reason lines for the attached items. "^" is the vanilla letter
+    // line-break token, honored by MFM. (FD-Q6=A reused.) U-21 BR-END-03 removed the refund line.
+    private static string BuildSettlementBody(IReadOnlyList<OverflowCategory> categories) =>
+        BuildOverflowBody(categories);
 
     private static string BuildOverflowBody(IReadOnlyList<OverflowCategory> categories)
     {

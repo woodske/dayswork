@@ -12,7 +12,6 @@ internal sealed class PendingSettlementRecord
     public string Sender { get; set; } = "";
     public string Body { get; set; } = "";
     public int EarliestDeliveryDay { get; set; }
-    public int RefundGold { get; set; }
     public List<PendingSettlementItemRecord> Items { get; set; } = new();
 }
 

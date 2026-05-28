@@ -120,7 +120,6 @@
     "mail.overflow.scope.greenhouse": "greenhouse",
     "mail.overflow.scope.animal_buildings": "animal care",
     "mail.overflow.scope.animal_building_named": "animal care from {{location}}",
-    "mail.settlement.refund_line": "I've also returned {{refund}}g from today's contract.",
     "mail.cannot_afford.body": "I came by this morning, but you couldn't cover today's fixed daily price of {{price}}g (short by {{shortfall}}g), so I took the day off. I'll try again tomorrow.",
     "mail.needs_attention.body": "I came by this morning, but this recurring contract needs attention before I can work it again. Please review it at the bulletin board.",
     "mail.festival.body": "There's a festival in town today, so I won't be working and I didn't charge today's contract price. See you tomorrow!",

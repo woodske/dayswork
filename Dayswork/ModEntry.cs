@@ -96,8 +96,9 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += mailDispatcher.OnSaveLoaded;
-        // Stop and settle any in-flight shift (sleep-stop + mailed refund) BEFORE contracts persist and
-        // before the day rolls over — handler order is authoritative (Pattern S / REL-U15-02).
+        // Stop and settle any in-flight shift (sleep-stop + mailed overflow items) BEFORE contracts
+        // persist and before the day rolls over — handler order is authoritative (Pattern S /
+        // REL-U15-02). U-21 BR-END-03 / BR-SLEEP-02 removed refund settlement from this path.
         helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;
         helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
