@@ -676,11 +676,25 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             .Select(candidate => candidate.LocationName)
             .ToHashSet(StringComparer.Ordinal);
 
-        var refreshedAnimalWork = BuildAnimalWork(farm, selectedAnimalHomes, batch.Tasks.ToHashSet());
+        var batchTasks = batch.Tasks.ToHashSet();
+        var refreshedAnimalWork = BuildAnimalWork(farm, selectedAnimalHomes, batchTasks);
+
+        // Truffles spawn on the farm continuously through the day as pigs forage. The
+        // initial shift-start scan in BuildInitialBatches is hours stale by the time we
+        // actually start this batch, so re-scan for forage-style animal products here.
+        var refreshedTileWork = batchTasks.Contains(TaskKind.CollectAnimalProducts)
+            ? _workAreaScanner.ScanWholeLocation(
+                farm,
+                batchTasks,
+                _ctx.ToolSnapshot,
+                _farmExitTile,
+                OutputScopeProvenance.AnimalBuilding(string.Empty))
+            : (IReadOnlyList<WorkItem>)Array.Empty<WorkItem>();
+
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][outdoor-animals] refreshed homes={selectedAnimalHomes.Count} animalWork={refreshedAnimalWork.Count}.",
-            refreshedAnimalWork.Count == 0 ? LogLevel.Debug : LogLevel.Info);
-        return batch with { AnimalWork = refreshedAnimalWork };
+            $"[Dayswork][outdoor-animals] refreshed homes={selectedAnimalHomes.Count} animalWork={refreshedAnimalWork.Count} tileWork={refreshedTileWork.Count}.",
+            (refreshedAnimalWork.Count == 0 && refreshedTileWork.Count == 0) ? LogLevel.Debug : LogLevel.Info);
+        return batch with { TileWork = refreshedTileWork, AnimalWork = refreshedAnimalWork };
     }
 
     private void CompleteBuildingEntry()
@@ -800,7 +814,65 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             ClearRemainingActiveBatchWork();
         }
 
+        // Before we declare the OutdoorAnimals batch finished, give the pigs one more
+        // chance: re-scan the farm for any truffles (or other animal-product forage) that
+        // spawned while the worker was picking up the earlier ones. If new work appears,
+        // requeue it and let the next tick route to it instead of completing the batch.
+        if (TryRescanOutdoorAnimalProductsBeforeBatchComplete())
+            return;
+
         CompleteCurrentBatch();
+    }
+
+    private bool TryRescanOutdoorAnimalProductsBeforeBatchComplete()
+    {
+        if (_ctx is null) return false;
+        if (_ctx.CurrentBatchIndex >= _ctx.Batches.Count) return false;
+
+        var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        if (batch.Kind != BatchKind.OutdoorAnimals) return false;
+
+        var batchTasks = batch.Tasks.ToHashSet();
+        if (!batchTasks.Contains(TaskKind.CollectAnimalProducts)) return false;
+
+        var farm = _currentLocation ?? Game1.getFarm();
+        var freshTileWork = _workAreaScanner.ScanWholeLocation(
+            farm,
+            batchTasks,
+            _ctx.ToolSnapshot,
+            _farmExitTile,
+            OutputScopeProvenance.AnimalBuilding(string.Empty));
+        if (freshTileWork.Count == 0) return false;
+
+        // Dedupe against anything we're already routing to (active queue, deferred, current).
+        // ClearRemainingActiveBatchWork ran above only if there was blocked work; either way,
+        // anything we don't already know about is genuinely new.
+        var seen = new HashSet<(TaskKind, TileCoord)>();
+        foreach (var item in _ctx.WorkList)
+            seen.Add((item.Task, item.TaskTile));
+        foreach (var item in _deferredTileWork)
+            seen.Add((item.Task, item.TaskTile));
+        if (_currentTileWork is not null)
+            seen.Add((_currentTileWork.Task, _currentTileWork.TaskTile));
+
+        var added = 0;
+        foreach (var item in freshTileWork)
+        {
+            if (seen.Add((item.Task, item.TaskTile)))
+            {
+                _ctx.WorkList.Enqueue(item);
+                added++;
+            }
+        }
+        if (added == 0) return false;
+
+        // Reset the routing guard so it doesn't immediately fire on the items we just queued.
+        _activeBatchSelectionAttempts = 0;
+
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][outdoor-animals] pre-completion rescan picked up {added} new tile item(s); batch continues.",
+            LogLevel.Info);
+        return true;
     }
 
     private bool TrySelectNextActiveWork(

@@ -54,7 +54,9 @@
       "Bash(dir \"C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\" /s /b)",
       "Bash(xargs grep -l \"OnItemReceived\\\\|addHUDMessage\\\\|hudMessages\\\\|mostRecentlyGrabbedItem\\\\|itemsLostLastDeath\")",
       "Bash(xargs grep -l \"Chest\\\\|chest\")",
-      "Bash(xargs grep -l)"
+      "Bash(xargs grep -l)",
+      "Bash(xargs grep -l \"dropItem\\\\|DropItem\")",
+      "Bash(xargs grep -l \"ItemRegistry\\\\|Error Item\")"
     ]
   }
 }
