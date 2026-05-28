@@ -57,7 +57,8 @@
       "Bash(xargs grep -l)",
       "Bash(xargs grep -l \"dropItem\\\\|DropItem\")",
       "Bash(xargs grep -l \"ItemRegistry\\\\|Error Item\")",
-      "Bash(find / -iname \"FruitTree.cs\" 2>/dev/null | head; echo \"---DLLs---\"; find / -iname \"Stardew Valley.dll\" -o -iname \"StardewValley.GameData.dll\" 2>/dev/null | head)"
+      "Bash(find / -iname \"FruitTree.cs\" 2>/dev/null | head; echo \"---DLLs---\"; find / -iname \"Stardew Valley.dll\" -o -iname \"StardewValley.GameData.dll\" 2>/dev/null | head)",
+      "Bash(kill %1)"
     ]
   }
 }

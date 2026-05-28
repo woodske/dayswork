@@ -2436,8 +2436,13 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not FruitTree tree)
             return new LaborBeatOutcome(true, true);
         var before = new HashSet<Debris>(loc.debris);
+        var hadFruit = tree.fruit.Count > 0;
         tree.shake(tileVec, false);
         CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
+        // Shaken fruit settles over the next several beats, so an immediate sweep misses it.
+        // Queue a delayed sweep (same mechanism trees use for falling wood) to catch it.
+        if (hadFruit)
+            QueueDelayedDebrisSweep(loc, tileVec, before, _pendingTask, _pendingOutputProvenance);
         return new LaborBeatOutcome(true, true);
     }
 
