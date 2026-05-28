@@ -51,7 +51,8 @@
       "PowerShell(\\(Get-Content \"C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\\\\aidlc-docs\\\\audit.md\" | Measure-Object -Line\\).Lines)",
       "Read(//c/Users/kwood/.claude/plans/**)",
       "Bash(mkdir -p \"C:\\\\Users\\\\kwood\\\\.claude\\\\plans\")",
-      "Bash(dir \"C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\" /s /b)"
+      "Bash(dir \"C:\\\\Users\\\\kwood\\\\Repos\\\\dayswork\" /s /b)",
+      "Bash(xargs grep -l \"OnItemReceived\\\\|addHUDMessage\\\\|hudMessages\\\\|mostRecentlyGrabbedItem\\\\|itemsLostLastDeath\")"
     ]
   }
 }

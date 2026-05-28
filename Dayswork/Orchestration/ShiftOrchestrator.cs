@@ -2081,6 +2081,12 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var playerState = new Game1WorkerActionPlayerState(Game1.player);
         var savedState = WorkerActionPlayerStateSnapshot.Capture(playerState);
 
+        // Snapshot the HUD message queue so any item-pickup notifications fired by vanilla
+        // harvest/grass/tree APIs (e.g. via Farmer.addItemToInventory → OnItemReceived) can
+        // be removed below. The worker's items end up in _ctx.Buffer, never the player's
+        // inventory, so the player should never see those notifications.
+        var hudMessageCountBefore = Game1.hudMessages.Count;
+
         try
         {
             return InvokeTaskAction(tile, task, location);
@@ -2088,6 +2094,13 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         finally
         {
             savedState.Restore(playerState);
+
+            // Trim any HUD messages enqueued during the worker beat. The beat runs
+            // synchronously inside OnUpdateTicked, so nothing else queues messages
+            // here — appended entries can only come from the vanilla worker-side
+            // callbacks we just invoked.
+            while (Game1.hudMessages.Count > hudMessageCountBefore)
+                Game1.hudMessages.RemoveAt(Game1.hudMessages.Count - 1);
         }
     }
 
