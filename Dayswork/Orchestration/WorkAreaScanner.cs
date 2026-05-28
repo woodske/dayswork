@@ -18,6 +18,9 @@ internal sealed class WorkAreaScanner
         "176", "(O)176", // Egg
         "180", "(O)180", // Egg
         "182", "(O)182", // Large Egg
+        "289", "(O)289", // Ostrich Egg
+        "305", "(O)305", // Void Egg
+        "928", "(O)928", // Golden Egg
         "430", "(O)430", // Truffle
         "442", "(O)442", // Duck Egg
         "444", "(O)444", // Duck Feather
