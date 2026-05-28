@@ -27,7 +27,7 @@ public static class ConfigDefaults
         {
             [OutdoorBandSize.Small] = 64,
             [OutdoorBandSize.Medium] = 160,
-            [OutdoorBandSize.Large] = 999999,
+            [OutdoorBandSize.Large] = 500,
         };
 
         var outdoorPrices = new Dictionary<OutdoorPriceKey, int>();

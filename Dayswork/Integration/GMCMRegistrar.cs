@@ -31,9 +31,9 @@ internal sealed class GMCMRegistrar
 
         api.Register(_manifest, _config.ResetToDefaults, _config.SaveAndPublish);
 
-        RegisterPricingOptions(api);
-        RegisterStaminaOptions(api);
         RegisterBehaviorOptions(api);
+        RegisterStaminaOptions(api);
+        RegisterPricingOptions(api);
     }
 
     private void RegisterPricingOptions(IGenericModConfigMenuApi api)
@@ -45,6 +45,13 @@ internal sealed class GMCMRegistrar
 
         foreach (var band in OutdoorBandOrder)
         {
+            // Skip the Large threshold slider: the classifier's final fall-through returns
+            // Large for any tile count above the Medium threshold (see
+            // OutdoorServiceBandClassifier.ClassifyBand line 49), so a Large ceiling has no
+            // effect on classification today. Bring this back if/when a "Huge" band is added.
+            if (band == OutdoorBandSize.Large)
+                continue;
+
             var encodedKey = ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(band);
             RegisterIntOption(
                 api,
@@ -54,7 +61,7 @@ internal sealed class GMCMRegistrar
                     () => I18nHelper.Get("gmcm.pricing.outdoor_threshold.name", new { band = OutdoorBandLabel(band) }),
                     () => I18nHelper.Get("gmcm.pricing.outdoor_threshold.tooltip", new { band = OutdoorBandLabel(band) }),
                     1,
-                    999999,
+                    2000,
                     1,
                     $"pricing-outdoor-threshold-{BandKey(band)}"));
         }
@@ -81,7 +88,7 @@ internal sealed class GMCMRegistrar
                             band = OutdoorBandLabel(band),
                         }),
                         0,
-                        100000,
+                        2000,
                         5,
                         $"pricing-outdoor-{TaskKey(service)}-{BandKey(band)}"));
             }
@@ -109,7 +116,7 @@ internal sealed class GMCMRegistrar
                             tier = AnimalTierLabel(tier),
                         }),
                         0,
-                        100000,
+                        2000,
                         5,
                         $"pricing-animal-{TaskKey(service)}-{AnimalTierKey(tier)}"));
             }
@@ -127,7 +134,7 @@ internal sealed class GMCMRegistrar
                     () => I18nHelper.Get("gmcm.pricing.greenhouse_price.name", new { service = TaskLabel(service) }),
                     () => I18nHelper.Get("gmcm.pricing.greenhouse_price.tooltip", new { service = TaskLabel(service) }),
                     0,
-                    100000,
+                    2000,
                     5,
                     $"pricing-greenhouse-{TaskKey(service)}"));
         }
