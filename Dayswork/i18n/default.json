@@ -114,6 +114,7 @@
     "mail.overflow.chest_missing": "Some {{scope}} output couldn't be delivered because its assigned chest is gone.",
     "mail.overflow.no_chest_assigned": "Some {{scope}} output didn't have a destination assigned.",
     "mail.overflow.not_delivered": "Some {{scope}} output was collected before I finished my delivery run.",
+    "mail.overflow.chest_busy": "Some {{scope}} output couldn't be delivered because its assigned chest was in use.",
     "mail.overflow.scope.general": "work",
     "mail.overflow.scope.outdoor": "outdoor work",
     "mail.overflow.scope.greenhouse": "greenhouse",

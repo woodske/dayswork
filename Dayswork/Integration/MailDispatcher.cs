@@ -336,6 +336,7 @@ internal sealed class MailDispatcher : IMailDispatcher
             {
                 OverflowReason.ChestFull => I18nHelper.Get("mail.overflow.chest_full", new { scope = DescribeScope(category) }),
                 OverflowReason.ChestMissing => I18nHelper.Get("mail.overflow.chest_missing", new { scope = DescribeScope(category) }),
+                OverflowReason.ChestBusy => I18nHelper.Get("mail.overflow.chest_busy", new { scope = DescribeScope(category) }),
                 OverflowReason.NoChestAssigned => I18nHelper.Get("mail.overflow.no_chest_assigned", new { scope = DescribeScope(category) }),
                 OverflowReason.NotDelivered => I18nHelper.Get("mail.overflow.not_delivered", new { scope = DescribeScope(category) }),
                 _ => string.Empty,

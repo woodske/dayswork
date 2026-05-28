@@ -68,6 +68,15 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private readonly Queue<DepositTrip> _depositTrips = new();
     private DepositTrip? _currentTrip;
 
+    // Per-stack paced execution within the in-flight trip. Each stack is one beat gated by
+    // _toolAnimator.IsSwinging (duration == WorkerActionAnimationMs), so the deposit cadence
+    // tracks the same config knob as task actions.
+    private int           _currentTripStackIndex;
+    private bool          _currentTripExecutionStarted;
+    private Chest?        _currentTripChest;
+    private GameLocation? _currentTripLocation;
+    private bool          _currentTripChestAnimated;   // we triggered the open-lid animation
+
     // Per-WorkItem state — the nav tile and task tile are tracked separately (trellis crops).
     private bool      _actionPending;
     private TaskKind  _pendingTask;
@@ -1644,23 +1653,65 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (!_nav.NavigationFailed && !_nav.HasArrived)
             return;
 
-        if (_currentTrip is not null)
+        if (_currentTrip is null)
         {
-            if (_nav.NavigationFailed)
-            {
-                MarkDepositTripUndelivered(_currentTrip);
-            }
-            else
-            {
-                // Execute the trip we just walked to (chest liveness resolved here, on arrival).
-                ExecuteTrip(_currentTrip, _currentLocation ?? farm);
-            }
-
-            CompleteDepositTripLocation(_currentTrip);
+            // Nothing in flight — advance to the next trip or exit.
+            FinalizeAndAdvanceTrip(farm);
+            return;
         }
-        _currentTrip = null;
 
-        // Walk the next trip, or exit once the queue is empty (Pattern N).
+        if (_nav.NavigationFailed)
+        {
+            MarkDepositTripUndelivered(_currentTrip);
+            FinalizeAndAdvanceTrip(farm);
+            return;
+        }
+
+        // First arrival at the trip's stand tile: open the chest visually (if applicable),
+        // resolve mutex/liveness, and start the first beat. The mutex/missing-chest paths
+        // already mail the items inside BeginTripExecution and return false so we skip the loop.
+        if (!_currentTripExecutionStarted)
+        {
+            if (!BeginTripExecution(_currentTrip, _currentLocation ?? farm))
+            {
+                FinalizeAndAdvanceTrip(farm);
+            }
+            return;
+        }
+
+        // Pacing gate: wait for the per-stack swing beat to finish before depositing the next stack.
+        if (_toolAnimator.IsSwinging)
+            return;
+
+        if (_currentTripStackIndex < _currentTrip.Items.Count)
+        {
+            DepositCurrentTripStack();
+            _currentTripStackIndex++;
+            if (_currentTripStackIndex < _currentTrip.Items.Count)
+            {
+                // Kick off the next beat by replaying the no-tool reach animation.
+                _toolAnimator.PlaySwing(WorkerTool.None, FacingTowardDestination());
+            }
+            return;
+        }
+
+        EndTripExecution();
+        FinalizeAndAdvanceTrip(farm);
+    }
+
+    // Drain the current trip's bookkeeping, dequeue the next trip (or exit if none).
+    private void FinalizeAndAdvanceTrip(Farm farm)
+    {
+        if (_currentTrip is not null)
+            CompleteDepositTripLocation(_currentTrip);
+
+        _currentTrip = null;
+        _currentTripExecutionStarted = false;
+        _currentTripStackIndex = 0;
+        _currentTripChest = null;
+        _currentTripLocation = null;
+        _currentTripChestAnimated = false;
+
         if (_depositTrips.Count > 0)
         {
             var next = _depositTrips.Dequeue();
@@ -1673,8 +1724,16 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         BeginExit(farm);
     }
 
-    private void ExecuteTrip(DepositTrip trip, GameLocation location)
+    // Returns true if the trip is ready to tick beats; false if the trip was aborted
+    // (chest missing or busy) and all its stacks were already routed to overflow.
+    private bool BeginTripExecution(DepositTrip trip, GameLocation location)
     {
+        _currentTripExecutionStarted = true;
+        _currentTripStackIndex = 0;
+        _currentTripChest = null;
+        _currentTripLocation = location;
+        _currentTripChestAnimated = false;
+
         if (trip.Destination is ChestDestination chestDest)
         {
             var chest = _chestResolver.ResolveChest(chestDest.Ref);
@@ -1686,23 +1745,98 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork][deposit] chest missing at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) → mail.",
                     LogLevel.Debug);
+                return false;
+            }
+
+            if (chest.GetMutex().IsLocked())
+            {
+                // A farmer (player) has the chest UI open. Defer the whole trip to mail
+                // rather than mutating items behind the player's back.
+                foreach (var stack in trip.Items)
+                    _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestBusy));
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][deposit] chest busy at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) → mail.",
+                    LogLevel.Debug);
+                return false;
+            }
+
+            _currentTripChest = chest;
+
+            // Only animate / play sound if the player is in the chest's location.
+            // SDV's location.playSound is already location-scoped; the playerHere guard also
+            // skips the lid frame mutation when nobody is around to see it.
+            if (chest.Location is { } chestLoc && Game1.player.currentLocation == chestLoc)
+            {
+                chest.frameCounter.Value = 5;  // vanilla open trigger
+                chestLoc.playSound("openChest", new Vector2(chest.TileLocation.X, chest.TileLocation.Y));
+                _currentTripChestAnimated = true;
+            }
+        }
+        // (Shipping bin: per-stack Farm.shipItem handles the bin lid + sound; no trip-level open.)
+
+        // Start the first beat: a no-tool reach animation facing the destination tile.
+        _toolAnimator.PlaySwing(WorkerTool.None, FacingTowardDestination());
+        return true;
+    }
+
+    private void DepositCurrentTripStack()
+    {
+        if (_currentTrip is null || _ctx is null)
+            return;
+
+        var stack = _currentTrip.Items[_currentTripStackIndex];
+        var loc = _currentTripLocation;
+        var playerHere = loc is not null && Game1.player.currentLocation == loc;
+
+        if (_currentTripChest is { } chest)
+        {
+            // Re-check the mutex per stack: if the player just opened the chest UI in the
+            // middle of our deposit, abort the rest of the trip and mail what remains.
+            if (chest.GetMutex().IsLocked())
+            {
+                for (var i = _currentTripStackIndex; i < _currentTrip.Items.Count; i++)
+                    _ctx.Overflow.Add(new OverflowItem(_currentTrip.Items[i], OverflowReason.ChestBusy));
+                _currentTripStackIndex = _currentTrip.Items.Count;  // skip ahead to "trip complete"
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][deposit] chest became busy mid-trip; remaining stacks → mail.",
+                    LogLevel.Debug);
                 return;
             }
 
-            foreach (var stack in trip.Items)
-                DepositIntoChest(chest, stack);
+            DepositIntoChest(chest, stack);
+            if (playerHere && chest.Location is { } chestLoc)
+                chestLoc.playSound("Ship", new Vector2(chest.TileLocation.X, chest.TileLocation.Y));
+            return;
         }
+
+        // Shipping bin path.
+        var farm = Game1.getFarm();
+        var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
+        if (item is null)
+            return;
+
+        if (playerHere)
+            farm.shipItem(item, Game1.player);          // vanilla lid animation + backpackIN + delayed "Ship"
         else
+            farm.getShippingBin(Game1.player).Add(item); // silent fallback
+    }
+
+    private void EndTripExecution()
+    {
+        if (_currentTripChest is { } chest && _currentTripChestAnimated)
         {
-            // Shipping bin — infinite capacity, never overflows (FR-OUT-06).
-            var bin = Game1.getFarm().getShippingBin(Game1.player);
-            foreach (var stack in trip.Items)
-            {
-                var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
-                if (item is not null)
-                    bin.Add(item);
-            }
+            // Vanilla close trigger: the chest's per-tick update will animate the lid down
+            // and emit the "doorClose" sound on completion.
+            chest.frameCounter.Value = -1;
         }
+    }
+
+    // Best-effort facing toward the chest/bin tile. Falls back to the worker's current facing.
+    private int FacingTowardDestination()
+    {
+        if (_currentTrip is null || _farmhand is null)
+            return _farmhand?.FacingDirection ?? 2;
+        return FacingToward(_farmhand.TilePoint, _currentTrip.Tile, _farmhand.FacingDirection);
     }
 
     private void MarkDepositTripUndelivered(DepositTrip trip)
@@ -2050,6 +2184,11 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _pendingDebrisSweeps.Clear();
         _depositTrips.Clear();
         _currentTrip = null;
+        _currentTripExecutionStarted = false;
+        _currentTripStackIndex = 0;
+        _currentTripChest = null;
+        _currentTripLocation = null;
+        _currentTripChestAnimated = false;
         _nav.Clear();
     }
 

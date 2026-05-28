@@ -26,6 +26,7 @@ public enum OverflowReason
     ChestFull,       // assigned chest could not hold all items (FR-OUT-02)
     ChestMissing,    // assigned chest was moved/destroyed (FR-OUT-03)
     NotDelivered,    // player slept/saved before the deposit run finished (FD-Q5=A)
+    ChestBusy,       // assigned chest was being accessed by a farmer (mutex held) when the worker arrived
 }
 
 // An undeliverable item plus the reason; the union becomes the single overflow letter (Pattern O).
