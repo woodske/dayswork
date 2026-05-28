@@ -2156,10 +2156,11 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         // For non-regrowable crops call HoeDirt.destroyCrop (the authoritative cleanup path).
         // Regrowable crops stay on the dirt and start regrowing; HoeDirt.readyForHarvest()
         // will return false until they're ready again, so IsTaskComplete terminates naturally.
+        // Note: watering of regrowable crops is handled by a separate WaterCrops WorkItem
+        // emitted by WorkAreaScanner after the harvest item, so the worker plays a distinct
+        // watering animation instead of silently flipping dirt.state here.
         if (dirt.crop is not null && !dirt.crop.RegrowsAfterHarvest())
             dirt.destroyCrop(false);
-        else if (dirt.crop is not null && _ctx!.EnabledTasks.Contains(TaskKind.WaterCrops))
-            dirt.state.Value = HoeDirt.watered;
 
         // Also collect any debris-spawned items (in case harvest used the debris path).
         CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);

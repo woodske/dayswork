@@ -39,8 +39,16 @@ internal sealed class ToolSwapAnimator
             StopSwing();
     }
 
-    public void PlaySwing(TaskKind task, int facingDirection) =>
-        PlaySwing(WorkerToolExtensions.ForTask(task), facingDirection);
+    public void PlaySwing(TaskKind task, int facingDirection)
+    {
+        if (_worker is null)
+            return;
+
+        _worker.FaceTaskDirection(facingDirection);
+        _worker.Sprite.setCurrentAnimation(WorkFramesForTask(task, facingDirection));
+        SpawnToolSwing(WorkerToolExtensions.ForTask(task), facingDirection);
+        _swingMsRemaining = _workAnimationMs;
+    }
 
     public void PlaySwing(WorkerTool tool, int facingDirection)
     {
@@ -59,25 +67,56 @@ internal sealed class ToolSwapAnimator
         _worker?.StopTaskAnimation();
     }
 
-    // Mirrors the generic Stardew Squad-style work beat: a brief action pose followed
-    // by the idle frame in the same direction. It keeps task visuals readable without
-    // invoking vanilla Farmer tool callbacks.
-    private static List<FarmerSprite.AnimationFrame> WorkFramesFor(int facingDirection) =>
-        facingDirection switch
-        {
-            0 => Frames(9, 8),
-            1 => Frames(5, 4),
-            2 => Frames(1, 0),
-            3 => Frames(13, 12),
-            _ => Frames(1, 0),
-        };
+    // Harvest/collect/feed tasks use the alternate action frame (row*4+3) so they look
+    // visually distinct from tool-swing tasks (row*4+1). All frame durations are derived
+    // from _workAnimationMs so the animation plays exactly once per beat — no looping.
+    private List<FarmerSprite.AnimationFrame> WorkFramesForTask(TaskKind task, int facingDirection)
+    {
+        var useAltPose = task is TaskKind.HarvestCrops or TaskKind.CollectFruit or TaskKind.FeedAnimals;
+        var (actionFrame, idleFrame) = ActionIdleFrames(facingDirection, useAltPose);
+        return BuildFrames(actionFrame, idleFrame);
+    }
 
-    private static List<FarmerSprite.AnimationFrame> Frames(int actionFrame, int idleFrame) =>
-        new()
+    private List<FarmerSprite.AnimationFrame> WorkFramesFor(int facingDirection)
+    {
+        var (actionFrame, idleFrame) = ActionIdleFrames(facingDirection, useAltPose: false);
+        return BuildFrames(actionFrame, idleFrame);
+    }
+
+    // Returns the action and idle sprite frame indices for a given facing direction.
+    // Row layout: 0(up)→row2, 1(right)→row1, 2(down)→row0, 3(left)→row3.
+    // Generic action = row*4+1; alt-pose action = row*4+3 (second walk step).
+    private static (int actionFrame, int idleFrame) ActionIdleFrames(int facingDirection, bool useAltPose)
+    {
+        var row = facingDirection switch
         {
-            new FarmerSprite.AnimationFrame(actionFrame, 150),
-            new FarmerSprite.AnimationFrame(idleFrame, 250),
+            0 => 2,
+            1 => 1,
+            2 => 0,
+            3 => 3,
+            _ => 0,
         };
+        var idleFrame   = row * 4;
+        var actionFrame = useAltPose ? idleFrame + 3 : idleFrame + 1;
+        return (actionFrame, idleFrame);
+    }
+
+    // Calculates frame durations from _workAnimationMs so the animation spans exactly
+    // one config-controlled beat. The action frame is capped at 150 ms; idle fills the rest.
+    private List<FarmerSprite.AnimationFrame> BuildFrames(int actionFrame, int idleFrame)
+    {
+        var totalMs  = (int)_workAnimationMs;
+        var actionMs = Math.Max(1, Math.Min(150, totalMs - 1));
+        var idleMs   = totalMs - actionMs;
+
+        var frames = new List<FarmerSprite.AnimationFrame>
+        {
+            new FarmerSprite.AnimationFrame(actionFrame, actionMs),
+        };
+        if (idleMs > 0)
+            frames.Add(new FarmerSprite.AnimationFrame(idleFrame, idleMs));
+        return frames;
+    }
 
     private void SpawnToolSwing(WorkerTool tool, int facingDirection)
     {

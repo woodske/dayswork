@@ -88,6 +88,24 @@ internal sealed class WorkAreaScanner
                 Increment(acceptedByKind, task.Value);
                 rawItems.Add(new WorkItem(navTiles[0], taskTile, task.Value, location.Name, provenance, navTiles));
                 ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}) candidates=[{string.Join("; ", navTiles.Select(tile => $"({tile.X},{tile.Y})"))}].", LogLevel.Trace);
+
+                // Harvest leaves regrowable crops in place. Queue a separate WaterCrops beat
+                // for the same tile so the worker plays a visible watering-can animation
+                // instead of silently re-wetting the dirt as a side effect of harvest.
+                if (task.Value == TaskKind.HarvestCrops
+                    && enabled.Contains(TaskKind.WaterCrops)
+                    && location.terrainFeatures.TryGetValue(tileVec, out var followUpTf)
+                    && followUpTf is HoeDirt followUpDirt
+                    && followUpDirt.crop is not null
+                    && followUpDirt.crop.RegrowsAfterHarvest()
+                    && followUpDirt.state.Value != HoeDirt.watered
+                    && seenWorkItems.Add((TaskKind.WaterCrops, taskTile)))
+                {
+                    Increment(detectedByKind, TaskKind.WaterCrops);
+                    Increment(acceptedByKind, TaskKind.WaterCrops);
+                    rawItems.Add(new WorkItem(navTiles[0], taskTile, TaskKind.WaterCrops, location.Name, provenance, navTiles));
+                    ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted WaterCrops (post-harvest regrow): loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
+                }
             }
         }
 
