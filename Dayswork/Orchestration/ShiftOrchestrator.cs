@@ -1604,6 +1604,15 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     private void HandleTaskAction(IntentPerformTaskAt intent, GameLocation location)
     {
+        // Don't start a new swing while a felled tree is still falling — the trunk's fall
+        // animation must finish before the stump is choppable. Swinging now wastes energy
+        // and plays a phantom chop (most visible at fast animation speeds). The deferred
+        // beat keeps the worker idle until falling clears, then chopping resumes.
+        if (!_actionPending
+            && intent.Task == TaskKind.CutTrees
+            && IsCutTreeTargetFalling(intent.Tile, location))
+            return;
+
         if (!_actionPending)
         {
             _toolAnimator.StopSwing();
@@ -2548,6 +2557,16 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         return new LaborBeatOutcome(true, true);
+    }
+
+    // True while the tree at this tile is mid-fall (trunk falling animation after the
+    // felling hit). Hits during this window deal no damage, so the beat loop should wait.
+    private static bool IsCutTreeTargetFalling(TileCoord tile, GameLocation loc)
+    {
+        var tileVec = new Vector2(tile.X, tile.Y);
+        return loc.terrainFeatures.TryGetValue(tileVec, out var tf)
+            && tf is Tree tree
+            && tree.falling.Value;
     }
 
     private LaborBeatOutcome InvokeCutTree(TileCoord tile, GameLocation loc)
