@@ -116,3 +116,61 @@ Only after `U-24` is approved does the redesign move to the global Build and Tes
 - No retrofit unit depends on a later retrofit unit
 - Every retrofit unit has a clear predecessor chain back to the historical baseline
 - The sequence preserves the approved hybrid strategy: foundation first, then feature/runtime slices, then final cleanup
+
+---
+
+# SVE Compatibility Units — Dependencies (appended 2026-05-29)
+
+The SVE-compatibility units `U-SVE-01` through `U-SVE-04` are appended after the entire prior baseline (`U-01..U-24`, `U-WR`). They depend only on existing built code, except that the three override units each depend on the foundation `U-SVE-01`. They are independent of one another.
+
+## SVE Dependency DAG (Mermaid)
+
+```mermaid
+flowchart TD
+    PB["Prior Baseline<br/><b>U-01 .. U-24, U-WR</b>"]
+    F["U-SVE-01 Provider Foundation + Detection"]
+    M["U-SVE-02 Farm Maps + Worker Entrance"]
+    A["U-SVE-03 Animal Buildings"]
+    C["U-SVE-04 New Content + Grandpa's Shed"]
+
+    PB --> F
+    F --> M
+    F --> A
+    F --> C
+
+    classDef baseline fill:#BDBDBD,stroke:#424242,stroke-width:2px,color:#000
+    classDef foundation fill:#C8E6C9,stroke:#2E7D32,stroke-width:2px,color:#000
+    classDef feature fill:#BBDEFB,stroke:#1565C0,stroke-width:2px,color:#000
+
+    class PB baseline
+    class F foundation
+    class M,A,C feature
+```
+
+## Text fallback — dependency summary
+
+| Unit | Depends on | Why |
+|---|---|---|
+| `U-SVE-01` Provider Foundation + Detection | Prior baseline | Adds the isolated compat seam on top of the already-built mod |
+| `U-SVE-02` Farm Maps + Worker Entrance | `U-SVE-01` | Entrance override consumption needs the seam + SVE profile |
+| `U-SVE-03` Animal Buildings | `U-SVE-01` | Capacity policy + tier mapping flow through the seam |
+| `U-SVE-04` New Content + Grandpa's Shed | `U-SVE-01` | Classification/work-location overrides flow through the seam |
+
+## Recommended execution order (unit-plan Q2=A)
+
+1. `U-SVE-01` Provider Foundation + Detection
+2. `U-SVE-02` Farm Maps + Worker Entrance — *entrance first: the worker must spawn correctly on an SVE map before other SVE behavior is observable/playtestable*
+3. `U-SVE-03` Animal Buildings
+4. `U-SVE-04` New Content + Grandpa's Shed
+
+The three override units are technically parallelizable after the foundation, but a solo developer should run them sequentially in this order to keep playtesting focused.
+
+## Construction loop handoff
+
+Each SVE unit completes the normal Construction loop (Functional Design → NFR Requirements → NFR Design → Code Generation; Infrastructure Design skipped) before the next begins. Only after `U-SVE-04` is approved does the SVE change move to the global Build and Test stage.
+
+## Validation
+
+- No SVE unit depends on a later SVE unit.
+- Every SVE unit has a clear predecessor chain back to the prior baseline via `U-SVE-01`.
+- Foundation-first is preserved; the Vanilla profile guarantees no vanilla regression while override units are built incrementally.

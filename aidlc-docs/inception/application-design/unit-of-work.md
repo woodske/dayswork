@@ -323,3 +323,112 @@ This order keeps the redesign coherent:
 **Validation**:
 - Every redesign-impacted component from the refreshed Application Design is either owned or explicitly extended by at least one retrofit unit.
 - Every refreshed story has at least one retrofit unit assigned in [unit-of-work-story-map.md](unit-of-work-story-map.md).
+
+---
+
+# SVE Compatibility Units (appended 2026-05-29)
+
+A second appended sequence for the **Stardew Valley Expanded compatibility** change. These units assume the full historical baseline (U-01..U-17), the pricing retrofit (U-18..U-24), and the worker-routing change (U-WR) are all already built. They add the isolated expansion-compatibility seam (see [sve-compatibility-application-design.md](sve-compatibility-application-design.md)) and its overrides. **Decomposition approved**: 4 units, foundation-first, entrance → animals → content/shed order (unit-plan Q1=A, Q2=A, Q3=A).
+
+The same conventions apply: **Owns** = introduces a new seam; **Extends** = changes an existing component/file without claiming to have introduced it.
+
+---
+
+### U-SVE-01 — Expansion-Compatibility Provider Foundation
+
+**Purpose**: Introduce the full expansion-compatibility seam plus SVE detection/selection, with the Vanilla profile fully working and the SVE profile present but with override tables filled in incrementally by U-SVE-02..04 (Q3=A). Independently verifiable: vanilla provably unchanged, SVE detected, no SVE override behavior yet.
+
+**Owns**:
+- `C-19 IExpansionProfile`, `C-20 ExpansionProfileSelector`, `C-21 VanillaExpansionProfile`, `C-22 SveExpansionProfile` (shell + ID/farm-map tables), `C-23 AnimalBuildingCapacityPolicy`
+- New pure helper types: `ContentDescriptor`, `WorkClassification`, `AnimalBuildingCapacityInputs`
+- `M-22 ExpansionDetector`, `M-23 ExpansionCompatService`
+
+**Extends**:
+- `M-01 ModEntry` (construct + select + inject the seam; log active profile once)
+
+**Stories**: `S-21` (vanilla invariance + SVE auto-detect), `S-26` (provider seam / extensibility / PBT obligations)
+
+**Primary expected files**:
+- `Dayswork.Core/Compat/IExpansionProfile.cs`, `ExpansionProfileSelector.cs`, `VanillaExpansionProfile.cs`, `SveExpansionProfile.cs`, `AnimalBuildingCapacityPolicy.cs`, `ContentDescriptor.cs`, `WorkClassification.cs`, `AnimalBuildingCapacityInputs.cs`
+- `Dayswork/Compat/ExpansionDetector.cs`, `ExpansionCompatService.cs`
+- `Dayswork/ModEntry.cs` (wiring), `Dayswork.Tests/Compat/*` (selection, capacity, profile-lookup examples + FsCheck)
+
+**Definition of Done**:
+- With no expansion installed, the selector returns `VanillaExpansionProfile` and all consumers take their existing paths (vanilla-invariance tests pass).
+- With SVE installed (`FlashShifter.StardewValleyExpandedCP` / `FlashShifter.SVECode`), the SVE profile is selected and logged once.
+- FsCheck covers deterministic provider selection and capacity derivation; xUnit covers profile lookups.
+- No SVE override behavior is active yet (tables are empty/stubbed pending U-SVE-02..04).
+
+---
+
+### U-SVE-02 — SVE Farm Maps + Worker Entrance
+
+**Purpose**: Resolve a correct worker spawn/exit on the three supported SVE farm maps (IF2R, Grandpa's Farm, Frontier Farm) by supplying per-map entrance overrides where the `Farm.warps` heuristic misfires; skip unreachable tiles gracefully.
+
+**Extends**:
+- `C-22 SveExpansionProfile` (per-map entrance-override table; farm-map IDs `flashshifter.immersivefarm2remastered`, `flashshifter.GrandpasFarm`, `flashshifter.FrontierFarm`)
+- `M-12 ShiftOrchestrator` (entrance resolution delegates to `ExpansionCompatService.TryGetFarmEntranceOverride` before the existing heuristic/fallback)
+
+**Stories**: `S-22`
+
+**Primary expected files**:
+- `Dayswork.Core/Compat/SveExpansionProfile.cs` (entrance data), `Dayswork/Orchestration/ShiftOrchestrator.cs` (delegation), `Dayswork.Tests/Compat/*`
+
+**Definition of Done**:
+- On each supported SVE map, the worker spawns at and exits from a reachable, sensible entrance (confirmed via manual SVE playtest; entrance values grounded in each map's source).
+- The `Farm.warps` heuristic + `(77,15)` fallback remain the default when no override applies.
+- Unreachable zone tiles on SVE maps are silently skipped (FR-SVE-15).
+
+---
+
+### U-SVE-03 — SVE Animal Buildings
+
+**Purpose**: Service Premium Barn/Coop correctly — data-driven feeding capacity (fixing the 16-animal underfeed) and premium→nearest-vanilla-tier mapping for scope/pricing, with no auto-petter/auto-grabber special-casing.
+
+**Extends**:
+- `Dayswork/Orchestration/AnimalTaskHandler.cs` (replace `FeedCapacity` ladder with `ExpansionCompatService.ResolveAnimalFeedCapacity` over `C-23`)
+- premium-building → vanilla-tier mapping in the hiring scope/building enumeration (via `ExpansionCompatService.ResolveAnimalBuildingTier`; Q4=A — no enum/save change)
+
+**Stories**: `S-23`
+
+**Primary expected files**:
+- `Dayswork/Orchestration/AnimalTaskHandler.cs`, the hiring building-enumeration/scope site, `Dayswork.Core/Compat/AnimalBuildingCapacityPolicy.cs` (consumption), `Dayswork.Tests/Compat/*`
+
+**Definition of Done**:
+- A 16-occupant premium building has all its troughs fillable (subject to silo hay).
+- Pet/Collect scan as usual and find nothing when an auto-petter/auto-grabber already acted; no machine-presence assumption.
+- Premium buildings are selectable in the hiring scope and priced as their nearest vanilla tier; no save-schema change.
+
+---
+
+### U-SVE-04 — New Content + Grandpa's Shed
+
+**Purpose**: Handle new SVE crops/trees/animals/products via existing data-driven paths, add classification overrides only at verified gaps, treat Grandpa's Shed as a work location, and preserve graceful-skip + item-safety guarantees.
+
+**Extends**:
+- `C-22 SveExpansionProfile` (content-classification override table; work-location/Grandpa's-Shed identity)
+- `Dayswork/Worker/ObjectTargetClassifier.cs` (consult `ExpansionCompatService.TryClassifyContentOverride` before vanilla classification/skip)
+- `Dayswork/Orchestration/BuildingWorkNavigator.cs`, `IndoorWorkScanner.cs`, `BuildingLocationResolver.cs` (include `IsExpansionWorkLocation` locations like Grandpa's Shed)
+
+**Stories**: `S-24`, `S-25`
+
+**Primary expected files**:
+- `Dayswork.Core/Compat/SveExpansionProfile.cs` (content/work-location data), `Dayswork/Worker/ObjectTargetClassifier.cs`, the building navigators, `Dayswork.Tests/Compat/*`
+
+**Definition of Done**:
+- Generic SVE crops/trees/animals/products work through the unchanged data-driven paths; verified gaps (custom clumps, new milk/wool animal types, special trees) handled per SVE source.
+- Unclassifiable content is skipped without crashing; no item loss (overflow-to-mail preserved).
+- Grandpa's Shed is enterable as a work location and a valid chest-deposit destination (interior task set confirmed from SVE source).
+
+---
+
+## SVE unit component coverage summary
+
+| SVE area | Covered by |
+|---|---|
+| Provider seam + detection + vanilla invariance | `U-SVE-01` |
+| SVE farm-map worker entrance | `U-SVE-02` |
+| Premium barn/coop capacity, feeding, scope tier | `U-SVE-03` |
+| New content classification + Grandpa's Shed work location | `U-SVE-04` |
+
+**Validation**: every SVE component from [sve-compatibility-application-design.md](sve-compatibility-application-design.md) is owned or extended by a unit; every SVE story (S-21..S-26) is assigned in [unit-of-work-story-map.md](unit-of-work-story-map.md); no SVE unit depends on a later SVE unit.

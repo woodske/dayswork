@@ -4627,3 +4627,120 @@ Tree cutting and grass cutting by the worker shows some animation on the farmer.
 **Context**: CONSTRUCTION — Build and Test review fix for farmer animation leak during worker tool actions
 
 ---
+
+## New Active Change Request — Stardew Valley Expanded (SVE) Compatibility
+**Timestamp**: 2026-05-29T16:10:58Z
+**User Input**:
+```text
+Using ai-dlc, I want to make this mod (Dayswork) compatible with the stardew valley expanded mod, which greatly enhances the vanilla version of the game.
+
+The source code for SVE is here:  /c/Users/kwood/Repos/StardewValleyExpanded . You have all read and search permissions for that folder. Included in this repository are the available extra farm maps in addition to the SVE source code.
+Also available, the SVE wiki: https://stardew-valley-expanded.fandom.com/wiki/Stardew_Valley_Expanded_Wiki
+
+Within the SVE code are several custom farms. Note that the entrances to these farms is very different than vanilla SDV, so we'll need to account for that when spawning the worker.
+
+Some notable callouts that are not exhaustive of the changes Dayswork will need to address:
+
+* New animal buildings (premium barn and premium coop)
+* New farm maps with different entrances
+* New crops
+* New trees
+* New farm building Grandpa's Shed: https://stardew-valley-expanded.fandom.com/wiki/Grandpa%27s_Shed
+* New animals and animal products
+
+All changes made for SVE compatibility should not affect vanilla compatibility. If possible, isolate SVE compatibility code from vanilla code. Keep in mind while working on this that there are other expansion mods available, so I'd like this to be architected in a way that makes it easy to add compatibility for other mods as well.
+
+Never make assumptions, always reference the SVE source code and/or the vanilla Stardew Valley compiled code when making compatibility changes or decisions.
+```
+**AI Response**: Logged the new active change. Loaded mandatory common rules (process-overview, session-continuity, content-validation, question-format-guide, welcome-message), the workspace-detection and requirements-analysis stage rules, and both extension opt-in prompts. Confirmed the previous active change (Worker Routing and Dynamic Task Selection) is parked at its Build and Test review gate; this SVE-compatibility request opens a new INCEPTION pass. Granted read access folder `C:\Users\kwood\Repos\StardewValleyExpanded` contains the SVE core mod plus four farm/location packages (Immersive Farm 2 Remastered, Grandpa's Farm, Frontier Farm, GrampletonFields).
+**Context**: INCEPTION — new active change logged; common + stage rules loaded
+
+---
+
+## Workspace Detection — SVE Compatibility Change
+**Timestamp**: 2026-05-29T16:10:58Z
+**User Input**: (no new input — automatic stage)
+**AI Response**: Brownfield continuation of the existing Dayswork AI-DLC project (multi-project C#/.NET 6 SMAPI solution: Dayswork, Dayswork.Core, Dayswork.Tests). Performed grounded source investigation across BOTH codebases (per user instruction never to assume): (1) Worker spawn/exit is computed dynamically from `Farm.warps` (first outdoor exit warp) with a vanilla fallback tile (77,15) in `ShiftOrchestrator.cs`; (2) `ObjectTargetClassifier` classifies trees/rocks by SDV type/`IsBreakableStone()` (mostly content-agnostic) but maps `ResourceClump` boulders/logs by hardcoded vanilla sheet indices; (3) `AnimalTaskHandler` collects products data-drivenly via `currentProduce`+`ItemRegistry` (content-agnostic) but `FeedCapacity` hardcodes Deluxe=12/Big=8/else=4 and `IsAutoFeedBuilding` only matches "Deluxe" (plus a map `AutoFeed` property), and `IsMilkProduce`/`IsShearProduce` string-match Cow/Goat/Sheep; (4) `Dayswork.Core.Domain.AnimalBuildingTier` hardcodes exactly the six vanilla tiers, so SVE Premium tiers are not representable in the hiring scope UI. Verified against SVE source `code/Other/Buildings.json`: Premium Coop/Barn are `Data/Buildings` entries with `IndoorMapType: StardewValley.AnimalHouse`, `MaxOccupants: 16`, vanilla feed hopper `(BC)99`, and default-installed AutoPetter `(BC)272` + AutoGrabber `(BC)165`.
+**Context**: INCEPTION — Workspace Detection (brownfield continuation); grounded coupling-surface analysis complete
+
+---
+
+## Requirements Analysis (Started) — SVE Compatibility Change
+**Timestamp**: 2026-05-29T16:10:58Z
+**User Input**: (no new input — created clarifying questions for user)
+**AI Response**: Assessed the request as an Enhancement / compatibility feature, system-wide scope, Complex — therefore Comprehensive requirements depth. Created change-scoped clarifying questions at `aidlc-docs/inception/requirements/sve-compatibility-requirement-verification-questions.md` (preserving the original greenfield `requirement-verification-questions.md`). The file includes a grounded intent summary, the verified coupling findings, eight scoping questions (architecture/isolation approach, which farm maps, spawn/entrance strategy, premium barn/coop handling, new crops/trees/animals/products handling, Grandpa's Shed scope, SVE detection & dependency model, unsupported-content behavior), and the two mandatory extension opt-in questions (Security Baseline, Property-Based Testing) carried forward for confirmation. GATE: awaiting user answers before generating requirements.md.
+**Context**: INCEPTION — Requirements Analysis Step 6 gate; questions presented, awaiting answers
+
+---
+
+## Requirements Analysis — Answers Received & requirements.md Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T16:10:58Z
+**User Input**: "done"
+**AI Response**: Read all 10 answers from `sve-compatibility-requirement-verification-questions.md` and checked for contradictions/ambiguities per question-format-guide. Answers: Q1=A, Q2=B, Q3=A, Q4=A (with refinement: do NOT special-case AutoPetter/AutoGrabber — scan buildings as usual and naturally find no work if automation already handled it; the player can relocate/remove those machines, so their presence must not be assumed; data-driven feeding capacity is still required to fix the 16-animal underfeed), Q5=A, Q6=A, Q7=A, Q8=A, Q9=A, Q10=A. No contradictions found; the Q4 refinement narrows scope (no auto-machine detection code) and is consistent with the data-driven capacity fix. Generated `aidlc-docs/inception/requirements/sve-compatibility-requirements.md` (FR-SVE-01..16, NFR-SVE-01..07, extension config, out-of-scope, summary). Updated `aidlc-state.md` (Requirements Analysis complete, answers recorded). Presenting requirements for approval at the gate; will not proceed to the next stage until approved.
+**Context**: INCEPTION — Requirements Analysis complete; awaiting approval
+
+---
+
+## Requirements Analysis — Approved (SVE Compatibility)
+**Timestamp**: 2026-05-29T16:35:54Z
+**User Input**: "approve and continue"
+**AI Response**: Requirements approved. Updated `aidlc-state.md` (Requirements Analysis approved). Proceeded to User Stories. Performed the mandatory User Stories intelligent assessment → **Execute = Yes** (documented in `inception/plans/sve-compatibility-user-stories-assessment.md`): high-priority user-experience change to an existing user-facing workflow with multiple scenarios (SVE farm maps/entrances, premium barn/coop, new crops/trees/animals/products, Grandpa's Shed) plus a maintainer extensibility concern (the new provider seam). This is also the first story coverage of the pre-existing `FR-COMPAT` group, which was previously docs-only. Created the Part-1 story plan with embedded planning questions at `inception/plans/sve-compatibility-story-generation-plan.md`. GATE: awaiting plan answers.
+**Context**: INCEPTION — Requirements approved; User Stories Part 1 (Planning) started
+
+---
+
+## User Stories — Plan Answers Received & Analyzed (SVE Compatibility)
+**Timestamp**: 2026-05-29T16:40:31Z
+**User Input**: "done" (story-plan answers: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A)
+**AI Response**: Read all five answers from `sve-compatibility-story-generation-plan.md`. Step 9 ambiguity analysis: all are clean single-letter selections of the recommended options, no vague/contradictory/combined responses — no follow-up clarification needed. Resolved plan: hybrid placement (new "Section 6 — Expansion Compatibility (SVE)" + brief notes on S-07/S-08), no new persona, one story per surface, dedicated maintainer extensibility story, Gherkin+bullets ACs with manual-SVE-playtest annotations plus PBT/xUnit for pure compat logic. Concrete story set to generate: S-21 (detection + vanilla invariance), S-22 (SVE farm maps + entrance), S-23 (premium barn/coop), S-24 (new crops/trees/animals/products + graceful skip + item safety), S-25 (Grandpa's Shed), S-26 (maintainer provider-seam/extensibility). Logging the plan-approval prompt and awaiting explicit approval before Part 2 generation.
+**Context**: INCEPTION — User Stories plan answers analyzed (no ambiguity); awaiting plan approval
+
+---
+
+## User Stories — Plan Approved & Stories Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:15:35Z
+**User Input**: "approve and continue"
+**AI Response**: Story plan approved. Executed Part 2 generation per the approved plan. Updated `inception/user-stories/stories.md`: added new **Section 6 — Expansion Compatibility (SVE)** with S-21 (vanilla stays vanilla + SVE auto-detect; FR-SVE-01/02/03, NFR-SVE-01), S-22 (worker entrance on IF2R/Grandpa's Farm/Frontier Farm + unreachable-tile skip; FR-SVE-05/06/15), S-23 (premium barn/coop full servicing, data-driven capacity, scan-and-skip with no auto-machine assumption, premium tiers selectable; FR-SVE-07..11), S-24 (new crops/trees/animals/products via data-driven paths + verified gaps + graceful skip + item safety; FR-SVE-12/13/15/16, NFR-SVE-04), S-25 (Grandpa's Shed as a work location; FR-SVE-14/16); and added S-26 (maintainer expansion-compatibility provider seam / extensibility / PBT obligations; FR-SVE-01/04, NFR-SVE-02/03/05/06/07) to Section 5. Added SVE notes to S-07 and S-08, refreshed the coverage summary (expanding the formerly docs-only FR-COMPAT row to S-21..S-26), and updated `personas.md` (review confirmed no new persona; P-01/P-02/P-03 story lists and coverage matrix extended). All SVE-asset-dependent acceptance criteria are annotated "validated via manual SVE playtest"; pure compatibility logic carries xUnit + FsCheck PBT obligations. Marked the story-generation-plan checklist complete and updated `aidlc-state.md`. Presenting generated stories for approval.
+**Context**: INCEPTION — User Stories Part 2 generation complete; awaiting story approval
+
+---
+
+## User Stories Approved & Workflow Planning Complete (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:19:57Z
+**User Input**: "continue"
+**AI Response**: User stories approved (S-21..S-26 + persona updates). Updated `aidlc-state.md` (User Stories approved). Executed Workflow Planning (always-on stage): loaded all prior context (requirements, stories), performed scope/impact/risk analysis, and created `inception/plans/sve-compatibility-execution-plan.md` with a validated Mermaid diagram + text alternative. Determination: **EXECUTE** Application Design (new expansion-compatibility provider seam = new component group), **EXECUTE** Units Generation (foundation + ~3 independent override surfaces), per-unit **EXECUTE** Functional Design / NFR Requirements / NFR Design, **SKIP** Infrastructure Design (no cloud/IaC), **EXECUTE** Code Generation + Build and Test. This differs from the worker-routing patch (which skipped App Design + Units) because SVE compatibility adds a real architectural seam and decomposes naturally. Proposed units: U-SVE-01 provider foundation/detection (S-21/S-26), U-SVE-02 farm maps + entrance (S-22), U-SVE-03 animal buildings (S-23), U-SVE-04 content + Grandpa's Shed (S-24/S-25). Risk Medium–High; vanilla path protected by NFR-SVE-01 invariance. Presenting the plan for approval; emphasized the user can override stage inclusion or unit count.
+**Context**: INCEPTION — Workflow Planning complete; awaiting plan approval
+
+---
+
+## Workflow Plan Approved & Application Design Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:25:54Z
+**User Input**: "approve and continue"
+**AI Response**: Workflow plan approved. Updated `aidlc-state.md` (Workflow Planning approved). Began Application Design. Grounded the design in source: confirmed the SMAPI `ModRegistry` detection idiom already used in `ModEntry`/`GMCMRegistrar`; confirmed SVE is multiple mods (content `FlashShifter.StardewValleyExpandedCP` / core C# `FlashShifter.SVECode`; farm maps `flashshifter.immersivefarm2remastered`, `flashshifter.GrandpasFarm`, `flashshifter.FrontierFarm`); confirmed the existing component model (C-## Core / M-## Mod, S-A..S-G services, strict Core-pure/Mod-SMAPI split) and that `AnimalBuildingScope`/`Selection`/`PriceKey` key on the six-value `AnimalBuildingTier` enum. Proposed compat seam — Core: C-19 IExpansionProfile, C-20 ExpansionProfileSelector, C-21 VanillaExpansionProfile, C-22 SveExpansionProfile, C-23 AnimalBuildingCapacityPolicy; Mod: M-22 ExpansionDetector, M-23 ExpansionCompatService; existing call sites delegate to the seam with no inline SVE branches. Created `inception/plans/sve-compatibility-application-design-plan.md` with 5 design questions (seam shape, where SVE data lives, capacity-policy generality, premium-tier scope/pricing model, call-site injection). GATE: awaiting design-plan answers.
+**Context**: INCEPTION — Application Design planning; awaiting design-plan answers
+
+---
+
+## Application Design — Answers Analyzed & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:31:47Z
+**User Input**: "done" (design-plan answers: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A)
+**AI Response**: Step 8 ambiguity analysis: all five are clean single-letter selections of the recommended options; no vague/contradictory/combined answers; no follow-up needed. Generated `inception/application-design/sve-compatibility-application-design.md` consolidating components (Core C-19 IExpansionProfile / C-20 ExpansionProfileSelector / C-21 VanillaExpansionProfile / C-22 SveExpansionProfile / C-23 AnimalBuildingCapacityPolicy; Mod M-22 ExpansionDetector / M-23 ExpansionCompatService), component methods (high-level signatures), services/ModEntry composition-root wiring, a Mermaid dependency diagram + text alternative, and the vanilla-path invariance guarantee. Key decisions: pure Core profile + selector + thin Mod runtime seam (Q1/Q2); a general data-driven `AnimalBuildingCapacityPolicy` for vanilla+SVE (Q3); SVE premium buildings mapped to nearest vanilla tier for scope/pricing with **no save-schema change** (Q4); constructor injection from `ModEntry` (Q5). Added an SVE-addendum pointer to `components.md`, ticked the design-plan checklist, and updated `aidlc-state.md`. Presenting the design for approval; next stage is Units Generation.
+**Context**: INCEPTION — Application Design complete; awaiting approval
+
+---
+
+## Application Design Approved & Units Generation Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:46:18Z
+**User Input**: "approve and continue"
+**AI Response**: Application Design approved. Updated `aidlc-state.md` (Application Design approved). Began Units Generation (Part 1 Planning). Created `inception/plans/sve-compatibility-unit-of-work-plan.md` proposing 4 units — U-SVE-01 (provider foundation + detection; C-19..C-23, M-22/M-23; S-21/S-26), U-SVE-02 (farm maps + worker entrance; S-22), U-SVE-03 (animal buildings; S-23), U-SVE-04 (new content + Grandpa's Shed; S-24/S-25) — with U-SVE-02/03/04 each depending only on the foundation. Three planning questions: unit count/granularity, override execution order, and foundation scope (whether U-SVE-01 ships the full seam with the SVE override tables filled incrementally). GATE: awaiting unit-plan answers.
+**Context**: INCEPTION — Units Generation Part 1 (Planning); awaiting unit-plan answers
+
+---
+
+## Units Generation — Plan Answered & Units Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T18:02:08Z
+**User Input**: "done" (unit-plan answers: Q1=A four units, Q2=A entrance-first order, Q3=A foundation ships full seam with incremental override tables)
+**AI Response**: Step 7 ambiguity analysis: all clean single-letter recommended choices; no follow-up needed. Generated the SVE unit artifacts by appending to the existing docs: `unit-of-work.md` (U-SVE-01 foundation+detection owning C-19..C-23/M-22/M-23; U-SVE-02 farm maps+entrance; U-SVE-03 animal buildings; U-SVE-04 content+Grandpa's Shed — each with owns/extends, stories, primary files, DoD), `unit-of-work-dependency.md` (SVE DAG: foundation → three independent override units; entrance-first order), and `unit-of-work-story-map.md` (S-21..S-26 → units, full coverage). Ticked the unit-plan checklist and updated `aidlc-state.md`. Presenting for approval; next is the CONSTRUCTION per-unit loop beginning with U-SVE-01.
+**Context**: INCEPTION — Units Generation complete; awaiting approval (next: CONSTRUCTION / U-SVE-01)
+
+---

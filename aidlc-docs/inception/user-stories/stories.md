@@ -173,6 +173,7 @@ The morning after a successful hire, the farmhand executes the contract.
 - The farmhand's movement speed is slower and more readable than the current instant-feeling implementation.
 - The farmhand visibly swaps tools when changing task type (FR-WORK-10): axe for trees, watering can for crops, scythe for grass, pickaxe for rocks.
 - Task beats are paced so the worker feels like in-world labor rather than instant automation.
+- **SVE note:** on supported SVE farm maps, the 6am spawn tile and shift-end exit are resolved per **S-22** (the `Farm.warps` heuristic plus a verified per-map override); arrival and departure are otherwise identical to vanilla.
 
 ---
 
@@ -225,6 +226,7 @@ The morning after a successful hire, the farmhand executes the contract.
 **Acceptance criteria (UI/visual — bullets):**
 - The farmhand should visibly behave like it is choosing sensible nearby work inside the current work area.
 - The farmhand should not appear to walk around an object just to use a different side when its current side is already valid.
+- **SVE note:** when SVE premium barns/coops are part of the contract, animal servicing follows **S-23** — feeding sizes to the building's real capacity, and pet/collect simply find nothing to do for animals an auto-petter/auto-grabber has already handled (no machine-presence assumption is made).
 
 ---
 
@@ -529,6 +531,186 @@ These stories anchor the architectural choices that keep the mod testable and tr
 
 ---
 
+### S-26 — Add expansion compatibility by writing one isolated provider
+
+**As** P-03 the Mod Maintainer,
+**I want** SVE-specific behavior isolated behind an expansion-compatibility provider with a vanilla default,
+**so that** I can support another expansion by writing one new provider, keep the vanilla path untouched, and unit/property-test the pure compatibility logic without launching Stardew.
+
+**Implements**: FR-SVE-01, FR-SVE-04, NFR-SVE-02, NFR-SVE-03, NFR-SVE-05, NFR-SVE-06, NFR-SVE-07 (companion to the SVE journey stories S-21..S-25 in Section 6)
+
+**Acceptance criteria (UI/visual — bullets):**
+- A single provider abstraction defines the compatibility surface: expansion detection, worker-entrance resolution, animal-building capacity/feeding derivation, the building work-location set, and content-classification overrides.
+- A **Vanilla** provider implements today's default behavior; an **SVE** provider implements only the overrides. No vanilla/core call site contains SVE-specific branches.
+- All SVE-specific identifiers (mod ID, building data keys, map/location names, per-map entrance overrides) are centralized in the SVE provider, not scattered as magic strings (NFR-SVE-07).
+- Adding a hypothetical new expansion requires implementing and registering a new provider only — no edits to vanilla/core call sites (NFR-SVE-02).
+- The pure compatibility logic compiles and its tests run without SMAPI / Stardew assemblies on the classpath (consistent with S-19).
+- Every SVE mapping is grounded in SVE source or vanilla behavior before implementation; no assumptions (NFR-SVE-03).
+
+**Acceptance criteria (state — Gherkin) — PBT obligations:**
+- **Given** the provider-selection function
+  **When** FsCheck generates sets of installed mod IDs (with and without the SVE ID)
+  **Then** exactly one provider is selected deterministically, the Vanilla provider is chosen whenever no recognized expansion is present, and selection is stable for the same input (PBT-03 invariant).
+- **Given** the worker-entrance resolution function
+  **When** FsCheck generates warp configurations and optional per-map overrides
+  **Then** a reachable entrance tile is always produced (override when present, else heuristic, else documented fallback), deterministically (PBT-03).
+- **Given** the animal-building capacity-derivation function
+  **When** FsCheck generates trough/occupant data for vanilla and premium buildings
+  **Then** derived feed capacity equals the actual trough/occupant-based count and never the legacy hardcoded constant for non-vanilla buildings (PBT-03).
+- **Given** the content-classification override function
+  **When** FsCheck generates known and unknown content descriptors
+  **Then** known content maps to the correct task/capability and unknown content maps to "skip" without ever throwing (PBT-03).
+- **Given** a property-test failure
+  **When** it is reported
+  **Then** the seed and the shrunk minimal failing input are logged for deterministic replay (PBT-08).
+
+**Acceptance criteria (performance):**
+- **Given** provider lookups occur in runtime hot paths
+  **When** the worker runs a shift
+  **Then** the active provider is resolved once / cached and introduces no per-tile reflection or per-frame mod-registry queries; runtime stays within the Worker Routing performance envelope (NFR-SVE-06). *(Validated via the existing performance scenario plus manual SVE playtest.)*
+
+---
+
+## Section 6 — Expansion Compatibility (Stardew Valley Expanded)
+
+These stories describe how Dayswork behaves when **Stardew Valley Expanded** is installed, while leaving vanilla behavior unchanged. The maintainer-facing companion (the provider seam itself) is **S-26**, kept in Section 5 alongside the other architecture stories.
+
+> **Grounding & validation note:** Per NFR-SVE-03, every SVE-specific detail (mod ID, entrance tiles, building keys, Grandpa's Shed interior, custom content) is confirmed against SVE source during design — none is assumed here. Per NFR-SVE-05, criteria that depend on SVE assets being loaded are marked *"validated via manual SVE playtest"*, while the pure compatibility logic is covered by xUnit + FsCheck (see S-26).
+
+### S-21 — Vanilla stays vanilla; SVE support turns on automatically
+
+**As** P-01 the Player,
+**I want** Dayswork to behave exactly as it does today when I have no expansion installed, and to adapt automatically when Stardew Valley Expanded is present,
+**so that** I never configure compatibility and my non-SVE saves are completely unaffected.
+
+**Implements**: FR-SVE-01, FR-SVE-02, FR-SVE-03, NFR-SVE-01
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** no recognized expansion mod is installed
+  **When** Dayswork loads and runs any contract
+  **Then** the Vanilla provider is active and every observable behavior matches the current release. *(Validated via the existing regression suite + vanilla playtest.)*
+- **Given** SVE is installed
+  **When** Dayswork starts up
+  **Then** SVE is detected through its mod ID in the SMAPI mod registry and the SVE provider is activated for the session. *(Validated via a unit test of provider selection + manual SVE playtest.)*
+- **Given** SVE was installed and is later removed
+  **When** Dayswork next loads without it
+  **Then** it falls back to the Vanilla provider with no error and no residual SVE state.
+
+**Acceptance criteria (UI/visual — bullets):**
+- Dayswork declares **no** SVE dependency in its `manifest.json`; it loads with or without SVE present.
+- The active provider is logged once at startup at debug level for maintainer diagnosis.
+
+---
+
+### S-22 — The farmhand arrives correctly on SVE farm maps
+
+**As** P-01 the Player (and **P-02** the Farmhand),
+**I want** the farmhand to spawn at and exit from a sensible entrance on the supported SVE farm maps — **Immersive Farm 2 Remastered, Grandpa's Farm, and Frontier Farm** — and to skip tiles it can't reach,
+**so that** hiring works on my SVE farm just like on a vanilla farm.
+
+**Implements**: FR-SVE-05, FR-SVE-06, FR-SVE-15
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** the active farm is one of the three supported SVE maps
+  **When** a contract day begins at 6am
+  **Then** the farmhand spawns at a reachable entrance tile appropriate to that map and begins work. *(Validated via manual SVE playtest on each supported map.)*
+- **Given** the `Farm.warps` "first outdoor warp" heuristic would resolve a wrong or unreachable entrance on a supported SVE map
+  **When** the entrance is resolved
+  **Then** the SVE provider supplies a verified per-map override (grounded in that map's warp/source data) and the worker uses it.
+- **Given** a drawn zone on an SVE map overlaps tiles the worker cannot reach (water, cliffs, custom terrain)
+  **When** the worker executes
+  **Then** those tiles are silently skipped (FR-SVE-15) exactly as on vanilla — no crash, no warning.
+
+**Acceptance criteria (UI/visual — bullets):**
+- On each supported SVE map the worker visibly walks in from the entrance and out at shift end (no extra warp-in/out beyond the existing building-entry behavior).
+- GrampletonFields is out of scope for this change; it is not offered as a work area.
+
+---
+
+### S-23 — Premium Barn and Premium Coop are fully serviced
+
+**As** P-02 the Farmhand,
+**I want** to feed, pet, and collect from SVE Premium Barns and Premium Coops correctly — including filling all troughs in a 16-animal building —
+**so that** players with premium buildings get the same service quality as with vanilla buildings.
+
+**Implements**: FR-SVE-07, FR-SVE-08, FR-SVE-09, FR-SVE-10, FR-SVE-11
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** a Premium Barn or Premium Coop (an `AnimalHouse` with `MaxOccupants` 16) is selected for animal care
+  **When** the worker services it with sufficient silo hay
+  **Then** feeding fills up to the building's **actual** capacity (derived from its real trough tiles / building data), not the legacy hardcoded 4. *(Capacity derivation covered by unit/PBT tests; end-to-end validated via manual SVE playtest.)*
+- **Given** an AutoPetter and/or AutoGrabber is present and has already petted animals / grabbed produce
+  **When** the worker scans the building for pet/collect work
+  **Then** it finds nothing to do for those animals and moves on — it does **not** detect or special-case the machines (the player may relocate or remove them).
+- **Given** those machines are absent, removed, or have not yet acted
+  **When** the worker scans
+  **Then** it pets un-petted animals and collects available produce normally.
+- **Given** the premium building turns out to auto-feed (to be confirmed from SVE building/map source)
+  **When** the worker evaluates feed work
+  **Then** full troughs yield no feed work (natural skip); where it does not auto-feed, the worker feeds to capacity.
+
+**Acceptance criteria (UI/visual — bullets):**
+- SVE premium animal buildings are selectable wherever the hiring UI enumerates animal buildings; the scope model accommodates premium tiers, not only the six vanilla tiers. *(Validated via manual SVE playtest of the hiring UI.)*
+- No code assumes an auto-petter or auto-grabber exists in any building.
+
+---
+
+### S-24 — New SVE crops, trees, animals, and products just work (or skip safely)
+
+**As** P-02 the Farmhand,
+**I want** SVE's new crops, trees, animals, and animal products handled through the same data-driven logic as vanilla, with anything I genuinely can't classify skipped safely,
+**so that** players get useful work on SVE content with no lost items and no crashes.
+
+**Implements**: FR-SVE-12, FR-SVE-13, FR-SVE-15, FR-SVE-16, NFR-SVE-04
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** SVE crops growing in tilled dirt
+  **When** harvest runs
+  **Then** they harvest through the existing `HoeDirt`/`Crop` path like vanilla crops. *(Validated via manual SVE playtest.)*
+- **Given** an SVE animal with a tool-harvest product (e.g., a new milk- or wool-type animal)
+  **When** collection runs
+  **Then** the product is collected via `currentProduce` + `ItemRegistry`, and milk/shear classification covers the new animal type (verified against SVE source). *(Classification covered by unit tests; end-to-end via manual SVE playtest.)*
+- **Given** SVE trees that are vanilla `Tree`/`FruitTree` instances
+  **When** the worker evaluates them
+  **Then** standing trees are chopped and fruit trees are always skipped, like vanilla.
+- **Given** a custom SVE `ResourceClump` or tree species whose identity is not recognized
+  **When** the worker evaluates it
+  **Then** it is classified if confirmed from SVE source, otherwise silently skipped (FR-SVE-15) without crashing.
+- **Given** the worker has buffered SVE items it cannot deposit
+  **When** the shift ends
+  **Then** existing overflow-to-mail safety applies and no item is lost (FR-SVE-16).
+
+**Acceptance criteria (UI/visual — bullets):**
+- Explicit per-content handling is added only at gaps confirmed in SVE source; generic content flows through the unchanged data-driven path.
+- Unclassifiable content is logged at debug/trace for maintainers, never surfaced to the player.
+
+---
+
+### S-25 — Grandpa's Shed is a usable work location
+
+**As** P-01 the Player (and **P-02** the Farmhand),
+**I want** the farmhand to treat Grandpa's Shed as a work location,
+**so that** the tasks its interior supports — and any chests inside it — are handled like other farm buildings.
+
+**Implements**: FR-SVE-14, FR-SVE-16
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** Grandpa's Shed is built and within the contract's scope
+  **When** the worker runs
+  **Then** it navigates into the shed (door/warp and entry tile resolved from the SVE map source) and performs whatever applicable tasks its interior supports. *(Validated via manual SVE playtest.)*
+- **Given** chests inside Grandpa's Shed are assigned as output destinations
+  **When** the worker deposits
+  **Then** it makes a deposit trip into the shed and places items, falling back to overflow mail if the chest is unreachable or full (FR-SVE-16). *(Validated via manual SVE playtest.)*
+- **Given** the shed interior supports indoor crops (to be confirmed from SVE source)
+  **When** crop tasks are enabled
+  **Then** the worker waters/harvests them as for any indoor crop area.
+
+**Acceptance criteria (UI/visual — bullets):**
+- Grandpa's Shed appears as a selectable building wherever the hiring UI enumerates buildings (when it exposes chests or work). *(Validated via manual SVE playtest.)*
+- Its exact interior contents and supported task set are confirmed from SVE source, not assumed (NFR-SVE-03).
+
+---
+
 ## Coverage Summary
 
 | Requirement group | Stories covering it |
@@ -545,9 +727,15 @@ These stories anchor the architectural choices that keep the mod testable and tr
 | §2.10 Persistence (FR-PERSIST-01..02) | S-05, S-12 |
 | §2.11 Multiplayer (FR-MP-01) | S-01, S-18 |
 | §2.12 Config & UX (FR-CFG-01..02) | S-13, S-20 |
-| §2.13 Mod compatibility (FR-COMPAT-01..02) | (docs-only; no story) |
+| §2.13 Mod compatibility (FR-COMPAT-01..02) | general docs; SVE compatibility now covered by S-21..S-26 |
+| SVE detection & vanilla invariance (FR-SVE-01/02/03; NFR-SVE-01) | S-21, S-26 |
+| SVE farm maps & worker entrance (FR-SVE-05/06; FR-SVE-15) | S-22 |
+| SVE premium barn/coop (FR-SVE-07..11) | S-23 |
+| SVE new crops/trees/animals/products (FR-SVE-12/13; FR-SVE-15; NFR-SVE-04) | S-24 |
+| SVE Grandpa's Shed (FR-SVE-14; FR-SVE-16) | S-25 |
+| SVE isolation/extensibility/testability (FR-SVE-04; NFR-SVE-02/03/05/06/07) | S-26 |
 | Maintainability NFRs (NFR-MAINT-01..05) | S-19 |
 | Onboarding NFRs (NFR-ONBOARD-01..02) | (covered by docs; no story) |
 | Safety / data-integrity NFRs (NFR-SAFE-01..04) | S-10, S-11, S-16, S-19 |
 
-No FR group is left uncovered. The two "covered by docs, no story" lines (mod compatibility and onboarding) are intentional — they're documentation deliverables rather than user-observable behavior.
+No FR group is left uncovered. SVE compatibility (FR-SVE-* / NFR-SVE-*) is now covered by S-21..S-26, expanding the formerly docs-only mod-compatibility row. The remaining "covered by docs, no story" line (onboarding) is intentional — it's a documentation deliverable rather than user-observable behavior.
