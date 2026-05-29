@@ -241,14 +241,14 @@ internal sealed class WorkerMovementDriver
         // Use inset rect (+1/62) to match PathFindController.findPath corner math — a full 64x64 rect
         // maps right/bottom edges to the ADJACENT tile (X+1, Y+1), causing false positives on tiles
         // next to buildings or objects (e.g. FarmEntrance tile falsely blocked by shipping bin above it).
-        // pathfinding: false matches PathFindController.findPath exactly (it does not pass the parameter,
-        // which defaults to false). Passing true applies extra terrain-feature checks that incorrectly
-        // block some passable tiles — notably exit-corridor tiles near the map boundary.
+        // pathfinding: true matches PathFindController.findPath, which passes pathfinding: true. For a
+        // null character this flag gates only the player-farmer collision block, so passing true makes
+        // the worker ignore the player when routing (the player is never a pathing obstacle).
         // ignoreCharacterRequirement skips the guard that would otherwise return true for null character.
         var bounds = new Rectangle(tile.X * 64 + 1, tile.Y * 64 + 1, 62, 62);
         if (location.isCollidingPosition(bounds, Game1.viewport,
                 isFarmer: false, damagesFarmer: 0, glider: false,
-                character: null, pathfinding: false,
+                character: null, pathfinding: true,
                 ignoreCharacterRequirement: true))
             return false;
 
