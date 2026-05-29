@@ -211,9 +211,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
                 if (WorkerMovementDriver.IsTilePassableForWorker(new Point(tx, ty), farm))
                 {
-                    ModEntry.ModMonitor.Log(
-                        $"[Dayswork] Farm exit: tile ({tx},{ty}) near warp ({warp.X},{warp.Y}) → {warp.TargetName} (step={step}).",
-                        LogLevel.Trace);
+//                     ModEntry.ModMonitor.Log(
+//                         $"[Dayswork] Farm exit: tile ({tx},{ty}) near warp ({warp.X},{warp.Y}) → {warp.TargetName} (step={step}).",
+//                         LogLevel.Trace);
                     return new TileCoord(tx, ty);
                 }
             }
@@ -229,9 +229,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                     if (!WorkerMovementDriver.IsTilePassableForWorker(n, farm))
                         continue;
 
-                    ModEntry.ModMonitor.Log(
-                        $"[Dayswork] Farm exit: adjacent tile ({n.X},{n.Y}) near warp ({warp.X},{warp.Y}) → {warp.TargetName}.",
-                        LogLevel.Trace);
+//                     ModEntry.ModMonitor.Log(
+//                         $"[Dayswork] Farm exit: adjacent tile ({n.X},{n.Y}) near warp ({warp.X},{warp.Y}) → {warp.TargetName}.",
+//                         LogLevel.Trace);
                     return new TileCoord(n.X, n.Y);
                 }
             }
@@ -699,7 +699,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork][outdoor-animals] refreshed homes={selectedAnimalHomes.Count} animalWork={refreshedAnimalWork.Count} tileWork={refreshedTileWork.Count}.",
-            (refreshedAnimalWork.Count == 0 && refreshedTileWork.Count == 0) ? LogLevel.Debug : LogLevel.Info);
+            (refreshedAnimalWork.Count == 0 && refreshedTileWork.Count == 0) ? LogLevel.Trace : LogLevel.Info);
         return batch with { TileWork = refreshedTileWork, AnimalWork = refreshedAnimalWork };
     }
 
@@ -816,7 +816,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         {
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][routing] no reachable active-batch work remains; skipping blocked work. tile={_ctx.WorkList.Count} animal={_animalWork.Count} deferredTile={_deferredTileWork.Count} deferredAnimal={_deferredAnimalWork.Count}.",
-                LogLevel.Debug);
+                LogLevel.Trace);
             ClearRemainingActiveBatchWork();
         }
 
@@ -1417,9 +1417,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     {
         if (_currentAnimalWork is not null)
         {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][animal] skipping unreachable animal {_currentAnimalWork.Animal.DisplayName} ({_currentAnimalWork.Task}).",
-                LogLevel.Debug);
+//             ModEntry.ModMonitor.Log(
+//                 $"[Dayswork][animal] skipping unreachable animal {_currentAnimalWork.Animal.DisplayName} ({_currentAnimalWork.Task}).",
+//                 LogLevel.Trace);
             _currentAnimalWork = null;
             StartNextAnimalOrTileOrAdvance();
             return;
@@ -1536,9 +1536,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
             if (_currentAnimalWork is not null)
             {
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork][animal] navigation failed for {_currentAnimalWork.Animal.DisplayName} ({_currentAnimalWork.Task}); deferring within active batch.",
-                    LogLevel.Debug);
+//                 ModEntry.ModMonitor.Log(
+//                     $"[Dayswork][animal] navigation failed for {_currentAnimalWork.Animal.DisplayName} ({_currentAnimalWork.Task}); deferring within active batch.",
+//                     LogLevel.Trace);
                 _deferredAnimalWork.Add(_currentAnimalWork);
                 _currentAnimalWork = null;
                 StartNextAnimalOrTileOrAdvance();
@@ -1547,9 +1547,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
             if (_currentTileWork is not null)
             {
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork][nav] failed task={_currentTileWork.Task} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_currentTileWork.TaskTile.X},{_currentTileWork.TaskTile.Y}); deferring within active batch.",
-                    LogLevel.Debug);
+//                 ModEntry.ModMonitor.Log(
+//                     $"[Dayswork][nav] failed task={_currentTileWork.Task} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_currentTileWork.TaskTile.X},{_currentTileWork.TaskTile.Y}); deferring within active batch.",
+//                     LogLevel.Trace);
                 _deferredTileWork.Add(_currentTileWork);
                 _currentTileWork = null;
                 StartNextAnimalOrTileOrAdvance();
@@ -1600,9 +1600,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                 return;
             }
 
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][nav] arrived task={_pendingTask} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_pendingTaskTile.X},{_pendingTaskTile.Y}) worker=({_farmhand!.TilePoint.X},{_farmhand.TilePoint.Y}) fallback={_nav.UsedDirectFallback}.",
-                LogLevel.Debug);
+//             ModEntry.ModMonitor.Log(
+//                 $"[Dayswork][nav] arrived task={_pendingTask} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_pendingTaskTile.X},{_pendingTaskTile.Y}) worker=({_farmhand!.TilePoint.X},{_farmhand.TilePoint.Y}) fallback={_nav.UsedDirectFallback}.",
+//                 LogLevel.Trace);
             _ctx!.StateMachine.SetIntent(new IntentPerformTaskAt(_pendingTaskTile, _pendingTask));
             _actionPending = false;
         }
@@ -1623,9 +1623,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         {
             _toolAnimator.StopSwing();
             _toolAnimator.PlaySwing(intent.Task, FacingToward(_farmhand!.TilePoint, intent.Tile, _farmhand.FacingDirection));
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][action] invoke task={intent.Task} taskTile=({intent.Tile.X},{intent.Tile.Y}) worker=({_farmhand.TilePoint.X},{_farmhand.TilePoint.Y}).",
-                LogLevel.Debug);
+//             ModEntry.ModMonitor.Log(
+//                 $"[Dayswork][action] invoke task={intent.Task} taskTile=({intent.Tile.X},{intent.Tile.Y}) worker=({_farmhand.TilePoint.X},{_farmhand.TilePoint.Y}).",
+//                 LogLevel.Trace);
             _pendingBeatOutcome = InvokeTaskActionGuarded(intent.Tile, intent.Task, location);
             SpendStaminaForBeat(ActionKindForTask(intent.Task));
             _actionPending = true;
@@ -1655,9 +1655,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
         if (outcome.TaskFullyComplete)
         {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][action] complete task={intent.Task} taskTile=({intent.Tile.X},{intent.Tile.Y}).",
-                LogLevel.Debug);
+//             ModEntry.ModMonitor.Log(
+//                 $"[Dayswork][action] complete task={intent.Task} taskTile=({intent.Tile.X},{intent.Tile.Y}).",
+//                 LogLevel.Trace);
             AdvanceWorkList(location);
         }
     }
@@ -1884,7 +1884,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                     _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork][deposit] chest missing at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) → mail.",
-                    LogLevel.Debug);
+                    LogLevel.Trace);
                 return false;
             }
 
@@ -1896,7 +1896,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                     _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestBusy));
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork][deposit] chest busy at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) → mail.",
-                    LogLevel.Debug);
+                    LogLevel.Trace);
                 return false;
             }
 
@@ -1939,7 +1939,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                 _currentTripStackIndex = _currentTrip.Items.Count;  // skip ahead to "trip complete"
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork][deposit] chest became busy mid-trip; remaining stacks → mail.",
-                    LogLevel.Debug);
+                    LogLevel.Trace);
                 return;
             }
 
@@ -2043,7 +2043,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                 OverflowReason.ChestFull));
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][deposit] chest full; {leftover.Stack}x {stack.QualifiedItemId} → mail.",
-                LogLevel.Debug);
+                LogLevel.Trace);
         }
     }
 
@@ -2073,7 +2073,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                 $"[Dayswork][exit] could not path to exit tile ({_farmExitTile.X},{_farmExitTile.Y}) — removing worker in place.",
                 LogLevel.Warn);
         else
-            ModEntry.ModMonitor.Log("[Dayswork][exit] worker reached farm exit — shift complete.", LogLevel.Debug);
+            ModEntry.ModMonitor.Log("[Dayswork][exit] worker reached farm exit — shift complete.", LogLevel.Trace);
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork] Shift complete. StopReason={_ctx!.StateMachine.StopReason}. Remaining stamina={_ctx.EnergyState.RemainingEnergy}/{_ctx.EnergyState.Capacity}.",
@@ -2114,9 +2114,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             _waitingForDebrisBeforeDeposit = true;
             _actionPending = true;
             _toolAnimator.StopSwing();
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][debris] waiting for {_pendingDebrisSweeps.Count} pending debris sweep(s) before deposit.",
-                LogLevel.Debug);
+//             ModEntry.ModMonitor.Log(
+//                 $"[Dayswork][debris] waiting for {_pendingDebrisSweeps.Count} pending debris sweep(s) before deposit.",
+//                 LogLevel.Trace);
             return;
         }
 
@@ -2620,16 +2620,16 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (loc.objects.ContainsKey(tileVec))
             loc.removeObject(tileVec, false);
         var removed = !loc.objects.ContainsKey(tileVec);
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork][action] clear rock at ({tile.X},{tile.Y}) performToolAction={actionRemoved} removed={removed}.",
-            LogLevel.Debug);
+//         ModEntry.ModMonitor.Log(
+//             $"[Dayswork][action] clear rock at ({tile.X},{tile.Y}) performToolAction={actionRemoved} removed={removed}.",
+//             LogLevel.Trace);
         var collectedDebris = CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
         if (!collectedDebris && removed && TryGetRemovedStandardStoneDrop(obj, out var itemId, out var stack))
         {
             _ctx.Buffer.Add(itemId, stack, _pendingTask, _pendingOutputProvenance);
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][debris] collected {stack}x {itemId} from removed standard stone object task={_pendingTask}.",
-                LogLevel.Debug);
+//             ModEntry.ModMonitor.Log(
+//                 $"[Dayswork][debris] collected {stack}x {itemId} from removed standard stone object task={_pendingTask}.",
+//                 LogLevel.Trace);
         }
 
         return new LaborBeatOutcome(true, true);
@@ -2657,9 +2657,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             var  removeTree = tree.performToolAction(axe, 0, tileVec);
             if (removeTree && loc.terrainFeatures.ContainsKey(tileVec))
                 loc.terrainFeatures.Remove(tileVec);
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][action] cut tree at ({tile.X},{tile.Y}) remove={removeTree} health={tree.health.Value:0.##} stump={tree.stump.Value}.",
-                LogLevel.Debug);
+//             ModEntry.ModMonitor.Log(
+//                 $"[Dayswork][action] cut tree at ({tile.X},{tile.Y}) remove={removeTree} health={tree.health.Value:0.##} stump={tree.stump.Value}.",
+//                 LogLevel.Trace);
             CollectNewDebrisAtTile(before, loc, _pendingTask, tileVec, _pendingOutputProvenance);
             if (!wasStump && !removeTree)
                 QueueDelayedDebrisSweep(loc, tileVec, before, _pendingTask, _pendingOutputProvenance);
@@ -2748,9 +2748,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             }
 
             _ctx!.Buffer.Add(itemId, stack, sourceTask, provenance ?? OutputScopeProvenance.Unknown);
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][debris] collected {stack}x {itemId} from game debris task={sourceTask} chunks={d.Chunks.Count} debrisType={d.debrisType.Value} chunkType={d.chunkType.Value}.",
-                LogLevel.Debug);
+//             ModEntry.ModMonitor.Log(
+//                 $"[Dayswork][debris] collected {stack}x {itemId} from game debris task={sourceTask} chunks={d.Chunks.Count} debrisType={d.debrisType.Value} chunkType={d.chunkType.Value}.",
+//                 LogLevel.Trace);
             loc.debris.Remove(d);
             collected = true;
         }

@@ -112,7 +112,7 @@ internal sealed class MailDispatcher : IMailDispatcher
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork][mail] queue settlement letter attachments={attachments.Count} categories={string.Join(",", categories.Select(category => $"{category.Reason}:{category.ScopeFamily}:{category.ScopeName}"))}.",
-            LogLevel.Debug);
+            LogLevel.Trace);
         if (TrySendViaMfm(
             $"Dayswork.Settlement.{CurrentDay()}.{Guid.NewGuid():N}",
             sender,
@@ -138,7 +138,7 @@ internal sealed class MailDispatcher : IMailDispatcher
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork][mail] queue cannot-afford notice price={dailyPrice} shortfall={shortfall}.",
-            LogLevel.Debug);
+            LogLevel.Trace);
         if (!TrySendViaMfm(
             $"Dayswork.CannotAfford.{CurrentDay()}.{Guid.NewGuid():N}",
             sender,
@@ -158,7 +158,7 @@ internal sealed class MailDispatcher : IMailDispatcher
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork][mail] queue needs-attention notice contract={contract.Id.Value}.",
-            LogLevel.Debug);
+            LogLevel.Trace);
         if (!TrySendViaMfm(
             $"Dayswork.NeedsAttention.{CurrentDay()}.{Guid.NewGuid():N}",
             sender,
@@ -180,7 +180,7 @@ internal sealed class MailDispatcher : IMailDispatcher
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork][mail] queue festival notice refund={refundGold}.",
-            LogLevel.Debug);
+            LogLevel.Trace);
         if (!TrySendViaMfm(
             $"Dayswork.Festival.{CurrentDay()}.{Guid.NewGuid():N}",
             sender,
@@ -212,7 +212,7 @@ internal sealed class MailDispatcher : IMailDispatcher
             var earliest = EarliestDeliveryDay(timing);
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][mail] register MFM letter id={id} attachments={attachments.Count} refund={refundGold} timing={timing}.",
-                LogLevel.Debug);
+                LogLevel.Trace);
             _mfm.RegisterLetter(id, synopsis, text, attachments, earliest, refundGold);
             if (timing == DeliveryTiming.Today)
                 AddToMailboxToday(id);
@@ -317,7 +317,7 @@ internal sealed class MailDispatcher : IMailDispatcher
 
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][mail] re-register pending settlement id={record.Id} attachments={attachments.Count} suppressed={suppressed}.",
-                suppressed > 0 ? LogLevel.Warn : LogLevel.Debug);
+                suppressed > 0 ? LogLevel.Warn : LogLevel.Trace);
             _mfm.RegisterLetter(
                 record.Id, record.Sender, record.Body,
                 attachments, record.EarliestDeliveryDay, moneyReward: 0);

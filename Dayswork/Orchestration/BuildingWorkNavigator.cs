@@ -99,7 +99,7 @@ internal sealed class BuildingWorkNavigator
     {
         var from = worker.currentLocation ?? Game1.getFarm();
         _movement.WarpWorker(worker, from, interior, interiorEntryTile);
-        _monitor.Log(I18nHelper.Get("log.building.entering", new { location = interior.Name }), LogLevel.Debug);
+        _monitor.Log(I18nHelper.Get("log.building.entering", new { location = interior.Name }), LogLevel.Trace);
     }
 
     public void ExitToFarm(FarmhandNpc worker, TileCoord outdoorDoorTile)

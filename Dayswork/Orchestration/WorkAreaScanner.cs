@@ -67,7 +67,7 @@ internal sealed class WorkAreaScanner
                 if (capabilitySkipped && skippedKind.HasValue)
                 {
                     capabilitySkippedTiles++;
-                    ModEntry.ModMonitor.Log($"[Dayswork][scan] capability skip {skippedKind.Value} at {location.Name} ({x},{y}).", LogLevel.Trace);
+//                     ModEntry.ModMonitor.Log($"[Dayswork][scan] capability skip {skippedKind.Value} at {location.Name} ({x},{y}).", LogLevel.Trace);
                 }
 
                 if (task is null) continue;
@@ -84,13 +84,13 @@ internal sealed class WorkAreaScanner
                 if (navTiles.Count == 0)
                 {
                     noNavigationTiles++;
-                    ModEntry.ModMonitor.Log($"[Dayswork][scan] no stand tile for {task.Value} at {location.Name} task ({taskTile.X},{taskTile.Y}) from scan ({x},{y}).", LogLevel.Trace);
+//                     ModEntry.ModMonitor.Log($"[Dayswork][scan] no stand tile for {task.Value} at {location.Name} task ({taskTile.X},{taskTile.Y}) from scan ({x},{y}).", LogLevel.Trace);
                     continue;
                 }
 
                 Increment(acceptedByKind, task.Value);
                 rawItems.Add(new WorkItem(navTiles[0], taskTile, task.Value, location.Name, provenance, navTiles));
-                ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}) candidates=[{string.Join("; ", navTiles.Select(tile => $"({tile.X},{tile.Y})"))}].", LogLevel.Trace);
+//                 ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}) candidates=[{string.Join("; ", navTiles.Select(tile => $"({tile.X},{tile.Y})"))}].", LogLevel.Trace);
 
                 // Harvest leaves regrowable crops in place. Queue a separate WaterCrops beat
                 // for the same tile so the worker plays a visible watering-can animation
@@ -107,7 +107,7 @@ internal sealed class WorkAreaScanner
                     Increment(detectedByKind, TaskKind.WaterCrops);
                     Increment(acceptedByKind, TaskKind.WaterCrops);
                     rawItems.Add(new WorkItem(navTiles[0], taskTile, TaskKind.WaterCrops, location.Name, provenance, navTiles));
-                    ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted WaterCrops (post-harvest regrow): loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
+//                     ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted WaterCrops (post-harvest regrow): loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
                 }
             }
         }
@@ -465,6 +465,6 @@ internal sealed class WorkAreaScanner
             $"accepted=[{FormatCounts(acceptedByKind)}] acceptedItems={acceptedItems} " +
             $"capabilitySkipped={capabilitySkippedTiles} noStandTile={noNavigationTiles} duplicateClumpTiles={duplicateTiles}";
 
-        ModEntry.ModMonitor.Log(message, acceptedItems == 0 ? LogLevel.Info : LogLevel.Debug);
+        ModEntry.ModMonitor.Log(message, acceptedItems == 0 ? LogLevel.Info : LogLevel.Trace);
     }
 }
