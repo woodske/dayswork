@@ -76,6 +76,12 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private Chest?        _currentTripChest;
     private GameLocation? _currentTripLocation;
     private bool          _currentTripChestAnimated;   // we triggered the open-lid animation
+    // Set while the worker is walking across the farm to a building door for an interior-chest
+    // deposit. Cleared when we cross the door (warp into the interior) on arrival.
+    private GameLocation? _pendingDepositInterior;
+    // Set while the worker is walking to the interior exit door after depositing in a building.
+    // Cleared when we cross the door (warp back to the farm) on arrival.
+    private bool          _pendingDepositExit;
 
     // Per-WorkItem state — the nav tile and task tile are tracked separately (trellis crops).
     private bool      _actionPending;
@@ -1741,6 +1747,27 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
+        // Two-phase interior-chest entry: the worker has finished walking to the building's
+        // outdoor door (or failed to reach it). Cross the door now and continue to the chest.
+        if (_pendingDepositInterior is { } depositInterior)
+        {
+            if (_nav.NavigationFailed)
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][deposit] could not walk to {depositInterior.Name} door; warping in.",
+                    LogLevel.Warn);
+            EnterDepositInterior(depositInterior);
+            return;
+        }
+
+        // Two-phase interior-chest exit: the worker has finished walking to the interior exit
+        // door after depositing. Advance the trip, which warps back out to the farm.
+        if (_pendingDepositExit)
+        {
+            _pendingDepositExit = false;
+            FinalizeAndAdvanceTrip(farm);
+            return;
+        }
+
         if (_nav.NavigationFailed)
         {
             MarkDepositTripUndelivered(_currentTrip);
@@ -1777,7 +1804,39 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         EndTripExecution();
+
+        // If we deposited inside a building, walk to the interior door before leaving;
+        // the warp back to the farm happens once the worker reaches the door.
+        if (BeginDepositInteriorExitWalk())
+            return;
+
         FinalizeAndAdvanceTrip(farm);
+    }
+
+    // Starts walking the worker to the nearest reachable interior exit door after an
+    // interior-chest deposit. Returns false (no walk) when the trip was a farm/shipping-bin
+    // destination or the worker is already on the farm. Mirrors CompleteCurrentBatch's exit.
+    private bool BeginDepositInteriorExitWalk()
+    {
+        if (_farmhand is null ||
+            _currentTrip is not { Destination: ChestDestination { Ref.LocationName: not "Farm" } })
+            return false;
+
+        var interior = _currentLocation;
+        if (interior is null || interior == Game1.getFarm())
+            return false;
+
+        var exitCandidates = _buildingNavigator.ResolveInteriorExitApproachTiles(interior);
+        var source = new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y);
+        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, interior);
+        var exitTile = BuildingWorkNavigator.SelectNearestReachableExitApproachTile(
+            exitCandidates,
+            routeCosts,
+            exitCandidates[0]);
+
+        _pendingDepositExit = true;
+        _nav.StartNavigation(exitTile, interior, _farmhand);
+        return true;
     }
 
     // Drain the current trip's bookkeeping, dequeue the next trip (or exit if none).
@@ -2110,12 +2169,13 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var farm = Game1.getFarm();
         if (trip.Destination is ChestDestination { Ref.LocationName: not "Farm" } chestDest)
         {
-            if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var _, out var interior))
+            if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out var interior))
             {
-                var entryTile = _buildingNavigator.ResolveInteriorEntryTile(interior);
-                _buildingNavigator.Enter(_farmhand, interior, entryTile);
-                _currentLocation = interior;
-                StartChestDepositNavigation(trip, chestDest, interior);
+                // Walk across the farm to the building's outdoor door first; we only cross the
+                // door (warp into the interior) once the worker arrives there — see HandleDeposit.
+                _pendingDepositInterior = interior;
+                _currentLocation = farm;
+                _nav.StartNavigation(outdoorDoor, farm, _farmhand);
                 return;
             }
 
@@ -2133,6 +2193,20 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         _nav.StartNavigation(trip.Tile, farm, _farmhand);
+    }
+
+    // Cross the building door (warp into the interior) and start walking to the chest.
+    // Called from HandleDeposit once the worker has reached the outdoor door tile.
+    private void EnterDepositInterior(GameLocation interior)
+    {
+        _pendingDepositInterior = null;
+        if (_farmhand is null || _currentTrip is not { Destination: ChestDestination chestDest })
+            return;
+
+        var entryTile = _buildingNavigator.ResolveInteriorEntryTile(interior);
+        _buildingNavigator.Enter(_farmhand, interior, entryTile);
+        _currentLocation = interior;
+        StartChestDepositNavigation(_currentTrip, chestDest, interior);
     }
 
     private void StartChestDepositNavigation(DepositTrip trip, ChestDestination chestDest, GameLocation location)
@@ -2309,6 +2383,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _currentTripChest = null;
         _currentTripLocation = null;
         _currentTripChestAnimated = false;
+        _pendingDepositInterior = null;
+        _pendingDepositExit = false;
         _nav.Clear();
     }
 

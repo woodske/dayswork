@@ -39,8 +39,8 @@ internal sealed class ChestResolver
         {
             foreach (var building in f.buildings)
             {
-                var indoors = building.indoors.Value;
-                if (indoors == null) continue;
+                if (!BuildingLocationResolver.TryGetInteriorForBuilding(building, out var indoors))
+                    continue;
 
                 string buildingName = building.buildingType.Value;
                 foreach (var (tile, obj) in indoors.Objects.Pairs)
