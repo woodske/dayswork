@@ -4744,3 +4744,107 @@ Never make assumptions, always reference the SVE source code and/or the vanilla 
 **Context**: INCEPTION — Units Generation complete; awaiting approval (next: CONSTRUCTION / U-SVE-01)
 
 ---
+
+## Units Generation Approved — CONSTRUCTION Started, U-SVE-01 Functional Design (SVE Compatibility)
+**Timestamp**: 2026-05-29T18:05:16Z
+**User Input**: "continue"
+**AI Response**: Units Generation approved; INCEPTION complete for the SVE change. Updated `aidlc-state.md`. Entered CONSTRUCTION per-unit loop at U-SVE-01 (Functional Design EXECUTE — the provider foundation has real business logic: selection determinism, vanilla fall-through semantics, capacity derivation, detection lifecycle). Created `construction/plans/u-sve-01-expansion-compat-foundation-functional-design-plan.md` with 3 questions: (Q1) animal-building feed-capacity derivation rule and how it stays vanilla-safe — the consequential one, given NFR-SVE-01; (Q2) profile-selection precedence/determinism; (Q3) detection lifecycle/caching/logging. Noted U-SVE-01 ships the full seam with SVE override tables stubbed (unit-plan Q3=A), so this FD is about the seam's pure logic, not concrete SVE values. GATE: awaiting FD answers.
+**Context**: CONSTRUCTION — U-SVE-01 Functional Design (planning); awaiting FD answers
+
+---
+
+## U-SVE-01 Functional Design — Answers Analyzed & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T18:41:06Z
+**User Input**: "done" (FD answers: Q1=A, Q2=A, Q3=A)
+**AI Response**: Ambiguity analysis: clean single-letter recommended choices; no follow-up needed. Generated U-SVE-01 functional design under `construction/u-sve-01-expansion-compat-foundation/functional-design/`: business-logic-model.md (detection/selection flow, capacity derivation, vanilla fall-through table, this-unit stub guardrail), business-rules.md (BR-SVE-01..13 incl. deterministic selection, detect-once-at-GameLaunched, vanilla no-op, capacity = clamp(TroughTileCount,0,MaxOccupants) with code-gen vanilla-parity verification, seam-is-sole-SVE-awareness, plus a PBT property table), and domain-entities.md (pure IExpansionProfile / VanillaExpansionProfile / SveExpansionProfile / ExpansionProfileSelector / AnimalBuildingCapacityInputs / AnimalBuildingCapacityPolicy / ContentDescriptor / WorkClassification + Mod adapters; no persistence change). Ticked the FD plan checklist and updated aidlc-state.md. Presenting via the standardized 2-option construction completion message; next stage NFR Requirements.
+**Context**: CONSTRUCTION — U-SVE-01 Functional Design complete; awaiting approval
+
+---
+
+## U-SVE-01 Functional Design Approved — NFR Requirements Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T20:52:35Z
+**User Input**: "continue"
+**AI Response**: U-SVE-01 Functional Design approved. Updated aidlc-state.md. Began NFR Requirements for U-SVE-01. Most NFRs are pre-fixed by the approved NFR-SVE-* requirements and the FD, so created a tight 3-question plan at `construction/plans/u-sve-01-expansion-compat-foundation-nfr-requirements-plan.md`: (Q1) reliability fail-safe-to-Vanilla posture on detection error; (Q2) performance envelope (once-at-GameLaunched detection, cached O(1) lookups, no per-frame registry queries, no per-shift regression); (Q3) tech stack (reuse existing C#/.NET 6 + xUnit + FsCheck, Core-pure/Mod-adapter split, no new deps). GATE: awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-01 NFR Requirements (planning); awaiting answers
+
+---
+
+## U-SVE-01 NFR Requirements — Answered & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:24:53Z
+**User Input**: "done" (NFR answers: Q1=A, Q2=A, Q3=A)
+**AI Response**: No ambiguities. Generated `construction/u-sve-01-expansion-compat-foundation/nfr-requirements/nfr-requirements.md` (NFRU-01 fail-safe-to-Vanilla, NFRU-02 total seam ops, NFRU-03/04 once-at-GameLaunched + cached O(1) lookups, NFRU-05/06 deterministic+grounded, NFRU-07/08/09 isolation/centralized-ids/extensible, NFRU-10 pure unit/PBT testable — each mapped to NFR-SVE-*) and tech-stack-decisions.md (reuse C#/.NET 6 + xUnit + FsCheck, Core-pure/Mod-adapter split, no new deps). Ticked the plan checklist; updated aidlc-state.md. Presenting via 2-option construction completion; next stage NFR Design.
+**Context**: CONSTRUCTION — U-SVE-01 NFR Requirements complete; awaiting approval
+
+---
+
+## U-SVE-01 NFR Requirements Approved — NFR Design Complete (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:26:17Z
+**User Input**: "continue"
+**AI Response**: U-SVE-01 NFR Requirements approved. Updated aidlc-state.md. Executed NFR Design: the plan evaluated resilience/scalability/performance/security/logical-component categories and concluded no additional question round was needed (requirements + App Design already fix the pattern set cleanly — same handling as U-22/U-23/U-24). Generated `construction/u-sve-01-expansion-compat-foundation/nfr-design/nfr-design-patterns.md` (P-SVE-01 guarded one-time detection with Vanilla fallback; P-SVE-02 cached singleton active profile; P-SVE-03 pure-Core decision seams + thin Mod adapter; P-SVE-04 Null-Object no-op Vanilla profile; P-SVE-05 strategy + ordered registry selection; P-SVE-06 clamp-not-throw capacity) and logical-components.md (pattern→component mapping, runtime data flow, failure modes; no new infrastructure). Updated aidlc-state.md. Presenting via 2-option construction completion; next stage Code Generation (Part 1 planning).
+**Context**: CONSTRUCTION — U-SVE-01 NFR Design complete; awaiting approval
+
+---
+
+## U-SVE-01 NFR Design Approved — Code Generation Plan (Part 1) Created (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:31:22Z
+**User Input**: "continue"
+**AI Response**: U-SVE-01 NFR Design approved. Updated aidlc-state.md. Created the Part 1 code-generation plan at `construction/plans/u-sve-01-expansion-compat-foundation-code-generation-plan.md` — a 14-step plan: Steps 1-6 pure Core (`WorkClassification`, `ContentDescriptor`, `AnimalBuildingCapacityInputs`, `IExpansionProfile`, `VanillaExpansionProfile`, `SveExpansionProfile`, `ExpansionProfileSelector`, `AnimalBuildingCapacityPolicy`); Steps 7-8 Mod adapters (`ExpansionDetector`, `ExpansionCompatService`); Step 9 wire `ModEntry` (construct in Entry, detect+SetActiveProfile in the existing GameLaunched handler, expose `internal static ExpansionCompat`); Steps 10-12 xUnit + FsCheck tests; Step 13 build/test verification; Step 14 code summary + state/audit. Grounded in the real ModEntry composition root (existing GameLaunched handler reused for detection). Scope guardrail: consumers are NOT rewired in this unit → no behavior change; only detection + the seam existing. Logging the plan-approval prompt and awaiting explicit approval before Part 2 generation.
+**Context**: CONSTRUCTION — U-SVE-01 Code Generation Part 1; awaiting plan approval (no code written yet)
+
+---
+
+## U-SVE-01 Code Generation Plan Approved & Part 2 Executed (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:42:25Z
+**User Input**: "approve"
+**AI Response**: Code-generation plan approved. Grounded conventions first (verified `Dayswork.Core`/`Dayswork`/`Dayswork.Tests` csprojs: net6.0, Nullable enable, ImplicitUsings, TreatWarningsAsErrors=true; record style; FsCheck.Xunit 2.16.5 `[Property(Arbitrary=...)]` pattern from existing U-WR tests; real ModEntry composition root + existing GameLaunched handler). Executed the 14-step plan: created 8 pure Core types under `Dayswork.Core/Compat/` (WorkClassification, ContentDescriptor, AnimalBuildingCapacityInputs, IExpansionProfile, VanillaExpansionProfile [Null-Object], SveExpansionProfile [SVE ids centralized; empty override tables], ExpansionProfileSelector [deterministic, Vanilla fallback], AnimalBuildingCapacityPolicy [total clamp]); 2 Mod adapters under `Dayswork/Compat/` (ExpansionDetector [guarded IModRegistry scan, logs once], ExpansionCompatService [runtime seam]); 4 test files under `Dayswork.Tests/Compat/` (generator + selector + capacity + no-op, xUnit + FsCheck); and modified `Dayswork/ModEntry.cs` to construct the seam and resolve the active profile in the existing GameLaunched handler, exposing `internal static ExpansionCompat`. Consumers were intentionally NOT rewired (U-SVE-01 scope), so there is no behavior change. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` → 0 warnings / 0 errors; `dotnet test Dayswork.sln /p:EnableModDeploy=false` → 336 passed / 1 expected skip / 0 failed (was 320). Wrote code-summary.md, ticked the plan checklist, updated aidlc-state.md. Presenting via 2-option construction completion; next is U-SVE-02 (Functional Design).
+**Context**: CONSTRUCTION — U-SVE-01 Code Generation complete; awaiting code review
+
+---
+
+## U-SVE-01 Code Generation Approved — U-SVE-02 Functional Design Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:45:55Z
+**User Input**: "continue"
+**AI Response**: U-SVE-01 code generation approved (foundation seam shipped; build 0/0, tests 336/1-skip/0). Updated aidlc-state.md. Began U-SVE-02 (SVE Farm Maps + Worker Entrance) Functional Design. Grounded in source: `ShiftOrchestrator.FindFarmExitTile` is a private static warp-scan with (77,15) fallback, reachable via ModEntry static (so it can consult `ModEntry.ExpansionCompat`); IF2R's Content Patcher pack edits `Maps/Farm` (location stays named "Farm") — confirmed SVE farms cannot be distinguished by location name, so identity must derive from the installed farm-map mod id or a map signature. `IExpansionProfile.TryGetEntranceOverride(farmIdentity,...)` is already generic so no interface change is forced. Created `construction/plans/u-sve-02-farm-maps-entrance-functional-design-plan.md` with 3 questions: (Q1) farm-map identity mechanism (installed mod id vs map signature); (Q2) entrance resolution rule (override-first-then-heuristic vs always-explicit); (Q3) override-value sourcing/verification from SVE map source + playtest. GATE: awaiting FD answers.
+**Context**: CONSTRUCTION — U-SVE-02 Functional Design (planning); awaiting answers
+
+---
+
+## U-SVE-02 Functional Design — Answered & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:50:54Z
+**User Input**: "done" (FD answers: Q1=B [+note: farm-map packs can load simultaneously], Q2=A, Q3=A)
+**AI Response**: Q1 answer changed the design from my recommendation (mod-id identity) to **map-signature identity** — the user correctly noted multiple farm-map packs can be installed at once, so identity must reflect the map Content Patcher actually applied to `Maps/Farm`, not what is installed. No ambiguity; this is a clear, well-reasoned correction. Grounded the signature approach in source: confirmed IF2R map is 163×156 and Frontier 156×65 (vanilla 80×65) — distinct dimensions, so a `(width,height)` signature with an optional unique map-property tiebreaker is viable; Grandpa's Farm dimensions/tiebreaker verified at code-gen. Generated `construction/u-sve-02-farm-maps-entrance/functional-design/` business-logic-model.md (signature identity flow, override-first-else-heuristic resolution, spawn/exit integration, graceful behavior), business-rules.md (BR-SVE2-01..10: live-map-signature identity, robust to multiple packs, override precedence, no-assumed-coords, vanilla-unaffected, unreachable-skip + PBT table), and domain-entities.md (`FarmMapSignature` pure value; signature→tile override table in SveExpansionProfile; `IExpansionProfile.TryGetEntranceOverride` refined to key on `FarmMapSignature`; no persistence change). Ticked the FD plan checklist; updated aidlc-state.md. Presenting via 2-option construction completion; next stage NFR Requirements.
+**Context**: CONSTRUCTION — U-SVE-02 Functional Design complete; awaiting approval
+
+---
+
+## U-SVE-02 Functional Design Approved — NFR Requirements Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T22:05:54Z
+**User Input**: "continue"
+**AI Response**: U-SVE-02 Functional Design approved (map-signature identity, override-first resolution). Updated aidlc-state.md. Began NFR Requirements; created `construction/plans/u-sve-02-farm-maps-entrance-nfr-requirements-plan.md` with 2 confirmations: (Q1) signature computed on demand at spawn/exit only, not per-frame (NFR-SVE-06); (Q2) fall back to the warp heuristic if signature extraction fails, never throw (NFR-SVE-04). GATE: awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-02 NFR Requirements (planning); awaiting answers
+
+---
+
+## U-SVE-02 NFR Requirements — Answered & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T22:07:30Z
+**User Input**: "done" (Q1=A, Q2=A)
+**AI Response**: No ambiguities. Generated `construction/u-sve-02-farm-maps-entrance/nfr-requirements/nfr-requirements.md` (NFRU2-01 on-demand signature/no per-frame cost; NFRU2-02 fallback-to-heuristic/never-throw; NFRU2-03 deterministic lookup; NFRU2-04 vanilla-unchanged; NFRU2-05 pure PBT + manual playtest for live extraction; NFRU2-06 grounded signatures/tiles) and tech-stack-decisions.md (reuse existing stack; signature extraction in the Mod adapter, table/lookup pure in Core; no new deps). Ticked the plan checklist; updated aidlc-state.md. Presenting via 2-option construction completion; next stage NFR Design.
+**Context**: CONSTRUCTION — U-SVE-02 NFR Requirements complete; awaiting approval
+
+---
+
+## U-SVE-02 NFR Req + NFR Design Accepted (Delegated) — Code Generation Plan Created (SVE Compatibility)
+**Timestamp**: 2026-05-29T22:19:44Z
+**User Input**: "continue with recommended until code planning"
+**AI Response**: Per the user's explicit delegation, accepted U-SVE-02 NFR Requirements at its recommended output and executed NFR Design with the recommended approach without separate per-stage approval gates, pausing again at the Code Generation plan. NFR Design: category evaluation concluded no question round needed; generated nfr-design-patterns.md (P-SVE2-01 live-map signature identity; P-SVE2-02 override-first + heuristic fallback; P-SVE2-03 pure table + thin live extraction; P-SVE2-04 guarded fallback) and logical-components.md (component mapping, data flow, failure modes; no new infra/persistence). Confirmed the integration point in source: `ShiftOrchestrator._farmExitTile = FindFarmExitTile(farm)` (once per shift) feeds both spawn and exit, so modifying the single static method covers both. Created the Part-1 code-generation plan `construction/plans/u-sve-02-farm-maps-entrance-code-generation-plan.md` (9 steps: FarmMapSignature; refine IExpansionProfile.TryGetEntranceOverride to key on it; SveExpansionProfile table; ExpansionCompatService signature extraction; FindFarmExitTile seam consult; source-verify signatures+entrances [playtest-pending]; update/add Compat tests; build/test; code summary). GATE: awaiting code-gen plan approval before writing code.
+**Context**: CONSTRUCTION — U-SVE-02 Code Generation Part 1; awaiting plan approval (no code written yet)
+
+---
+
+## U-SVE-02 Code Generation Plan Approved & Part 2 Executed (SVE Compatibility)
+**Timestamp**: 2026-05-29T22:26:20Z
+**User Input**: "approve"
+**AI Response**: Code-gen plan approved. Verified entrance data from SVE source first: confirmed IF2R 163×156 and Frontier 156×65 dimensions; found that BusStop→Farm warp targets are conditional/tangled (IF2R content.json `Farm 86 18` under FarmType=Standard + no Grandpa's; warp patches `Farm 79 17`), so per-farm entrance tiles could not be confidently attributed from source alone. Per Q3=A (encode only verified tiles; override only when heuristic is wrong) and the never-assume rule, shipped the full mechanism with an EMPTY entrance table (documented confirmed signatures + candidate warp targets for playtest). Created `Dayswork.Core/Compat/FarmMapSignature.cs` and `Dayswork.Tests/Compat/EntranceOverrideTests.cs`; modified `IExpansionProfile`/`VanillaExpansionProfile`/`SveExpansionProfile` (signature-keyed `TryGetEntranceOverride` + override dictionary), `ExpansionCompatService` (guarded live-map signature extraction), `ShiftOrchestrator.FindFarmExitTile` (consults seam first, else existing heuristic), and updated `ExpansionProfileNoOpTests`. Vanilla path unchanged (vanilla signature absent → heuristic). Verification: `dotnet build /p:EnableModDeploy=false` 0 warnings/0 errors; `dotnet test` 341 passed / 1 expected skip / 0 failed (was 336). Wrote code-summary.md (with the playtest-pending entrance step), ticked the plan checklist, updated aidlc-state.md. Presenting via 2-option construction completion; next is U-SVE-03.
+**Context**: CONSTRUCTION — U-SVE-02 Code Generation complete; awaiting code review (entrance tiles playtest-pending)
+
+---

@@ -163,6 +163,13 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     /// </summary>
     private static TileCoord FindFarmExitTile(Farm farm)
     {
+        // SVE/expansion entrance override (U-SVE-02): consult the compat seam first. If it supplies
+        // a verified per-map entrance for this farm's signature, use it; otherwise fall through to
+        // the existing warp heuristic (FR-SVE-06). The override is best-effort and never throws.
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryGetFarmEntranceOverride(farm, out var overrideTile))
+            return new TileCoord(overrideTile.X, overrideTile.Y);
+
         // Build the set of interior location names so we can skip building-entry warps.
         var interiorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var building in farm.buildings)

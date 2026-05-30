@@ -1,3 +1,5 @@
+using Dayswork.Compat;
+using Dayswork.Core.Compat;
 using Dayswork.Core.Config;
 using Dayswork.Core.Capabilities;
 using Dayswork.Core.Energy;
@@ -23,6 +25,8 @@ public sealed class ModEntry : Mod
     internal static IMonitor ModMonitor { get; private set; } = null!;
     internal static HiringFlowCoordinator Coordinator { get; private set; } = null!;
     internal static ShiftOrchestrator Orchestrator { get; private set; } = null!;
+    // Expansion-compatibility seam (U-SVE-01). Vanilla-by-default; active profile resolved at GameLaunched.
+    internal static ExpansionCompatService ExpansionCompat { get; private set; } = null!;
 
     public override void Entry(IModHelper helper)
     {
@@ -85,12 +89,24 @@ public sealed class ModEntry : Mod
             store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, mailDispatcher);
         var gmcmRegistrar = new GMCMRegistrar(helper, this.ModManifest, configManager);
 
+        // ── Expansion compatibility (U-SVE-01) ───────────────────────────────
+        // Vanilla-by-default seam; the active profile is resolved at GameLaunched (after all mods
+        // load) and assigned below. Consumers are wired in U-SVE-02..04 — this unit only detects,
+        // so behavior is unchanged for vanilla and (with empty SVE tables) for SVE too.
+        var vanillaProfile    = new VanillaExpansionProfile();
+        var sveProfile        = new SveExpansionProfile();
+        var expansionSelector = new ExpansionProfileSelector(new IExpansionProfile[] { sveProfile, vanillaProfile });
+        var expansionDetector = new ExpansionDetector(helper.ModRegistry, expansionSelector, vanillaProfile, this.Monitor);
+        var expansionCompat   = new ExpansionCompatService(vanillaProfile, new AnimalBuildingCapacityPolicy());
+        ExpansionCompat = expansionCompat;
+
         // ── Event registrations ──────────────────────────────────────────────
         // Fetch the MFM API after all mods are initialised (never in Entry()).
         helper.Events.GameLoop.GameLaunched += (_, _) =>
         {
             mailDispatcher.SetApi(helper.ModRegistry.GetApi("DIGUS.MailFrameworkMod"));
             gmcmRegistrar.RegisterIfAvailable();
+            expansionCompat.SetActiveProfile(expansionDetector.ResolveActiveProfile());
         };
         helper.Events.GameLoop.ReturnedToTitle += sessionResetHandler.OnReturnedToTitle;
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
