@@ -65,7 +65,12 @@ internal sealed class AnimalTaskHandler
         if (IsAutoFeedBuilding(parent?.buildingType.Value, animalHouseLocation))
             return EmptyFeedWork();
 
-        var capacity = FeedCapacity(parent?.buildingType.Value);
+        // Data-driven capacity (trough count clamped to the building's real max occupants) via the
+        // expansion compat seam; falls back to the legacy tier ladder when the seam is unavailable
+        // (e.g., unit tests / compat not yet resolved). Fixes premium-building under/over-feeding
+        // without changing vanilla capacities (parity covered by tests). (U-SVE-03 / BR-SVE3-02)
+        var capacity = ModEntry.ExpansionCompat?.ResolveAnimalFeedCapacity(animalHouse)
+                       ?? FeedCapacity(parent?.buildingType.Value);
         var filled = Math.Clamp(CountPlacedHay(animalHouse), 0, capacity);
         var emptySlots = Math.Max(0, capacity - filled);
         if (emptySlots == 0)

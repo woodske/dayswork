@@ -82,7 +82,32 @@ internal sealed class ExpansionCompatService
     public int ResolveAnimalFeedCapacity(AnimalHouse house)
     {
         var troughs = CountTroughTiles(house);
-        return _capacityPolicy.DeriveCapacity(new AnimalBuildingCapacityInputs(troughs, troughs));
+
+        // Bound by the building's real max occupants (= 16 for SVE premium). When the parent building
+        // or its occupant cap is unavailable, fall back to the trough count so capacity is unchanged
+        // from the U-SVE-01 behavior and never over-fills.
+        var maxOccupants = house.ParentBuilding?.maxOccupants.Value ?? 0;
+        if (maxOccupants <= 0)
+            maxOccupants = troughs;
+
+        return _capacityPolicy.DeriveCapacity(new AnimalBuildingCapacityInputs(troughs, maxOccupants));
+    }
+
+    /// <summary>
+    /// Premium animal-building tier mapping keyed on the raw building type string (as carried by the
+    /// hiring enumeration on <c>BuildingOutline</c>). Returns false when the active profile has no
+    /// mapping — i.e., vanilla buildings, which then keep the existing vanilla tier inference.
+    /// </summary>
+    public bool TryResolvePremiumBuildingTier(string buildingType, out AnimalBuildingTier tier)
+    {
+        if (_activeProfile.MapPremiumBuildingTier(buildingType) is { } mapped)
+        {
+            tier = mapped;
+            return true;
+        }
+
+        tier = default;
+        return false;
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using Dayswork.Core.Domain;
+using StardewModdingAPI;
 
 namespace Dayswork.UI;
 
@@ -96,13 +97,45 @@ internal static class LegacyScopeBootstrapper
             if (TryClassify(outline, out var animalBuilding, out var greenhouse))
             {
                 anySupported = true;
-                if (animalBuilding is not null && !draft.AnimalBuildings.Contains(animalBuilding))
-                    draft.AnimalBuildings.Add(animalBuilding);
+                if (animalBuilding is not null)
+                {
+                    // Diagnostic (Bug: selecting normal + premium coop/barn only saves the normal
+                    // ones). Captures the interior LocationName, the raw buildingType (DisplayName),
+                    // and the resolved tier so we can see whether two buildings collapse because
+                    // their interior Name is not unique (Contains uses LocationName + Tier equality).
+                    var duplicate = draft.AnimalBuildings.Contains(animalBuilding);
+                    ModEntry.ModMonitor.Log(
+                        $"[Dayswork][building-select] selected animal building: location='{outline.LocationName}' " +
+                        $"type='{outline.DisplayName}' tier={animalBuilding.Tier} " +
+                        $"{(duplicate ? "DROPPED (duplicate LocationName+Tier already in draft)" : "added")}.",
+                        LogLevel.Info);
+
+                    if (!duplicate)
+                        draft.AnimalBuildings.Add(animalBuilding);
+                }
+                else if (greenhouse is not null)
+                {
+                    ModEntry.ModMonitor.Log(
+                        $"[Dayswork][building-select] selected greenhouse: location='{outline.LocationName}' type='{outline.DisplayName}'.",
+                        LogLevel.Info);
+                }
 
                 if (greenhouse is not null)
                     draft.Greenhouse = greenhouse;
             }
+            else
+            {
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork][building-select] selected building NOT classified as work scope: " +
+                    $"location='{outline.LocationName}' type='{outline.DisplayName}'.",
+                    LogLevel.Info);
+            }
         }
+
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][building-select] draft now has {draft.AnimalBuildings.Count} animal building(s): " +
+            $"[{string.Join("; ", draft.AnimalBuildings.Select(b => $"{b.LocationName}:{b.Tier}"))}].",
+            LogLevel.Info);
 
         return anySupported;
     }
@@ -121,6 +154,17 @@ internal static class LegacyScopeBootstrapper
         if (IsGreenhouseLocation(outline.LocationName) || IsGreenhouseLocation(outline.DisplayName))
         {
             greenhouse = new GreenhouseSelection(outline.LocationName);
+            return true;
+        }
+
+        // Expansion premium buildings (e.g., SVE Premium Coop/Barn) map to their nearest vanilla
+        // tier before the vanilla name-substring inference, which would otherwise misclassify them as
+        // the cheapest Coop/Barn tier. DisplayName carries the raw building type. Vanilla buildings
+        // get no mapping and fall through unchanged. (U-SVE-03 / BR-SVE3-06)
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryResolvePremiumBuildingTier(outline.DisplayName, out var premiumTier))
+        {
+            animalBuilding = new AnimalBuildingSelection(outline.LocationName, premiumTier);
             return true;
         }
 

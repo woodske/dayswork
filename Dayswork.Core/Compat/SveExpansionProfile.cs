@@ -25,6 +25,12 @@ public sealed class SveExpansionProfile : IExpansionProfile
     /// <summary>Frontier Farm farm-map pack.</summary>
     public const string FrontierFarmModId = "flashshifter.FrontierFarm";
 
+    /// <summary>SVE Premium Coop building type (16 occupants; upgrade above Deluxe Coop).</summary>
+    public const string PremiumCoopBuildingType = "FlashShifter.StardewValleyExpandedCP_PremiumCoop";
+
+    /// <summary>SVE Premium Barn building type (16 occupants; upgrade above Deluxe Barn).</summary>
+    public const string PremiumBarnBuildingType = "FlashShifter.StardewValleyExpandedCP_PremiumBarn";
+
     public string Id => "sve";
 
     public IReadOnlySet<string> FarmMapModIds { get; } = new HashSet<string>
@@ -69,5 +75,14 @@ public sealed class SveExpansionProfile : IExpansionProfile
 
     public bool IsExpansionWorkLocation(string locationName) => false;
 
-    public AnimalBuildingTier? MapPremiumBuildingTier(string buildingType) => null;
+    // SVE Premium Coop/Barn are upgrades above Deluxe (MaxOccupants 16). They have no dedicated
+    // Dayswork tier; per App Design Q4=A they map to the nearest vanilla tier (Deluxe) for
+    // scope/pricing, with no enum or save-schema change. Every other building type → null
+    // (pass-through to the vanilla tier inference). All SVE ids stay in this profile (NFR-SVE-07).
+    public AnimalBuildingTier? MapPremiumBuildingTier(string buildingType) => buildingType switch
+    {
+        PremiumCoopBuildingType => AnimalBuildingTier.DeluxeCoop,
+        PremiumBarnBuildingType => AnimalBuildingTier.DeluxeBarn,
+        _ => null,
+    };
 }

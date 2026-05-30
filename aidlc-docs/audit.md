@@ -4864,3 +4864,91 @@ Never make assumptions, always reference the SVE source code and/or the vanilla 
 **Context**: CONSTRUCTION — U-SVE-02 complete & approved; next unit U-SVE-03 Functional Design
 
 ---
+
+## U-SVE-03 Functional Design — Planning (start)
+**Timestamp**: 2026-05-30T00:45:00Z
+**User Input**: [AskUserQuestion] "What next now that U-SVE-02 is approved?" → "Start U-SVE-03"
+**AI Response**: Began U-SVE-03 (SVE Animal Buildings) Functional Design. Analyzed unit context (unit-of-work U-SVE-03; story S-23) and grounded the design in SVE source before drafting questions. Key source findings: (1) SVE Premium Coop/Barn building types are `FlashShifter.StardewValleyExpandedCP_PremiumCoop`/`_PremiumBarn`, both MaxOccupants 16, BuildCondition requires the matching Deluxe building first (so premium is an upgrade above Deluxe); (2) BOTH premium building maps (`PremiumCoop.tmx`/`PremiumBarn.tmx`) set the `AutoFeed = T` map property — i.e., they auto-feed like vanilla Deluxe, so the existing `IsAutoFeedBuilding` map-property check already makes the worker skip feeding them. This contradicts the pre-source "16-animal underfeed" premise. (3) The hiring enumeration (`ChestResolver.GetBuildingOutlines` → `LegacyScopeBootstrapper.TryInferAnimalBuildingSelection`) passes `building.buildingType.Value` as the outline DisplayName; "…_PremiumCoop"/"…_PremiumBarn" contain "Coop"/"Barn" but not Deluxe markers, so premium buildings currently classify to the cheapest Coop/Barn tier (underpriced). Wrote functional-design-plan.md with 4 source-grounded questions (premium feed behavior; tier-mapping target; tier-override seam; capacity-policy MaxOccupants source). Awaiting user answers.
+**Context**: CONSTRUCTION — U-SVE-03 Functional Design (Part 1 planning); questions pending
+
+---
+
+## U-SVE-03 Functional Design — Answers + Generation
+**Timestamp**: 2026-05-30T01:00:00Z
+**User Input**: "continue"
+**AI Response**: Accepted the recommended functional-design answers Q1=A, Q2=A, Q3=A, Q4=A (no ambiguities to resolve). Q1=A keeps SVE premium (AutoFeed=T) buildings skipped for manual feeding like vanilla Deluxe while replacing the hardcoded FeedCapacity ladder with the data-driven trough-count policy. Q2=A maps PremiumCoop→DeluxeCoop / PremiumBarn→DeluxeBarn (nearest vanilla tier; no enum/save change). Q3=A injects the override via the existing ResolveAnimalBuildingTier seam (keyed on buildingType carried by BuildingOutline) ahead of the vanilla substring inference. Q4=A sets capacity = min(troughTiles, building MaxOccupants). Generated functional-design artifacts (business-logic-model.md, business-rules.md with BR-SVE3-01..09 + PBT table, domain-entities.md) under construction/u-sve-03-animal-buildings/functional-design/. Auto-petter/auto-grabber remain no-special-case (scan & natural skip). Presenting 2-option completion; next stage is NFR Requirements.
+**Context**: CONSTRUCTION — U-SVE-03 Functional Design artifacts generated; awaiting approval
+
+---
+
+## U-SVE-03 Functional Design — Approval; NFR Requirements start
+**Timestamp**: 2026-05-30T01:15:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-03 Functional Design APPROVED. Advanced to NFR Requirements. The unit's NFR surface is narrow and mirrors U-SVE-01/02 (fail-safe to vanilla, cheap on-demand lookups, reuse existing stack). The one genuine new performance consideration is `CountTroughTiles` scanning the interior map (O(W×H)) when deriving capacity — but auto-feed buildings (incl. all SVE premium) short-circuit before that scan, and non-auto-feed buildings scan a small interior only a handful of times per shift. Wrote nfr-requirements-plan.md with 3 source-grounded questions (capacity-scan performance/caching; fail-safe-to-vanilla resolution; tech-stack/deps). Awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-03 NFR Requirements (Part 1 planning); questions pending
+
+---
+
+## U-SVE-03 NFR Requirements — Answers + Generation
+**Timestamp**: 2026-05-30T01:30:00Z
+**User Input**: "continue"
+**AI Response**: Accepted NFR requirements answers Q1=A (on-demand trough scan, no caching), Q2=A (fail-safe to vanilla, never throw), Q3=A (reuse existing stack, no new deps); no ambiguity. Generated nfr-requirements.md (NFRU3-01..08 → NFR-SVE-*) and tech-stack-decisions.md under construction/u-sve-03-animal-buildings/nfr-requirements/. Presenting 2-option completion; next stage NFR Design.
+**Context**: CONSTRUCTION — U-SVE-03 NFR Requirements generated; awaiting approval
+
+---
+
+## U-SVE-03 NFR Requirements — Approval; NFR Design
+**Timestamp**: 2026-05-30T01:45:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-03 NFR Requirements APPROVED. Advanced to NFR Design. Category evaluation (resilience/scalability/performance/security/logical-components) concluded no additional question round is needed — the approved NFR requirements + Application Design already fix the pattern set (mirrors U-SVE-01/02). Generated nfr-design-patterns.md (P-SVE3-01..05) and logical-components.md under construction/u-sve-03-animal-buildings/nfr-design/. Presenting 2-option completion; next stage Code Generation.
+**Context**: CONSTRUCTION — U-SVE-03 NFR Design generated; awaiting approval
+
+---
+
+## U-SVE-03 NFR Design — Approval; Code Generation planning
+**Timestamp**: 2026-05-30T02:00:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-03 NFR Design APPROVED. Advanced to Code Generation Part 1 (planning). Grounded two API details: premium tier mapping keys on the full `FlashShifter.StardewValleyExpandedCP_PremiumCoop/_PremiumBarn` strings (existing `Premium_tier_mapping_is_null("Barn")` no-op test stays valid since "Barn" is not a premium id); MaxOccupants will be read from the parent building (`AnimalHouse.ParentBuilding.maxOccupants`, =16 for SVE premium — exact member confirmed at code-gen). Wrote the code-generation plan (8 steps) and presented for approval before any code change.
+**Context**: CONSTRUCTION — U-SVE-03 Code Generation plan presented; awaiting plan approval
+
+---
+
+## U-SVE-03 Code Generation — Plan approved + Part 2 generated
+**Timestamp**: 2026-05-30T02:20:00Z
+**User Input**: "approve"
+**AI Response**: U-SVE-03 code-generation plan approved; executed Part 2 (8 steps). SveExpansionProfile: added PremiumCoop/PremiumBarn building-type constants and MapPremiumBuildingTier → DeluxeCoop/DeluxeBarn (else null). ExpansionCompatService: ResolveAnimalFeedCapacity now bounds by ParentBuilding.maxOccupants (fallback to trough count); added TryResolvePremiumBuildingTier(string,out). AnimalTaskHandler.CreateFeedWork consumes ResolveAnimalFeedCapacity (legacy ladder fallback); auto-feed gate + pet/collect unchanged. LegacyScopeBootstrapper.TryClassify consults premium mapping before vanilla substring inference. Added Dayswork.Tests/Compat/PremiumBuildingTierTests (xUnit + FsCheck). Verification: build 0/0; tests 355 passed / 1 expected skip / 0 failed (was 343). code-summary.md written; plan checkboxes ticked. Vanilla path unchanged. Presenting 2-option completion; next is U-SVE-04 (final SVE unit) on approval. Deploy deferred (game running).
+**Context**: CONSTRUCTION — U-SVE-03 Code Generation complete; awaiting review
+
+---
+
+## U-SVE-03 Playtest — 3 bugs reported
+**Timestamp**: 2026-05-30T02:45:00Z
+**User Input**: "A few bugs found: (1) worker does not pick up goose eggs, rabbit wool, or camel wool from the ground; (2) worker gets stuck in a continuous loop after completing tasks (repeated '[outdoor-animals] pre-completion rescan picked up 1 new tile item(s); batch continues' log); (3) with a normal coop+barn plus a premium coop+barn, selecting all four saves only the normal coop and barn to the contract (unsure if SVE or vanilla bug)."
+**AI Response**: Diagnosed all three. Bug 2 (loop): TryRescanOutdoorAnimalProductsBeforeBatchComplete re-detects a forage tile every completion cycle once ClearRemainingActiveBatchWork drops it from the queues (happens when a detected forage item is unreachable or not removable) → infinite loop. FIXED with a per-batch guard (_rescanBatchIndex/_rescanEnqueuedTiles): each tile is enqueued at most once per batch; genuinely new forage at fresh tiles still flows. Build 0/0; tests 355 pass. Bug 1 (root cause): WorkAreaScanner.AnimalProductObjectIds is a hardcoded ID whitelist missing vanilla Wool(440) and SVE custom products (Goose Egg/Camel Wool); InvokeCollectAnimalProduct gates on the same predicate so unrecognized products are never removed. This is content-classification = U-SVE-04's purpose (data-driven new content + verified gaps). Bug 3: selection (TryApplySelectedBuildings→TryClassify, incl. premium mapping) and save round-trip (LocationName+Tier) are correct in code; most likely culprit is BuildingOutline.LocationName (=indoors.Name) not being unique across same-type interiors, so Distinct()/the home HashSet collapses normal+premium — possibly a pre-existing vanilla multi-building bug. Needs repro detail (does premium price as Deluxe in the running build? building LocationNames). Presenting diagnosis + scope decision.
+**Context**: CONSTRUCTION — U-SVE-03 playtest fixes; Bug 2 fixed, Bugs 1 & 3 pending scope decision
+
+---
+
+## U-SVE-03 Playtest bugs — scope decision + fixes
+**Timestamp**: 2026-05-30T03:00:00Z
+**User Input**: [AskUserQuestion] Bug 1 scope = "Defer to U-SVE-04"; Bug 3 approach = "Add diagnostic logging"
+**AI Response**: Bug 2 loop guard already applied. Bug 1 deferred to U-SVE-04 (TODO-07 added: hardcoded AnimalProductObjectIds whitelist misses Wool 440 + SVE Goose Egg/Camel Wool; fix data-driven with source-verified IDs via the content-classification seam). Bug 3: added `[Dayswork][building-select]` diagnostic logging in LegacyScopeBootstrapper.TryApplySelectedBuildings (per-building location/type/resolved tier, explicit DROPPED-duplicate marker, final draft list) to confirm whether same-type interior names collide under Distinct(). Verification: build 0/0; tests 355 passed / 1 skip / 0 failed. Updated U-SVE-03 code-summary with the playtest-fixes section. Awaiting next playtest (with the building-select log) + deploy once the game is closed.
+**Context**: CONSTRUCTION — U-SVE-03 playtest: Bug 2 fixed, Bug 1 deferred (TODO-07), Bug 3 instrumented
+
+---
+
+## U-SVE-03 Playtest — Bug 3 root cause found + fixed
+**Timestamp**: 2026-05-30T03:30:00Z
+**User Input**: "Now the worker will do the premium barn and coop, but not the base barn and coop. Maybe it has something to do with not being able to do multiple barn/coops?" + building-select logs (draft held all 4: Coop:Coop, Barn:Barn, PremiumCoop:DeluxeCoop, PremiumBarn:DeluxeBarn) + shift-plan log (runtime batches = PremiumBarn x2, PremiumCoop x2; base Coop/Barn absent).
+**AI Response**: Diagnostic confirmed selection/draft were correct; the bug was in runtime building resolution. Root cause: BuildingLocationResolver.Matches fell back to LooseBuildingTypeMatch (requestedName.Contains(buildingType) || buildingType.Contains(requestedName)), so "…PremiumCoop".Contains("Coop") made the base-Coop selection loose-match the premium building; TryResolve returns the first match (premium enumerates first), collapsing base+premium onto the premium building (premium serviced twice, base never). Latent vanilla bug too ("Coop" ⊂ "Big Coop"/"Deluxe Coop"). Fix: TryResolve now runs an exact-name pass across all buildings first (interior.Name / indoors name / buildingType), loose only as fallback. Extracted pure SelectBuildingIndex + MatchesExactly; added Dayswork.Tests/Integration/BuildingLocationResolverTests (SVE base+premium scenario, vanilla tier precedence, loose fallback, no-match). Documented known follow-up: two identical-type buildings still collapse on a shared selection LocationName (needs unique interior keying). Verification: build 0/0; tests 364 passed / 1 skip / 0 failed (was 355). Kept the [Dayswork][building-select] diagnostic logging.
+**Context**: CONSTRUCTION — U-SVE-03 playtest: Bug 3 fixed (exact-first building resolution)
+
+---
+
+## U-SVE-03 — Approved; follow-up folded into U-SVE-04
+**Timestamp**: 2026-05-30T03:45:00Z
+**User Input**: "fold it into the next one. changes are tested and approved"
+**AI Response**: U-SVE-03 Code Generation (incl. the three playtest fixes: Bug 2 loop guard, Bug 3 exact-first building resolution, Bug 1 deferred) APPROVED and marked COMPLETE. Folded the identical-type-buildings follow-up into U-SVE-04 as TODO-08 (two same-type buildings share a selection LocationName and collapse under Distinct(); needs unique per-instance interior keying threaded through BuildingOutline → AnimalBuildingSelection → resolver/runtime). U-SVE-04 (final SVE unit) now carries: new content classification incl. animal-product pickup gap (TODO-07), Grandpa's Shed work location, and TODO-08. Verification at approval: build 0/0; tests 364 passed / 1 expected skip / 0 failed. Deploy to Mods still pending game exit. Next on user go-ahead: U-SVE-04 Functional Design.
+**Context**: CONSTRUCTION — U-SVE-03 COMPLETE/approved; U-SVE-04 is the final SVE unit
+
+---

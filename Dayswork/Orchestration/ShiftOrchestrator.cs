@@ -68,6 +68,14 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private readonly Queue<DepositTrip> _depositTrips = new();
     private DepositTrip? _currentTrip;
 
+    // Guards the OutdoorAnimals pre-completion rescan against re-enqueuing the same tile forever.
+    // A forage tile the worker cannot reach (or cannot remove) would otherwise be re-detected on
+    // every completion cycle once ClearRemainingActiveBatchWork drops it from the work queues,
+    // producing an infinite "rescan picked up 1 new tile item" loop. We enqueue each tile at most
+    // once per batch; the set resets when the active batch index changes.
+    private int _rescanBatchIndex = -1;
+    private readonly HashSet<TileCoord> _rescanEnqueuedTiles = new();
+
     // Per-stack paced execution within the in-flight trip. Each stack is one beat gated by
     // _toolAnimator.IsSwinging (duration == WorkerActionAnimationMs), so the deposit cadence
     // tracks the same config knob as task actions.
@@ -895,6 +903,13 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var batchTasks = batch.Tasks.ToHashSet();
         if (!batchTasks.Contains(TaskKind.CollectAnimalProducts)) return false;
 
+        // Reset the per-batch re-enqueue guard whenever we start rescanning a different batch.
+        if (_ctx.CurrentBatchIndex != _rescanBatchIndex)
+        {
+            _rescanBatchIndex = _ctx.CurrentBatchIndex;
+            _rescanEnqueuedTiles.Clear();
+        }
+
         var farm = _currentLocation ?? Game1.getFarm();
         var freshTileWork = _workAreaScanner.ScanWholeLocation(
             farm,
@@ -918,9 +933,14 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var added = 0;
         foreach (var item in freshTileWork)
         {
-            if (seen.Add((item.Task, item.TaskTile)))
+            // Skip tiles this batch's rescan already enqueued once — they were either unreachable or
+            // not actually removable, so re-adding them would loop forever (Bug: continuous
+            // "rescan picked up 1 new tile item"). Genuinely new forage at fresh tiles still flows.
+            if (!_rescanEnqueuedTiles.Contains(item.TaskTile) &&
+                seen.Add((item.Task, item.TaskTile)))
             {
                 _ctx.WorkList.Enqueue(item);
+                _rescanEnqueuedTiles.Add(item.TaskTile);
                 added++;
             }
         }
