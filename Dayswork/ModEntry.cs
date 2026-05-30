@@ -6,6 +6,7 @@ using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
+using Dayswork.Diagnostics;
 using Dayswork.Integration;
 using Dayswork.Orchestration;
 using Dayswork.UI;
@@ -64,6 +65,7 @@ public sealed class ModEntry : Mod
         var animalHandler   = new AnimalTaskHandler(this.Monitor);
         var buildingNavigator = new BuildingWorkNavigator(this.Monitor, movementDriver);
         var depositPlanner  = new DepositPlanner();
+        var playerTileStepLogger = new PlayerTileStepLogger(this.Monitor);
         // MFM is a required dependency (manifest). Mod-provided APIs must be fetched after all mods
         // initialize (GameLaunched), NOT in Entry() — so construct the dispatcher now and inject the
         // API on GameLaunched below. If it's ever null, MailDispatcher logs and falls back so no
@@ -109,15 +111,18 @@ public sealed class ModEntry : Mod
             expansionCompat.SetActiveProfile(expansionDetector.ResolveActiveProfile());
         };
         helper.Events.GameLoop.ReturnedToTitle += sessionResetHandler.OnReturnedToTitle;
+        helper.Events.GameLoop.ReturnedToTitle += (_, _) => playerTileStepLogger.Reset();
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += mailDispatcher.OnSaveLoaded;
+        helper.Events.GameLoop.SaveLoaded   += (_, _) => playerTileStepLogger.Reset();
         // Stop and settle any in-flight shift (sleep-stop + mailed overflow items) BEFORE contracts
         // persist and before the day rolls over — handler order is authoritative (Pattern S /
         // REL-U15-02). U-21 BR-END-03 / BR-SLEEP-02 removed refund settlement from this path.
         helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;
         helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
+        helper.Events.GameLoop.UpdateTicked += playerTileStepLogger.OnUpdateTicked;
         helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;
         helper.Events.GameLoop.TimeChanged  += orchestrator.OnTimeChanged;
         helper.Events.Content.AssetRequested += OnAssetRequested;
@@ -126,7 +131,7 @@ public sealed class ModEntry : Mod
         new Harmony(this.ModManifest.UniqueID).PatchAll();
 
         // TODO: REMOVE before release — debug command for verifying save/load persistence (task #1 play-test)
-        RegisterDebugCommands(helper, store);
+        RegisterDebugCommands(helper, store, playerTileStepLogger);
 
         this.Monitor.Log($"Dayswork loaded ({this.ModManifest.Version}) build=U24-Step19", LogLevel.Info);
     }
@@ -142,7 +147,7 @@ public sealed class ModEntry : Mod
     }
 
     // TODO: REMOVE before release — see RegisterDebugCommands call above
-    private void RegisterDebugCommands(IModHelper helper, ContractStore store)
+    private void RegisterDebugCommands(IModHelper helper, ContractStore store, PlayerTileStepLogger playerTileStepLogger)
     {
         helper.ConsoleCommands.Add(
             "dayswork_list",
@@ -177,6 +182,40 @@ public sealed class ModEntry : Mod
             {
                 var requested = args.Length > 0 ? string.Join(" ", args) : "Greenhouse";
                 this.Monitor.Log(BuildingLocationResolver.DescribeResolutionState(Game1.getFarm(), requested), LogLevel.Info);
+            });
+
+        helper.ConsoleCommands.Add(
+            "dayswork_debug_player_tile",
+            "Toggles player tile step logging to SMAPI debug logs. Usage: dayswork_debug_player_tile [on|off|toggle|status]",
+            (_, args) =>
+            {
+                var mode = args.Length > 0 ? args[0].Trim().ToLowerInvariant() : "toggle";
+                switch (mode)
+                {
+                    case "on":
+                        playerTileStepLogger.SetEnabled(true);
+                        break;
+
+                    case "off":
+                        playerTileStepLogger.SetEnabled(false);
+                        break;
+
+                    case "toggle":
+                        playerTileStepLogger.Toggle();
+                        break;
+
+                    case "status":
+                        this.Monitor.Log(
+                            $"[Dayswork][debug] Player tile step logger is currently {(playerTileStepLogger.IsEnabled ? "enabled" : "disabled")}.",
+                            LogLevel.Info);
+                        break;
+
+                    default:
+                        this.Monitor.Log(
+                            "[Dayswork][debug] Usage: dayswork_debug_player_tile [on|off|toggle|status]",
+                            LogLevel.Info);
+                        break;
+                }
             });
     }
 }

@@ -4848,3 +4848,19 @@ Never make assumptions, always reference the SVE source code and/or the vanilla 
 **Context**: CONSTRUCTION — U-SVE-02 Code Generation complete; awaiting code review (entrance tiles playtest-pending)
 
 ---
+
+## U-SVE-02 Playtest Fix — Grandpa's Farm entrance
+**Timestamp**: 2026-05-30T00:00:00Z
+**User Input**: "continue ai-dlc workflow. I am in the middle of playtesting u-sve-02. I added a small debugger tool to help figure out spawn points. I want the worker to spawn on Farm (112, 51) for grandpa's farm. If that is blocked, find a nearby tile that is not blocked."
+**AI Response**: Populated the previously-empty SVE entrance-override table with the first playtest-confirmed entry. Verified Grandpa's Farm map dimensions from SVE source `GrandpasFarm.tbin` (all 18 layers = 140×93; cross-validated the dimension-reading method against Frontier 156×65 and IF2R 163×156 from their TMX headers). Added `FarmMapSignature(140, 93) → TileCoord(112, 51)` to `SveExpansionProfile.EntranceOverrides`. Added a blocked-tile fallback: `ShiftOrchestrator.FindFarmExitTile` now routes entrance overrides through a new `ResolvePassableNearby(preferred, farm)` helper that returns the preferred tile when a worker can stand on it, else searches expanding Chebyshev rings (radius ≤ 12) for the nearest passable tile via `WorkerMovementDriver.IsTilePassableForWorker`, falling back to the preferred tile (with a warning) if none is found. Updated `EntranceOverrideTests` (split the empty-table test into a configured-Grandpa's-Farm assertion + an IF2R/Frontier fall-through assertion). Vanilla path unchanged. Verification: `dotnet build /p:EnableModDeploy=false` 0 warnings/0 errors; `dotnet test` 342 passed / 1 expected skip / 0 failed. Deploy-enabled build blocked by file lock (Stardew running mid-playtest) — pending game exit.
+**Context**: CONSTRUCTION — U-SVE-02 playtest fix (entrance tile now confirmed for Grandpa's Farm)
+
+---
+
+## U-SVE-02 Code Generation — Approval
+**Timestamp**: 2026-05-30T00:30:00Z
+**User Input**: "approve the u-sve-02 changes"
+**AI Response**: U-SVE-02 Code Generation APPROVED. The map-signature entrance mechanism plus the two playtest-confirmed entrance overrides (Grandpa's Farm 140×93 → (112,51); Frontier Farm 156×65 → (142,16); IF2R 163×156 verified to need none) and the blocked-tile fallback (`ResolvePassableNearby`) are accepted. Updated code-summary.md to reflect the confirmed overrides; verification green (build 0/0; tests 343 passed / 1 expected skip / 0 failed). Per-unit loop advances to U-SVE-03 (premium animal buildings; stories S-23). Deploy to the Mods folder remains pending game exit (DLL locked mid-playtest).
+**Context**: CONSTRUCTION — U-SVE-02 complete & approved; next unit U-SVE-03 Functional Design
+
+---

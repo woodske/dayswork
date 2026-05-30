@@ -168,7 +168,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         // the existing warp heuristic (FR-SVE-06). The override is best-effort and never throws.
         if (ModEntry.ExpansionCompat is { } compat &&
             compat.TryGetFarmEntranceOverride(farm, out var overrideTile))
-            return new TileCoord(overrideTile.X, overrideTile.Y);
+            return ResolvePassableNearby(new TileCoord(overrideTile.X, overrideTile.Y), farm);
 
         // Build the set of interior location names so we can skip building-entry warps.
         var interiorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -255,6 +255,53 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             "[Dayswork] No external farm exit warp found — using fallback tile (77, 15).",
             LogLevel.Warn);
         return new TileCoord(77, 15);
+    }
+
+    /// <summary>
+    /// Returns <paramref name="preferred"/> when a worker can stand on it; otherwise searches outward
+    /// in expanding rings for the nearest passable tile, clamped to the map. Used for expansion
+    /// entrance overrides, where the configured spawn tile is a preference that may be blocked at
+    /// spawn time (placed objects, seasonal debris). Falls back to the preferred tile if nothing
+    /// passable is found within the search radius (HandleExit logs if navigation then fails).
+    /// </summary>
+    private static TileCoord ResolvePassableNearby(TileCoord preferred, Farm farm)
+    {
+        var mapLayer = farm.Map.Layers[0];
+        int w = mapLayer.LayerWidth, h = mapLayer.LayerHeight;
+
+        bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < w && y < h;
+
+        if (InBounds(preferred.X, preferred.Y) &&
+            WorkerMovementDriver.IsTilePassableForWorker(new Point(preferred.X, preferred.Y), farm))
+            return preferred;
+
+        const int maxRadius = 12;
+        for (int r = 1; r <= maxRadius; r++)
+        {
+            for (int dx = -r; dx <= r; dx++)
+            for (int dy = -r; dy <= r; dy++)
+            {
+                // Only the tiles on the ring at Chebyshev distance r (inner rings already searched).
+                if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r)
+                    continue;
+
+                int x = preferred.X + dx, y = preferred.Y + dy;
+                if (!InBounds(x, y))
+                    continue;
+                if (!WorkerMovementDriver.IsTilePassableForWorker(new Point(x, y), farm))
+                    continue;
+
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork] Entrance override ({preferred.X},{preferred.Y}) blocked — using nearby passable tile ({x},{y}).",
+                    LogLevel.Debug);
+                return new TileCoord(x, y);
+            }
+        }
+
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork] Entrance override ({preferred.X},{preferred.Y}) blocked and no passable tile found within {maxRadius} tiles — using it anyway.",
+            LogLevel.Warn);
+        return preferred;
     }
 
     private ContractTermsSnapshot ResolveContractTerms(Contract contract, IConfigSnapshot runtimeConfig)

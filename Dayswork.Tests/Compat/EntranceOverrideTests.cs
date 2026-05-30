@@ -14,14 +14,27 @@ public sealed class EntranceOverrideTests
         Assert.False(p.TryGetEntranceOverride(new FarmMapSignature(156, 65), out _));  // Frontier
     }
 
-    [Fact]
-    public void Sve_entrance_table_is_empty_pending_playtest()
+    [Theory]
+    // Per-farm entrance overrides are added only after playtest confirms the warp heuristic lands
+    // the worker on the wrong tile. Each configured tile is a preference — the orchestrator searches
+    // outward for the nearest passable tile if it is blocked at spawn time.
+    [InlineData(140, 93, 112, 51)] // Grandpa's Farm
+    [InlineData(156, 65, 142, 16)] // Frontier Farm
+    public void Sve_entrance_override_is_configured(int width, int height, int expectedX, int expectedY)
     {
-        // U-SVE-02 ships the mechanism; per-farm entrance overrides are added only after playtest
-        // confirms the warp heuristic is wrong. Until then every lookup falls through (no override).
+        var p = new SveExpansionProfile();
+
+        Assert.True(p.TryGetEntranceOverride(new FarmMapSignature(width, height), out var tile));
+        Assert.Equal(expectedX, tile.X);
+        Assert.Equal(expectedY, tile.Y);
+    }
+
+    [Fact]
+    public void Sve_maps_without_a_confirmed_override_fall_through_to_the_heuristic()
+    {
+        // Maps whose warp heuristic already works correctly need no entry and fall through (no override).
         var p = new SveExpansionProfile();
         Assert.False(p.TryGetEntranceOverride(new FarmMapSignature(163, 156), out _)); // IF2R
-        Assert.False(p.TryGetEntranceOverride(new FarmMapSignature(156, 65), out _));  // Frontier
     }
 
     [Fact]

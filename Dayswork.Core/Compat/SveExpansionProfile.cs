@@ -39,18 +39,24 @@ public sealed class SveExpansionProfile : IExpansionProfile
 
     // ── Farm-map signatures (dimensions verified from SVE map source) ────────────
     // IF2R map is 163x156; Frontier Farm 156x65 (vanilla Standard Farm is 80x65).
-    // Grandpa's Farm dimensions are confirmed during its own playtest pass.
+    // Grandpa's Farm is 140x93 (verified from GrandpasFarm.tbin — all 18 layers).
 
     /// <summary>
     /// Verified per-map worker-entrance overrides, keyed by <see cref="FarmMapSignature"/>.
     /// An entry is added ONLY when manual SVE playtest confirms the existing <c>Farm.warps</c>
     /// heuristic lands the worker at the wrong tile; a farm whose heuristic already works needs no
-    /// entry and falls through to the heuristic (FR-SVE-06 / BR-SVE2-04). This table is currently
-    /// empty pending playtest. Source-observed BusStop→Farm warp candidates to verify in-game:
-    /// (79,17) and (86,18).
+    /// entry and falls through to the heuristic (FR-SVE-06 / BR-SVE2-04). The configured tile is a
+    /// preferred spawn point — if it is blocked at spawn time the caller searches outward for the
+    /// nearest passable tile (see <c>ShiftOrchestrator.FindFarmExitTile</c>).
+    /// Grandpa's Farm (140x93): worker spawns at (112,51), confirmed by playtest.
+    /// Frontier Farm (156x65): worker spawns at (142,16), confirmed by playtest.
     /// </summary>
     private static readonly IReadOnlyDictionary<FarmMapSignature, TileCoord> EntranceOverrides =
-        new Dictionary<FarmMapSignature, TileCoord>();
+        new Dictionary<FarmMapSignature, TileCoord>
+        {
+            [new FarmMapSignature(140, 93)] = new TileCoord(112, 51),
+            [new FarmMapSignature(156, 65)] = new TileCoord(142, 16),
+        };
 
     public bool TryGetEntranceOverride(FarmMapSignature signature, out TileCoord tile) =>
         EntranceOverrides.TryGetValue(signature, out tile);
