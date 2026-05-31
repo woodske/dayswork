@@ -80,7 +80,7 @@ internal static class BuildingLocationResolver
             return "Farm";
 
         return TryResolve(farm, requestedName, out var match)
-            ? match.Interior.Name
+            ? match.Interior.NameOrUniqueName
             : requestedName;
     }
 
@@ -118,7 +118,12 @@ internal static class BuildingLocationResolver
     {
         foreach (var building in farm.buildings)
         {
-            TryGetInteriorForBuilding(building, requestedName, out var interior);
+            // Resolve THIS building's OWN interior for matching — NOT via a name lookup of the
+            // requested name. The requestedName fallback in the other overload returns the *requested*
+            // building's interior regardless of which building we're iterating, so the first building
+            // would falsely match any unique-name request and lend its (wrong) door to every building
+            // (TODO-08 door regression: all buildings resolved to the first building's door).
+            TryGetInteriorForBuilding(building, out var interior);
             if (!matcher(requestedName, building, interior))
                 continue;
 
@@ -184,17 +189,19 @@ internal static class BuildingLocationResolver
         LooseBuildingTypeMatch(requestedName, building.buildingType.Value);
 
     private static bool ExactMatches(string requestedName, Building building, GameLocation? interior) =>
-        MatchesExactly(requestedName, interior?.Name, Safe(building.GetIndoorsName), building.buildingType.Value);
+        MatchesExactly(requestedName, interior?.Name, interior?.NameOrUniqueName, Safe(building.GetIndoorsName), building.buildingType.Value);
 
-    /// <summary>Pure exact-name test (interior name / indoors name / building type) used by both the
-    /// live resolver and <see cref="SelectBuildingIndex"/>.</summary>
-    internal static bool MatchesExactly(string requestedName, string? interiorName, string? indoorsName, string buildingType) =>
+    /// <summary>Pure exact-name test (interior name / interior unique name / indoors name / building
+    /// type) used by both the live resolver and <see cref="SelectBuildingIndex"/>. The unique name
+    /// (distinct per building instance) lets two same-type buildings be told apart (TODO-08).</summary>
+    internal static bool MatchesExactly(string requestedName, string? interiorName, string? interiorUniqueName, string? indoorsName, string buildingType) =>
         NameEquals(interiorName, requestedName) ||
+        NameEquals(interiorUniqueName, requestedName) ||
         NameEquals(indoorsName, requestedName) ||
         NameEquals(buildingType, requestedName);
 
     /// <summary>Identity of a building for pure resolution testing.</summary>
-    internal readonly record struct BuildingMatchInfo(string? InteriorName, string? IndoorsName, string BuildingType);
+    internal readonly record struct BuildingMatchInfo(string? InteriorName, string? InteriorUniqueName, string? IndoorsName, string BuildingType);
 
     /// <summary>
     /// Pure mirror of <see cref="TryResolve"/>'s building-selection precedence: returns the index of
@@ -208,7 +215,7 @@ internal static class BuildingLocationResolver
         for (var i = 0; i < candidates.Count; i++)
         {
             var c = candidates[i];
-            if (MatchesExactly(requestedName, c.InteriorName, c.IndoorsName, c.BuildingType))
+            if (MatchesExactly(requestedName, c.InteriorName, c.InteriorUniqueName, c.IndoorsName, c.BuildingType))
                 return i;
         }
 

@@ -176,18 +176,24 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         DrawButton(b, _workAreaBtn, enabled: true);
         DrawButton(b, _clearScopeBtn, enabled: HasSelectedScope());
 
-        DrawScopeSection(
+        const int leftMargin = 48;
+        const float sectionGap = 24f;
+        var sectionY = yPositionOnScreen + 190f;
+
+        sectionY += DrawScopeSection(
             b,
             I18nHelper.Get("ui.zone_chest.outdoor_section_label"),
             I18nHelper.Get("ui.zone_chest.outdoor_count_label", new { count = _draft.PreviewState.ScopeSummary.OutdoorZones.Count }),
-            new Vector2(xPositionOnScreen + 48, yPositionOnScreen + 190));
+            new Vector2(xPositionOnScreen + leftMargin, sectionY));
+        sectionY += sectionGap;
 
-        DrawScopeSection(
+        sectionY += DrawScopeSection(
             b,
             I18nHelper.Get("ui.zone_chest.animal_section_label"),
             FormatAnimalScopeSummary(),
-            new Vector2(xPositionOnScreen + 48, yPositionOnScreen + 280),
+            new Vector2(xPositionOnScreen + leftMargin, sectionY),
             I18nHelper.Get("ui.zone_chest.animal_scope_detail"));
+        sectionY += sectionGap;
 
         DrawScopeSection(
             b,
@@ -197,7 +203,7 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
                 : I18nHelper.Get(
                     "ui.zone_chest.greenhouse_selected",
                     new { location = _draft.PreviewState.ScopeSummary.Greenhouse.LocationName }),
-            new Vector2(xPositionOnScreen + 48, yPositionOnScreen + 400),
+            new Vector2(xPositionOnScreen + leftMargin, sectionY),
             I18nHelper.Get("ui.zone_chest.greenhouse_scope_detail"));
 
         DrawButton(b, _confirmBtn, enabled: true);
@@ -205,12 +211,28 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         drawMouse(b);
     }
 
-    private void DrawScopeSection(SpriteBatch b, string label, string value, Vector2 position, string? detail = null)
+    // Draws a scope section (label + wrapped value + optional wrapped detail) and returns the total
+    // height consumed, so the caller can lay the next section out below it. Wrapping keeps long
+    // animal-building lists inside the panel instead of running off the right edge.
+    private float DrawScopeSection(SpriteBatch b, string label, string value, Vector2 position, string? detail = null)
     {
+        var maxWidth = Math.Max(120, width - 96);
+
         Utility.drawTextWithShadow(b, label, Game1.smallFont, position, Game1.textColor);
-        Utility.drawTextWithShadow(b, value, Game1.smallFont, position + new Vector2(0, 22), SecondaryTextColor);
+        var y = position.Y + 30f;
+
+        var wrappedValue = Game1.parseText(value, Game1.smallFont, maxWidth);
+        Utility.drawTextWithShadow(b, wrappedValue, Game1.smallFont, new Vector2(position.X, y), SecondaryTextColor);
+        y += Game1.smallFont.MeasureString(wrappedValue).Y + 6f;
+
         if (!string.IsNullOrWhiteSpace(detail))
-            Utility.drawTextWithShadow(b, detail, Game1.smallFont, position + new Vector2(0, 44), SecondaryTextColor * 0.9f);
+        {
+            var wrappedDetail = Game1.parseText(detail, Game1.smallFont, maxWidth);
+            Utility.drawTextWithShadow(b, wrappedDetail, Game1.smallFont, new Vector2(position.X, y), SecondaryTextColor * 0.9f);
+            y += Game1.smallFont.MeasureString(wrappedDetail).Y;
+        }
+
+        return y - position.Y;
     }
 
     private bool HasSelectedScope() =>
@@ -226,8 +248,18 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         return string.Join(
             ", ",
             _draft.PreviewState.ScopeSummary.AnimalBuildings
-                .Select(building => building.LocationName)
+                .Select(building => FriendlyBuildingName(building.LocationName))
                 .OrderBy(name => name, StringComparer.Ordinal));
+    }
+
+    // Selection LocationNames are unique interior names (type + a trailing GUID, TODO-08). Strip the
+    // GUID for display so the player sees "Coop"/"Barn" rather than "Coop1bc97e5f-…".
+    private static string FriendlyBuildingName(string locationName)
+    {
+        if (locationName.Length > 36 && Guid.TryParse(locationName[^36..], out _))
+            return locationName[..^36];
+
+        return locationName;
     }
 
     private static void DrawButton(SpriteBatch b, ClickableComponent btn, bool enabled)

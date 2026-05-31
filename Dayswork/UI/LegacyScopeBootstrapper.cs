@@ -168,8 +168,15 @@ internal static class LegacyScopeBootstrapper
             return true;
         }
 
-        animalBuilding = TryInferAnimalBuildingSelection(outline.DisplayName)
-                         ?? TryInferAnimalBuildingSelection(outline.LocationName);
+        // Infer the tier from the building type (DisplayName), falling back to the location name, but
+        // always key the selection on the UNIQUE outline.LocationName so two same-type buildings stay
+        // distinct (TODO-08). TryInferAnimalBuildingSelection embeds whatever name it was given as the
+        // selection's LocationName, so take only its Tier and rebuild with the unique key.
+        var inferred = TryInferAnimalBuildingSelection(outline.DisplayName)
+                       ?? TryInferAnimalBuildingSelection(outline.LocationName);
+        animalBuilding = inferred is null
+            ? null
+            : new AnimalBuildingSelection(outline.LocationName, inferred.Tier);
         return animalBuilding is not null;
     }
 

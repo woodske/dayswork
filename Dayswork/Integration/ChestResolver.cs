@@ -89,8 +89,21 @@ internal sealed class ChestResolver
             if (!BuildingLocationResolver.TryGetInteriorForBuilding(building, out var indoors))
                 continue;
 
+            // Diagnostic for TODO-08 (multiple identical-type buildings): does each interior have a
+            // distinct NameOrUniqueName? If duplicates share both Name and NameOrUniqueName, unique
+            // keying must use a tile-coord discriminator instead. Captured on the next playtest.
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][building-outline] type='{building.buildingType.Value}' " +
+                $"name='{indoors.Name}' uniqueName='{indoors.NameOrUniqueName}' " +
+                $"tile=({building.tileX.Value},{building.tileY.Value})",
+                LogLevel.Info);
+
+            // Key the selection by the interior's UNIQUE name (distinct per building instance) so two
+            // same-type buildings (two Coops/Barns) are distinct selections and each is serviced.
+            // DisplayName stays the building type for premium-tier classification + friendly display.
+            // (U-SVE-04 / TODO-08)
             result.Add(new BuildingOutline(
-                indoors.Name,
+                indoors.NameOrUniqueName,
                 new Rectangle(building.tileX.Value, building.tileY.Value,
                                building.tilesWide.Value, building.tilesHigh.Value),
                 building.buildingType.Value));

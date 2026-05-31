@@ -4952,3 +4952,110 @@ Never make assumptions, always reference the SVE source code and/or the vanilla 
 **Context**: CONSTRUCTION — U-SVE-03 COMPLETE/approved; U-SVE-04 is the final SVE unit
 
 ---
+
+## U-SVE-04 Functional Design — Planning (start)
+**Timestamp**: 2026-05-30T04:15:00Z
+**User Input**: "kick off u-sve-04"
+**AI Response**: Began U-SVE-04 (New Content + Grandpa's Shed) Functional Design — the final SVE unit (stories S-24/S-25 + folded TODO-07 animal-product pickup + TODO-08 identical-type buildings). Grounded in SVE source first: (1) SVE Goose Egg = Category -5 (Egg), Camel Wool = Category -18 (animal goods, same as vanilla Wool 440); both HarvestType DropOvernight (ground products) — so a category-based ground-pickup detection cleanly covers vanilla + SVE + future products. (2) SVE's new farm animals (Goose, Camel) are DropOvernight, not tool-harvested, so IsMilkProduce/IsShearProduce likely need no SVE additions (re-verify at code-gen). (3) Grandpa's Shed is a multi-location complex: Custom_GrandpasShedGreenhouse (CanPlantHere=true → crop work), shed interior, Custom_GrandpasShedOutside. Wrote functional-design-plan.md with 5 source-grounded questions (animal-product detection approach; tool-harvest milk/wool gap; custom clump/tree overrides; Grandpa's Shed scope+task set; TODO-08 unique building keying + save-compat). Awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-04 Functional Design (Part 1 planning); questions pending
+
+---
+
+## U-SVE-04 Functional Design — Answers + Generation
+**Timestamp**: 2026-05-30T04:30:00Z
+**User Input**: "use recommended, continue"
+**AI Response**: Accepted U-SVE-04 functional-design answers Q1=A..Q5=A (no ambiguity). Q1=A category-based animal-product ground detection (egg -5, animal-goods -18, +truffle/forage) replacing the hardcoded whitelist. Q2=A no milk/shear change (SVE goose/camel are DropOvernight; re-verify at code-gen). Q3=A content-override seam consulted in ObjectTargetClassifier, verified gaps only. Q4=A plantable Grandpa's Shed greenhouse as indoor crop-work location. Q5=A unique building keying via interior NameOrUniqueName, no save-schema change, old saves valid via resolver fallback. Generated functional-design artifacts (business-logic-model.md, business-rules.md BR-SVE4-01..12 + PBT table, domain-entities.md). Presenting 2-option completion; next stage NFR Requirements.
+**Context**: CONSTRUCTION — U-SVE-04 Functional Design artifacts generated; awaiting approval
+
+---
+
+## U-SVE-04 Functional Design — Approval; NFR Requirements start
+**Timestamp**: 2026-05-30T04:45:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-04 Functional Design APPROVED. Advanced to NFR Requirements. The NFR surface mirrors U-SVE-01/02/03 (fail-safe to vanilla, cheap O(1) per-object detection during the existing scan, reuse existing stack). New consideration: category-based animal-product detection runs once per ground object in the existing scan (same frequency/cost as the old whitelist check — no regression); content-override + work-location lookups are O(1). Wrote nfr-requirements-plan.md with 3 questions (detection performance/caching; fail-safe-to-vanilla; tech-stack/deps), all recommended A. Awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-04 NFR Requirements (Part 1 planning); questions pending
+
+---
+
+## U-SVE-04 NFR Requirements — Answers + Generation
+**Timestamp**: 2026-05-30T05:00:00Z
+**User Input**: "continue"
+**AI Response**: Accepted U-SVE-04 NFR requirements answers Q1=A (on-demand detection, no caching), Q2=A (fail-safe to vanilla, never throw), Q3=A (reuse existing stack); no ambiguity. Generated nfr-requirements.md (NFRU4-01..08 → NFR-SVE-*) and tech-stack-decisions.md. Presenting 2-option completion; next stage NFR Design.
+**Context**: CONSTRUCTION — U-SVE-04 NFR Requirements generated; awaiting approval
+
+---
+
+## U-SVE-04 NFR Requirements — Approval; NFR Design
+**Timestamp**: 2026-05-30T05:15:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-04 NFR Requirements APPROVED. Advanced to NFR Design. Category evaluation (resilience/scalability/performance/security/logical-components) concluded no additional question round is needed — the approved NFR requirements + Application Design already fix the pattern set (mirrors U-SVE-01/02/03). Generated nfr-design-patterns.md (P-SVE4-01..05) and logical-components.md. Presenting 2-option completion; next stage Code Generation.
+**Context**: CONSTRUCTION — U-SVE-04 NFR Design generated; awaiting approval
+
+---
+
+## U-SVE-04 NFR Design — Approval; Code Generation planning
+**Timestamp**: 2026-05-30T05:30:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-04 NFR Design APPROVED. Advanced to Code Generation Part 1 (planning). Wrote the code-generation plan (ordered, lowest-risk-first: category-based product detection → content-override wiring → Grandpa's Shed work location → unique building keying (TODO-08, highest risk) → tests → verify → document), flagging TODO-08's cross-site consistency (outline + resolver + animal-home + chest resolution must share the same unique key, with legacy fallback) and the Truffle-category parity check for the detection switch. Presented for plan approval before any code change.
+**Context**: CONSTRUCTION — U-SVE-04 Code Generation plan presented; awaiting plan approval
+
+---
+
+## U-SVE-04 Code Generation — Plan approved; Part 2 partial (Steps 1–2 done, 3–4 gated)
+**Timestamp**: 2026-05-30T06:15:00Z
+**User Input**: "approve"
+**AI Response**: U-SVE-04 code-gen plan approved; executed Part 2 incrementally. Step 1 (TODO-07) DONE: WorkAreaScanner.IsAnimalProductForageObject now category-based ({Egg -5, Animal Goods -18} + legacy-id parity include, big-craftable excluded, default-empty exclude set) — fixes the worker ignoring goose egg / rabbit wool (vanilla Wool 440) / camel wool; collection shares the predicate. Pure overload extracted; added Dayswork.Tests/Orchestration/AnimalProductDetectionTests (parity, SVE products, non-products, big-craftable, FsCheck). TODO-07 closed. Step 2 DONE as no-gap: SVE source audit found no custom ResourceClump indices (only a performToolAction Harmony patch) and SVE custom wild trees (Birch/Fir) use the generic Tree path → content-override table stays empty (passthrough), no classifier change (documented deviation from the plan's wire-the-seam wording: avoid lossy plumbing for an empty table). Step 4 (TODO-08): added [Dayswork][building-outline] diagnostic (type/name/uniqueName/tile) to determine whether duplicate same-type interiors have distinct NameOrUniqueName before changing the selection key (else coord discriminator) — impl gated on this evidence to avoid regressing single-building servicing. Step 3 (Grandpa's Shed): deferred pending runtime evidence of the Custom_GrandpasShedGreenhouse location graph. Verification: build 0/0; tests 375 passed / 1 skip / 0 failed (was 364). Both pending steps are SMAPI-coupled and follow the project's playtest-validation pattern (as with entrances/feed capacity).
+**Context**: CONSTRUCTION — U-SVE-04 Code Generation partial: Steps 1–2 complete, Steps 3–4 await playtest evidence
+
+---
+
+## U-SVE-04 TODO-08 — duplicate confirmed; awaiting building-outline evidence
+**Timestamp**: 2026-05-30T06:40:00Z
+**User Input**: building-select log showing two base barns + two base coops both classify to location='Barn'/'Coop' (second of each DROPPED as duplicate LocationName+Tier); "Everything was working when I had a premium coop, premium barn, coop, and barn. I added an additional coop and barn, but the worker would not service the new buildings."
+**AI Response**: Confirmed TODO-08: two same-type buildings share indoors.Name ("Barn"/"Coop"), so Distinct() drops the duplicate AND the runtime animal→home matching (ResolveHomeLocation by Name) can't distinguish them. Asked the user to paste the [Dayswork][building-outline] diagnostic lines (name vs uniqueName vs tile) to decide the fix: if uniqueName is distinct per building → lightweight NameOrUniqueName keying across outline/resolver/ResolveHomeLocation (no save change, fallback for old contracts); if uniqueName collides → tile-coordinate discriminator (animal.home carries the same coords). Fix must be consistent end-to-end.
+**Context**: CONSTRUCTION — U-SVE-04 Step 4 (TODO-08): duplicate confirmed, awaiting uniqueName evidence
+
+---
+
+## U-SVE-04 TODO-08 — building-outline evidence; unique-name keying implemented
+**Timestamp**: 2026-05-30T07:10:00Z
+**User Input**: [building-outline logs] two Coops uniqueName='Coop1bc97e5f-...' / 'Coopd3136445-...', two Barns 'Barn1e65de34-...' / 'Barn157d6ffd-...', premium GUID-suffixed; Name is just the type. "Everything was working when I had a premium coop, premium barn, coop, and barn. I added an additional coop and barn, but the worker would not service the new buildings."
+**AI Response**: Evidence confirmed distinct GUID-suffixed NameOrUniqueName per interior → lightweight keying works (no coord scheme). Implemented unique-name keying end-to-end: ChestResolver.GetBuildingOutlines keys BuildingOutline.LocationName on indoors.NameOrUniqueName; BuildingLocationResolver.MatchesExactly/BuildingMatchInfo gained InteriorUniqueName and NormalizeLocationName returns NameOrUniqueName; AnimalTaskHandler matches an animal's home by {unique name, type name, building type} (HomeLocationKeys) with the precise unique name as AnimalRef.HomeLocation — new contracts service the specific building, legacy contracts (type-name) still service all same-type (backward compatible, no save change); ZoneAndChestMenu.FormatAnimalScopeSummary strips the trailing GUID for display. Verified UI shows animal buildings by count/this-summary (no other GUID leak). Extended BuildingLocationResolverTests (two same-type coops resolve by unique name; legacy type-name still resolves). Verification: build 0/0; tests 378 passed / 1 skip / 0 failed (was 375). TODO-08 closed. Remaining U-SVE-04 item: Step 3 Grandpa's Shed (pending location-graph evidence).
+**Context**: CONSTRUCTION — U-SVE-04 Step 4 (TODO-08) DONE; only Grandpa's Shed (Step 3) remains
+
+---
+
+## U-SVE-04 TODO-08 — base-building keying follow-up fix
+**Timestamp**: 2026-05-30T07:35:00Z
+**User Input**: building-select log showing premium buildings keyed by uniqueName (worked) but two base coops/barns still DROPPED as duplicates (draft = [PremiumCoop<guid>; PremiumBarn<guid>; Coop; Barn]); "it's still dropping duplicate barns and coops".
+**AI Response**: Root cause of the remaining drop: LegacyScopeBootstrapper.TryClassify's vanilla path built the selection via TryInferAnimalBuildingSelection(outline.DisplayName), which embeds the DisplayName (building type "Coop") as the selection LocationName — so base buildings kept collapsing to "Coop"/"Barn" even though GetBuildingOutlines now supplies a unique outline.LocationName (the premium path already used outline.LocationName, which is why premium worked). Fix: infer only the Tier from DisplayName/LocationName, then rebuild the selection with the unique outline.LocationName. Now both base and premium same-type buildings get distinct selection keys. Verification: build 0/0; tests 378 passed / 1 skip / 0 failed. (TryApplySelectedBuildings is ModEntry.ModMonitor-coupled so not unit-tested; resolver + animal-matching keep their tests; confirmed by playtest.) Redeploying.
+**Context**: CONSTRUCTION — U-SVE-04 TODO-08 base-building keying fixed
+---
+
+## U-SVE-04 — Work Scope UI overflow fix
+**Timestamp**: 2026-05-30T07:55:00Z
+**User Input**: [screenshot] Work Scope screen — animal buildings line "Barn, Barn, Coop, Coop, SVE_PremiumBarn, SVE_PremiumCoop" runs off the right edge of the panel; "need a UI fix. In work scope, the animal buildings are coming off of the UI". (Confirms TODO-08 works: all 6 buildings listed, GUIDs stripped.)
+**AI Response**: ZoneAndChestMenu.DrawScopeSection drew the value as a single unwrapped line at fixed Y offsets, so a long animal-building list overflowed horizontally. Reworked DrawScopeSection to wrap value + detail to the panel width (Game1.parseText with maxWidth = width - 96) and return the consumed height; draw() now lays the three scope sections out dynamically (outdoor → animal → greenhouse) with a gap, so wrapped multi-line values no longer collide with the next section. Verification: build 0/0; tests 378 passed / 1 skip / 0 failed (lint green). Deploying.
+**Context**: CONSTRUCTION — U-SVE-04 Work Scope UI overflow fixed (text wrapping + dynamic layout)
+---
+
+## U-SVE-04 — inter-building "warping" regression: diagnostics added
+**Timestamp**: 2026-05-30T08:30:00Z
+**User Input**: "There's been a regression (not from the UI fix). the worker is now warping to the different animal buildings instead of walking between them."
+**AI Response**: Traced the only teleport mechanism in inter-building travel: stuck-detection → step-2 teleport recovery (QueueStuckTeleport → IntentTeleportToTile), which fires when the worker can't make progress walking to its target (e.g., PathFindController can't path to a building door, so WorkerMovementDriver sets NavigationFailed and the worker doesn't move → stuck timer → teleport). Hypothesis: TODO-08 now services all duplicate/clustered buildings, and the foot route to one of the newly-serviced doors fails, triggering the recovery teleport (looks like warping). Door entry/exit themselves are intentional door-warps. Added two Info diagnostics: [Dayswork][building-travel] (logs target building, door tile, worker tile, navFailed, fallback at each building-entry navigation) and [Dayswork][stuck] (logs the step-2 teleport-recovery and the home-teleport). Build 0/0; deployed. Awaiting reproduction logs to confirm whether the walk-to-door is failing (navFailed=True) and at which building.
+**Context**: CONSTRUCTION — U-SVE-04 inter-building warping regression under diagnosis
+---
+
+## U-SVE-04 — inter-building "warping" root cause + fix
+**Timestamp**: 2026-05-30T08:55:00Z
+**User Input**: [building-travel logs] all six buildings resolved to door=(106,49); from=(106,49) for every building after the first; navFailed=False throughout; work happened in each (correct interiors).
+**AI Response**: Root cause: NOT stuck-recovery. BuildingLocationResolver.TryResolveWith resolved each candidate building's interior via TryGetInteriorForBuilding(building, requestedName, ...), whose final fallback is `?? Game1.getLocationFromName(requestedName)`. Post-TODO-08 the selection keys are unique interior names that ARE registered locations, so for the FIRST-iterated building (whose own-interior lookups don't match the request) the fallback returned the *requested* interior — making the first building falsely match every request. Result: match.Interior was correct (via the fallback) but match.OutdoorDoorTile came from the first building → every building's door = the first building's door (106,49). The worker walked there once, then door==from for all → no walking, just door-warps into each correct interior (so work still happened, no nav failure). Before TODO-08 the request was a type name that getLocationFromName didn't resolve, so the poison never fired. Fix: TryResolveWith now resolves each building's OWN interior via TryGetInteriorForBuilding(building, out interior) (no requestedName fallback) for matching, so the matched building and its door correspond to the requested interior. Verification: build 0/0; tests 378 passed / 1 skip / 0 failed. Diagnostics kept for confirming playtest (doors should now differ per building). Deploying.
+**Context**: CONSTRUCTION — U-SVE-04 inter-building door mis-resolution fixed
+---
+
+## U-SVE-04 — inter-building walk fix confirmed; TODO-09 added
+**Timestamp**: 2026-05-30T09:10:00Z
+**User Input**: "It looks good now. u-sve-03 is approved. Add a todo task for the worker to perform all inside and outside animal building tasks before moving to the next animal building. Right now it does the indoor tasks for each building, then does the outdoor tasks for all at once, but that wouldn't make sense if the animal buildings are spread out over the farm."
+**AI Response**: User confirmed the door-resolution fix — worker now walks between animal buildings correctly. Recorded approval of the SVE animal-building work (premium tiers, exact-first + unique-name building resolution, multi-building servicing). Added TODO-09 (per-building animal work ordering: do all of a building's indoor + that building's outdoor/grazing animals before moving to the next building, vs. the current indoor-per-building-then-all-outdoor pass) as a future scheduling/UX improvement (no correctness bug). Also marked TODO-07 CLOSED (category-based pickup shipped in U-SVE-04 Step 1). Remaining before U-SVE-04 closeout: Grandpa's Shed (Step 3, pending) + strip the temporary [building-travel]/[building-outline]/[building-select] debug diagnostics.
+**Context**: CONSTRUCTION — U-SVE-04: inter-building walk confirmed; TODO-09 logged; Grandpa's Shed + diagnostic cleanup remain
+---

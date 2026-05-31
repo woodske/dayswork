@@ -244,22 +244,43 @@ internal sealed class AnimalTaskHandler
         IReadOnlySet<string>? selectedHomeLocations,
         List<(AnimalRef Ref, FarmAnimal Live)> result)
     {
-        var homeLocation = ResolveHomeLocation(animal);
-        if (selectedHomeLocations is not null && !selectedHomeLocations.Contains(homeLocation))
+        // Match the animal's home against the selection by either its unique interior name (new,
+        // precise — services only the selected building) or its type name / building type (legacy
+        // contracts that stored the type name still service all of that type). (U-SVE-04 / TODO-08)
+        if (selectedHomeLocations is not null &&
+            !HomeLocationKeys(animal).Any(selectedHomeLocations.Contains))
             return;
 
         result.Add((
-            new AnimalRef(animal.myID.Value, homeLocation, animal.displayName),
+            new AnimalRef(animal.myID.Value, ResolveHomeLocation(animal), animal.displayName),
             animal));
     }
 
-    private static string ResolveHomeLocation(FarmAnimal animal)
-    {
-        if (animal.homeInterior is not null)
-            return animal.homeInterior.Name;
+    // The animal's home interior, preferring the live interior reference.
+    private static GameLocation? HomeInterior(FarmAnimal animal) =>
+        animal.homeInterior ?? animal.home?.indoors.Value;
 
-        var indoors = animal.home?.indoors.Value;
-        return indoors?.Name ?? animal.buildingTypeILiveIn.Value ?? string.Empty;
+    // Precise home key (unique per building instance) used as the AnimalRef home + primary match.
+    private static string ResolveHomeLocation(FarmAnimal animal) =>
+        HomeInterior(animal)?.NameOrUniqueName
+        ?? animal.buildingTypeILiveIn.Value
+        ?? string.Empty;
+
+    // All identifiers a selection could have used for this animal's home: the unique name (new
+    // contracts), the plain type name (legacy contracts / vanilla), and the building type.
+    private static IEnumerable<string> HomeLocationKeys(FarmAnimal animal)
+    {
+        var interior = HomeInterior(animal);
+        if (interior is not null)
+        {
+            yield return interior.NameOrUniqueName;
+            if (!string.Equals(interior.Name, interior.NameOrUniqueName, StringComparison.Ordinal))
+                yield return interior.Name;
+        }
+
+        var typeName = animal.buildingTypeILiveIn.Value;
+        if (!string.IsNullOrEmpty(typeName))
+            yield return typeName;
     }
 
     private static FeedWorkPlan EmptyFeedWork(int emptySlots = 0) =>

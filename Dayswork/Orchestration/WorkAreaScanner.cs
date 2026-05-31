@@ -11,6 +11,9 @@ namespace Dayswork.Orchestration;
 
 internal sealed class WorkAreaScanner
 {
+    // Legacy explicit ids retained as a guaranteed-parity INCLUDE set (covers Truffle 430, whose
+    // category we don't hardcode, plus the original vanilla products). Open-ended new content —
+    // vanilla or SVE — is matched by category instead (U-SVE-04 / TODO-07).
     private static readonly HashSet<string> AnimalProductObjectIds = new(StringComparer.Ordinal)
     {
         "107", "(O)107", // Dinosaur Egg
@@ -26,6 +29,20 @@ internal sealed class WorkAreaScanner
         "444", "(O)444", // Duck Feather
         "446", "(O)446", // Rabbit's Foot
     };
+
+    // Animal-product item categories that drop on the ground and should be collected. Covers
+    // vanilla Egg (-5) and Animal Goods (-18: Wool/Duck Feather/Rabbit's Foot) AND SVE products that
+    // share them (Goose Egg/Golden Goose Egg -5; Camel Wool -18) AND any future product. Milk (-6)
+    // is intentionally excluded — it is tool-harvested, never a ground object. (U-SVE-04 / BR-SVE4-01)
+    private static readonly HashSet<int> AnimalProductCategories = new()
+    {
+        StardewValley.Object.EggCategory,             // -5
+        StardewValley.Object.sellAtPierresAndMarnies, // -18 (Wool, Duck Feather, Rabbit's Foot, Camel Wool)
+    };
+
+    // Narrow safety valve for a verified category false positive (a ground object in an animal-product
+    // category that should NOT be auto-collected). Empty unless a real case is found. (BR-SVE4-04)
+    private static readonly HashSet<string> AnimalProductExcludedIds = new(StringComparer.Ordinal);
 
     private readonly ICapabilityEvaluator _capability;
 
@@ -245,8 +262,23 @@ internal sealed class WorkAreaScanner
     }
 
     public static bool IsAnimalProductForageObject(StardewValley.Object obj) =>
-        AnimalProductObjectIds.Contains(obj.QualifiedItemId) ||
-        AnimalProductObjectIds.Contains(obj.ItemId);
+        IsAnimalProductForageObject(obj.QualifiedItemId, obj.ItemId, obj.Category, obj.bigCraftable.Value);
+
+    /// <summary>
+    /// Pure animal-product test (SMAPI-free, for unit testing). True when the object is a ground
+    /// animal product: a guaranteed-parity legacy id, or an item in an animal-product category
+    /// (Egg -5 / Animal Goods -18) that is not a big-craftable and not explicitly excluded.
+    /// </summary>
+    internal static bool IsAnimalProductForageObject(string qualifiedItemId, string itemId, int category, bool bigCraftable)
+    {
+        if (AnimalProductExcludedIds.Contains(qualifiedItemId) ||
+            AnimalProductExcludedIds.Contains(itemId))
+            return false;
+
+        return AnimalProductObjectIds.Contains(qualifiedItemId) ||
+               AnimalProductObjectIds.Contains(itemId) ||
+               (!bigCraftable && AnimalProductCategories.Contains(category));
+    }
 
     public static bool IsTrellisCrop(Vector2 tileVec, GameLocation loc)
     {
