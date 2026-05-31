@@ -68,7 +68,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private readonly Queue<DepositTrip> _depositTrips = new();
     private DepositTrip? _currentTrip;
 
-    // Guards the OutdoorAnimals pre-completion rescan against re-enqueuing the same tile forever.
+    // Guards the FarmForage pre-completion rescan against re-enqueuing the same tile forever.
     // A forage tile the worker cannot reach (or cannot remove) would otherwise be re-detected on
     // every completion cycle once ClearRemainingActiveBatchWork drops it from the work queues,
     // producing an infinite "rescan picked up 1 new tile item" loop. We enqueue each tile at most
@@ -497,7 +497,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var batches = BuildInitialBatches(contract, workScopes, farm, snapshot);
 
         if (batches.Count == 0 ||
-            batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing &&
+            batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing or BatchKind.FarmForage &&
                                  batch.TileWork.Count == 0 &&
                                  batch.AnimalWork.Count == 0 &&
                                  !batch.FeedBuilding))
@@ -591,9 +591,6 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         ToolSnapshot snapshot)
     {
         var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks);
-        var selectedAnimalHomes = workScopes.AnimalBuildings
-            .Select(building => building.LocationName)
-            .ToHashSet(StringComparer.Ordinal);
         var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
         var outdoorProvenance = OutputScopeProvenance.Outdoor();
         var greenhouseLocation = workScopes.GreenhouseWork?.LocationName ?? "Greenhouse";
@@ -610,17 +607,26 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
                 case BatchKind.OutdoorAnimals:
                 {
+                    // Per-building grazing pass (TODO-09): service only the grazing animals whose
+                    // home key matches this batch's building. Farm-wide forage is handled separately
+                    // by the trailing FarmForage batch.
                     var batchTasks = batch.Tasks.ToHashSet();
-                    var tileWork = batchTasks.Contains(TaskKind.CollectAnimalProducts)
-                        ? _workAreaScanner.ScanWholeLocation(
-                            farm,
-                            batchTasks,
-                            snapshot,
-                            _farmExitTile,
-                            OutputScopeProvenance.AnimalBuilding(string.Empty))
-                        : Array.Empty<WorkItem>();
-                    var animalWork = BuildAnimalWork(farm, selectedAnimalHomes, batchTasks);
-                    batches.Add(batch with { TileWork = tileWork, AnimalWork = animalWork });
+                    var buildingHomes = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
+                    var animalWork = BuildAnimalWork(farm, buildingHomes, batchTasks);
+                    batches.Add(batch with { TileWork = Array.Empty<WorkItem>(), AnimalWork = animalWork });
+                    break;
+                }
+
+                case BatchKind.FarmForage:
+                {
+                    // Single farm-wide ground-forage (truffle) sweep after all building visits.
+                    var tileWork = _workAreaScanner.ScanWholeLocation(
+                        farm,
+                        batch.Tasks.ToHashSet(),
+                        snapshot,
+                        _farmExitTile,
+                        OutputScopeProvenance.AnimalBuilding(string.Empty));
+                    batches.Add(batch with { TileWork = tileWork, AnimalWork = Array.Empty<AnimalWorkItem>() });
                     break;
                 }
 
@@ -730,26 +736,40 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
         _currentLocation = Game1.getFarm();
         if (batch.Kind == BatchKind.OutdoorAnimals)
-            batch = RefreshOutdoorAnimalWork(batch, _currentLocation);
+            batch = RefreshBuildingGrazingWork(batch, _currentLocation);
+        else if (batch.Kind == BatchKind.FarmForage)
+            batch = RefreshFarmForageWork(batch, _currentLocation);
         QueueBatchWork(batch, _currentLocation);
         StartNextAnimalOrTileOrAdvance();
     }
 
-    private WorkBatch RefreshOutdoorAnimalWork(WorkBatch batch, GameLocation farm)
+    private WorkBatch RefreshBuildingGrazingWork(WorkBatch batch, GameLocation farm)
     {
         if (_ctx is null || batch.Kind != BatchKind.OutdoorAnimals)
             return batch;
 
-        var selectedAnimalHomes = _ctx.WorkScopes.AnimalBuildings
-            .Select(candidate => candidate.LocationName)
-            .ToHashSet(StringComparer.Ordinal);
-
+        // Per-building grazing pass (TODO-09): rebuild this one building's grazing-animal work at
+        // batch start (animals roam, so the shift-start snapshot is stale). Scoped to the single
+        // building's home key; farm-wide forage is handled by the separate FarmForage batch.
+        var buildingHomes = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
         var batchTasks = batch.Tasks.ToHashSet();
-        var refreshedAnimalWork = BuildAnimalWork(farm, selectedAnimalHomes, batchTasks);
+        var refreshedAnimalWork = BuildAnimalWork(farm, buildingHomes, batchTasks);
 
-        // Truffles spawn on the farm continuously through the day as pigs forage. The
-        // initial shift-start scan in BuildInitialBatches is hours stale by the time we
-        // actually start this batch, so re-scan for forage-style animal products here.
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][building-grazing] home={batch.LocationName} animalWork={refreshedAnimalWork.Count}.",
+            refreshedAnimalWork.Count == 0 ? LogLevel.Trace : LogLevel.Info);
+        return batch with { TileWork = Array.Empty<WorkItem>(), AnimalWork = refreshedAnimalWork };
+    }
+
+    private WorkBatch RefreshFarmForageWork(WorkBatch batch, GameLocation farm)
+    {
+        if (_ctx is null || batch.Kind != BatchKind.FarmForage)
+            return batch;
+
+        // Truffles spawn on the farm continuously through the day as pigs forage. The initial
+        // shift-start scan in BuildInitialBatches is hours stale by the time we actually start this
+        // final farm-wide pass, so re-scan for forage-style animal products here.
+        var batchTasks = batch.Tasks.ToHashSet();
         var refreshedTileWork = batchTasks.Contains(TaskKind.CollectAnimalProducts)
             ? _workAreaScanner.ScanWholeLocation(
                 farm,
@@ -760,9 +780,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             : (IReadOnlyList<WorkItem>)Array.Empty<WorkItem>();
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][outdoor-animals] refreshed homes={selectedAnimalHomes.Count} animalWork={refreshedAnimalWork.Count} tileWork={refreshedTileWork.Count}.",
-            (refreshedAnimalWork.Count == 0 && refreshedTileWork.Count == 0) ? LogLevel.Trace : LogLevel.Info);
-        return batch with { TileWork = refreshedTileWork, AnimalWork = refreshedAnimalWork };
+            $"[Dayswork][farm-forage] tileWork={refreshedTileWork.Count}.",
+            refreshedTileWork.Count == 0 ? LogLevel.Trace : LogLevel.Info);
+        return batch with { TileWork = refreshedTileWork, AnimalWork = Array.Empty<AnimalWorkItem>() };
     }
 
     private void CompleteBuildingEntry()
@@ -882,23 +902,23 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             ClearRemainingActiveBatchWork();
         }
 
-        // Before we declare the OutdoorAnimals batch finished, give the pigs one more
-        // chance: re-scan the farm for any truffles (or other animal-product forage) that
-        // spawned while the worker was picking up the earlier ones. If new work appears,
-        // requeue it and let the next tick route to it instead of completing the batch.
-        if (TryRescanOutdoorAnimalProductsBeforeBatchComplete())
+        // Before we declare the FarmForage batch finished, give the pigs one more chance: re-scan
+        // the farm for any truffles (or other animal-product forage) that spawned while the worker
+        // was picking up the earlier ones. If new work appears, requeue it and let the next tick
+        // route to it instead of completing the batch.
+        if (TryRescanFarmForageBeforeBatchComplete())
             return;
 
         CompleteCurrentBatch();
     }
 
-    private bool TryRescanOutdoorAnimalProductsBeforeBatchComplete()
+    private bool TryRescanFarmForageBeforeBatchComplete()
     {
         if (_ctx is null) return false;
         if (_ctx.CurrentBatchIndex >= _ctx.Batches.Count) return false;
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
-        if (batch.Kind != BatchKind.OutdoorAnimals) return false;
+        if (batch.Kind != BatchKind.FarmForage) return false;
 
         var batchTasks = batch.Tasks.ToHashSet();
         if (!batchTasks.Contains(TaskKind.CollectAnimalProducts)) return false;
@@ -950,7 +970,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _activeBatchSelectionAttempts = 0;
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][outdoor-animals] pre-completion rescan picked up {added} new tile item(s); batch continues.",
+            $"[Dayswork][farm-forage] pre-completion rescan picked up {added} new tile item(s); batch continues.",
             LogLevel.Info);
         return true;
     }
