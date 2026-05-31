@@ -25,10 +25,10 @@ Playtest evidence (`[Dayswork][building-outline]`) confirmed animal-house interi
 - Tests: `BuildingLocationResolverTests` extended (two same-type coops resolve by unique name; legacy type-name still resolves).
 - **Closes TODO-08.**
 
-## Pending — gated on runtime evidence (not yet implemented)
+## Step 3 — Grandpa's Shed work location (S-25) — DEFERRED (TODO-10)
+Source investigation (user chose "investigate a lighter path") concluded there is **no single-warp path** to the shed greenhouse: `Custom_GrandpasShedGreenhouse` is quest-gated and sits **behind** the shed (Farm → shed → greenhouse, multi-hop), reached via **farm-type-specific tile-action warps** (`Warps_GrandpasShed_GF`/`_IF2R`/`_NF`) whose map-level `Warp` props are off-map placeholders — so `BuildingLocationResolver.TryFindFarmWarpTo` (scans `farm.warps`) can't reach it. Servicing it needs multi-hop cross-location navigation + shed quest-state awareness, disproportionate to the SVE-compat scope. **Deferred to TODO-10.** The *standard* Grandpa's Farm greenhouse (`Greenhouse_GrandpasFarm`, named `"Greenhouse"`) is already covered by existing greenhouse support, so the common crop-work case is served. No code added for Step 3.
 
-### Step 3 — Grandpa's Shed work location (S-25) ⏳
-`IsExpansionWorkLocation` is currently unconsumed; making the worker scope/enter/deposit at `Custom_GrandpasShedGreenhouse` (`CanPlantHere: true`) requires integrating into the hiring scope, the greenhouse/indoor crop scan, navigation (warp/arrival), and chest resolution — which needs runtime verification of how that location connects to the farm. Deferred pending that evidence; no dead data added.
+## Unit status: U-SVE-04 COMPLETE (S-24 done; S-25 shed-greenhouse deferred → TODO-10)
 
 ## Verification
 - `dotnet build Dayswork.sln /p:EnableModDeploy=false` → **0 warnings / 0 errors**.

@@ -725,13 +725,6 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             _pendingTaskTile = outdoorDoor;
             EnsureWorkingIntent(new IntentMoveToTile(outdoorDoor));
             _nav.StartNavigation(outdoorDoor, Game1.getFarm(), _farmhand);
-            // Diagnostic (regression: worker warping between animal buildings). If the walk to a
-            // building door fails to find a path, the worker can't move → stuck timer → teleport
-            // recovery, which looks like warping. Logs the door + whether pathing succeeded.
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][building-travel] -> '{batch.LocationName}' door=({outdoorDoor.X},{outdoorDoor.Y}) " +
-                $"from=({_farmhand.TilePoint.X},{_farmhand.TilePoint.Y}) navFailed={_nav.NavigationFailed} fallback={_nav.UsedDirectFallback}",
-                LogLevel.Info);
             return;
         }
 
@@ -1537,20 +1530,10 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (recoveryTile is null)
         {
             // No reachable tile — skip straight to step 3 (REL-U13-02).
-            ModEntry.ModMonitor.Log(
-                "[Dayswork][stuck] no reachable work — teleporting home (ending shift).",
-                LogLevel.Info);
             _ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
         }
         else
         {
-            // Diagnostic (regression: worker warping between animal buildings). This step-2 recovery
-            // teleport is what visibly "warps" the worker — it fires because it got stuck (couldn't
-            // walk to its target). The building-travel log above shows why the walk failed.
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][stuck] teleport-recovery to ({recoveryTile.Value.X},{recoveryTile.Value.Y}) " +
-                $"in '{location.NameOrUniqueName}' after failing to walk to target.",
-                LogLevel.Info);
             _ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportToTile(recoveryTile.Value));
         }
     }

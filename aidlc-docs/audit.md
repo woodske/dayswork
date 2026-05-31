@@ -5059,3 +5059,29 @@ Never make assumptions, always reference the SVE source code and/or the vanilla 
 **AI Response**: User confirmed the door-resolution fix — worker now walks between animal buildings correctly. Recorded approval of the SVE animal-building work (premium tiers, exact-first + unique-name building resolution, multi-building servicing). Added TODO-09 (per-building animal work ordering: do all of a building's indoor + that building's outdoor/grazing animals before moving to the next building, vs. the current indoor-per-building-then-all-outdoor pass) as a future scheduling/UX improvement (no correctness bug). Also marked TODO-07 CLOSED (category-based pickup shipped in U-SVE-04 Step 1). Remaining before U-SVE-04 closeout: Grandpa's Shed (Step 3, pending) + strip the temporary [building-travel]/[building-outline]/[building-select] debug diagnostics.
 **Context**: CONSTRUCTION — U-SVE-04: inter-building walk confirmed; TODO-09 logged; Grandpa's Shed + diagnostic cleanup remain
 ---
+
+## U-SVE-04 — Grandpa's Shed deferred; unit finalized
+**Timestamp**: 2026-05-31T00:00:00Z
+**User Input**: "Do the recommended option" (after AskUserQuestion: Grandpa's Shed = "Investigate a lighter path")
+**AI Response**: Investigated the lighter path and found none: SVE Custom_GrandpasShedGreenhouse is quest-gated and multi-hop (Farm → shed → greenhouse) via farm-type-specific tile-action warps (Warps_GrandpasShed_GF/_IF2R/_NF) whose map-level Warp properties are off-map placeholders, so farm.warps doesn't carry a reachable warp and the resolver's standalone TryFindFarmWarpTo path can't find it. No single-warp option exists; servicing it needs multi-hop navigation the worker lacks. The standard Grandpa's Farm greenhouse (named "Greenhouse") is already covered by existing greenhouse support, so the common crop-work case is served. Per the user's choice, deferred the shed greenhouse (S-25) to TODO-10 and finalized U-SVE-04 on Steps 1/2/4. Diagnostics already stripped; build 0/0; tests 378 passed / 1 skip / 0 failed; deployed. All four SVE units (U-SVE-01..04) now complete. Next: global Build & Test (final stage).
+**Context**: CONSTRUCTION — U-SVE-04 COMPLETE; S-25 shed greenhouse → TODO-10; advancing to Build & Test
+---
+
+## Build and Test Stage (SVE Compatibility)
+**Timestamp**: 2026-05-31T00:30:00Z
+**User Input**: "continue"
+**Build Status**: Success — `dotnet build Dayswork.sln /p:EnableModDeploy=false` 0 warnings / 0 errors; deployed build succeeds.
+**Test Status**: Pass — `dotnet test Dayswork.sln` 378 passed / 1 expected skip / 0 failed.
+**AI Response**: Kicked off the final Build & Test stage for the SVE compatibility change (all four units complete). Base build/unit-test instructions unchanged (dotnet build/test). Generated SVE-specific artifacts: sve-integration-test-instructions.md (manual matrix S1–S8 across vanilla + SVE environments) and sve-build-and-test-summary.md (build/test status, per-unit completion, deviations DEV-SVE-01/02/03, ready-for-operations). Captured deferrals as TODO-09 (animal work ordering) and TODO-10 (shed greenhouse / multi-hop navigation). Presenting the 2-option completion; Operations is a placeholder (SMAPI mod — deploy = build to Mods folder, already automated).
+**Files Generated**:
+- sve-integration-test-instructions.md
+- sve-build-and-test-summary.md
+**Context**: CONSTRUCTION — Build & Test (SVE) artifacts generated; awaiting approval
+---
+
+## Build and Test (SVE) — Approval; SVE change COMPLETE
+**Timestamp**: 2026-05-31T01:00:00Z
+**User Input**: "approved"
+**AI Response**: Build & Test stage APPROVED. The Stardew Valley Expanded compatibility change is COMPLETE — all four units (U-SVE-01 provider foundation, U-SVE-02 farm maps + entrance, U-SVE-03 premium animal buildings, U-SVE-04 new content + multi-building) plus Build & Test are done; vanilla invariance preserved (null-object profile). Final verification: build 0/0; tests 378 passed / 1 expected skip / 0 failed; deployed to the Mods folder. Operations is a placeholder for this SMAPI mod (deploy = automated build copy). Open follow-ups carried forward: TODO-09 (per-building animal work ordering) and TODO-10 (SVE Grandpa's Shed greenhouse — needs multi-hop worker navigation). Marked the active SVE change COMPLETE in aidlc-state.md.
+**Context**: CONSTRUCTION → COMPLETE — SVE compatibility change closed out
+---

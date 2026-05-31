@@ -1,5 +1,4 @@
 using Dayswork.Core.Domain;
-using StardewModdingAPI;
 
 namespace Dayswork.UI;
 
@@ -97,45 +96,13 @@ internal static class LegacyScopeBootstrapper
             if (TryClassify(outline, out var animalBuilding, out var greenhouse))
             {
                 anySupported = true;
-                if (animalBuilding is not null)
-                {
-                    // Diagnostic (Bug: selecting normal + premium coop/barn only saves the normal
-                    // ones). Captures the interior LocationName, the raw buildingType (DisplayName),
-                    // and the resolved tier so we can see whether two buildings collapse because
-                    // their interior Name is not unique (Contains uses LocationName + Tier equality).
-                    var duplicate = draft.AnimalBuildings.Contains(animalBuilding);
-                    ModEntry.ModMonitor.Log(
-                        $"[Dayswork][building-select] selected animal building: location='{outline.LocationName}' " +
-                        $"type='{outline.DisplayName}' tier={animalBuilding.Tier} " +
-                        $"{(duplicate ? "DROPPED (duplicate LocationName+Tier already in draft)" : "added")}.",
-                        LogLevel.Info);
-
-                    if (!duplicate)
-                        draft.AnimalBuildings.Add(animalBuilding);
-                }
-                else if (greenhouse is not null)
-                {
-                    ModEntry.ModMonitor.Log(
-                        $"[Dayswork][building-select] selected greenhouse: location='{outline.LocationName}' type='{outline.DisplayName}'.",
-                        LogLevel.Info);
-                }
+                if (animalBuilding is not null && !draft.AnimalBuildings.Contains(animalBuilding))
+                    draft.AnimalBuildings.Add(animalBuilding);
 
                 if (greenhouse is not null)
                     draft.Greenhouse = greenhouse;
             }
-            else
-            {
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork][building-select] selected building NOT classified as work scope: " +
-                    $"location='{outline.LocationName}' type='{outline.DisplayName}'.",
-                    LogLevel.Info);
-            }
         }
-
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork][building-select] draft now has {draft.AnimalBuildings.Count} animal building(s): " +
-            $"[{string.Join("; ", draft.AnimalBuildings.Select(b => $"{b.LocationName}:{b.Tier}"))}].",
-            LogLevel.Info);
 
         return anySupported;
     }
