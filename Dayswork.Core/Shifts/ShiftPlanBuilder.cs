@@ -51,8 +51,14 @@ public sealed class ShiftPlanBuilder
         }
 
         var greenhouseTasks = Order(enabledTasks.Where(TaskKindSets.IsGreenhouseService));
-        if (scopes.GreenhouseWork is not null && greenhouseTasks.Count > 0)
-            batches.Add(CreateSkeleton(scopes.GreenhouseWork.LocationName, BatchKind.Greenhouse, greenhouseTasks, feedBuilding: false));
+        if (greenhouseTasks.Count > 0)
+        {
+            // One greenhouse batch per selected greenhouse (TODO-10): a farm may expose the vanilla
+            // greenhouse and an expansion greenhouse (e.g. SVE's Grandpa's Shed) at once; each is
+            // serviced as its own batch so the worker visits both in a single shift.
+            foreach (var greenhouse in scopes.GreenhouseWorks)
+                batches.Add(CreateSkeleton(greenhouse.LocationName, BatchKind.Greenhouse, greenhouseTasks, feedBuilding: false));
+        }
 
         var outdoorCropTasks = Order(enabledTasks.Where(TaskKindSets.IsOutdoorCropService));
         if (scopes.OutdoorWork is not null && outdoorCropTasks.Count > 0)

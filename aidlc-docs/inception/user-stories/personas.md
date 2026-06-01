@@ -1,6 +1,6 @@
 # Personas — Dayswork
 
-Three personas were chosen during planning (see [story-generation-plan.md](../plans/story-generation-plan.md)): one unified human player, the worker NPC modelled as a system actor, and the mod maintainer for testability/translation framing. The worker-routing update reviewed these personas and confirmed that no new persona is needed. The **SVE-compatibility** change likewise reviewed them and confirmed no new persona is required: **P-01** covers the player running an expansion, **P-02** covers the farmhand's behavior on SVE maps/buildings/content, and **P-03** covers the provider seam / extensibility concern (Q2=A of the SVE story plan).
+Three personas were chosen during planning (see [story-generation-plan.md](../plans/story-generation-plan.md)): one unified human player, the worker NPC modelled as a system actor, and the mod maintainer for testability/translation framing. The worker-routing update reviewed these personas and confirmed that no new persona is needed. The **SVE-compatibility** change likewise reviewed them and confirmed no new persona is required: **P-01** covers the player running an expansion, **P-02** covers the farmhand's behavior on SVE maps/buildings/content, and **P-03** covers the provider seam / extensibility concern (Q2=A of the SVE story plan). The **TODO-10 shed-greenhouse** story update reviewed the same set and kept it unchanged: the player selects the shed greenhouse, the farmhand performs or skips the route-backed work, and the maintainer owns the explicit route-provider/testability surface.
 
 ---
 
@@ -16,7 +16,7 @@ Three personas were chosen during planning (see [story-generation-plan.md](../pl
 | **Pain points** | Watering 80 crop tiles every morning eats 15+ real minutes. Harvesting on a Fall 28 strawberry day is exhausting. Late-game farms get overwhelming. Upfront-deposit-then-refund pricing feels fiddly and makes recurring hiring harder to trust. |
 | **Goals when using Dayswork** | (1) Hand off the boring chores. (2) See visible, satisfying work happening. (3) Never lose items. (4) Predictable, fair economics with a simple fixed daily price. (5) Understand how much work the farmhand can still do from a visible energy bar. |
 | **Tech comfort** | Comfortable installing SMAPI mods from Nexus. May read the README; rarely reads code. May use gamepad. May not speak English natively. |
-| **Stories they care about** | Most of the player-facing journey: discovery, hiring, configuration, schedule, day-of-work, mail, edits, edge cases. Specifically all of S-01 through S-15 and S-17, S-18 — plus the SVE player stories S-21 (vanilla-safe auto-detect), S-22 (SVE farm maps), S-23 (premium barn/coop), S-25 (Grandpa's Shed). |
+| **Stories they care about** | Most of the player-facing journey: discovery, hiring, configuration, schedule, day-of-work, mail, edits, edge cases. Specifically all of S-01 through S-15 and S-17, S-18 — plus the SVE player stories S-21 (vanilla-safe auto-detect), S-22 (SVE farm maps), S-23 (premium barn/coop), S-25 (Grandpa's Shed greenhouse). |
 
 ---
 
@@ -31,7 +31,7 @@ Three personas were chosen during planning (see [story-generation-plan.md](../pl
 | **Motivations (anthropomorphized)** | Complete assigned tasks within capability. Spend daily energy on useful work. Deposit collected items safely. Don't drop anything. Get home before 8pm. |
 | **Pain points** | Pathfinding into geometry it can't escape (fences, walls, furniture). Full chests. Chest disappears mid-shift (building demolished). Festival days that consume the whole day. Player swinging a sword at it. |
 | **Goals encoded as behavior** | Priority-ordered task execution (FR-WORK-03). Capability-based silent skipping (FR-SKIP-01/02). Hybrid stuck escalation (FR-WORK-12). Atomic shift completion on early player sleep (FR-DAY-02). Finish the current work unit when energy reaches zero, then deposit and leave (FR-WORK-06/17). |
-| **Stories they care about** | All worker-perspective stories: S-07 (arrival), S-08 (priority order), S-09 (capability snapshot), S-10 (deposit), S-15 (sleep fast-forward), S-16 (stuck recovery), S-17 (invulnerable) — plus SVE execution stories S-22 (entrance on SVE maps), S-23 (premium barn/coop servicing), S-24 (new SVE content), S-25 (Grandpa's Shed). |
+| **Stories they care about** | All worker-perspective stories: S-07 (arrival), S-08 (priority order), S-09 (capability snapshot), S-10 (deposit), S-15 (sleep fast-forward), S-16 (stuck recovery), S-17 (invulnerable) — plus SVE execution stories S-22 (entrance on SVE maps), S-23 (premium barn/coop servicing), S-24 (new SVE content), S-25 (Grandpa's Shed greenhouse). |
 
 ---
 
@@ -46,7 +46,7 @@ Three personas were chosen during planning (see [story-generation-plan.md](../pl
 | **Motivations** | Ship a quality MIT-licensed Nexus mod with low ongoing support burden. Allow future contributors to make changes confidently. Keep upgrade-day painless when SMAPI or SV releases a new version. |
 | **Pain points** | Stardew tightly couples business logic with the game runtime. Without separation, every test requires launching the game. Localization that lives in code can't be updated by the community without a PR. |
 | **Goals** | (1) Pure business logic (contract pricing, energy accounting, zone-tile intersection, save-data DTOs) is isolated and unit-testable without the game. (2) All user-visible strings are routed through SMAPI's i18n so translators contribute without touching C#. |
-| **Stories they care about** | S-19 (testable pure logic), S-20 (i18n routing), S-26 (expansion-compatibility provider seam / extensibility). |
+| **Stories they care about** | S-19 (testable pure logic), S-20 (i18n routing), S-26 (expansion-compatibility provider seam / extensibility, including TODO-10 explicit route-provider and route-model testability criteria). |
 
 ---
 
@@ -59,5 +59,5 @@ Three personas were chosen during planning (see [story-generation-plan.md](../pl
 | Daily life with recurring contracts (S-12 to S-13) | ✓ | | |
 | Calendar & edge cases (S-14 to S-18) | ✓ | ✓ | |
 | Maintainability (S-19 to S-20) | | | ✓ |
-| Expansion compatibility — SVE (S-21 to S-25) | ✓ | ✓ | |
-| Expansion provider seam (S-26) | | | ✓ |
+| Expansion compatibility — SVE (S-21 to S-25, including TODO-10 shed greenhouse) | ✓ | ✓ | |
+| Expansion provider seam (S-26, including TODO-10 route provider) | | | ✓ |

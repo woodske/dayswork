@@ -154,7 +154,7 @@ internal sealed class HiringFlowCoordinator
     {
         draft.OutdoorZones.Clear();
         draft.AnimalBuildings.Clear();
-        draft.Greenhouse = null;
+        draft.Greenhouses.Clear();
         RefreshPreview(draft);
     }
 

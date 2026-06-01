@@ -5123,3 +5123,151 @@ Never make assumptions, always reference the SVE source code and/or the vanilla 
 **AI Response**: Recorded Code Generation approval. Ran the final Build & Test stage: base build/unit-test instructions unchanged; generated [todo-09-build-and-test-summary.md](construction/build-and-test/todo-09-build-and-test-summary.md) capturing automated verification (build 0/0; tests 382 passed / 1 skip / 0 failed), the added/updated example + PBT coverage, and the maintainer-confirmed manual in-game scenario (per-building grouping: worker fully services one spread-out building — interior then its grazing animals — before the next; truffles still collected; no animal unserviced). No deviations. Marked TODO-09 CLOSED in Open TODOs and the active change COMPLETE in aidlc-state. AI-DLC workflow for TODO-09 finished. Operations is a placeholder (SMAPI deploy = build-to-Mods, automated).
 **Context**: CONSTRUCTION → COMPLETE — TODO-09 closed out
 ---
+
+## New Change — TODO-10 SVE Grandpa's Shed Greenhouse — Workspace Detection start
+**Timestamp**: 2026-05-31T13:35:14Z
+**User Input**: "using ai-dlc, do task TODO-10"
+**AI Response**: Started AI-DLC workflow for TODO-10. Loaded common AI-DLC rules (`process-overview`, `session-continuity`, `content-validation`, `question-format-guide`, and `welcome-message`), scanned extension opt-ins (Security Baseline, Property-Based Testing), confirmed existing `aidlc-docs/aidlc-state.md`, and began Workspace Detection against the existing Dayswork brownfield project. Content validation for this audit append: markdown only, no Mermaid or ASCII diagrams.
+**Context**: INCEPTION — Workspace Detection
+---
+
+## TODO-10 — Workspace Detection complete; Requirements Analysis question gate
+**Timestamp**: 2026-05-31T13:38:50Z
+**User Input**: "(none; workflow action after initial TODO-10 request)"
+**AI Response**: Workspace Detection complete. Findings: existing AI-DLC project resumed; source code present in `Dayswork`, `Dayswork.Core`, and `Dayswork.Tests`; build system is MSBuild / `dotnet`; reverse-engineering artifacts directory is absent, but targeted SVE and routing artifacts are already present and loaded, so no broad reverse-engineering refresh was executed for this focused TODO continuation. Loaded the enabled Property-Based Testing rules (full mode); skipped loading Security Baseline full rules because project state has Security disabled. Requirements Analysis started at comprehensive depth because TODO-10 requires multi-hop cross-location navigation, SVE source-grounded route data, scope-selection behavior, failure handling, and item-safety guarantees. Created `aidlc-docs/inception/requirements/todo-10-requirement-verification-questions.md` with 11 questions, including extension opt-ins. Content validation: markdown only, no Mermaid or ASCII diagrams, question format follows `[Answer]:` tags with `X) Other` options.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/inception/requirements/todo-10-requirement-verification-questions.md` and tell me when you are done."
+**Context**: INCEPTION — Requirements Analysis question gate; awaiting user answers
+---
+
+## TODO-10 — Requirements Analysis answers received and requirements generated
+**Timestamp**: 2026-05-31T13:54:25Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/requirements/todo-10-requirement-verification-questions.md` and validated all 11 answers: Q1=B, Q2=A, Q3=A, Q4=A, Q5=A, Q6=A, Q7=A, Q8=A, Q9=A, Q10=B, Q11=B. No contradictions detected; Q1 and Q7 combine into shed-greenhouse crop work with main-shed/greenhouse chest deposit support. Security Baseline is disabled for TODO-10; Property-Based Testing is enabled in partial mode (PBT-02, PBT-03, PBT-07, PBT-08, PBT-09 blocking where applicable). Generated `aidlc-docs/inception/requirements/todo-10-requirements.md` at comprehensive depth, covering explicit SVE multi-hop routes for IF2R, Grandpa's Farm, and Frontier Farm; runtime route validation rather than direct quest-flag authority; single-greenhouse alternative selection; greenhouse Water/Harvest only; graceful skip/continue on route failure; item-safe deposit support; and manual SVE playtest requirements. Updated `aidlc-state.md` with TODO-10 Requirements Analysis review status and extension configuration. Content validation: markdown tables/lists only, no Mermaid or ASCII diagrams.
+**AI Prompt**: "Requirements Analysis complete. Please review `aidlc-docs/inception/requirements/todo-10-requirements.md`; approve to proceed to User Stories or request changes."
+**Context**: INCEPTION — Requirements Analysis complete; awaiting approval
+---
+
+## TODO-10 — Requirements Analysis approved; User Stories start
+**Timestamp**: 2026-05-31T13:57:46Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 Requirements Analysis and moved into User Stories. Loaded User Stories rule details, question-format rules, content-validation rules, TODO-10 requirements, existing SVE stories, existing personas, and current extension configuration. Determined User Stories should execute in minimal update mode because TODO-10 is user-facing and refines S-25 with multi-hop route, shed-greenhouse scope, deposit, item-safety, and route-failure acceptance criteria. Content validation for planned artifacts: markdown only, no Mermaid or ASCII diagrams.
+**Context**: INCEPTION — User Stories Part 1 start
+---
+
+## TODO-10 — User Stories assessment and planning question gate
+**Timestamp**: 2026-05-31T13:57:46Z
+**User Input**: "(none; workflow action after requirements approval)"
+**AI Response**: Created `aidlc-docs/inception/plans/todo-10-user-stories-assessment.md` and `aidlc-docs/inception/plans/todo-10-story-generation-plan.md`. Updated `aidlc-state.md` to User Stories Part 1 question gate. Extension compliance: Security Baseline skipped because disabled for TODO-10; Property-Based Testing partial mode remains applicable to story criteria and route-model testability expectations. Content validation: markdown tables/lists only, no Mermaid or ASCII diagrams; questions use required `[Answer]:` tags and `X) Other` options.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/inception/plans/todo-10-story-generation-plan.md` and tell me when you are done."
+**Context**: INCEPTION — User Stories Part 1 question gate; awaiting story-plan answers
+---
+
+## TODO-10 — User Stories plan answers received; approval gate
+**Timestamp**: 2026-05-31T14:07:17Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/plans/todo-10-story-generation-plan.md` and validated all four answers: Q1=A, Q2=A, Q3=A, Q4=A. All answers are complete, valid, and mutually consistent. No clarification question file is required. Updated the plan checklist to mark answer collection, ambiguity analysis, and clarification evaluation complete; added answer analysis and resolved generation approach. Updated `aidlc-state.md` to User Stories Part 1 plan approval gate. Content validation: markdown tables/lists only, no Mermaid or ASCII diagrams.
+**AI Prompt**: "Story plan answers are complete and unambiguous. Please approve the TODO-10 story-generation plan so I can update `stories.md` and `personas.md`, or request changes."
+**Context**: INCEPTION — User Stories Part 1 plan approval gate; awaiting explicit approval
+---
+
+## TODO-10 — User Stories plan approved; generation started
+**Timestamp**: 2026-05-31T14:11:33Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of the resolved TODO-10 story-generation plan. Marked the plan approval checkbox complete and started User Stories Part 2 generation. Loaded the approved plan and identified the next unchecked generation step: update `stories.md` using the selected story-scope approach. Content validation for planned edits: markdown only, no Mermaid or ASCII diagrams.
+**Context**: INCEPTION — User Stories Part 2 generation
+---
+
+## TODO-10 — User Stories generation complete
+**Timestamp**: 2026-05-31T14:13:40Z
+**User Input**: "(none; workflow action after story-plan approval)"
+**AI Response**: Completed TODO-10 User Stories generation. Updated `stories.md`: refined S-25 as "Grandpa's Shed greenhouse is a selectable crop-work location"; added criteria for single greenhouse selection, source-grounded multi-hop route use, no direct farm-to-greenhouse success warp, runtime route validation, graceful skip/continue route failure, shed greenhouse/main shed deposit routing, item safety, vanilla invariance, manual SVE playtest, and route-model PBT expectations; updated S-26 for explicit route-provider data and pure route-model property tests; updated coverage summary for TODO-10 traceability. Updated `personas.md` to document that TODO-10 keeps P-01/P-02/P-03 unchanged and maps P-03 to the route-provider/testability surface. Marked all story-generation plan checklist items complete and updated `aidlc-state.md` to User Stories review required. Content validation: markdown only, no Mermaid or ASCII diagrams. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode reflected through S-25/S-26 criteria.
+**AI Prompt**: "# 📚 User Stories Complete\n\nUser stories generation has refined the existing SVE story set for TODO-10: S-25 now describes the selected Grandpa's Shed greenhouse crop-work flow, S-26 now carries the explicit route-provider and pure route-model testability expectations, and the existing P-01/P-02/P-03 personas were reviewed without adding a new persona.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the user stories and personas at: `aidlc-docs/inception/user-stories/stories.md` and `aidlc-docs/inception/user-stories/personas.md`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** -  Ask for modifications to the stories or personas based on your review  \n> ✅ **Approve & Continue** - Approve user stories and proceed to **Workflow Planning**\n\n---"
+**Context**: INCEPTION — User Stories complete; awaiting approval
+---
+
+## TODO-10 — User Stories approved; Workflow Planning complete
+**Timestamp**: 2026-05-31T14:26:56Z
+**User Input**: "approved"
+**AI Response**: Recorded explicit approval of TODO-10 User Stories and executed Workflow Planning. Loaded workflow-planning rules, content-validation rules, TODO-10 requirements, approved story plan, refined stories/personas, and current extension configuration. Generated `aidlc-docs/inception/plans/todo-10-execution-plan.md`. Recommended execution: Application Design, Functional Design, NFR Requirements, NFR Design, Code Generation, and Build and Test. Recommended skips: Reverse Engineering, Units Generation, and Infrastructure Design. Package sequence: `Dayswork.Core` pure route model first, `Dayswork` runtime wiring second, `Dayswork.Tests` coverage third. Updated `aidlc-state.md` to Workflow Planning review required. Content validation: Mermaid diagram validated manually with alphanumeric node IDs, valid flowchart syntax, no unescaped quotes, and text fallback; no ASCII diagrams. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode carried into planned NFR/design/code/test stages.
+**AI Prompt**: "Workflow Planning complete. Please review `aidlc-docs/inception/plans/todo-10-execution-plan.md`; approve to proceed to Application Design, request changes, or ask to add a skipped stage."
+**Context**: INCEPTION — Workflow Planning complete; awaiting approval
+---
+
+## TODO-10 — Workflow Planning approved; Application Design question gate
+**Timestamp**: 2026-05-31T16:01:06Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of the TODO-10 workflow plan and started Application Design. Loaded application-design rules, content-validation rules, question-format rules, the TODO-10 execution plan, current requirements/stories/personas context, the existing SVE application design, and the current compat/navigation/scope/deposit seams in code. Created `aidlc-docs/inception/plans/todo-10-application-design-plan.md` with four questions covering route-definition ownership, multi-hop route execution coordination, shed greenhouse/chest discovery, and route-failure decision ownership. Updated `aidlc-state.md` to Application Design question gate. Content validation: markdown only, no Mermaid or ASCII diagrams; questions use required `[Answer]:` tags and `X) Other` options. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode preserved through pure route-definition and validation design questions.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/inception/plans/todo-10-application-design-plan.md` and tell me when you are done."
+**Context**: INCEPTION — Application Design question gate; awaiting design answers
+---
+
+## TODO-10 — Application Design answers received and artifacts generated
+**Timestamp**: 2026-05-31T16:09:20Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/plans/todo-10-application-design-plan.md` and validated all four answers: Q1=A, Q2=A, Q3=A, Q4=A. Answers are complete, valid, and mutually consistent; no clarification questions are required. Generated Application Design addenda: `todo-10-components.md`, `todo-10-component-methods.md`, `todo-10-services.md`, `todo-10-component-dependency.md`, and consolidated `todo-10-application-design.md`. Design decisions: extend `IExpansionProfile`/`SveExpansionProfile` with pure route definitions; add `CrossLocationRouteNavigator`; expose virtual shed greenhouse/main shed discovery through the compat seam; keep route-failure policy in `ShiftOrchestrator`. Marked all application-design plan checkboxes complete and updated `aidlc-state.md` to Application Design review required. Content validation: markdown only; no Mermaid or ASCII diagrams; C# code blocks are signature sketches only. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode supported by pure route model/profile boundaries.
+**AI Prompt**: "# 🏗️ Application Design Complete\n\nApplication design has created TODO-10 addenda for components, methods, services, dependencies, and the consolidated design summary. The design keeps SVE route data centralized in the existing profile seam, live validation in `ExpansionCompatService`, route execution in a narrow `CrossLocationRouteNavigator`, and route-failure decisions in `ShiftOrchestrator`.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the application design artifacts at: `aidlc-docs/inception/application-design/`\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the application design if required\n> 📝 **Add Units Generation** - Choose to include **Units Generation** stage (currently skipped)\n> ✅ **Approve & Continue** - Approve design and proceed to **CONSTRUCTION PHASE / Functional Design**"
+**Context**: INCEPTION — Application Design complete; awaiting approval
+---
+
+## TODO-10 — Application Design approved; Functional Design question gate
+**Timestamp**: 2026-05-31T17:10:18Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 Application Design. Skipped Units Generation per the approved workflow plan and started Construction / Functional Design for unit `u-t10-shed-greenhouse-routing`. Loaded Functional Design, content-validation, question-format, and Property-Based Testing rule details; loaded TODO-10 requirements and application-design context; reviewed current route/scope/deposit seams. Created `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-functional-design-plan.md` with six Functional Design questions and plan-level checkboxes. Updated `aidlc-state.md` to the Functional Design question gate. Content validation: markdown only, no Mermaid or ASCII diagrams, questions use `[Answer]:` tags with `X) Other` as the last option. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode carried forward with no blocking finding at question gate.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-functional-design-plan.md` and tell me when you are done."
+**Context**: CONSTRUCTION — Functional Design question gate; awaiting functional-design answers
+---
+
+## TODO-10 — Functional Design answers received and artifacts generated
+**Timestamp**: 2026-05-31T17:22:43Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-functional-design-plan.md` and validated all six answers: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A, Q6=A. All answers are complete, valid, and mutually consistent; no clarification questions are required. Updated the plan checkboxes for answer collection, validation, clarification evaluation, artifact generation, state/audit updates, and review presentation. Generated Functional Design artifacts: `business-logic-model.md`, `business-rules.md`, `domain-entities.md`, and `frontend-components.md` under `aidlc-docs/construction/u-t10-shed-greenhouse-routing/functional-design/`. Updated `aidlc-state.md` to Functional Design review required. Content validation: markdown tables/lists only; no Mermaid diagrams, ASCII diagrams, or parser-sensitive embedded code blocks. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode compliant with PBT-02 N/A, PBT-03 invariants documented, PBT-07 domain-generator obligations documented, and PBT-08/PBT-09 carried forward with FsCheck.
+**AI Prompt**: "# 🔧 Functional Design Complete - u-t10-shed-greenhouse-routing\n\nFunctional design has created the route, work-scope, deposit, failure-policy, domain-entity, UI-discovery, and property-test boundary artifacts for TODO-10.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the functional design artifacts at: `aidlc-docs/construction/u-t10-shed-greenhouse-routing/functional-design/`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the functional design based on your review  \n> ✅ **Continue to Next Stage** - Approve functional design and proceed to **NFR Requirements**\n\n---"
+**Context**: CONSTRUCTION — Functional Design complete; awaiting approval
+---
+
+## TODO-10 — Functional Design approved; NFR Requirements question gate
+**Timestamp**: 2026-05-31T17:28:59Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 Functional Design and started NFR Requirements for unit `u-t10-shed-greenhouse-routing`. Loaded NFR Requirements, content-validation, question-format, and Property-Based Testing rule details; loaded the TODO-10 Functional Design artifacts; analyzed NFR categories for scalability, performance, availability, security, tech stack, reliability, maintainability, and usability. Created `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-nfr-requirements-plan.md` with six NFR questions and plan-level checkboxes. Updated `aidlc-state.md` to the NFR Requirements question gate. Content validation: markdown only, no Mermaid or ASCII diagrams, questions use `[Answer]:` tags with `X) Other` as the last option. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode carried forward with PBT-09 directly applicable to NFR Requirements and no blocking finding at question gate.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-nfr-requirements-plan.md` and tell me when you are done."
+**Context**: CONSTRUCTION — NFR Requirements question gate; awaiting NFR answers
+---
+
+## TODO-10 — NFR Requirements answers received and artifacts generated
+**Timestamp**: 2026-05-31T17:37:21Z
+**User Input**: "use recommended"
+**AI Response**: Applied the recommended `A` option to all six questions in `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-nfr-requirements-plan.md`. Validated all answers as complete, valid, unambiguous, and mutually consistent; no clarification question file is required. Generated `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-requirements/nfr-requirements.md` and `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-requirements/tech-stack-decisions.md`. Updated `aidlc-state.md` to the NFR Requirements review gate. Content validation: markdown tables/lists only; no Mermaid diagrams, ASCII diagrams, or parser-sensitive embedded code blocks. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode compliant with PBT-02 N/A unless reversible transforms are introduced, PBT-03 invariants required, PBT-07 generators required, PBT-08 shrinking/reproducibility required, and PBT-09 satisfied by FsCheck.
+**AI Prompt**: "# 📊 NFR Requirements Complete - u-t10-shed-greenhouse-routing\n\nNFR requirements assessment has identified bounded route-validation, fresh live readiness, item-safe non-throwing failures, existing-stack tech decisions, and FsCheck-backed property-test obligations for TODO-10.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the NFR requirements at: `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-requirements/`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the NFR requirements based on your review  \n> ✅ **Continue to Next Stage** - Approve NFR requirements and proceed to **NFR Design**\n\n---"
+**Context**: CONSTRUCTION — NFR Requirements complete; awaiting review approval
+---
+
+## TODO-10 — NFR Requirements approved; NFR Design generated
+**Timestamp**: 2026-05-31T17:43:04Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 NFR Requirements and executed NFR Design for unit `u-t10-shed-greenhouse-routing`. Loaded NFR Design, content-validation, question-format, and Property-Based Testing rule details; loaded approved NFR Requirements, Tech Stack Decisions, Functional Design, and Application Design context. Created `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-nfr-design-plan.md`; evaluated resilience, scalability, performance, security, and logical-component categories; determined no additional question round was needed because the approved artifacts already fixed the pattern set. Generated `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-design/nfr-design-patterns.md` and `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-design/logical-components.md`. Updated `aidlc-state.md` to the NFR Design review gate. Content validation: markdown tables/lists only; no Mermaid diagrams, ASCII diagrams, or parser-sensitive embedded code blocks. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode has no blocking findings, with PBT-02 N/A unless reversible transforms are introduced, PBT-03/PBT-07/PBT-08 carried into Code Generation and Build/Test, and PBT-09 satisfied by FsCheck.
+**AI Prompt**: "# 🎨 NFR Design Complete - u-t10-shed-greenhouse-routing\n\nNFR design has incorporated profile-owned route tables, per-attempt live validation, ordered-hop navigation, orchestrator-owned route-failure policy, item-safe deposit failure handling, draft-aware expansion destination filtering, one-warning route failure aggregation, and the pure route-property test seam.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the NFR design at: `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-design/`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the NFR design based on your review  \n> ✅ **Continue to Next Stage** - Approve NFR design and proceed to **Code Generation**\n\n---"
+**Context**: CONSTRUCTION — NFR Design complete; awaiting review approval
+---
+
+## TODO-10 — NFR Design approved; Code Generation plan created
+**Timestamp**: 2026-05-31T17:51:46Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 NFR Design and started Code Generation Part 1 planning for unit `u-t10-shed-greenhouse-routing`. Loaded Code Generation, content-validation, question-format, and Property-Based Testing rule details; loaded approved NFR Design artifacts; inspected existing Core compat profile files, Mod compat service, building navigation, chest discovery, scope bootstrap, output destination, shift orchestration, and existing test/FsCheck patterns. Created `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-code-generation-plan.md` with 16 implementation steps covering SVE source verification, Core route model/profile data, live validation, cross-location navigation, UI/destination discovery, shift work/deposit route integration, warning policy, example tests, FsCheck generators/properties, verification, and code summary. Updated `aidlc-state.md` to the Code Generation planning approval gate. Content validation: markdown tables/lists only; no Mermaid diagrams, ASCII diagrams, or parser-sensitive embedded code blocks. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode planned with PBT-02 N/A unless reversible transforms are introduced, PBT-03/PBT-07/PBT-08 carried into planned tests and verification, and PBT-09 satisfied by FsCheck.
+**AI Prompt**: "Code Generation plan complete. Please review `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-code-generation-plan.md`; approve to begin implementation, or request changes."
+**Context**: CONSTRUCTION — Code Generation Part 1 planning approval gate; awaiting explicit plan approval
+---
+
+## TODO-10 — Code Generation plan approved; implementation started
+**Timestamp**: 2026-05-31T18:05:41Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of the TODO-10 Code Generation plan. Marked Code Generation Part 1 planning checklist items complete in `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-code-generation-plan.md` and updated `aidlc-state.md` to Code Generation Part 2 in progress. Started implementation with Step 1 source verification from the local SVE repository before encoding route data.
+**Context**: CONSTRUCTION — Code Generation Part 2 started; executing Step 1 source verification
+---
+
+## TODO-10 — Code Generation complete
+**Timestamp**: 2026-05-31T18:33:18Z
+**User Input**: "continue"
+**AI Response**: Completed TODO-10 Code Generation for unit `u-t10-shed-greenhouse-routing`. Verified SVE route source data from the local `C:\Users\kwood\Repos\StardewValleyExpanded` checkout; implemented the pure Core expansion route model, SVE route/descriptors, live route validation, `CrossLocationRouteNavigator`, route-gated shed greenhouse discovery, draft-aware expansion chest filtering, shed greenhouse work/deposit routing, item-safe failure handling, one-warning route failure logging, example tests, and FsCheck route generators/properties. Created `aidlc-docs/construction/u-t10-shed-greenhouse-routing/code/code-summary.md`; updated the Code Generation plan, `aidlc-state.md`, and audit trail. Verification: `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with 397 passed / 1 skipped / 0 failed; `dotnet build Dayswork.sln /p:EnableModDeploy=false` succeeded with 0 warnings / 0 errors.
+**AI Prompt**: "Code Generation complete for `u-t10-shed-greenhouse-routing`. Please review the code summary and choose Request Changes or Continue to Next Stage."
+**Context**: CONSTRUCTION — Code Generation complete; awaiting review approval
+---

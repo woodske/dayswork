@@ -214,9 +214,18 @@ internal sealed class SummaryMenu : IClickableMenu
         AddWrappedLine(I18nHelper.Get("ui.summary.outdoor_scope_label", new { count = _reviewModel.ScopeSummary.OutdoorZones.Count }));
         AddWrappedLine(I18nHelper.Get("ui.summary.animal_scope_label", new { count = _reviewModel.ScopeSummary.AnimalBuildings.Count }));
         AddWrappedLine(
-            _reviewModel.ScopeSummary.Greenhouse is null
+            _reviewModel.ScopeSummary.Greenhouses.Count == 0
                 ? I18nHelper.Get("ui.summary.greenhouse_scope_none")
-                : I18nHelper.Get("ui.summary.greenhouse_scope_selected", new { location = _reviewModel.ScopeSummary.Greenhouse.LocationName }));
+                : I18nHelper.Get(
+                    "ui.summary.greenhouse_scope_selected",
+                    new
+                    {
+                        location = string.Join(
+                            ", ",
+                            _reviewModel.ScopeSummary.Greenhouses
+                                .Select(greenhouse => greenhouse.LocationName)
+                                .OrderBy(name => name, StringComparer.Ordinal)),
+                    }));
 
         if (_reviewModel.CanConfirm && _reviewModel.Pricing is not null && _reviewModel.WorkerEnergy is not null)
         {

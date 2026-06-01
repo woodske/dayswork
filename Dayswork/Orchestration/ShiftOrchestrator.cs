@@ -1,4 +1,6 @@
 using Dayswork.Core.Config;
+using Dayswork.Compat;
+using Dayswork.Core.Compat;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
@@ -19,6 +21,15 @@ namespace Dayswork.Orchestration;
 
 internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 {
+    private enum PendingExpansionRouteKind
+    {
+        None,
+        WorkEntry,
+        WorkExit,
+        DepositEntry,
+        DepositExit,
+    }
+
     // Shipping bin tile on Standard Farm.
     private static readonly TileCoord ShippingBinTile = new(71, 13);
 
@@ -54,6 +65,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private readonly WorkUnitBoundaryClassifier _boundaryClassifier = new();
     private readonly OverflowCategorizer _overflowCategorizer = new();
     private readonly WorkerRouteSelector _routeSelector = new();
+    private readonly CrossLocationRouteNavigator _expansionRouteNavigator;
 
     private ShiftContext? _ctx;
     private FarmhandNpc?  _farmhand;
@@ -90,6 +102,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     // Set while the worker is walking to the interior exit door after depositing in a building.
     // Cleared when we cross the door (warp back to the farm) on arrival.
     private bool          _pendingDepositExit;
+    private PendingExpansionRouteKind _pendingExpansionRouteKind;
+    private WorkBatch? _pendingExpansionRouteBatch;
 
     // Per-WorkItem state — the nav tile and task tile are tracked separately (trellis crops).
     private bool      _actionPending;
@@ -155,6 +169,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _chestResolver     = chestResolver;
         _depositPlanner    = depositPlanner;
         _mailDispatcher    = mailDispatcher;
+        _expansionRouteNavigator = new CrossLocationRouteNavigator(nav);
         _stuck             = new StuckDetector(config.StuckInitialWaitMinutes);
     }
 
@@ -537,6 +552,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _pendingDebrisSweeps.Clear();
         _pendingBeatOutcome = null;
         _pendingOutputProvenance = OutputScopeProvenance.Unknown;
+        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
+        _pendingExpansionRouteBatch = null;
+        _expansionRouteNavigator.Clear();
 
         _ctx = new ShiftContext(
             contractId:       contract.Id,
@@ -577,11 +595,30 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             .ThenBy(building => building.Tier)
             .ToList();
 
-        var greenhouse = selection.Greenhouse is null
-            ? null
-            : new GreenhouseSelection(BuildingLocationResolver.NormalizeLocationName(farm, selection.Greenhouse.LocationName));
+        var greenhouses = selection.Greenhouses
+            .Select(greenhouse => NormalizeGreenhouseLocationName(farm, greenhouse.LocationName))
+            .Where(locationName => !string.IsNullOrWhiteSpace(locationName))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(locationName => locationName, StringComparer.Ordinal)
+            .Select(locationName => new GreenhouseSelection(locationName))
+            .ToList();
 
-        return new ContractScopeSelection(outdoorZones, animalBuildings, greenhouse);
+        return new ContractScopeSelection(outdoorZones, animalBuildings, greenhouses);
+    }
+
+    // Expansion greenhouse work locations (e.g. SVE's Custom_GrandpasShedGreenhouse) are standalone
+    // game locations, not farm buildings. The vanilla building resolver's loose substring fallback
+    // would collapse "Custom_GrandpasShedGreenhouse" onto the vanilla "Greenhouse" building (the
+    // request string contains "Greenhouse"), rewriting the batch location and sending the worker to
+    // the wrong greenhouse so the expansion route never fires. Leave expansion location names
+    // untouched; only vanilla greenhouse selections go through the building resolver.
+    private static string NormalizeGreenhouseLocationName(Farm farm, string requestedName)
+    {
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryGetExpansionLocationDescriptor(requestedName, out _))
+            return requestedName;
+
+        return BuildingLocationResolver.NormalizeLocationName(farm, requestedName);
     }
 
     private IReadOnlyList<WorkBatch> BuildInitialBatches(
@@ -714,6 +751,21 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        if (IsExpansionGreenhouseBatch(batch))
+        {
+            if (TryStartExpansionRoute(
+                    "Farm",
+                    batch.LocationName,
+                    ExpansionRoutePurpose.WorkEntry,
+                    PendingExpansionRouteKind.WorkEntry,
+                    batch))
+                return;
+
+            _ctx.CurrentBatchIndex++;
+            BeginCurrentBatch();
+            return;
+        }
+
         if (BatchRequiresInteriorEntry(batch))
         {
             if (!_buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out var interior))
@@ -783,6 +835,186 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             $"[Dayswork][farm-forage] tileWork={refreshedTileWork.Count}.",
             refreshedTileWork.Count == 0 ? LogLevel.Trace : LogLevel.Info);
         return batch with { TileWork = refreshedTileWork, AnimalWork = Array.Empty<AnimalWorkItem>() };
+    }
+
+    private bool IsExpansionGreenhouseBatch(WorkBatch batch) =>
+        batch.Kind == BatchKind.Greenhouse &&
+        ModEntry.ExpansionCompat is { } compat &&
+        compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
+        descriptor.Role == ExpansionLocationRole.GreenhouseWork;
+
+    private bool TryStartExpansionRoute(
+        string sourceLocationName,
+        string targetLocationName,
+        ExpansionRoutePurpose purpose,
+        PendingExpansionRouteKind routeKind,
+        WorkBatch? batch)
+    {
+        if (_farmhand is null || ModEntry.ExpansionCompat is not { } compat)
+            return false;
+
+        var farm = Game1.getFarm();
+        if (!compat.TryValidateRoute(
+                farm,
+                sourceLocationName,
+                targetLocationName,
+                purpose,
+                out var route,
+                out var failure))
+        {
+            LogExpansionRouteFailure(failure);
+            return false;
+        }
+
+        _pendingExpansionRouteKind = routeKind;
+        _pendingExpansionRouteBatch = batch;
+        _toolAnimator.StopSwing();
+        EnsureWorkingIntent(new IntentMoveToTile(route.Hops[0].Hop.ApproachTile));
+        _expansionRouteNavigator.Start(route, _farmhand);
+        _currentLocation = route.Hops[0].Source;
+        return true;
+    }
+
+    private void HandleExpansionRouteMovement()
+    {
+        _expansionRouteNavigator.Update();
+        if (_farmhand?.currentLocation is { } location)
+            _currentLocation = location;
+
+        if (_expansionRouteNavigator.NavigationFailed)
+        {
+            FailPendingExpansionRoute(_expansionRouteNavigator.Failure);
+            return;
+        }
+
+        if (!_expansionRouteNavigator.IsComplete)
+            return;
+
+        var completedKind = _pendingExpansionRouteKind;
+        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
+        _expansionRouteNavigator.Clear();
+
+        switch (completedKind)
+        {
+            case PendingExpansionRouteKind.WorkEntry:
+                CompleteExpansionWorkEntry();
+                break;
+            case PendingExpansionRouteKind.WorkExit:
+                CompleteExpansionWorkExit();
+                break;
+            case PendingExpansionRouteKind.DepositEntry:
+                CompleteExpansionDepositEntry();
+                break;
+            case PendingExpansionRouteKind.DepositExit:
+                FinalizeAndAdvanceTrip(Game1.getFarm());
+                break;
+        }
+    }
+
+    private void CompleteExpansionWorkEntry()
+    {
+        if (_ctx is null || _farmhand is null)
+            return;
+
+        var batch = _pendingExpansionRouteBatch ?? _ctx.Batches[_ctx.CurrentBatchIndex];
+        _pendingExpansionRouteBatch = null;
+        var location = _farmhand.currentLocation ?? Game1.getLocationFromName(batch.LocationName);
+        if (location is null)
+        {
+            _ctx.CurrentBatchIndex++;
+            BeginCurrentBatch();
+            return;
+        }
+
+        _currentLocation = location;
+        var batchTasks = batch.Tasks.ToHashSet();
+        var tileWork = _indoorScanner.ScanInterior(
+            location,
+            batchTasks,
+            _ctx.ToolSnapshot,
+            OutputScopeProvenance.Greenhouse(batch.LocationName));
+
+        QueueBatchWork(batch with { TileWork = tileWork, AnimalWork = Array.Empty<AnimalWorkItem>() }, location);
+        StartNextAnimalOrTileOrAdvance();
+    }
+
+    private void CompleteExpansionWorkExit()
+    {
+        _pendingExpansionRouteBatch = null;
+        _currentLocation = Game1.getFarm();
+        if (_ctx is null)
+            return;
+
+        _ctx.CurrentBatchIndex++;
+        BeginCurrentBatch();
+    }
+
+    private void CompleteExpansionDepositEntry()
+    {
+        if (_currentTrip is not { Destination: ChestDestination chestDest })
+        {
+            FinalizeAndAdvanceTrip(Game1.getFarm());
+            return;
+        }
+
+        _ctx!.StateMachine.SetIntent(ToDepositIntent(_currentTrip));
+        StartChestDepositNavigation(_currentTrip, chestDest, _currentLocation ?? Game1.getFarm());
+    }
+
+    private void FailPendingExpansionRoute(ExpansionRouteFailure? failure)
+    {
+        if (failure is not null)
+            LogExpansionRouteFailure(failure);
+
+        var failedKind = _pendingExpansionRouteKind;
+        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
+        _pendingExpansionRouteBatch = null;
+        _expansionRouteNavigator.Clear();
+
+        switch (failedKind)
+        {
+            case PendingExpansionRouteKind.WorkEntry:
+                if (_ctx is not null)
+                {
+                    _ctx.CurrentBatchIndex++;
+                    BeginCurrentBatch();
+                }
+                break;
+            case PendingExpansionRouteKind.WorkExit:
+                WarpExpansionWorkerToFarm();
+                CompleteExpansionWorkExit();
+                break;
+            case PendingExpansionRouteKind.DepositEntry:
+                if (_currentTrip is not null)
+                    MarkDepositTripUndelivered(_currentTrip);
+                FinalizeAndAdvanceTrip(Game1.getFarm());
+                break;
+            case PendingExpansionRouteKind.DepositExit:
+                WarpExpansionWorkerToFarm();
+                FinalizeAndAdvanceTrip(Game1.getFarm());
+                break;
+        }
+    }
+
+    private void LogExpansionRouteFailure(ExpansionRouteFailure failure) =>
+        ModEntry.ModMonitor.Log(ExpansionCompatService.FormatRouteFailure(failure), LogLevel.Warn);
+
+    private void WarpExpansionWorkerToFarm()
+    {
+        if (_farmhand is null)
+            return;
+
+        var farm = Game1.getFarm();
+        var from = _farmhand.currentLocation ?? _currentLocation ?? farm;
+        if (from == farm)
+        {
+            _currentLocation = farm;
+            _nav.Clear();
+            return;
+        }
+
+        _nav.WarpWorker(_farmhand, from, farm, _farmExitTile);
+        _currentLocation = farm;
     }
 
     private void CompleteBuildingEntry()
@@ -1284,6 +1516,29 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             return;
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        if (IsExpansionGreenhouseBatch(batch))
+        {
+            var currentName = (_currentLocation ?? _farmhand.currentLocation)?.NameOrUniqueName
+                              ?? batch.LocationName;
+            if (string.Equals(currentName, "Farm", StringComparison.OrdinalIgnoreCase))
+            {
+                CompleteExpansionWorkExit();
+                return;
+            }
+
+            if (TryStartExpansionRoute(
+                    currentName,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    PendingExpansionRouteKind.WorkExit,
+                    batch))
+                return;
+
+            WarpExpansionWorkerToFarm();
+            CompleteExpansionWorkExit();
+            return;
+        }
+
         if (BatchRequiresInteriorEntry(batch))
         {
             var interior = _currentLocation;
@@ -1607,6 +1862,12 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     private void HandleMovement(GameLocation location)
     {
+        if (_pendingExpansionRouteKind != PendingExpansionRouteKind.None)
+        {
+            HandleExpansionRouteMovement();
+            return;
+        }
+
         if (_nav.NavigationFailed)
         {
             if (_pendingBuildingExit)
@@ -1915,6 +2176,24 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (_farmhand is null ||
             _currentTrip is not { Destination: ChestDestination { Ref.LocationName: not "Farm" } })
             return false;
+
+        if (_currentTrip.Destination is ChestDestination expansionChest &&
+            ModEntry.ExpansionCompat is { } compat &&
+            compat.IsExpansionDepositLocation(expansionChest.Ref.LocationName))
+        {
+            var routeSource = (_currentLocation ?? _farmhand.currentLocation)?.NameOrUniqueName
+                              ?? expansionChest.Ref.LocationName;
+            if (TryStartExpansionRoute(
+                    routeSource,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    PendingExpansionRouteKind.DepositExit,
+                    batch: null))
+                return true;
+
+            WarpExpansionWorkerToFarm();
+            return false;
+        }
 
         var interior = _currentLocation;
         if (interior is null || interior == Game1.getFarm())
@@ -2263,6 +2542,23 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var farm = Game1.getFarm();
         if (trip.Destination is ChestDestination { Ref.LocationName: not "Farm" } chestDest)
         {
+            if (ModEntry.ExpansionCompat is { } compat &&
+                compat.IsExpansionDepositLocation(chestDest.Ref.LocationName))
+            {
+                var source = (_currentLocation ?? farm).NameOrUniqueName;
+                if (TryStartExpansionRoute(
+                        source,
+                        chestDest.Ref.LocationName,
+                        ExpansionRoutePurpose.DepositEntry,
+                        PendingExpansionRouteKind.DepositEntry,
+                        batch: null))
+                    return;
+
+                MarkDepositTripUndelivered(trip);
+                FinalizeAndAdvanceTrip(farm);
+                return;
+            }
+
             if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out var interior))
             {
                 // Walk across the farm to the building's outdoor door first; we only cross the
@@ -2346,6 +2642,10 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             trip.Destination is not ChestDestination { Ref.LocationName: not "Farm" } chestDest)
             return;
 
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.IsExpansionDepositLocation(chestDest.Ref.LocationName))
+            return;
+
         if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out _))
         {
             _buildingNavigator.ExitToFarm(_farmhand, outdoorDoor);
@@ -2362,6 +2662,30 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if ((_farmhand.currentLocation ?? farm) == farm)
         {
             _currentLocation = farm;
+            return;
+        }
+
+        var currentLocation = _farmhand.currentLocation ?? _currentLocation;
+        if (currentLocation is not null &&
+            ModEntry.ExpansionCompat is { } compat &&
+            compat.IsExpansionDepositLocation(currentLocation.NameOrUniqueName))
+        {
+            if (compat.TryValidateRoute(
+                    farm,
+                    currentLocation.NameOrUniqueName,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    out var route,
+                    out var failure))
+            {
+                var farmArrival = route.Hops[^1].Hop.ArrivalTile;
+                _nav.WarpWorker(_farmhand, currentLocation, farm, farmArrival);
+                _currentLocation = farm;
+                return;
+            }
+
+            LogExpansionRouteFailure(failure);
+            WarpExpansionWorkerToFarm();
             return;
         }
 
@@ -2479,6 +2803,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _currentTripChestAnimated = false;
         _pendingDepositInterior = null;
         _pendingDepositExit = false;
+        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
+        _pendingExpansionRouteBatch = null;
+        _expansionRouteNavigator.Clear();
         _nav.Clear();
     }
 

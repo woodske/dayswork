@@ -29,5 +29,14 @@ public sealed class VanillaExpansionProfile : IExpansionProfile
 
     public bool IsExpansionWorkLocation(string locationName) => false;
 
+    public IReadOnlyList<ExpansionLocationDescriptor> GetLocationDescriptors() =>
+        Array.Empty<ExpansionLocationDescriptor>();
+
+    public bool TryGetRoute(ExpansionRouteRequest request, out ExpansionRouteDefinition route)
+    {
+        route = null!;
+        return false;
+    }
+
     public AnimalBuildingTier? MapPremiumBuildingTier(string buildingType) => null;
 }

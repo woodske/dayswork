@@ -15,7 +15,8 @@ internal static class LegacyScopeBootstrapper
         draft.OutdoorZones.AddRange(selection.OutdoorZones);
         draft.AnimalBuildings.Clear();
         draft.AnimalBuildings.AddRange(selection.AnimalBuildings);
-        draft.Greenhouse = selection.Greenhouse;
+        draft.Greenhouses.Clear();
+        draft.Greenhouses.AddRange(selection.Greenhouses);
         draft.HydrationMode = contract.ScopeSelection is null
             ? DraftHydrationMode.DerivedFromCompatibilityZones
             : DraftHydrationMode.HydratedFromAuthoritativeScope;
@@ -28,8 +29,12 @@ internal static class LegacyScopeBootstrapper
             .OrderBy(DescribeZone, StringComparer.Ordinal)
             .ToList();
 
-        var greenhouseZone = compatibilityZones.FirstOrDefault(zone => IsGreenhouseLocation(zone.LocationName));
-        var greenhouse = greenhouseZone is null ? null : new GreenhouseSelection(greenhouseZone.LocationName);
+        var greenhouses = compatibilityZones
+            .Where(zone => IsGreenhouseLocation(zone.LocationName))
+            .Select(zone => new GreenhouseSelection(zone.LocationName))
+            .Distinct()
+            .OrderBy(greenhouse => greenhouse.LocationName, StringComparer.Ordinal)
+            .ToList();
 
         var animalBuildings = compatibilityZones
             .Where(zone =>
@@ -46,7 +51,7 @@ internal static class LegacyScopeBootstrapper
         return new ContractScopeSelection(
             OutdoorZones: outdoorZones.AsReadOnly(),
             AnimalBuildings: animalBuildings.AsReadOnly(),
-            Greenhouse: greenhouse);
+            Greenhouses: greenhouses.AsReadOnly());
     }
 
     public static IReadOnlyList<Zone> ProjectCompatibilityZones(ContractScopeSelection selection)
@@ -60,13 +65,11 @@ internal static class LegacyScopeBootstrapper
                 CompatibilityPlaceholderTopLeft,
                 CompatibilityPlaceholderBottomRight)));
 
-        if (selection.Greenhouse is not null)
-        {
-            zones.Add(new Zone(
-                selection.Greenhouse.LocationName,
+        zones.AddRange(selection.Greenhouses.Select(greenhouse =>
+            new Zone(
+                greenhouse.LocationName,
                 CompatibilityPlaceholderTopLeft,
-                CompatibilityPlaceholderBottomRight));
-        }
+                CompatibilityPlaceholderBottomRight)));
 
         return zones
             .Distinct()
@@ -88,7 +91,7 @@ internal static class LegacyScopeBootstrapper
         IEnumerable<BuildingOutline> selectedBuildings)
     {
         draft.AnimalBuildings.Clear();
-        draft.Greenhouse = null;
+        draft.Greenhouses.Clear();
 
         var anySupported = false;
         foreach (var outline in selectedBuildings)
@@ -99,8 +102,8 @@ internal static class LegacyScopeBootstrapper
                 if (animalBuilding is not null && !draft.AnimalBuildings.Contains(animalBuilding))
                     draft.AnimalBuildings.Add(animalBuilding);
 
-                if (greenhouse is not null)
-                    draft.Greenhouse = greenhouse;
+                if (greenhouse is not null && !draft.Greenhouses.Contains(greenhouse))
+                    draft.Greenhouses.Add(greenhouse);
             }
         }
 

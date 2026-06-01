@@ -267,9 +267,11 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
                     Tier = building.Tier.ToString(),
                 })
                 .ToList(),
-            Greenhouse = selection.Greenhouse is null
-                ? null
-                : new GreenhouseSelectionDto { LocationName = selection.Greenhouse.LocationName },
+            Greenhouse = null,
+            Greenhouses = selection.Greenhouses
+                .OrderBy(greenhouse => greenhouse.LocationName, StringComparer.Ordinal)
+                .Select(greenhouse => new GreenhouseSelectionDto { LocationName = greenhouse.LocationName })
+                .ToList(),
         };
 
     private static ContractScopeSelection MapScopeSelection(ContractScopeSelectionDto dto)
@@ -288,14 +290,23 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             .ThenBy(building => building.Tier)
             .ToList();
 
-        var greenhouse = dto.Greenhouse is null
-            ? null
-            : new GreenhouseSelection(dto.Greenhouse.LocationName);
+        // Prefer the TODO-10 Greenhouses list; fall back to the legacy single Greenhouse field for
+        // saves written before multi-greenhouse support.
+        var greenhouses = (dto.Greenhouses is { Count: > 0 }
+                ? dto.Greenhouses.Select(greenhouse => greenhouse.LocationName)
+                : dto.Greenhouse is null
+                    ? Enumerable.Empty<string>()
+                    : new[] { dto.Greenhouse.LocationName })
+            .Where(locationName => !string.IsNullOrWhiteSpace(locationName))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(locationName => locationName, StringComparer.Ordinal)
+            .Select(locationName => new GreenhouseSelection(locationName))
+            .ToList();
 
         return new ContractScopeSelection(
             OutdoorZones: outdoorZones.AsReadOnly(),
             AnimalBuildings: animalBuildings.AsReadOnly(),
-            Greenhouse: greenhouse);
+            Greenhouses: greenhouses.AsReadOnly());
     }
 
     private static ContractTermsSnapshotDto MapTermsSnapshot(ContractTermsSnapshot snapshot) =>

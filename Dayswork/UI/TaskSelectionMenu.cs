@@ -291,7 +291,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
             ServiceContributionState.NeedsAnimalBuildingScope => I18nHelper.Get("ui.task_selection.row_needs_animal"),
             ServiceContributionState.NeedsGreenhouseScope => I18nHelper.Get("ui.task_selection.row_needs_greenhouse"),
             ServiceContributionState.NeedsOutdoorScope when TaskKindSets.IsGreenhouseService(task)
-                && _draft.Greenhouse is null
+                && _draft.Greenhouses.Count == 0
                 && _draft.OutdoorZones.Count == 0 => I18nHelper.Get("ui.task_selection.row_needs_crop_scope"),
             _ => I18nHelper.Get("ui.task_selection.row_needs_outdoor"),
         };

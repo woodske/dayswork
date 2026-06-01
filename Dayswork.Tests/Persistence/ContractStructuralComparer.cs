@@ -25,7 +25,7 @@ internal static class ContractStructuralComparer
 
         return ZonesEqual(left.OutdoorZones, right.OutdoorZones)
             && left.AnimalBuildings.SequenceEqual(right.AnimalBuildings)
-            && Equals(left.Greenhouse, right.Greenhouse);
+            && left.Greenhouses.SequenceEqual(right.Greenhouses);
     }
 
     public static bool TermsSnapshotsEqual(ContractTermsSnapshot? left, ContractTermsSnapshot? right)
@@ -63,7 +63,7 @@ internal static class ContractStructuralComparer
             ? "none"
             : $"{string.Join(";", contract.ScopeSelection.OutdoorZones.Select(DescribeZone))}|"
               + $"{string.Join(";", contract.ScopeSelection.AnimalBuildings.Select(building => $"{building.LocationName}:{building.Tier}"))}|"
-              + $"{contract.ScopeSelection.Greenhouse?.LocationName ?? "none"}";
+              + $"{(contract.ScopeSelection.Greenhouses.Count == 0 ? "none" : string.Join(",", contract.ScopeSelection.Greenhouses.Select(greenhouse => greenhouse.LocationName)))}";
 
         var terms = contract.TermsSnapshot is null
             ? "none"

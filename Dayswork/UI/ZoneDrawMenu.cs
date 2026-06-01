@@ -72,11 +72,11 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
                 _selectedBuildings.Add(match);
         }
 
-        if (draft.Greenhouse is not null)
+        foreach (var greenhouse in draft.Greenhouses)
         {
-            var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), draft.Greenhouse.LocationName);
+            var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), greenhouse.LocationName);
             var greenhouseMatch = buildingOutlines.FirstOrDefault(outline =>
-                outline.LocationName == draft.Greenhouse.LocationName
+                outline.LocationName == greenhouse.LocationName
                 || outline.LocationName == normalizedName);
             if (greenhouseMatch is not null && !_selectedBuildings.Contains(greenhouseMatch))
                 _selectedBuildings.Add(greenhouseMatch);

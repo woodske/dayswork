@@ -1,3 +1,4 @@
+using Dayswork.Core.Domain;
 using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -198,11 +199,11 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         DrawScopeSection(
             b,
             I18nHelper.Get("ui.zone_chest.greenhouse_section_label"),
-            _draft.PreviewState.ScopeSummary.Greenhouse is null
+            _draft.PreviewState.ScopeSummary.Greenhouses.Count == 0
                 ? I18nHelper.Get("ui.zone_chest.greenhouse_not_selected")
                 : I18nHelper.Get(
                     "ui.zone_chest.greenhouse_selected",
-                    new { location = _draft.PreviewState.ScopeSummary.Greenhouse.LocationName }),
+                    new { location = FormatGreenhouseSummary(_draft.PreviewState.ScopeSummary.Greenhouses) }),
             new Vector2(xPositionOnScreen + leftMargin, sectionY),
             I18nHelper.Get("ui.zone_chest.greenhouse_scope_detail"));
 
@@ -238,7 +239,14 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
     private bool HasSelectedScope() =>
         _draft.OutdoorZones.Count > 0
         || _draft.AnimalBuildings.Count > 0
-        || _draft.Greenhouse is not null;
+        || _draft.Greenhouses.Count > 0;
+
+    private static string FormatGreenhouseSummary(IReadOnlyList<GreenhouseSelection> greenhouses) =>
+        string.Join(
+            ", ",
+            greenhouses
+                .Select(greenhouse => FriendlyBuildingName(greenhouse.LocationName))
+                .OrderBy(name => name, StringComparer.Ordinal));
 
     private string FormatAnimalScopeSummary()
     {

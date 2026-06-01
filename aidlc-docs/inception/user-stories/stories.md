@@ -537,12 +537,13 @@ These stories anchor the architectural choices that keep the mod testable and tr
 **I want** SVE-specific behavior isolated behind an expansion-compatibility provider with a vanilla default,
 **so that** I can support another expansion by writing one new provider, keep the vanilla path untouched, and unit/property-test the pure compatibility logic without launching Stardew.
 
-**Implements**: FR-SVE-01, FR-SVE-04, NFR-SVE-02, NFR-SVE-03, NFR-SVE-05, NFR-SVE-06, NFR-SVE-07 (companion to the SVE journey stories S-21..S-25 in Section 6)
+**Implements**: FR-SVE-01, FR-SVE-04, NFR-SVE-02, NFR-SVE-03, NFR-SVE-05, NFR-SVE-06, NFR-SVE-07; TODO-10 route-provider requirements FR-T10-05, FR-T10-06, FR-T10-08, FR-T10-18, NFR-T10-02, NFR-T10-03, NFR-T10-05, NFR-T10-07 (companion to the SVE journey stories S-21..S-25 in Section 6)
 
 **Acceptance criteria (UI/visual — bullets):**
-- A single provider abstraction defines the compatibility surface: expansion detection, worker-entrance resolution, animal-building capacity/feeding derivation, the building work-location set, and content-classification overrides.
+- A single provider abstraction defines the compatibility surface: expansion detection, worker-entrance resolution, animal-building capacity/feeding derivation, the building work-location set, content-classification overrides, and explicit multi-hop route definitions/validation for known expansion locations.
 - A **Vanilla** provider implements today's default behavior; an **SVE** provider implements only the overrides. No vanilla/core call site contains SVE-specific branches.
-- All SVE-specific identifiers (mod ID, building data keys, map/location names, per-map entrance overrides) are centralized in the SVE provider, not scattered as magic strings (NFR-SVE-07).
+- All SVE-specific identifiers (mod ID, building data keys, map/location names, per-map entrance overrides, multi-hop route IDs, and route hop locations/tiles) are centralized in the SVE provider or a closely related route provider, not scattered as magic strings (NFR-SVE-07, FR-T10-18).
+- SVE shed-greenhouse route data is represented as explicit source-grounded hops rather than a generic runtime scan over all Content Patcher tile actions (FR-T10-05, FR-T10-06).
 - Adding a hypothetical new expansion requires implementing and registering a new provider only — no edits to vanilla/core call sites (NFR-SVE-02).
 - The pure compatibility logic compiles and its tests run without SMAPI / Stardew assemblies on the classpath (consistent with S-19).
 - Every SVE mapping is grounded in SVE source or vanilla behavior before implementation; no assumptions (NFR-SVE-03).
@@ -554,6 +555,9 @@ These stories anchor the architectural choices that keep the mod testable and tr
 - **Given** the worker-entrance resolution function
   **When** FsCheck generates warp configurations and optional per-map overrides
   **Then** a reachable entrance tile is always produced (override when present, else heuristic, else documented fallback), deterministically (PBT-03).
+- **Given** the explicit SVE multi-hop route model
+  **When** FsCheck generates supported farm-map signatures, route availability states, and hop-validation outcomes
+  **Then** route selection is deterministic, each configured hop is evaluated at most once per route attempt, validation is total/non-throwing, and unavailable routes produce a skip-and-continue decision rather than direct warp or crash (PBT-02, PBT-03, PBT-07).
 - **Given** the animal-building capacity-derivation function
   **When** FsCheck generates trough/occupant data for vanilla and premium buildings
   **Then** derived feed capacity equals the actual trough/occupant-based count and never the legacy hardcoded constant for non-vanilla buildings (PBT-03).
@@ -575,7 +579,7 @@ These stories anchor the architectural choices that keep the mod testable and tr
 
 These stories describe how Dayswork behaves when **Stardew Valley Expanded** is installed, while leaving vanilla behavior unchanged. The maintainer-facing companion (the provider seam itself) is **S-26**, kept in Section 5 alongside the other architecture stories.
 
-> **Grounding & validation note:** Per NFR-SVE-03, every SVE-specific detail (mod ID, entrance tiles, building keys, Grandpa's Shed interior, custom content) is confirmed against SVE source during design — none is assumed here. Per NFR-SVE-05, criteria that depend on SVE assets being loaded are marked *"validated via manual SVE playtest"*, while the pure compatibility logic is covered by xUnit + FsCheck (see S-26).
+> **Grounding & validation note:** Per NFR-SVE-03, every SVE-specific detail (mod ID, entrance tiles, building keys, Grandpa's Shed interior, multi-hop shed-greenhouse route data, custom content) is confirmed against SVE source during design — none is assumed here. Per NFR-SVE-05, criteria that depend on SVE assets being loaded are marked *"validated via manual SVE playtest"*, while the pure compatibility logic is covered by xUnit + FsCheck (see S-26).
 
 ### S-21 — Vanilla stays vanilla; SVE support turns on automatically
 
@@ -686,28 +690,36 @@ These stories describe how Dayswork behaves when **Stardew Valley Expanded** is 
 
 ---
 
-### S-25 — Grandpa's Shed is a usable work location
+### S-25 — Grandpa's Shed greenhouse is a selectable crop-work location
 
 **As** P-01 the Player (and **P-02** the Farmhand),
-**I want** the farmhand to treat Grandpa's Shed as a work location,
-**so that** the tasks its interior supports — and any chests inside it — are handled like other farm buildings.
+**I want** the farmhand to service SVE's quest-unlocked Grandpa's Shed greenhouse when I select it as the greenhouse work area,
+**so that** its indoor crops are handled safely without treating the entire shed complex as a generic work location.
 
-**Implements**: FR-SVE-14, FR-SVE-16
+**Implements**: FR-SVE-14, FR-SVE-16; TODO-10 requirements FR-T10-01, FR-T10-02, FR-T10-03, FR-T10-04, FR-T10-05, FR-T10-07, FR-T10-08, FR-T10-09, FR-T10-10, FR-T10-11, FR-T10-12, FR-T10-13, FR-T10-14, FR-T10-15, FR-T10-16, FR-T10-17, NFR-T10-01, NFR-T10-04, NFR-T10-07
 
 **Acceptance criteria (state — Gherkin):**
-- **Given** Grandpa's Shed is built and within the contract's scope
-  **When** the worker runs
-  **Then** it navigates into the shed (door/warp and entry tile resolved from the SVE map source) and performs whatever applicable tasks its interior supports. *(Validated via manual SVE playtest.)*
-- **Given** chests inside Grandpa's Shed are assigned as output destinations
-  **When** the worker deposits
-  **Then** it makes a deposit trip into the shed and places items, falling back to overflow mail if the chest is unreachable or full (FR-SVE-16). *(Validated via manual SVE playtest.)*
-- **Given** the shed interior supports indoor crops (to be confirmed from SVE source)
-  **When** crop tasks are enabled
-  **Then** the worker waters/harvests them as for any indoor crop area.
+- **Given** SVE is installed and `Custom_GrandpasShedGreenhouse` is available in the live save
+  **When** the hiring UI enumerates greenhouse-like work locations
+  **Then** the standard greenhouse and the shed greenhouse are offered as single-selection alternatives; selecting one never automatically includes the other (FR-T10-02, FR-T10-03). *(Validated via manual SVE playtest.)*
+- **Given** the player selected `Custom_GrandpasShedGreenhouse` for greenhouse work on Immersive Farm 2 Remastered, Grandpa's Farm, or Frontier Farm
+  **When** the worker starts the greenhouse batch and the configured route validates
+  **Then** the worker walks the source-grounded multi-hop route into the shed greenhouse, does not direct-warp from the farm to the greenhouse as the primary success path, and performs only existing greenhouse crop services: Water Crops and Harvest Crops (FR-T10-04, FR-T10-05, FR-T10-07, FR-T10-11). *(Validated via manual SVE playtest.)*
+- **Given** the player selected the shed greenhouse but the live route cannot validate because a location, hop, approach tile, or passable stand tile is unavailable
+  **When** the shed-greenhouse batch is reached
+  **Then** the worker skips that batch, continues any remaining shift work, preserves all buffered items, and logs a maintainer-facing reason without creating player-facing mail or a needs-attention state (FR-T10-08, FR-T10-09, FR-T10-10, NFR-T10-01).
+- **Given** chests in `Custom_GrandpasShedGreenhouse` or the main `Custom_GrandpasShed` interior are assigned as output destinations for shed-greenhouse work
+  **When** the worker deposits harvested items
+  **Then** it uses the same validated route-provider model for the deposit trip and falls back to existing overflow/undelivered-item safeguards if the chest is full or unreachable (FR-T10-14, FR-T10-15, FR-T10-16). *(Validated via manual SVE playtest.)*
+- **Given** SVE is absent, the shed greenhouse is not selected, or only the standard greenhouse is selected
+  **When** the worker runs greenhouse work
+  **Then** vanilla greenhouse and standard SVE greenhouse behavior remain unchanged (FR-T10-13, FR-T10-17).
 
 **Acceptance criteria (UI/visual — bullets):**
-- Grandpa's Shed appears as a selectable building wherever the hiring UI enumerates buildings (when it exposes chests or work). *(Validated via manual SVE playtest.)*
-- Its exact interior contents and supported task set are confirmed from SVE source, not assumed (NFR-SVE-03).
+- The shed greenhouse appears as a greenhouse-like selectable location when SVE exposes it; the main shed appears only as a possible deposit-destination source for shed-greenhouse output, not as a general work location (FR-T10-01, FR-T10-14).
+- `Custom_GrandpasShedOutside`, `Custom_GrandpasShedRuins`, and main-shed interior tasks are explicitly out of scope for work execution in this story.
+- Route data for the supported SVE farm maps is confirmed from SVE source before implementation and then validated in at least one live SVE playtest (NFR-T10-04).
+- Pure route-model examples and FsCheck properties cover deterministic route selection, total validation, skip-and-continue route failure, and replayable property failures where applicable (NFR-T10-07, see S-26).
 
 ---
 
@@ -732,10 +744,10 @@ These stories describe how Dayswork behaves when **Stardew Valley Expanded** is 
 | SVE farm maps & worker entrance (FR-SVE-05/06; FR-SVE-15) | S-22 |
 | SVE premium barn/coop (FR-SVE-07..11) | S-23 |
 | SVE new crops/trees/animals/products (FR-SVE-12/13; FR-SVE-15; NFR-SVE-04) | S-24 |
-| SVE Grandpa's Shed (FR-SVE-14; FR-SVE-16) | S-25 |
-| SVE isolation/extensibility/testability (FR-SVE-04; NFR-SVE-02/03/05/06/07) | S-26 |
+| SVE Grandpa's Shed greenhouse / TODO-10 selected shed greenhouse crop work, deposit routing, item safety, and graceful route failure (FR-SVE-14; FR-SVE-16; FR-T10-01/02/03/04/05/07/08/09/10/11/12/13/14/15/16/17; NFR-T10-01/04/07) | S-25 |
+| SVE isolation/extensibility/testability and TODO-10 explicit route provider (FR-SVE-04; FR-T10-06/18; NFR-SVE-02/03/05/06/07; NFR-T10-02/03/05/07) | S-26 |
 | Maintainability NFRs (NFR-MAINT-01..05) | S-19 |
 | Onboarding NFRs (NFR-ONBOARD-01..02) | (covered by docs; no story) |
 | Safety / data-integrity NFRs (NFR-SAFE-01..04) | S-10, S-11, S-16, S-19 |
 
-No FR group is left uncovered. SVE compatibility (FR-SVE-* / NFR-SVE-*) is now covered by S-21..S-26, expanding the formerly docs-only mod-compatibility row. The remaining "covered by docs, no story" line (onboarding) is intentional — it's a documentation deliverable rather than user-observable behavior.
+No FR group is left uncovered. SVE compatibility (FR-SVE-* / NFR-SVE-*) is now covered by S-21..S-26, expanding the formerly docs-only mod-compatibility row. TODO-10's shed-greenhouse requirements are covered by the refined S-25 plus S-26 route-provider/testability criteria. The remaining "covered by docs, no story" line (onboarding) is intentional — it's a documentation deliverable rather than user-observable behavior.

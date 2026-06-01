@@ -4,16 +4,14 @@ using Xunit;
 namespace Dayswork.Tests.Compat;
 
 /// <summary>
-/// In U-SVE-01 both profiles must report "no override" for every lookup (Vanilla by design;
-/// SVE because its override tables are empty until U-SVE-02..04). This guarantees no behavior
-/// change in this unit (BR-SVE-05/07, S-21).
+/// Vanilla remains the Null-Object profile: every lookup reports "no override" so vanilla
+/// behavior does not change when expansion compatibility seams are called.
 /// </summary>
 public sealed class ExpansionProfileNoOpTests
 {
     public static IEnumerable<object[]> Profiles() => new[]
     {
         new object[] { new VanillaExpansionProfile() },
-        new object[] { new SveExpansionProfile() },
     };
 
     [Theory]
@@ -46,6 +44,20 @@ public sealed class ExpansionProfileNoOpTests
     public void Premium_tier_mapping_is_null(IExpansionProfile profile)
     {
         Assert.Null(profile.MapPremiumBuildingTier("Barn"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Route_and_descriptor_lookups_are_empty(IExpansionProfile profile)
+    {
+        Assert.Empty(profile.GetLocationDescriptors());
+        Assert.False(profile.TryGetRoute(
+            new ExpansionRouteRequest(
+                new FarmMapSignature(140, 93),
+                "Farm",
+                SveExpansionProfile.GrandpasShedGreenhouseLocation,
+                ExpansionRoutePurpose.WorkEntry),
+            out _));
     }
 
     [Fact]

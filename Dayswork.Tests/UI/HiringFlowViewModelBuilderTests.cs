@@ -129,7 +129,7 @@ public sealed class HiringFlowViewModelBuilderTests
         draft.EnabledTasks.UnionWith(enabledTasks);
         draft.OutdoorZones.AddRange(selection.OutdoorZones);
         draft.AnimalBuildings.AddRange(selection.AnimalBuildings);
-        draft.Greenhouse = selection.Greenhouse;
+        draft.Greenhouses.AddRange(selection.Greenhouses);
         return draft;
     }
 }

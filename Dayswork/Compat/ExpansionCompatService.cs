@@ -1,5 +1,6 @@
 using Dayswork.Core.Compat;
 using Dayswork.Core.Domain;
+using Dayswork.Worker;
 using Microsoft.Xna.Framework;
 using StardewValley;
 using StardewValley.Buildings;
@@ -131,6 +132,160 @@ internal sealed class ExpansionCompatService
     public bool IsExpansionWorkLocation(GameLocation location) =>
         _activeProfile.IsExpansionWorkLocation(location.NameOrUniqueName);
 
+    public bool TryGetExpansionLocationDescriptor(string locationName, out ExpansionLocationDescriptor descriptor)
+    {
+        descriptor = _activeProfile.GetLocationDescriptors().FirstOrDefault(candidate =>
+            string.Equals(candidate.LocationName, locationName, StringComparison.OrdinalIgnoreCase))!;
+        return descriptor is not null;
+    }
+
+    public IReadOnlyList<ExpansionLocationDescriptor> GetExpansionLocationDescriptors() =>
+        _activeProfile.GetLocationDescriptors();
+
+    public bool IsExpansionDepositLocation(string locationName) =>
+        TryGetExpansionLocationDescriptor(locationName, out var descriptor) &&
+        descriptor.IsDepositDestinationEligible;
+
+    public bool IsExpansionChestVisibleForScope(
+        ExpansionLocationDescriptor descriptor,
+        GreenhouseSelection? selectedGreenhouse) =>
+        descriptor.IsDepositDestinationEligible &&
+        selectedGreenhouse is not null &&
+        string.Equals(
+            selectedGreenhouse.LocationName,
+            descriptor.AssociatedWorkLocationName,
+            StringComparison.OrdinalIgnoreCase);
+
+    public bool TryValidateRoute(
+        Farm farm,
+        string sourceLocationName,
+        string targetLocationName,
+        ExpansionRoutePurpose purpose,
+        out ValidatedExpansionRoute route,
+        out ExpansionRouteFailure failure)
+    {
+        if (!TryComputeSignature(farm, out var signature))
+        {
+            var requestWithoutSignature = new ExpansionRouteRequest(
+                new FarmMapSignature(0, 0),
+                sourceLocationName,
+                targetLocationName,
+                purpose);
+            route = null!;
+            failure = new ExpansionRouteFailure(
+                requestWithoutSignature,
+                null,
+                null,
+                ExpansionRouteFailureReason.UnsupportedFarmSignature,
+                "farm_signature_unavailable");
+            return false;
+        }
+
+        var request = new ExpansionRouteRequest(signature, sourceLocationName, targetLocationName, purpose);
+        if (!_activeProfile.TryGetRoute(request, out var definition))
+        {
+            route = null!;
+            failure = new ExpansionRouteFailure(
+                request,
+                null,
+                null,
+                ExpansionRouteFailureReason.RouteNotDefined,
+                "route_not_defined");
+            return false;
+        }
+
+        var hops = new List<ValidatedExpansionRouteHop>(definition.Hops.Count);
+        foreach (var hop in definition.Hops.OrderBy(hop => hop.Ordinal))
+        {
+            if (!TryResolveLocation(farm, hop.SourceLocationName, out var source))
+            {
+                route = null!;
+                failure = new ExpansionRouteFailure(
+                    request,
+                    definition.Id,
+                    hop.Ordinal,
+                    ExpansionRouteFailureReason.SourceLocationMissing,
+                    $"source_missing_{hop.SourceLocationName}");
+                return false;
+            }
+
+            if (!TryResolveLocation(farm, hop.TargetLocationName, out var target))
+            {
+                route = null!;
+                failure = new ExpansionRouteFailure(
+                    request,
+                    definition.Id,
+                    hop.Ordinal,
+                    ExpansionRouteFailureReason.TargetLocationMissing,
+                    $"target_missing_{hop.TargetLocationName}");
+                return false;
+            }
+
+            if (!IsWithinMap(hop.ApproachTile, source))
+            {
+                route = null!;
+                failure = new ExpansionRouteFailure(
+                    request,
+                    definition.Id,
+                    hop.Ordinal,
+                    ExpansionRouteFailureReason.ApproachTileInvalid,
+                    $"approach_invalid_{source.NameOrUniqueName}_{hop.ApproachTile.X}_{hop.ApproachTile.Y}");
+                return false;
+            }
+
+            if (!IsWithinMap(hop.ArrivalTile, target))
+            {
+                route = null!;
+                failure = new ExpansionRouteFailure(
+                    request,
+                    definition.Id,
+                    hop.Ordinal,
+                    ExpansionRouteFailureReason.ArrivalTileInvalid,
+                    $"arrival_invalid_{target.NameOrUniqueName}_{hop.ArrivalTile.X}_{hop.ArrivalTile.Y}");
+                return false;
+            }
+
+            if (!WorkerMovementDriver.IsTilePassableForWorker(new Point(hop.ApproachTile.X, hop.ApproachTile.Y), source))
+            {
+                route = null!;
+                failure = new ExpansionRouteFailure(
+                    request,
+                    definition.Id,
+                    hop.Ordinal,
+                    ExpansionRouteFailureReason.ApproachTileBlocked,
+                    $"approach_blocked_{source.NameOrUniqueName}_{hop.ApproachTile.X}_{hop.ApproachTile.Y}");
+                return false;
+            }
+
+            if (!WorkerMovementDriver.IsTilePassableForWorker(new Point(hop.ArrivalTile.X, hop.ArrivalTile.Y), target))
+            {
+                route = null!;
+                failure = new ExpansionRouteFailure(
+                    request,
+                    definition.Id,
+                    hop.Ordinal,
+                    ExpansionRouteFailureReason.ArrivalTileBlocked,
+                    $"arrival_blocked_{target.NameOrUniqueName}_{hop.ArrivalTile.X}_{hop.ArrivalTile.Y}");
+                return false;
+            }
+
+            hops.Add(new ValidatedExpansionRouteHop(hop, source, target));
+        }
+
+        route = new ValidatedExpansionRoute(definition, hops);
+        failure = null!;
+        return true;
+    }
+
+    internal static string FormatRouteFailure(ExpansionRouteFailure failure)
+    {
+        var route = failure.RouteId?.Value ?? "<unresolved>";
+        var hop = failure.HopOrdinal is null ? "n/a" : failure.HopOrdinal.Value.ToString();
+        return $"expansion_route|route={route}|purpose={failure.Request.Purpose}|" +
+               $"source={failure.Request.SourceLocationName}|target={failure.Request.TargetLocationName}|" +
+               $"hop={hop}|reason={failure.Reason}|detail={failure.Detail}";
+    }
+
     private static int CountTroughTiles(GameLocation location)
     {
         var layer = location.Map.Layers[0];
@@ -144,4 +299,34 @@ internal sealed class ExpansionCompatService
 
         return count;
     }
+
+    private static bool TryResolveLocation(Farm farm, string locationName, out GameLocation location)
+    {
+        if (string.Equals(locationName, "Farm", StringComparison.OrdinalIgnoreCase))
+        {
+            location = farm;
+            return true;
+        }
+
+        location = Game1.getLocationFromName(locationName);
+        return location is not null;
+    }
+
+    private static bool IsWithinMap(TileCoord tile, GameLocation location)
+    {
+        var layer = location.Map.Layers[0];
+        return tile.X >= 0 &&
+               tile.Y >= 0 &&
+               tile.X < layer.LayerWidth &&
+               tile.Y < layer.LayerHeight;
+    }
 }
+
+internal sealed record ValidatedExpansionRoute(
+    ExpansionRouteDefinition Definition,
+    IReadOnlyList<ValidatedExpansionRouteHop> Hops);
+
+internal sealed record ValidatedExpansionRouteHop(
+    ExpansionRouteHop Hop,
+    GameLocation Source,
+    GameLocation Target);

@@ -35,6 +35,15 @@ public interface IExpansionProfile
     /// <summary>Whether a location is an expansion work location (e.g., Grandpa's Shed).</summary>
     bool IsExpansionWorkLocation(string locationName);
 
+    /// <summary>Expansion locations that can participate in work selection or output routing.</summary>
+    IReadOnlyList<ExpansionLocationDescriptor> GetLocationDescriptors();
+
+    /// <summary>
+    /// Explicit route lookup for supported cross-location expansion paths. Returns false when the
+    /// profile has no exact route for the farm signature, source, target, and purpose.
+    /// </summary>
+    bool TryGetRoute(ExpansionRouteRequest request, out ExpansionRouteDefinition route);
+
     /// <summary>
     /// Maps an expansion premium animal-building type to its nearest vanilla
     /// <see cref="AnimalBuildingTier"/> for scope/pricing; returns null when not applicable.

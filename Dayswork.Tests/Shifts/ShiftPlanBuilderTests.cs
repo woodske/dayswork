@@ -291,7 +291,7 @@ public sealed class ShiftPlanBuilderTests
         OutdoorWorkScope? outdoor = null,
         IReadOnlyList<AnimalBuildingScope>? animalBuildings = null,
         GreenhouseWorkScope? greenhouse = null) =>
-        new(
+        WorkScopeSet.WithSingleGreenhouse(
             outdoor,
             animalBuildings ?? Array.Empty<AnimalBuildingScope>(),
             greenhouse);

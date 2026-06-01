@@ -22,15 +22,19 @@ public sealed class WorkScopeClassifier : IWorkScopeClassifier
                     .Select(building => new AnimalBuildingScope(building.LocationName, building.Tier)));
         }
 
-        GreenhouseWorkScope? greenhouseWork = null;
-        if (selection.Greenhouse is not null
-            && !string.IsNullOrWhiteSpace(selection.Greenhouse.LocationName)
-            && enabledTasks.Any(TaskKindSets.IsGreenhouseService))
+        var greenhouseWorks = new List<GreenhouseWorkScope>();
+        if (enabledTasks.Any(TaskKindSets.IsGreenhouseService))
         {
-            greenhouseWork = new GreenhouseWorkScope(selection.Greenhouse.LocationName);
+            greenhouseWorks.AddRange(
+                selection.Greenhouses
+                    .Where(greenhouse => !string.IsNullOrWhiteSpace(greenhouse.LocationName))
+                    .Select(greenhouse => greenhouse.LocationName)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(locationName => locationName, StringComparer.Ordinal)
+                    .Select(locationName => new GreenhouseWorkScope(locationName)));
         }
 
-        return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWork);
+        return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks);
     }
 
     private static OutdoorWorkScope BuildOutdoorWorkScope(IReadOnlyList<Zone> zones)

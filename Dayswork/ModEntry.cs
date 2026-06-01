@@ -133,7 +133,7 @@ public sealed class ModEntry : Mod
         // TODO: REMOVE before release — debug command for verifying save/load persistence (task #1 play-test)
         RegisterDebugCommands(helper, store, playerTileStepLogger);
 
-        this.Monitor.Log($"Dayswork loaded ({this.ModManifest.Version}) build=U24-Step19", LogLevel.Info);
+        this.Monitor.Log($"Dayswork loaded ({this.ModManifest.Version})", LogLevel.Info);
     }
 
     private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
