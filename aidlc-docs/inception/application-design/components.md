@@ -361,3 +361,14 @@ These are pure domain/value types rather than top-level orchestrators, but they 
 - **Total**: 39 components
 
 The increase versus the earlier design is intentional: the redesign replaces one big hourly-billing mental model with clearer, explicitly separated responsibilities for typed scope modeling, pricing snapshots, and worker energy.
+
+---
+
+## Addendum — SVE Compatibility Provider Seam (2026-05-29)
+
+The Stardew Valley Expanded compatibility change adds an isolated expansion-compatibility seam. Full design in [sve-compatibility-application-design.md](sve-compatibility-application-design.md). New components:
+
+- **Core (`Dayswork.Core/Compat/`)**: `C-19 IExpansionProfile`, `C-20 ExpansionProfileSelector`, `C-21 VanillaExpansionProfile`, `C-22 SveExpansionProfile`, `C-23 AnimalBuildingCapacityPolicy` (all pure).
+- **Mod (`Dayswork/Compat/`)**: `M-22 ExpansionDetector`, `M-23 ExpansionCompatService` (the runtime seam).
+
+Existing components (`ShiftOrchestrator`, `AnimalTaskHandler`, `ObjectTargetClassifier`, building navigators) delegate to `M-23` with no inline SVE branches; the Vanilla profile guarantees unchanged vanilla behavior.

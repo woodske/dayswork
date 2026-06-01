@@ -10,5 +10,4 @@ public sealed class ContractDtoV2
     public GameDateDtoV1 HireDate { get; set; } = new();
     public ContractScopeSelectionDto ScopeSelection { get; set; } = new();
     public ContractTermsSnapshotDto TermsSnapshot { get; set; } = new();
-    public LegacyFinancialBridgeDto LegacyFinancialBridge { get; set; } = new();
 }

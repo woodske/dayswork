@@ -38,16 +38,6 @@ public sealed class ContractTermsBuilder : IContractTermsBuilder
         return preview.ProposedTerms;
     }
 
-    public ContractTermsSnapshot RebuildTerms(
-        Contract contract,
-        IConfigSnapshot config)
-    {
-        if (contract.ScopeSelection is null)
-            throw new InvalidOperationException("Cannot rebuild contract terms for a legacy contract without a saved scope selection.");
-
-        return BuildTerms(contract.ScopeSelection, contract.EnabledTasks, config);
-    }
-
     public ContractPreview BuildPreview(
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,

@@ -27,7 +27,7 @@ internal static class HiringFlowViewModelBuilder
         var scopeSummary = new ScopeSummaryModel(
             draft.ScopeSelection.OutdoorZones,
             draft.ScopeSelection.AnimalBuildings,
-            draft.ScopeSelection.Greenhouse);
+            draft.ScopeSelection.Greenhouses);
 
         var selectedTasks = TaskPresentation.TaskOrder
             .Where(draft.EnabledTasks.Contains)
@@ -86,7 +86,7 @@ internal static class HiringFlowViewModelBuilder
         if (TaskKindSets.IsOutdoorService(task) && draft.OutdoorZones.Count == 0)
             return ServiceContributionState.NeedsOutdoorScope;
 
-        if (TaskKindSets.IsGreenhouseService(task) && draft.Greenhouse is null)
+        if (TaskKindSets.IsGreenhouseService(task) && draft.Greenhouses.Count == 0)
             return ServiceContributionState.NeedsGreenhouseScope;
 
         return ServiceContributionState.NeedsOutdoorScope;

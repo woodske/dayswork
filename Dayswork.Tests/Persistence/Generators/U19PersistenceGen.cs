@@ -9,8 +9,6 @@ namespace Dayswork.Tests.Persistence.Generators;
 
 public static class U19PersistenceGen
 {
-    private static readonly TileCoord CompatibilityPlaceholderTopLeft = new(0, 0);
-    private static readonly TileCoord CompatibilityPlaceholderBottomRight = new(999, 999);
     private static readonly TaskKind[] OutputProducingTasks =
     {
         TaskKind.HarvestCrops,
@@ -32,20 +30,16 @@ public static class U19PersistenceGen
          from schedule in Gen.Elements(ContractSchedule.OneTime, ContractSchedule.Recurring)
          from status in Gen.Elements(ContractStatus.Active, ContractStatus.Paused, ContractStatus.Cancelled)
          from hireDate in GameDateGen()
-         from financial in FinancialBridgeGen()
          from taskDestinations in TaskDestinationsGen(enabledTasks)
          select new Contract(
              Id: new ContractId(id),
              EnabledTasks: enabledTasks,
-             Zones: ProjectCompatibilityZones(canonicalScope),
              TaskDestinations: taskDestinations,
              Schedule: schedule,
              Status: status,
              HireDate: hireDate,
-             DepositAmount: financial.depositAmount,
-             HourlyRate: financial.hourlyRate,
              ScopeSelection: canonicalScope,
-             TermsSnapshot: preview.ProposedTerms))
+             TermsSnapshot: preview.ProposedTerms!))
         .ToArbitrary();
 
     public static Arbitrary<ContractTermsSnapshot> TermsSnapshot() =>
@@ -90,13 +84,10 @@ public static class U19PersistenceGen
         return new Contract(
             Id: new ContractId(Guid.Parse("11111111-2222-3333-4444-555555555555")),
             EnabledTasks: enabledTasks,
-            Zones: ProjectCompatibilityZones(scope),
             TaskDestinations: taskDestinations,
             Schedule: ContractSchedule.Recurring,
             Status: ContractStatus.Active,
             HireDate: new GameDate(12, Season.Fall, 2),
-            DepositAmount: 650,
-            HourlyRate: 95,
             ScopeSelection: scope,
             TermsSnapshot: BuildTerms(scope, enabledTasks));
     }
@@ -189,33 +180,6 @@ public static class U19PersistenceGen
         from season in Gen.Elements(Season.Spring, Season.Summer, Season.Fall, Season.Winter)
         from year in Gen.Choose(1, 10)
         select new GameDate(day, season, year);
-
-    private static Gen<(int depositAmount, int hourlyRate)> FinancialBridgeGen() =>
-        from depositAmount in Gen.Choose(0, 10_000)
-        from hourlyRate in Gen.Choose(50, 500)
-        select (depositAmount, hourlyRate);
-
-    private static IReadOnlyList<Zone> ProjectCompatibilityZones(ContractScopeSelection selection)
-    {
-        var projected = new List<Zone>();
-        projected.AddRange(selection.OutdoorZones);
-        projected.AddRange(selection.AnimalBuildings.Select(building =>
-            new Zone(building.LocationName, CompatibilityPlaceholderTopLeft, CompatibilityPlaceholderBottomRight)));
-
-        if (selection.Greenhouse is not null)
-        {
-            projected.Add(new Zone(
-                selection.Greenhouse.LocationName,
-                CompatibilityPlaceholderTopLeft,
-                CompatibilityPlaceholderBottomRight));
-        }
-
-        return projected
-            .Distinct()
-            .OrderBy(zone => $"{zone.LocationName}|{zone.TopLeft.X}|{zone.TopLeft.Y}|{zone.BottomRight.X}|{zone.BottomRight.Y}", StringComparer.Ordinal)
-            .ToList()
-            .AsReadOnly();
-    }
 
     private static ContractScopeSelection CanonicalizeScopeSelection(ContractScopeSelection selection) =>
         new(

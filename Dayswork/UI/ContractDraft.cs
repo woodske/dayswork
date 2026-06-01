@@ -11,8 +11,7 @@ internal sealed class ContractDraft
     public Dictionary<TaskKind, DestinationKey> Destinations { get; } = new();
     public ContractSchedule Schedule { get; set; } = ContractSchedule.OneTime;
     public ContractId? EditingId { get; set; }
-    public DraftHydrationMode HydrationMode { get; set; } = DraftHydrationMode.NewDraft;
-    public GreenhouseSelection? Greenhouse { get; set; }
+    public List<GreenhouseSelection> Greenhouses { get; } = new();
     public DraftPreviewState PreviewState { get; set; } = DraftPreviewState.Empty;
 
     public bool IsEditing => EditingId.HasValue;
@@ -30,17 +29,14 @@ internal sealed class ContractDraft
                 .ThenBy(building => building.Tier)
                 .ToList()
                 .AsReadOnly(),
-            Greenhouse: Greenhouse);
+            Greenhouses: Greenhouses
+                .Distinct()
+                .OrderBy(greenhouse => greenhouse.LocationName, StringComparer.Ordinal)
+                .ToList()
+                .AsReadOnly());
 
     private static string DescribeZone(Zone zone) =>
         $"{zone.LocationName}|{zone.TopLeft.X}|{zone.TopLeft.Y}|{zone.BottomRight.X}|{zone.BottomRight.Y}";
-}
-
-internal enum DraftHydrationMode
-{
-    NewDraft,
-    HydratedFromAuthoritativeScope,
-    DerivedFromCompatibilityZones,
 }
 
 internal sealed record DraftPreviewState(
@@ -59,13 +55,13 @@ internal sealed record DraftPreviewState(
             new ScopeSummaryModel(
                 Array.Empty<Zone>(),
                 Array.Empty<AnimalBuildingSelection>(),
-                null),
+                Array.Empty<GreenhouseSelection>()),
             new SummaryReviewModel(
                 Array.Empty<TaskKind>(),
                 new ScopeSummaryModel(
                     Array.Empty<Zone>(),
                     Array.Empty<AnimalBuildingSelection>(),
-                    null),
+                    Array.Empty<GreenhouseSelection>()),
                 null,
                 null,
                 PaymentTimingKind.OneTimeChargeNow,
@@ -90,7 +86,10 @@ internal enum ServiceContributionState
 internal sealed record ScopeSummaryModel(
     IReadOnlyList<Zone> OutdoorZones,
     IReadOnlyList<AnimalBuildingSelection> AnimalBuildings,
-    GreenhouseSelection? Greenhouse);
+    IReadOnlyList<GreenhouseSelection> Greenhouses)
+{
+    public GreenhouseSelection? Greenhouse => Greenhouses.Count > 0 ? Greenhouses[0] : null;
+}
 
 internal sealed record SummaryReviewModel(
     IReadOnlyList<TaskKind> SelectedTasks,

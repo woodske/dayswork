@@ -4,9 +4,6 @@ using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 
 public sealed record ConfigSnapshot(
-    int BaseRate,
-    IReadOnlyDictionary<TaskKind, int> TaskIncrements,
-    double AverageSpeedConstant,
     int HardCapTime,
     int StuckInitialWaitMinutes,
     int StuckPostTeleportWaitMinutes,
@@ -24,8 +21,6 @@ public sealed record ConfigSnapshot(
     // IReadOnlyDictionary uses reference equality, so override to get structural equality.
     public bool Equals(ConfigSnapshot? other) =>
         other is not null
-        && BaseRate == other.BaseRate
-        && AverageSpeedConstant == other.AverageSpeedConstant
         && HardCapTime == other.HardCapTime
         && StuckInitialWaitMinutes == other.StuckInitialWaitMinutes
         && StuckPostTeleportWaitMinutes == other.StuckPostTeleportWaitMinutes
@@ -33,7 +28,6 @@ public sealed record ConfigSnapshot(
         && WorkerActionAnimationMs == other.WorkerActionAnimationMs
         && WorkerEntranceHoldTicks == other.WorkerEntranceHoldTicks
         && WorkerDailyEnergyCapacity == other.WorkerDailyEnergyCapacity
-        && DictionaryEquals(TaskIncrements, other.TaskIncrements)
         && DictionaryEquals(OutdoorBandThresholds, other.OutdoorBandThresholds)
         && DictionaryEquals(OutdoorServiceBandPrices, other.OutdoorServiceBandPrices)
         && DictionaryEquals(AnimalBuildingPrices, other.AnimalBuildingPrices)
@@ -43,8 +37,6 @@ public sealed record ConfigSnapshot(
     public override int GetHashCode()
     {
         var hash = new HashCode();
-        hash.Add(BaseRate);
-        hash.Add(AverageSpeedConstant);
         hash.Add(HardCapTime);
         hash.Add(StuckInitialWaitMinutes);
         hash.Add(StuckPostTeleportWaitMinutes);
@@ -52,7 +44,6 @@ public sealed record ConfigSnapshot(
         hash.Add(WorkerActionAnimationMs);
         hash.Add(WorkerEntranceHoldTicks);
         hash.Add(WorkerDailyEnergyCapacity);
-        hash.Add(TaskIncrements.Count);
         hash.Add(OutdoorBandThresholds.Count);
         hash.Add(OutdoorServiceBandPrices.Count);
         hash.Add(AnimalBuildingPrices.Count);

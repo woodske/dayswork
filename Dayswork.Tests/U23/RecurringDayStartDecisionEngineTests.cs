@@ -50,37 +50,6 @@ public sealed class RecurringDayStartDecisionEngineTests
     }
 
     [Fact]
-    public void MissingTypedScope_ReturnsNeedsAttentionWithoutPersisting()
-    {
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract() with { ScopeSelection = null };
-        var config = ConfigDefaults.Build();
-
-        var outcome = _engine.Evaluate(contract, config, festivalToday: false, availableGold: int.MaxValue);
-
-        Assert.Equal(RecurringTermsRefreshStatus.Unsupported, outcome.Refresh.Status);
-        Assert.Null(outcome.Refresh.TermsSnapshot);
-        Assert.False(outcome.ShouldPersistTermsSnapshot);
-        Assert.False(outcome.ShouldChargePlayer);
-        Assert.False(outcome.ShouldStartShift);
-        Assert.Equal(RecurringDayStartNoticeKind.NeedsAttention, outcome.NoticeKind);
-    }
-
-    [Fact]
-    public void InvalidRefresh_DoesNotReplacePreviouslySavedTerms()
-    {
-        var store = new ContractStore(_ => { });
-        var original = U19PersistenceGen.CreateExampleCurrentSchemaContract();
-        store.Add(original);
-
-        var invalidContract = original with { ScopeSelection = null };
-        var outcome = _engine.Evaluate(invalidContract, ConfigDefaults.Build(), festivalToday: false, availableGold: int.MaxValue);
-        if (outcome.ShouldPersistTermsSnapshot && outcome.Refresh.TermsSnapshot is not null)
-            store.ReplaceTermsSnapshot(invalidContract.Id, outcome.Refresh.TermsSnapshot);
-
-        Assert.True(ContractStructuralComparer.ContractsEqual(original, store.Get(original.Id)));
-    }
-
-    [Fact]
     public void UnaffordableRefresh_SkipsWorkButKeepsRefreshedTermsEligibleForPersistence()
     {
         var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();

@@ -4,75 +4,16 @@ namespace Dayswork.UI;
 
 internal static class LegacyScopeBootstrapper
 {
-    private static readonly TileCoord CompatibilityPlaceholderTopLeft = new(0, 0);
-    private static readonly TileCoord CompatibilityPlaceholderBottomRight = new(999, 999);
-
     public static void HydrateDraft(ContractDraft draft, Contract contract)
     {
-        var selection = contract.ScopeSelection ?? Bootstrap(contract.Zones);
+        var selection = contract.ScopeSelection;
 
         draft.OutdoorZones.Clear();
         draft.OutdoorZones.AddRange(selection.OutdoorZones);
         draft.AnimalBuildings.Clear();
         draft.AnimalBuildings.AddRange(selection.AnimalBuildings);
-        draft.Greenhouse = selection.Greenhouse;
-        draft.HydrationMode = contract.ScopeSelection is null
-            ? DraftHydrationMode.DerivedFromCompatibilityZones
-            : DraftHydrationMode.HydratedFromAuthoritativeScope;
-    }
-
-    public static ContractScopeSelection Bootstrap(IReadOnlyList<Zone> compatibilityZones)
-    {
-        var outdoorZones = compatibilityZones
-            .Where(zone => string.Equals(zone.LocationName, "Farm", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(DescribeZone, StringComparer.Ordinal)
-            .ToList();
-
-        var greenhouseZone = compatibilityZones.FirstOrDefault(zone => IsGreenhouseLocation(zone.LocationName));
-        var greenhouse = greenhouseZone is null ? null : new GreenhouseSelection(greenhouseZone.LocationName);
-
-        var animalBuildings = compatibilityZones
-            .Where(zone =>
-                !string.Equals(zone.LocationName, "Farm", StringComparison.OrdinalIgnoreCase)
-                && !IsGreenhouseLocation(zone.LocationName))
-            .Select(zone => TryInferAnimalBuildingSelection(zone.LocationName))
-            .Where(selection => selection is not null)
-            .Cast<AnimalBuildingSelection>()
-            .Distinct()
-            .OrderBy(selection => selection.LocationName, StringComparer.Ordinal)
-            .ThenBy(selection => selection.Tier)
-            .ToList();
-
-        return new ContractScopeSelection(
-            OutdoorZones: outdoorZones.AsReadOnly(),
-            AnimalBuildings: animalBuildings.AsReadOnly(),
-            Greenhouse: greenhouse);
-    }
-
-    public static IReadOnlyList<Zone> ProjectCompatibilityZones(ContractScopeSelection selection)
-    {
-        var zones = new List<Zone>();
-        zones.AddRange(selection.OutdoorZones);
-
-        zones.AddRange(selection.AnimalBuildings.Select(building =>
-            new Zone(
-                building.LocationName,
-                CompatibilityPlaceholderTopLeft,
-                CompatibilityPlaceholderBottomRight)));
-
-        if (selection.Greenhouse is not null)
-        {
-            zones.Add(new Zone(
-                selection.Greenhouse.LocationName,
-                CompatibilityPlaceholderTopLeft,
-                CompatibilityPlaceholderBottomRight));
-        }
-
-        return zones
-            .Distinct()
-            .OrderBy(DescribeZone, StringComparer.Ordinal)
-            .ToList()
-            .AsReadOnly();
+        draft.Greenhouses.Clear();
+        draft.Greenhouses.AddRange(selection.Greenhouses);
     }
 
     public static IReadOnlyList<BuildingOutline> FilterSupportedBuildings(IEnumerable<BuildingOutline> outlines) =>
@@ -88,7 +29,7 @@ internal static class LegacyScopeBootstrapper
         IEnumerable<BuildingOutline> selectedBuildings)
     {
         draft.AnimalBuildings.Clear();
-        draft.Greenhouse = null;
+        draft.Greenhouses.Clear();
 
         var anySupported = false;
         foreach (var outline in selectedBuildings)
@@ -99,8 +40,8 @@ internal static class LegacyScopeBootstrapper
                 if (animalBuilding is not null && !draft.AnimalBuildings.Contains(animalBuilding))
                     draft.AnimalBuildings.Add(animalBuilding);
 
-                if (greenhouse is not null)
-                    draft.Greenhouse = greenhouse;
+                if (greenhouse is not null && !draft.Greenhouses.Contains(greenhouse))
+                    draft.Greenhouses.Add(greenhouse);
             }
         }
 
@@ -124,8 +65,26 @@ internal static class LegacyScopeBootstrapper
             return true;
         }
 
-        animalBuilding = TryInferAnimalBuildingSelection(outline.DisplayName)
-                         ?? TryInferAnimalBuildingSelection(outline.LocationName);
+        // Expansion premium buildings (e.g., SVE Premium Coop/Barn) map to their nearest vanilla
+        // tier before the vanilla name-substring inference, which would otherwise misclassify them as
+        // the cheapest Coop/Barn tier. DisplayName carries the raw building type. Vanilla buildings
+        // get no mapping and fall through unchanged. (U-SVE-03 / BR-SVE3-06)
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryResolvePremiumBuildingTier(outline.DisplayName, out var premiumTier))
+        {
+            animalBuilding = new AnimalBuildingSelection(outline.LocationName, premiumTier);
+            return true;
+        }
+
+        // Infer the tier from the building type (DisplayName), falling back to the location name, but
+        // always key the selection on the UNIQUE outline.LocationName so two same-type buildings stay
+        // distinct (TODO-08). TryInferAnimalBuildingSelection embeds whatever name it was given as the
+        // selection's LocationName, so take only its Tier and rebuild with the unique key.
+        var inferred = TryInferAnimalBuildingSelection(outline.DisplayName)
+                       ?? TryInferAnimalBuildingSelection(outline.LocationName);
+        animalBuilding = inferred is null
+            ? null
+            : new AnimalBuildingSelection(outline.LocationName, inferred.Tier);
         return animalBuilding is not null;
     }
 
@@ -170,7 +129,4 @@ internal static class LegacyScopeBootstrapper
 
         return null;
     }
-
-    private static string DescribeZone(Zone zone) =>
-        $"{zone.LocationName}|{zone.TopLeft.X}|{zone.TopLeft.Y}|{zone.BottomRight.X}|{zone.BottomRight.Y}";
 }

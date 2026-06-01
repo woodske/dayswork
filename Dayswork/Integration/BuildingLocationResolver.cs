@@ -80,16 +80,51 @@ internal static class BuildingLocationResolver
             return "Farm";
 
         return TryResolve(farm, requestedName, out var match)
-            ? match.Interior.Name
+            ? match.Interior.NameOrUniqueName
             : requestedName;
     }
 
     public static bool TryResolve(Farm farm, string requestedName, out BuildingLocationMatch match)
     {
+        // Pass 1 — exact name match across ALL buildings before any loose fallback. Without this,
+        // a base building's name (e.g. "Coop") loose-matches a different building whose type merely
+        // contains it ("Big Coop", "Deluxe Coop", or SVE "...PremiumCoop"), so two distinct
+        // selections collapse onto whichever building enumerates first. Exact-first keeps each
+        // selection on its own building.
+        if (TryResolveWith(farm, requestedName, ExactMatches, out match))
+            return true;
+
+        // Pass 2 — loose substring fallback, for resilience when the requested name is a
+        // display-name-ish value that doesn't exactly equal the interior/type name.
+        if (TryResolveWith(farm, requestedName, Matches, out match))
+            return true;
+
+        var standalone = Game1.getLocationFromName(requestedName);
+        if (standalone is not null && TryFindFarmWarpTo(farm, standalone.Name, out var warpTile))
+        {
+            match = new BuildingLocationMatch(null, standalone, warpTile, standalone.Name);
+            return true;
+        }
+
+        match = null!;
+        return false;
+    }
+
+    private static bool TryResolveWith(
+        Farm farm,
+        string requestedName,
+        Func<string, Building, GameLocation?, bool> matcher,
+        out BuildingLocationMatch match)
+    {
         foreach (var building in farm.buildings)
         {
-            TryGetInteriorForBuilding(building, requestedName, out var interior);
-            if (!Matches(requestedName, building, interior))
+            // Resolve THIS building's OWN interior for matching — NOT via a name lookup of the
+            // requested name. The requestedName fallback in the other overload returns the *requested*
+            // building's interior regardless of which building we're iterating, so the first building
+            // would falsely match any unique-name request and lend its (wrong) door to every building
+            // (TODO-08 door regression: all buildings resolved to the first building's door).
+            TryGetInteriorForBuilding(building, out var interior);
+            if (!matcher(requestedName, building, interior))
                 continue;
 
             interior ??= ResolveInteriorByName(requestedName, building);
@@ -102,13 +137,6 @@ internal static class BuildingLocationResolver
                 interior,
                 ResolveOutdoorApproachTile(farm, door),
                 building.buildingType.Value);
-            return true;
-        }
-
-        var standalone = Game1.getLocationFromName(requestedName);
-        if (standalone is not null && TryFindFarmWarpTo(farm, standalone.Name, out var warpTile))
-        {
-            match = new BuildingLocationMatch(null, standalone, warpTile, standalone.Name);
             return true;
         }
 
@@ -156,14 +184,48 @@ internal static class BuildingLocationResolver
         ?? Game1.getLocationFromName(requestedName)
         ?? Game1.getLocationFromName(building.buildingType.Value);
 
-    private static bool Matches(string requestedName, Building building, GameLocation? interior)
-    {
-        if (NameEquals(interior?.Name, requestedName) ||
-            NameEquals(building.GetIndoorsName(), requestedName) ||
-            NameEquals(building.buildingType.Value, requestedName))
-            return true;
+    private static bool Matches(string requestedName, Building building, GameLocation? interior) =>
+        ExactMatches(requestedName, building, interior) ||
+        LooseBuildingTypeMatch(requestedName, building.buildingType.Value);
 
-        return LooseBuildingTypeMatch(requestedName, building.buildingType.Value);
+    private static bool ExactMatches(string requestedName, Building building, GameLocation? interior) =>
+        MatchesExactly(requestedName, interior?.Name, interior?.NameOrUniqueName, Safe(building.GetIndoorsName), building.buildingType.Value);
+
+    /// <summary>Pure exact-name test (interior name / interior unique name / indoors name / building
+    /// type) used by both the live resolver and <see cref="SelectBuildingIndex"/>. The unique name
+    /// (distinct per building instance) lets two same-type buildings be told apart (TODO-08).</summary>
+    internal static bool MatchesExactly(string requestedName, string? interiorName, string? interiorUniqueName, string? indoorsName, string buildingType) =>
+        NameEquals(interiorName, requestedName) ||
+        NameEquals(interiorUniqueName, requestedName) ||
+        NameEquals(indoorsName, requestedName) ||
+        NameEquals(buildingType, requestedName);
+
+    /// <summary>Identity of a building for pure resolution testing.</summary>
+    internal readonly record struct BuildingMatchInfo(string? InteriorName, string? InteriorUniqueName, string? IndoorsName, string BuildingType);
+
+    /// <summary>
+    /// Pure mirror of <see cref="TryResolve"/>'s building-selection precedence: returns the index of
+    /// the first building that matches <paramref name="requestedName"/> <em>exactly</em>; if none do,
+    /// the first that matches loosely; else -1. Exact-first is what stops a base building's name
+    /// (e.g. "Coop") from resolving to a different building whose type contains it ("Big Coop",
+    /// "Deluxe Coop", SVE "...PremiumCoop").
+    /// </summary>
+    internal static int SelectBuildingIndex(string requestedName, IReadOnlyList<BuildingMatchInfo> candidates)
+    {
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            var c = candidates[i];
+            if (MatchesExactly(requestedName, c.InteriorName, c.InteriorUniqueName, c.IndoorsName, c.BuildingType))
+                return i;
+        }
+
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            if (LooseBuildingTypeMatch(requestedName, candidates[i].BuildingType))
+                return i;
+        }
+
+        return -1;
     }
 
     private static bool LooseBuildingTypeMatch(string requestedName, string buildingType)

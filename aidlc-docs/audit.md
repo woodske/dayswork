@@ -4627,3 +4627,647 @@ Tree cutting and grass cutting by the worker shows some animation on the farmer.
 **Context**: CONSTRUCTION — Build and Test review fix for farmer animation leak during worker tool actions
 
 ---
+
+## New Active Change Request — Stardew Valley Expanded (SVE) Compatibility
+**Timestamp**: 2026-05-29T16:10:58Z
+**User Input**:
+```text
+Using ai-dlc, I want to make this mod (Dayswork) compatible with the stardew valley expanded mod, which greatly enhances the vanilla version of the game.
+
+The source code for SVE is here:  /c/Users/kwood/Repos/StardewValleyExpanded . You have all read and search permissions for that folder. Included in this repository are the available extra farm maps in addition to the SVE source code.
+Also available, the SVE wiki: https://stardew-valley-expanded.fandom.com/wiki/Stardew_Valley_Expanded_Wiki
+
+Within the SVE code are several custom farms. Note that the entrances to these farms is very different than vanilla SDV, so we'll need to account for that when spawning the worker.
+
+Some notable callouts that are not exhaustive of the changes Dayswork will need to address:
+
+* New animal buildings (premium barn and premium coop)
+* New farm maps with different entrances
+* New crops
+* New trees
+* New farm building Grandpa's Shed: https://stardew-valley-expanded.fandom.com/wiki/Grandpa%27s_Shed
+* New animals and animal products
+
+All changes made for SVE compatibility should not affect vanilla compatibility. If possible, isolate SVE compatibility code from vanilla code. Keep in mind while working on this that there are other expansion mods available, so I'd like this to be architected in a way that makes it easy to add compatibility for other mods as well.
+
+Never make assumptions, always reference the SVE source code and/or the vanilla Stardew Valley compiled code when making compatibility changes or decisions.
+```
+**AI Response**: Logged the new active change. Loaded mandatory common rules (process-overview, session-continuity, content-validation, question-format-guide, welcome-message), the workspace-detection and requirements-analysis stage rules, and both extension opt-in prompts. Confirmed the previous active change (Worker Routing and Dynamic Task Selection) is parked at its Build and Test review gate; this SVE-compatibility request opens a new INCEPTION pass. Granted read access folder `C:\Users\kwood\Repos\StardewValleyExpanded` contains the SVE core mod plus four farm/location packages (Immersive Farm 2 Remastered, Grandpa's Farm, Frontier Farm, GrampletonFields).
+**Context**: INCEPTION — new active change logged; common + stage rules loaded
+
+---
+
+## Workspace Detection — SVE Compatibility Change
+**Timestamp**: 2026-05-29T16:10:58Z
+**User Input**: (no new input — automatic stage)
+**AI Response**: Brownfield continuation of the existing Dayswork AI-DLC project (multi-project C#/.NET 6 SMAPI solution: Dayswork, Dayswork.Core, Dayswork.Tests). Performed grounded source investigation across BOTH codebases (per user instruction never to assume): (1) Worker spawn/exit is computed dynamically from `Farm.warps` (first outdoor exit warp) with a vanilla fallback tile (77,15) in `ShiftOrchestrator.cs`; (2) `ObjectTargetClassifier` classifies trees/rocks by SDV type/`IsBreakableStone()` (mostly content-agnostic) but maps `ResourceClump` boulders/logs by hardcoded vanilla sheet indices; (3) `AnimalTaskHandler` collects products data-drivenly via `currentProduce`+`ItemRegistry` (content-agnostic) but `FeedCapacity` hardcodes Deluxe=12/Big=8/else=4 and `IsAutoFeedBuilding` only matches "Deluxe" (plus a map `AutoFeed` property), and `IsMilkProduce`/`IsShearProduce` string-match Cow/Goat/Sheep; (4) `Dayswork.Core.Domain.AnimalBuildingTier` hardcodes exactly the six vanilla tiers, so SVE Premium tiers are not representable in the hiring scope UI. Verified against SVE source `code/Other/Buildings.json`: Premium Coop/Barn are `Data/Buildings` entries with `IndoorMapType: StardewValley.AnimalHouse`, `MaxOccupants: 16`, vanilla feed hopper `(BC)99`, and default-installed AutoPetter `(BC)272` + AutoGrabber `(BC)165`.
+**Context**: INCEPTION — Workspace Detection (brownfield continuation); grounded coupling-surface analysis complete
+
+---
+
+## Requirements Analysis (Started) — SVE Compatibility Change
+**Timestamp**: 2026-05-29T16:10:58Z
+**User Input**: (no new input — created clarifying questions for user)
+**AI Response**: Assessed the request as an Enhancement / compatibility feature, system-wide scope, Complex — therefore Comprehensive requirements depth. Created change-scoped clarifying questions at `aidlc-docs/inception/requirements/sve-compatibility-requirement-verification-questions.md` (preserving the original greenfield `requirement-verification-questions.md`). The file includes a grounded intent summary, the verified coupling findings, eight scoping questions (architecture/isolation approach, which farm maps, spawn/entrance strategy, premium barn/coop handling, new crops/trees/animals/products handling, Grandpa's Shed scope, SVE detection & dependency model, unsupported-content behavior), and the two mandatory extension opt-in questions (Security Baseline, Property-Based Testing) carried forward for confirmation. GATE: awaiting user answers before generating requirements.md.
+**Context**: INCEPTION — Requirements Analysis Step 6 gate; questions presented, awaiting answers
+
+---
+
+## Requirements Analysis — Answers Received & requirements.md Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T16:10:58Z
+**User Input**: "done"
+**AI Response**: Read all 10 answers from `sve-compatibility-requirement-verification-questions.md` and checked for contradictions/ambiguities per question-format-guide. Answers: Q1=A, Q2=B, Q3=A, Q4=A (with refinement: do NOT special-case AutoPetter/AutoGrabber — scan buildings as usual and naturally find no work if automation already handled it; the player can relocate/remove those machines, so their presence must not be assumed; data-driven feeding capacity is still required to fix the 16-animal underfeed), Q5=A, Q6=A, Q7=A, Q8=A, Q9=A, Q10=A. No contradictions found; the Q4 refinement narrows scope (no auto-machine detection code) and is consistent with the data-driven capacity fix. Generated `aidlc-docs/inception/requirements/sve-compatibility-requirements.md` (FR-SVE-01..16, NFR-SVE-01..07, extension config, out-of-scope, summary). Updated `aidlc-state.md` (Requirements Analysis complete, answers recorded). Presenting requirements for approval at the gate; will not proceed to the next stage until approved.
+**Context**: INCEPTION — Requirements Analysis complete; awaiting approval
+
+---
+
+## Requirements Analysis — Approved (SVE Compatibility)
+**Timestamp**: 2026-05-29T16:35:54Z
+**User Input**: "approve and continue"
+**AI Response**: Requirements approved. Updated `aidlc-state.md` (Requirements Analysis approved). Proceeded to User Stories. Performed the mandatory User Stories intelligent assessment → **Execute = Yes** (documented in `inception/plans/sve-compatibility-user-stories-assessment.md`): high-priority user-experience change to an existing user-facing workflow with multiple scenarios (SVE farm maps/entrances, premium barn/coop, new crops/trees/animals/products, Grandpa's Shed) plus a maintainer extensibility concern (the new provider seam). This is also the first story coverage of the pre-existing `FR-COMPAT` group, which was previously docs-only. Created the Part-1 story plan with embedded planning questions at `inception/plans/sve-compatibility-story-generation-plan.md`. GATE: awaiting plan answers.
+**Context**: INCEPTION — Requirements approved; User Stories Part 1 (Planning) started
+
+---
+
+## User Stories — Plan Answers Received & Analyzed (SVE Compatibility)
+**Timestamp**: 2026-05-29T16:40:31Z
+**User Input**: "done" (story-plan answers: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A)
+**AI Response**: Read all five answers from `sve-compatibility-story-generation-plan.md`. Step 9 ambiguity analysis: all are clean single-letter selections of the recommended options, no vague/contradictory/combined responses — no follow-up clarification needed. Resolved plan: hybrid placement (new "Section 6 — Expansion Compatibility (SVE)" + brief notes on S-07/S-08), no new persona, one story per surface, dedicated maintainer extensibility story, Gherkin+bullets ACs with manual-SVE-playtest annotations plus PBT/xUnit for pure compat logic. Concrete story set to generate: S-21 (detection + vanilla invariance), S-22 (SVE farm maps + entrance), S-23 (premium barn/coop), S-24 (new crops/trees/animals/products + graceful skip + item safety), S-25 (Grandpa's Shed), S-26 (maintainer provider-seam/extensibility). Logging the plan-approval prompt and awaiting explicit approval before Part 2 generation.
+**Context**: INCEPTION — User Stories plan answers analyzed (no ambiguity); awaiting plan approval
+
+---
+
+## User Stories — Plan Approved & Stories Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:15:35Z
+**User Input**: "approve and continue"
+**AI Response**: Story plan approved. Executed Part 2 generation per the approved plan. Updated `inception/user-stories/stories.md`: added new **Section 6 — Expansion Compatibility (SVE)** with S-21 (vanilla stays vanilla + SVE auto-detect; FR-SVE-01/02/03, NFR-SVE-01), S-22 (worker entrance on IF2R/Grandpa's Farm/Frontier Farm + unreachable-tile skip; FR-SVE-05/06/15), S-23 (premium barn/coop full servicing, data-driven capacity, scan-and-skip with no auto-machine assumption, premium tiers selectable; FR-SVE-07..11), S-24 (new crops/trees/animals/products via data-driven paths + verified gaps + graceful skip + item safety; FR-SVE-12/13/15/16, NFR-SVE-04), S-25 (Grandpa's Shed as a work location; FR-SVE-14/16); and added S-26 (maintainer expansion-compatibility provider seam / extensibility / PBT obligations; FR-SVE-01/04, NFR-SVE-02/03/05/06/07) to Section 5. Added SVE notes to S-07 and S-08, refreshed the coverage summary (expanding the formerly docs-only FR-COMPAT row to S-21..S-26), and updated `personas.md` (review confirmed no new persona; P-01/P-02/P-03 story lists and coverage matrix extended). All SVE-asset-dependent acceptance criteria are annotated "validated via manual SVE playtest"; pure compatibility logic carries xUnit + FsCheck PBT obligations. Marked the story-generation-plan checklist complete and updated `aidlc-state.md`. Presenting generated stories for approval.
+**Context**: INCEPTION — User Stories Part 2 generation complete; awaiting story approval
+
+---
+
+## User Stories Approved & Workflow Planning Complete (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:19:57Z
+**User Input**: "continue"
+**AI Response**: User stories approved (S-21..S-26 + persona updates). Updated `aidlc-state.md` (User Stories approved). Executed Workflow Planning (always-on stage): loaded all prior context (requirements, stories), performed scope/impact/risk analysis, and created `inception/plans/sve-compatibility-execution-plan.md` with a validated Mermaid diagram + text alternative. Determination: **EXECUTE** Application Design (new expansion-compatibility provider seam = new component group), **EXECUTE** Units Generation (foundation + ~3 independent override surfaces), per-unit **EXECUTE** Functional Design / NFR Requirements / NFR Design, **SKIP** Infrastructure Design (no cloud/IaC), **EXECUTE** Code Generation + Build and Test. This differs from the worker-routing patch (which skipped App Design + Units) because SVE compatibility adds a real architectural seam and decomposes naturally. Proposed units: U-SVE-01 provider foundation/detection (S-21/S-26), U-SVE-02 farm maps + entrance (S-22), U-SVE-03 animal buildings (S-23), U-SVE-04 content + Grandpa's Shed (S-24/S-25). Risk Medium–High; vanilla path protected by NFR-SVE-01 invariance. Presenting the plan for approval; emphasized the user can override stage inclusion or unit count.
+**Context**: INCEPTION — Workflow Planning complete; awaiting plan approval
+
+---
+
+## Workflow Plan Approved & Application Design Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:25:54Z
+**User Input**: "approve and continue"
+**AI Response**: Workflow plan approved. Updated `aidlc-state.md` (Workflow Planning approved). Began Application Design. Grounded the design in source: confirmed the SMAPI `ModRegistry` detection idiom already used in `ModEntry`/`GMCMRegistrar`; confirmed SVE is multiple mods (content `FlashShifter.StardewValleyExpandedCP` / core C# `FlashShifter.SVECode`; farm maps `flashshifter.immersivefarm2remastered`, `flashshifter.GrandpasFarm`, `flashshifter.FrontierFarm`); confirmed the existing component model (C-## Core / M-## Mod, S-A..S-G services, strict Core-pure/Mod-SMAPI split) and that `AnimalBuildingScope`/`Selection`/`PriceKey` key on the six-value `AnimalBuildingTier` enum. Proposed compat seam — Core: C-19 IExpansionProfile, C-20 ExpansionProfileSelector, C-21 VanillaExpansionProfile, C-22 SveExpansionProfile, C-23 AnimalBuildingCapacityPolicy; Mod: M-22 ExpansionDetector, M-23 ExpansionCompatService; existing call sites delegate to the seam with no inline SVE branches. Created `inception/plans/sve-compatibility-application-design-plan.md` with 5 design questions (seam shape, where SVE data lives, capacity-policy generality, premium-tier scope/pricing model, call-site injection). GATE: awaiting design-plan answers.
+**Context**: INCEPTION — Application Design planning; awaiting design-plan answers
+
+---
+
+## Application Design — Answers Analyzed & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:31:47Z
+**User Input**: "done" (design-plan answers: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A)
+**AI Response**: Step 8 ambiguity analysis: all five are clean single-letter selections of the recommended options; no vague/contradictory/combined answers; no follow-up needed. Generated `inception/application-design/sve-compatibility-application-design.md` consolidating components (Core C-19 IExpansionProfile / C-20 ExpansionProfileSelector / C-21 VanillaExpansionProfile / C-22 SveExpansionProfile / C-23 AnimalBuildingCapacityPolicy; Mod M-22 ExpansionDetector / M-23 ExpansionCompatService), component methods (high-level signatures), services/ModEntry composition-root wiring, a Mermaid dependency diagram + text alternative, and the vanilla-path invariance guarantee. Key decisions: pure Core profile + selector + thin Mod runtime seam (Q1/Q2); a general data-driven `AnimalBuildingCapacityPolicy` for vanilla+SVE (Q3); SVE premium buildings mapped to nearest vanilla tier for scope/pricing with **no save-schema change** (Q4); constructor injection from `ModEntry` (Q5). Added an SVE-addendum pointer to `components.md`, ticked the design-plan checklist, and updated `aidlc-state.md`. Presenting the design for approval; next stage is Units Generation.
+**Context**: INCEPTION — Application Design complete; awaiting approval
+
+---
+
+## Application Design Approved & Units Generation Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T17:46:18Z
+**User Input**: "approve and continue"
+**AI Response**: Application Design approved. Updated `aidlc-state.md` (Application Design approved). Began Units Generation (Part 1 Planning). Created `inception/plans/sve-compatibility-unit-of-work-plan.md` proposing 4 units — U-SVE-01 (provider foundation + detection; C-19..C-23, M-22/M-23; S-21/S-26), U-SVE-02 (farm maps + worker entrance; S-22), U-SVE-03 (animal buildings; S-23), U-SVE-04 (new content + Grandpa's Shed; S-24/S-25) — with U-SVE-02/03/04 each depending only on the foundation. Three planning questions: unit count/granularity, override execution order, and foundation scope (whether U-SVE-01 ships the full seam with the SVE override tables filled incrementally). GATE: awaiting unit-plan answers.
+**Context**: INCEPTION — Units Generation Part 1 (Planning); awaiting unit-plan answers
+
+---
+
+## Units Generation — Plan Answered & Units Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T18:02:08Z
+**User Input**: "done" (unit-plan answers: Q1=A four units, Q2=A entrance-first order, Q3=A foundation ships full seam with incremental override tables)
+**AI Response**: Step 7 ambiguity analysis: all clean single-letter recommended choices; no follow-up needed. Generated the SVE unit artifacts by appending to the existing docs: `unit-of-work.md` (U-SVE-01 foundation+detection owning C-19..C-23/M-22/M-23; U-SVE-02 farm maps+entrance; U-SVE-03 animal buildings; U-SVE-04 content+Grandpa's Shed — each with owns/extends, stories, primary files, DoD), `unit-of-work-dependency.md` (SVE DAG: foundation → three independent override units; entrance-first order), and `unit-of-work-story-map.md` (S-21..S-26 → units, full coverage). Ticked the unit-plan checklist and updated `aidlc-state.md`. Presenting for approval; next is the CONSTRUCTION per-unit loop beginning with U-SVE-01.
+**Context**: INCEPTION — Units Generation complete; awaiting approval (next: CONSTRUCTION / U-SVE-01)
+
+---
+
+## Units Generation Approved — CONSTRUCTION Started, U-SVE-01 Functional Design (SVE Compatibility)
+**Timestamp**: 2026-05-29T18:05:16Z
+**User Input**: "continue"
+**AI Response**: Units Generation approved; INCEPTION complete for the SVE change. Updated `aidlc-state.md`. Entered CONSTRUCTION per-unit loop at U-SVE-01 (Functional Design EXECUTE — the provider foundation has real business logic: selection determinism, vanilla fall-through semantics, capacity derivation, detection lifecycle). Created `construction/plans/u-sve-01-expansion-compat-foundation-functional-design-plan.md` with 3 questions: (Q1) animal-building feed-capacity derivation rule and how it stays vanilla-safe — the consequential one, given NFR-SVE-01; (Q2) profile-selection precedence/determinism; (Q3) detection lifecycle/caching/logging. Noted U-SVE-01 ships the full seam with SVE override tables stubbed (unit-plan Q3=A), so this FD is about the seam's pure logic, not concrete SVE values. GATE: awaiting FD answers.
+**Context**: CONSTRUCTION — U-SVE-01 Functional Design (planning); awaiting FD answers
+
+---
+
+## U-SVE-01 Functional Design — Answers Analyzed & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T18:41:06Z
+**User Input**: "done" (FD answers: Q1=A, Q2=A, Q3=A)
+**AI Response**: Ambiguity analysis: clean single-letter recommended choices; no follow-up needed. Generated U-SVE-01 functional design under `construction/u-sve-01-expansion-compat-foundation/functional-design/`: business-logic-model.md (detection/selection flow, capacity derivation, vanilla fall-through table, this-unit stub guardrail), business-rules.md (BR-SVE-01..13 incl. deterministic selection, detect-once-at-GameLaunched, vanilla no-op, capacity = clamp(TroughTileCount,0,MaxOccupants) with code-gen vanilla-parity verification, seam-is-sole-SVE-awareness, plus a PBT property table), and domain-entities.md (pure IExpansionProfile / VanillaExpansionProfile / SveExpansionProfile / ExpansionProfileSelector / AnimalBuildingCapacityInputs / AnimalBuildingCapacityPolicy / ContentDescriptor / WorkClassification + Mod adapters; no persistence change). Ticked the FD plan checklist and updated aidlc-state.md. Presenting via the standardized 2-option construction completion message; next stage NFR Requirements.
+**Context**: CONSTRUCTION — U-SVE-01 Functional Design complete; awaiting approval
+
+---
+
+## U-SVE-01 Functional Design Approved — NFR Requirements Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T20:52:35Z
+**User Input**: "continue"
+**AI Response**: U-SVE-01 Functional Design approved. Updated aidlc-state.md. Began NFR Requirements for U-SVE-01. Most NFRs are pre-fixed by the approved NFR-SVE-* requirements and the FD, so created a tight 3-question plan at `construction/plans/u-sve-01-expansion-compat-foundation-nfr-requirements-plan.md`: (Q1) reliability fail-safe-to-Vanilla posture on detection error; (Q2) performance envelope (once-at-GameLaunched detection, cached O(1) lookups, no per-frame registry queries, no per-shift regression); (Q3) tech stack (reuse existing C#/.NET 6 + xUnit + FsCheck, Core-pure/Mod-adapter split, no new deps). GATE: awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-01 NFR Requirements (planning); awaiting answers
+
+---
+
+## U-SVE-01 NFR Requirements — Answered & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:24:53Z
+**User Input**: "done" (NFR answers: Q1=A, Q2=A, Q3=A)
+**AI Response**: No ambiguities. Generated `construction/u-sve-01-expansion-compat-foundation/nfr-requirements/nfr-requirements.md` (NFRU-01 fail-safe-to-Vanilla, NFRU-02 total seam ops, NFRU-03/04 once-at-GameLaunched + cached O(1) lookups, NFRU-05/06 deterministic+grounded, NFRU-07/08/09 isolation/centralized-ids/extensible, NFRU-10 pure unit/PBT testable — each mapped to NFR-SVE-*) and tech-stack-decisions.md (reuse C#/.NET 6 + xUnit + FsCheck, Core-pure/Mod-adapter split, no new deps). Ticked the plan checklist; updated aidlc-state.md. Presenting via 2-option construction completion; next stage NFR Design.
+**Context**: CONSTRUCTION — U-SVE-01 NFR Requirements complete; awaiting approval
+
+---
+
+## U-SVE-01 NFR Requirements Approved — NFR Design Complete (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:26:17Z
+**User Input**: "continue"
+**AI Response**: U-SVE-01 NFR Requirements approved. Updated aidlc-state.md. Executed NFR Design: the plan evaluated resilience/scalability/performance/security/logical-component categories and concluded no additional question round was needed (requirements + App Design already fix the pattern set cleanly — same handling as U-22/U-23/U-24). Generated `construction/u-sve-01-expansion-compat-foundation/nfr-design/nfr-design-patterns.md` (P-SVE-01 guarded one-time detection with Vanilla fallback; P-SVE-02 cached singleton active profile; P-SVE-03 pure-Core decision seams + thin Mod adapter; P-SVE-04 Null-Object no-op Vanilla profile; P-SVE-05 strategy + ordered registry selection; P-SVE-06 clamp-not-throw capacity) and logical-components.md (pattern→component mapping, runtime data flow, failure modes; no new infrastructure). Updated aidlc-state.md. Presenting via 2-option construction completion; next stage Code Generation (Part 1 planning).
+**Context**: CONSTRUCTION — U-SVE-01 NFR Design complete; awaiting approval
+
+---
+
+## U-SVE-01 NFR Design Approved — Code Generation Plan (Part 1) Created (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:31:22Z
+**User Input**: "continue"
+**AI Response**: U-SVE-01 NFR Design approved. Updated aidlc-state.md. Created the Part 1 code-generation plan at `construction/plans/u-sve-01-expansion-compat-foundation-code-generation-plan.md` — a 14-step plan: Steps 1-6 pure Core (`WorkClassification`, `ContentDescriptor`, `AnimalBuildingCapacityInputs`, `IExpansionProfile`, `VanillaExpansionProfile`, `SveExpansionProfile`, `ExpansionProfileSelector`, `AnimalBuildingCapacityPolicy`); Steps 7-8 Mod adapters (`ExpansionDetector`, `ExpansionCompatService`); Step 9 wire `ModEntry` (construct in Entry, detect+SetActiveProfile in the existing GameLaunched handler, expose `internal static ExpansionCompat`); Steps 10-12 xUnit + FsCheck tests; Step 13 build/test verification; Step 14 code summary + state/audit. Grounded in the real ModEntry composition root (existing GameLaunched handler reused for detection). Scope guardrail: consumers are NOT rewired in this unit → no behavior change; only detection + the seam existing. Logging the plan-approval prompt and awaiting explicit approval before Part 2 generation.
+**Context**: CONSTRUCTION — U-SVE-01 Code Generation Part 1; awaiting plan approval (no code written yet)
+
+---
+
+## U-SVE-01 Code Generation Plan Approved & Part 2 Executed (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:42:25Z
+**User Input**: "approve"
+**AI Response**: Code-generation plan approved. Grounded conventions first (verified `Dayswork.Core`/`Dayswork`/`Dayswork.Tests` csprojs: net6.0, Nullable enable, ImplicitUsings, TreatWarningsAsErrors=true; record style; FsCheck.Xunit 2.16.5 `[Property(Arbitrary=...)]` pattern from existing U-WR tests; real ModEntry composition root + existing GameLaunched handler). Executed the 14-step plan: created 8 pure Core types under `Dayswork.Core/Compat/` (WorkClassification, ContentDescriptor, AnimalBuildingCapacityInputs, IExpansionProfile, VanillaExpansionProfile [Null-Object], SveExpansionProfile [SVE ids centralized; empty override tables], ExpansionProfileSelector [deterministic, Vanilla fallback], AnimalBuildingCapacityPolicy [total clamp]); 2 Mod adapters under `Dayswork/Compat/` (ExpansionDetector [guarded IModRegistry scan, logs once], ExpansionCompatService [runtime seam]); 4 test files under `Dayswork.Tests/Compat/` (generator + selector + capacity + no-op, xUnit + FsCheck); and modified `Dayswork/ModEntry.cs` to construct the seam and resolve the active profile in the existing GameLaunched handler, exposing `internal static ExpansionCompat`. Consumers were intentionally NOT rewired (U-SVE-01 scope), so there is no behavior change. Verification: `dotnet build Dayswork.sln /p:EnableModDeploy=false` → 0 warnings / 0 errors; `dotnet test Dayswork.sln /p:EnableModDeploy=false` → 336 passed / 1 expected skip / 0 failed (was 320). Wrote code-summary.md, ticked the plan checklist, updated aidlc-state.md. Presenting via 2-option construction completion; next is U-SVE-02 (Functional Design).
+**Context**: CONSTRUCTION — U-SVE-01 Code Generation complete; awaiting code review
+
+---
+
+## U-SVE-01 Code Generation Approved — U-SVE-02 Functional Design Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:45:55Z
+**User Input**: "continue"
+**AI Response**: U-SVE-01 code generation approved (foundation seam shipped; build 0/0, tests 336/1-skip/0). Updated aidlc-state.md. Began U-SVE-02 (SVE Farm Maps + Worker Entrance) Functional Design. Grounded in source: `ShiftOrchestrator.FindFarmExitTile` is a private static warp-scan with (77,15) fallback, reachable via ModEntry static (so it can consult `ModEntry.ExpansionCompat`); IF2R's Content Patcher pack edits `Maps/Farm` (location stays named "Farm") — confirmed SVE farms cannot be distinguished by location name, so identity must derive from the installed farm-map mod id or a map signature. `IExpansionProfile.TryGetEntranceOverride(farmIdentity,...)` is already generic so no interface change is forced. Created `construction/plans/u-sve-02-farm-maps-entrance-functional-design-plan.md` with 3 questions: (Q1) farm-map identity mechanism (installed mod id vs map signature); (Q2) entrance resolution rule (override-first-then-heuristic vs always-explicit); (Q3) override-value sourcing/verification from SVE map source + playtest. GATE: awaiting FD answers.
+**Context**: CONSTRUCTION — U-SVE-02 Functional Design (planning); awaiting answers
+
+---
+
+## U-SVE-02 Functional Design — Answered & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T21:50:54Z
+**User Input**: "done" (FD answers: Q1=B [+note: farm-map packs can load simultaneously], Q2=A, Q3=A)
+**AI Response**: Q1 answer changed the design from my recommendation (mod-id identity) to **map-signature identity** — the user correctly noted multiple farm-map packs can be installed at once, so identity must reflect the map Content Patcher actually applied to `Maps/Farm`, not what is installed. No ambiguity; this is a clear, well-reasoned correction. Grounded the signature approach in source: confirmed IF2R map is 163×156 and Frontier 156×65 (vanilla 80×65) — distinct dimensions, so a `(width,height)` signature with an optional unique map-property tiebreaker is viable; Grandpa's Farm dimensions/tiebreaker verified at code-gen. Generated `construction/u-sve-02-farm-maps-entrance/functional-design/` business-logic-model.md (signature identity flow, override-first-else-heuristic resolution, spawn/exit integration, graceful behavior), business-rules.md (BR-SVE2-01..10: live-map-signature identity, robust to multiple packs, override precedence, no-assumed-coords, vanilla-unaffected, unreachable-skip + PBT table), and domain-entities.md (`FarmMapSignature` pure value; signature→tile override table in SveExpansionProfile; `IExpansionProfile.TryGetEntranceOverride` refined to key on `FarmMapSignature`; no persistence change). Ticked the FD plan checklist; updated aidlc-state.md. Presenting via 2-option construction completion; next stage NFR Requirements.
+**Context**: CONSTRUCTION — U-SVE-02 Functional Design complete; awaiting approval
+
+---
+
+## U-SVE-02 Functional Design Approved — NFR Requirements Started (SVE Compatibility)
+**Timestamp**: 2026-05-29T22:05:54Z
+**User Input**: "continue"
+**AI Response**: U-SVE-02 Functional Design approved (map-signature identity, override-first resolution). Updated aidlc-state.md. Began NFR Requirements; created `construction/plans/u-sve-02-farm-maps-entrance-nfr-requirements-plan.md` with 2 confirmations: (Q1) signature computed on demand at spawn/exit only, not per-frame (NFR-SVE-06); (Q2) fall back to the warp heuristic if signature extraction fails, never throw (NFR-SVE-04). GATE: awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-02 NFR Requirements (planning); awaiting answers
+
+---
+
+## U-SVE-02 NFR Requirements — Answered & Artifacts Generated (SVE Compatibility)
+**Timestamp**: 2026-05-29T22:07:30Z
+**User Input**: "done" (Q1=A, Q2=A)
+**AI Response**: No ambiguities. Generated `construction/u-sve-02-farm-maps-entrance/nfr-requirements/nfr-requirements.md` (NFRU2-01 on-demand signature/no per-frame cost; NFRU2-02 fallback-to-heuristic/never-throw; NFRU2-03 deterministic lookup; NFRU2-04 vanilla-unchanged; NFRU2-05 pure PBT + manual playtest for live extraction; NFRU2-06 grounded signatures/tiles) and tech-stack-decisions.md (reuse existing stack; signature extraction in the Mod adapter, table/lookup pure in Core; no new deps). Ticked the plan checklist; updated aidlc-state.md. Presenting via 2-option construction completion; next stage NFR Design.
+**Context**: CONSTRUCTION — U-SVE-02 NFR Requirements complete; awaiting approval
+
+---
+
+## U-SVE-02 NFR Req + NFR Design Accepted (Delegated) — Code Generation Plan Created (SVE Compatibility)
+**Timestamp**: 2026-05-29T22:19:44Z
+**User Input**: "continue with recommended until code planning"
+**AI Response**: Per the user's explicit delegation, accepted U-SVE-02 NFR Requirements at its recommended output and executed NFR Design with the recommended approach without separate per-stage approval gates, pausing again at the Code Generation plan. NFR Design: category evaluation concluded no question round needed; generated nfr-design-patterns.md (P-SVE2-01 live-map signature identity; P-SVE2-02 override-first + heuristic fallback; P-SVE2-03 pure table + thin live extraction; P-SVE2-04 guarded fallback) and logical-components.md (component mapping, data flow, failure modes; no new infra/persistence). Confirmed the integration point in source: `ShiftOrchestrator._farmExitTile = FindFarmExitTile(farm)` (once per shift) feeds both spawn and exit, so modifying the single static method covers both. Created the Part-1 code-generation plan `construction/plans/u-sve-02-farm-maps-entrance-code-generation-plan.md` (9 steps: FarmMapSignature; refine IExpansionProfile.TryGetEntranceOverride to key on it; SveExpansionProfile table; ExpansionCompatService signature extraction; FindFarmExitTile seam consult; source-verify signatures+entrances [playtest-pending]; update/add Compat tests; build/test; code summary). GATE: awaiting code-gen plan approval before writing code.
+**Context**: CONSTRUCTION — U-SVE-02 Code Generation Part 1; awaiting plan approval (no code written yet)
+
+---
+
+## U-SVE-02 Code Generation Plan Approved & Part 2 Executed (SVE Compatibility)
+**Timestamp**: 2026-05-29T22:26:20Z
+**User Input**: "approve"
+**AI Response**: Code-gen plan approved. Verified entrance data from SVE source first: confirmed IF2R 163×156 and Frontier 156×65 dimensions; found that BusStop→Farm warp targets are conditional/tangled (IF2R content.json `Farm 86 18` under FarmType=Standard + no Grandpa's; warp patches `Farm 79 17`), so per-farm entrance tiles could not be confidently attributed from source alone. Per Q3=A (encode only verified tiles; override only when heuristic is wrong) and the never-assume rule, shipped the full mechanism with an EMPTY entrance table (documented confirmed signatures + candidate warp targets for playtest). Created `Dayswork.Core/Compat/FarmMapSignature.cs` and `Dayswork.Tests/Compat/EntranceOverrideTests.cs`; modified `IExpansionProfile`/`VanillaExpansionProfile`/`SveExpansionProfile` (signature-keyed `TryGetEntranceOverride` + override dictionary), `ExpansionCompatService` (guarded live-map signature extraction), `ShiftOrchestrator.FindFarmExitTile` (consults seam first, else existing heuristic), and updated `ExpansionProfileNoOpTests`. Vanilla path unchanged (vanilla signature absent → heuristic). Verification: `dotnet build /p:EnableModDeploy=false` 0 warnings/0 errors; `dotnet test` 341 passed / 1 expected skip / 0 failed (was 336). Wrote code-summary.md (with the playtest-pending entrance step), ticked the plan checklist, updated aidlc-state.md. Presenting via 2-option construction completion; next is U-SVE-03.
+**Context**: CONSTRUCTION — U-SVE-02 Code Generation complete; awaiting code review (entrance tiles playtest-pending)
+
+---
+
+## U-SVE-02 Playtest Fix — Grandpa's Farm entrance
+**Timestamp**: 2026-05-30T00:00:00Z
+**User Input**: "continue ai-dlc workflow. I am in the middle of playtesting u-sve-02. I added a small debugger tool to help figure out spawn points. I want the worker to spawn on Farm (112, 51) for grandpa's farm. If that is blocked, find a nearby tile that is not blocked."
+**AI Response**: Populated the previously-empty SVE entrance-override table with the first playtest-confirmed entry. Verified Grandpa's Farm map dimensions from SVE source `GrandpasFarm.tbin` (all 18 layers = 140×93; cross-validated the dimension-reading method against Frontier 156×65 and IF2R 163×156 from their TMX headers). Added `FarmMapSignature(140, 93) → TileCoord(112, 51)` to `SveExpansionProfile.EntranceOverrides`. Added a blocked-tile fallback: `ShiftOrchestrator.FindFarmExitTile` now routes entrance overrides through a new `ResolvePassableNearby(preferred, farm)` helper that returns the preferred tile when a worker can stand on it, else searches expanding Chebyshev rings (radius ≤ 12) for the nearest passable tile via `WorkerMovementDriver.IsTilePassableForWorker`, falling back to the preferred tile (with a warning) if none is found. Updated `EntranceOverrideTests` (split the empty-table test into a configured-Grandpa's-Farm assertion + an IF2R/Frontier fall-through assertion). Vanilla path unchanged. Verification: `dotnet build /p:EnableModDeploy=false` 0 warnings/0 errors; `dotnet test` 342 passed / 1 expected skip / 0 failed. Deploy-enabled build blocked by file lock (Stardew running mid-playtest) — pending game exit.
+**Context**: CONSTRUCTION — U-SVE-02 playtest fix (entrance tile now confirmed for Grandpa's Farm)
+
+---
+
+## U-SVE-02 Code Generation — Approval
+**Timestamp**: 2026-05-30T00:30:00Z
+**User Input**: "approve the u-sve-02 changes"
+**AI Response**: U-SVE-02 Code Generation APPROVED. The map-signature entrance mechanism plus the two playtest-confirmed entrance overrides (Grandpa's Farm 140×93 → (112,51); Frontier Farm 156×65 → (142,16); IF2R 163×156 verified to need none) and the blocked-tile fallback (`ResolvePassableNearby`) are accepted. Updated code-summary.md to reflect the confirmed overrides; verification green (build 0/0; tests 343 passed / 1 expected skip / 0 failed). Per-unit loop advances to U-SVE-03 (premium animal buildings; stories S-23). Deploy to the Mods folder remains pending game exit (DLL locked mid-playtest).
+**Context**: CONSTRUCTION — U-SVE-02 complete & approved; next unit U-SVE-03 Functional Design
+
+---
+
+## U-SVE-03 Functional Design — Planning (start)
+**Timestamp**: 2026-05-30T00:45:00Z
+**User Input**: [AskUserQuestion] "What next now that U-SVE-02 is approved?" → "Start U-SVE-03"
+**AI Response**: Began U-SVE-03 (SVE Animal Buildings) Functional Design. Analyzed unit context (unit-of-work U-SVE-03; story S-23) and grounded the design in SVE source before drafting questions. Key source findings: (1) SVE Premium Coop/Barn building types are `FlashShifter.StardewValleyExpandedCP_PremiumCoop`/`_PremiumBarn`, both MaxOccupants 16, BuildCondition requires the matching Deluxe building first (so premium is an upgrade above Deluxe); (2) BOTH premium building maps (`PremiumCoop.tmx`/`PremiumBarn.tmx`) set the `AutoFeed = T` map property — i.e., they auto-feed like vanilla Deluxe, so the existing `IsAutoFeedBuilding` map-property check already makes the worker skip feeding them. This contradicts the pre-source "16-animal underfeed" premise. (3) The hiring enumeration (`ChestResolver.GetBuildingOutlines` → `LegacyScopeBootstrapper.TryInferAnimalBuildingSelection`) passes `building.buildingType.Value` as the outline DisplayName; "…_PremiumCoop"/"…_PremiumBarn" contain "Coop"/"Barn" but not Deluxe markers, so premium buildings currently classify to the cheapest Coop/Barn tier (underpriced). Wrote functional-design-plan.md with 4 source-grounded questions (premium feed behavior; tier-mapping target; tier-override seam; capacity-policy MaxOccupants source). Awaiting user answers.
+**Context**: CONSTRUCTION — U-SVE-03 Functional Design (Part 1 planning); questions pending
+
+---
+
+## U-SVE-03 Functional Design — Answers + Generation
+**Timestamp**: 2026-05-30T01:00:00Z
+**User Input**: "continue"
+**AI Response**: Accepted the recommended functional-design answers Q1=A, Q2=A, Q3=A, Q4=A (no ambiguities to resolve). Q1=A keeps SVE premium (AutoFeed=T) buildings skipped for manual feeding like vanilla Deluxe while replacing the hardcoded FeedCapacity ladder with the data-driven trough-count policy. Q2=A maps PremiumCoop→DeluxeCoop / PremiumBarn→DeluxeBarn (nearest vanilla tier; no enum/save change). Q3=A injects the override via the existing ResolveAnimalBuildingTier seam (keyed on buildingType carried by BuildingOutline) ahead of the vanilla substring inference. Q4=A sets capacity = min(troughTiles, building MaxOccupants). Generated functional-design artifacts (business-logic-model.md, business-rules.md with BR-SVE3-01..09 + PBT table, domain-entities.md) under construction/u-sve-03-animal-buildings/functional-design/. Auto-petter/auto-grabber remain no-special-case (scan & natural skip). Presenting 2-option completion; next stage is NFR Requirements.
+**Context**: CONSTRUCTION — U-SVE-03 Functional Design artifacts generated; awaiting approval
+
+---
+
+## U-SVE-03 Functional Design — Approval; NFR Requirements start
+**Timestamp**: 2026-05-30T01:15:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-03 Functional Design APPROVED. Advanced to NFR Requirements. The unit's NFR surface is narrow and mirrors U-SVE-01/02 (fail-safe to vanilla, cheap on-demand lookups, reuse existing stack). The one genuine new performance consideration is `CountTroughTiles` scanning the interior map (O(W×H)) when deriving capacity — but auto-feed buildings (incl. all SVE premium) short-circuit before that scan, and non-auto-feed buildings scan a small interior only a handful of times per shift. Wrote nfr-requirements-plan.md with 3 source-grounded questions (capacity-scan performance/caching; fail-safe-to-vanilla resolution; tech-stack/deps). Awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-03 NFR Requirements (Part 1 planning); questions pending
+
+---
+
+## U-SVE-03 NFR Requirements — Answers + Generation
+**Timestamp**: 2026-05-30T01:30:00Z
+**User Input**: "continue"
+**AI Response**: Accepted NFR requirements answers Q1=A (on-demand trough scan, no caching), Q2=A (fail-safe to vanilla, never throw), Q3=A (reuse existing stack, no new deps); no ambiguity. Generated nfr-requirements.md (NFRU3-01..08 → NFR-SVE-*) and tech-stack-decisions.md under construction/u-sve-03-animal-buildings/nfr-requirements/. Presenting 2-option completion; next stage NFR Design.
+**Context**: CONSTRUCTION — U-SVE-03 NFR Requirements generated; awaiting approval
+
+---
+
+## U-SVE-03 NFR Requirements — Approval; NFR Design
+**Timestamp**: 2026-05-30T01:45:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-03 NFR Requirements APPROVED. Advanced to NFR Design. Category evaluation (resilience/scalability/performance/security/logical-components) concluded no additional question round is needed — the approved NFR requirements + Application Design already fix the pattern set (mirrors U-SVE-01/02). Generated nfr-design-patterns.md (P-SVE3-01..05) and logical-components.md under construction/u-sve-03-animal-buildings/nfr-design/. Presenting 2-option completion; next stage Code Generation.
+**Context**: CONSTRUCTION — U-SVE-03 NFR Design generated; awaiting approval
+
+---
+
+## U-SVE-03 NFR Design — Approval; Code Generation planning
+**Timestamp**: 2026-05-30T02:00:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-03 NFR Design APPROVED. Advanced to Code Generation Part 1 (planning). Grounded two API details: premium tier mapping keys on the full `FlashShifter.StardewValleyExpandedCP_PremiumCoop/_PremiumBarn` strings (existing `Premium_tier_mapping_is_null("Barn")` no-op test stays valid since "Barn" is not a premium id); MaxOccupants will be read from the parent building (`AnimalHouse.ParentBuilding.maxOccupants`, =16 for SVE premium — exact member confirmed at code-gen). Wrote the code-generation plan (8 steps) and presented for approval before any code change.
+**Context**: CONSTRUCTION — U-SVE-03 Code Generation plan presented; awaiting plan approval
+
+---
+
+## U-SVE-03 Code Generation — Plan approved + Part 2 generated
+**Timestamp**: 2026-05-30T02:20:00Z
+**User Input**: "approve"
+**AI Response**: U-SVE-03 code-generation plan approved; executed Part 2 (8 steps). SveExpansionProfile: added PremiumCoop/PremiumBarn building-type constants and MapPremiumBuildingTier → DeluxeCoop/DeluxeBarn (else null). ExpansionCompatService: ResolveAnimalFeedCapacity now bounds by ParentBuilding.maxOccupants (fallback to trough count); added TryResolvePremiumBuildingTier(string,out). AnimalTaskHandler.CreateFeedWork consumes ResolveAnimalFeedCapacity (legacy ladder fallback); auto-feed gate + pet/collect unchanged. LegacyScopeBootstrapper.TryClassify consults premium mapping before vanilla substring inference. Added Dayswork.Tests/Compat/PremiumBuildingTierTests (xUnit + FsCheck). Verification: build 0/0; tests 355 passed / 1 expected skip / 0 failed (was 343). code-summary.md written; plan checkboxes ticked. Vanilla path unchanged. Presenting 2-option completion; next is U-SVE-04 (final SVE unit) on approval. Deploy deferred (game running).
+**Context**: CONSTRUCTION — U-SVE-03 Code Generation complete; awaiting review
+
+---
+
+## U-SVE-03 Playtest — 3 bugs reported
+**Timestamp**: 2026-05-30T02:45:00Z
+**User Input**: "A few bugs found: (1) worker does not pick up goose eggs, rabbit wool, or camel wool from the ground; (2) worker gets stuck in a continuous loop after completing tasks (repeated '[outdoor-animals] pre-completion rescan picked up 1 new tile item(s); batch continues' log); (3) with a normal coop+barn plus a premium coop+barn, selecting all four saves only the normal coop and barn to the contract (unsure if SVE or vanilla bug)."
+**AI Response**: Diagnosed all three. Bug 2 (loop): TryRescanOutdoorAnimalProductsBeforeBatchComplete re-detects a forage tile every completion cycle once ClearRemainingActiveBatchWork drops it from the queues (happens when a detected forage item is unreachable or not removable) → infinite loop. FIXED with a per-batch guard (_rescanBatchIndex/_rescanEnqueuedTiles): each tile is enqueued at most once per batch; genuinely new forage at fresh tiles still flows. Build 0/0; tests 355 pass. Bug 1 (root cause): WorkAreaScanner.AnimalProductObjectIds is a hardcoded ID whitelist missing vanilla Wool(440) and SVE custom products (Goose Egg/Camel Wool); InvokeCollectAnimalProduct gates on the same predicate so unrecognized products are never removed. This is content-classification = U-SVE-04's purpose (data-driven new content + verified gaps). Bug 3: selection (TryApplySelectedBuildings→TryClassify, incl. premium mapping) and save round-trip (LocationName+Tier) are correct in code; most likely culprit is BuildingOutline.LocationName (=indoors.Name) not being unique across same-type interiors, so Distinct()/the home HashSet collapses normal+premium — possibly a pre-existing vanilla multi-building bug. Needs repro detail (does premium price as Deluxe in the running build? building LocationNames). Presenting diagnosis + scope decision.
+**Context**: CONSTRUCTION — U-SVE-03 playtest fixes; Bug 2 fixed, Bugs 1 & 3 pending scope decision
+
+---
+
+## U-SVE-03 Playtest bugs — scope decision + fixes
+**Timestamp**: 2026-05-30T03:00:00Z
+**User Input**: [AskUserQuestion] Bug 1 scope = "Defer to U-SVE-04"; Bug 3 approach = "Add diagnostic logging"
+**AI Response**: Bug 2 loop guard already applied. Bug 1 deferred to U-SVE-04 (TODO-07 added: hardcoded AnimalProductObjectIds whitelist misses Wool 440 + SVE Goose Egg/Camel Wool; fix data-driven with source-verified IDs via the content-classification seam). Bug 3: added `[Dayswork][building-select]` diagnostic logging in LegacyScopeBootstrapper.TryApplySelectedBuildings (per-building location/type/resolved tier, explicit DROPPED-duplicate marker, final draft list) to confirm whether same-type interior names collide under Distinct(). Verification: build 0/0; tests 355 passed / 1 skip / 0 failed. Updated U-SVE-03 code-summary with the playtest-fixes section. Awaiting next playtest (with the building-select log) + deploy once the game is closed.
+**Context**: CONSTRUCTION — U-SVE-03 playtest: Bug 2 fixed, Bug 1 deferred (TODO-07), Bug 3 instrumented
+
+---
+
+## U-SVE-03 Playtest — Bug 3 root cause found + fixed
+**Timestamp**: 2026-05-30T03:30:00Z
+**User Input**: "Now the worker will do the premium barn and coop, but not the base barn and coop. Maybe it has something to do with not being able to do multiple barn/coops?" + building-select logs (draft held all 4: Coop:Coop, Barn:Barn, PremiumCoop:DeluxeCoop, PremiumBarn:DeluxeBarn) + shift-plan log (runtime batches = PremiumBarn x2, PremiumCoop x2; base Coop/Barn absent).
+**AI Response**: Diagnostic confirmed selection/draft were correct; the bug was in runtime building resolution. Root cause: BuildingLocationResolver.Matches fell back to LooseBuildingTypeMatch (requestedName.Contains(buildingType) || buildingType.Contains(requestedName)), so "…PremiumCoop".Contains("Coop") made the base-Coop selection loose-match the premium building; TryResolve returns the first match (premium enumerates first), collapsing base+premium onto the premium building (premium serviced twice, base never). Latent vanilla bug too ("Coop" ⊂ "Big Coop"/"Deluxe Coop"). Fix: TryResolve now runs an exact-name pass across all buildings first (interior.Name / indoors name / buildingType), loose only as fallback. Extracted pure SelectBuildingIndex + MatchesExactly; added Dayswork.Tests/Integration/BuildingLocationResolverTests (SVE base+premium scenario, vanilla tier precedence, loose fallback, no-match). Documented known follow-up: two identical-type buildings still collapse on a shared selection LocationName (needs unique interior keying). Verification: build 0/0; tests 364 passed / 1 skip / 0 failed (was 355). Kept the [Dayswork][building-select] diagnostic logging.
+**Context**: CONSTRUCTION — U-SVE-03 playtest: Bug 3 fixed (exact-first building resolution)
+
+---
+
+## U-SVE-03 — Approved; follow-up folded into U-SVE-04
+**Timestamp**: 2026-05-30T03:45:00Z
+**User Input**: "fold it into the next one. changes are tested and approved"
+**AI Response**: U-SVE-03 Code Generation (incl. the three playtest fixes: Bug 2 loop guard, Bug 3 exact-first building resolution, Bug 1 deferred) APPROVED and marked COMPLETE. Folded the identical-type-buildings follow-up into U-SVE-04 as TODO-08 (two same-type buildings share a selection LocationName and collapse under Distinct(); needs unique per-instance interior keying threaded through BuildingOutline → AnimalBuildingSelection → resolver/runtime). U-SVE-04 (final SVE unit) now carries: new content classification incl. animal-product pickup gap (TODO-07), Grandpa's Shed work location, and TODO-08. Verification at approval: build 0/0; tests 364 passed / 1 expected skip / 0 failed. Deploy to Mods still pending game exit. Next on user go-ahead: U-SVE-04 Functional Design.
+**Context**: CONSTRUCTION — U-SVE-03 COMPLETE/approved; U-SVE-04 is the final SVE unit
+
+---
+
+## U-SVE-04 Functional Design — Planning (start)
+**Timestamp**: 2026-05-30T04:15:00Z
+**User Input**: "kick off u-sve-04"
+**AI Response**: Began U-SVE-04 (New Content + Grandpa's Shed) Functional Design — the final SVE unit (stories S-24/S-25 + folded TODO-07 animal-product pickup + TODO-08 identical-type buildings). Grounded in SVE source first: (1) SVE Goose Egg = Category -5 (Egg), Camel Wool = Category -18 (animal goods, same as vanilla Wool 440); both HarvestType DropOvernight (ground products) — so a category-based ground-pickup detection cleanly covers vanilla + SVE + future products. (2) SVE's new farm animals (Goose, Camel) are DropOvernight, not tool-harvested, so IsMilkProduce/IsShearProduce likely need no SVE additions (re-verify at code-gen). (3) Grandpa's Shed is a multi-location complex: Custom_GrandpasShedGreenhouse (CanPlantHere=true → crop work), shed interior, Custom_GrandpasShedOutside. Wrote functional-design-plan.md with 5 source-grounded questions (animal-product detection approach; tool-harvest milk/wool gap; custom clump/tree overrides; Grandpa's Shed scope+task set; TODO-08 unique building keying + save-compat). Awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-04 Functional Design (Part 1 planning); questions pending
+
+---
+
+## U-SVE-04 Functional Design — Answers + Generation
+**Timestamp**: 2026-05-30T04:30:00Z
+**User Input**: "use recommended, continue"
+**AI Response**: Accepted U-SVE-04 functional-design answers Q1=A..Q5=A (no ambiguity). Q1=A category-based animal-product ground detection (egg -5, animal-goods -18, +truffle/forage) replacing the hardcoded whitelist. Q2=A no milk/shear change (SVE goose/camel are DropOvernight; re-verify at code-gen). Q3=A content-override seam consulted in ObjectTargetClassifier, verified gaps only. Q4=A plantable Grandpa's Shed greenhouse as indoor crop-work location. Q5=A unique building keying via interior NameOrUniqueName, no save-schema change, old saves valid via resolver fallback. Generated functional-design artifacts (business-logic-model.md, business-rules.md BR-SVE4-01..12 + PBT table, domain-entities.md). Presenting 2-option completion; next stage NFR Requirements.
+**Context**: CONSTRUCTION — U-SVE-04 Functional Design artifacts generated; awaiting approval
+
+---
+
+## U-SVE-04 Functional Design — Approval; NFR Requirements start
+**Timestamp**: 2026-05-30T04:45:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-04 Functional Design APPROVED. Advanced to NFR Requirements. The NFR surface mirrors U-SVE-01/02/03 (fail-safe to vanilla, cheap O(1) per-object detection during the existing scan, reuse existing stack). New consideration: category-based animal-product detection runs once per ground object in the existing scan (same frequency/cost as the old whitelist check — no regression); content-override + work-location lookups are O(1). Wrote nfr-requirements-plan.md with 3 questions (detection performance/caching; fail-safe-to-vanilla; tech-stack/deps), all recommended A. Awaiting answers.
+**Context**: CONSTRUCTION — U-SVE-04 NFR Requirements (Part 1 planning); questions pending
+
+---
+
+## U-SVE-04 NFR Requirements — Answers + Generation
+**Timestamp**: 2026-05-30T05:00:00Z
+**User Input**: "continue"
+**AI Response**: Accepted U-SVE-04 NFR requirements answers Q1=A (on-demand detection, no caching), Q2=A (fail-safe to vanilla, never throw), Q3=A (reuse existing stack); no ambiguity. Generated nfr-requirements.md (NFRU4-01..08 → NFR-SVE-*) and tech-stack-decisions.md. Presenting 2-option completion; next stage NFR Design.
+**Context**: CONSTRUCTION — U-SVE-04 NFR Requirements generated; awaiting approval
+
+---
+
+## U-SVE-04 NFR Requirements — Approval; NFR Design
+**Timestamp**: 2026-05-30T05:15:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-04 NFR Requirements APPROVED. Advanced to NFR Design. Category evaluation (resilience/scalability/performance/security/logical-components) concluded no additional question round is needed — the approved NFR requirements + Application Design already fix the pattern set (mirrors U-SVE-01/02/03). Generated nfr-design-patterns.md (P-SVE4-01..05) and logical-components.md. Presenting 2-option completion; next stage Code Generation.
+**Context**: CONSTRUCTION — U-SVE-04 NFR Design generated; awaiting approval
+
+---
+
+## U-SVE-04 NFR Design — Approval; Code Generation planning
+**Timestamp**: 2026-05-30T05:30:00Z
+**User Input**: "continue"
+**AI Response**: U-SVE-04 NFR Design APPROVED. Advanced to Code Generation Part 1 (planning). Wrote the code-generation plan (ordered, lowest-risk-first: category-based product detection → content-override wiring → Grandpa's Shed work location → unique building keying (TODO-08, highest risk) → tests → verify → document), flagging TODO-08's cross-site consistency (outline + resolver + animal-home + chest resolution must share the same unique key, with legacy fallback) and the Truffle-category parity check for the detection switch. Presented for plan approval before any code change.
+**Context**: CONSTRUCTION — U-SVE-04 Code Generation plan presented; awaiting plan approval
+
+---
+
+## U-SVE-04 Code Generation — Plan approved; Part 2 partial (Steps 1–2 done, 3–4 gated)
+**Timestamp**: 2026-05-30T06:15:00Z
+**User Input**: "approve"
+**AI Response**: U-SVE-04 code-gen plan approved; executed Part 2 incrementally. Step 1 (TODO-07) DONE: WorkAreaScanner.IsAnimalProductForageObject now category-based ({Egg -5, Animal Goods -18} + legacy-id parity include, big-craftable excluded, default-empty exclude set) — fixes the worker ignoring goose egg / rabbit wool (vanilla Wool 440) / camel wool; collection shares the predicate. Pure overload extracted; added Dayswork.Tests/Orchestration/AnimalProductDetectionTests (parity, SVE products, non-products, big-craftable, FsCheck). TODO-07 closed. Step 2 DONE as no-gap: SVE source audit found no custom ResourceClump indices (only a performToolAction Harmony patch) and SVE custom wild trees (Birch/Fir) use the generic Tree path → content-override table stays empty (passthrough), no classifier change (documented deviation from the plan's wire-the-seam wording: avoid lossy plumbing for an empty table). Step 4 (TODO-08): added [Dayswork][building-outline] diagnostic (type/name/uniqueName/tile) to determine whether duplicate same-type interiors have distinct NameOrUniqueName before changing the selection key (else coord discriminator) — impl gated on this evidence to avoid regressing single-building servicing. Step 3 (Grandpa's Shed): deferred pending runtime evidence of the Custom_GrandpasShedGreenhouse location graph. Verification: build 0/0; tests 375 passed / 1 skip / 0 failed (was 364). Both pending steps are SMAPI-coupled and follow the project's playtest-validation pattern (as with entrances/feed capacity).
+**Context**: CONSTRUCTION — U-SVE-04 Code Generation partial: Steps 1–2 complete, Steps 3–4 await playtest evidence
+
+---
+
+## U-SVE-04 TODO-08 — duplicate confirmed; awaiting building-outline evidence
+**Timestamp**: 2026-05-30T06:40:00Z
+**User Input**: building-select log showing two base barns + two base coops both classify to location='Barn'/'Coop' (second of each DROPPED as duplicate LocationName+Tier); "Everything was working when I had a premium coop, premium barn, coop, and barn. I added an additional coop and barn, but the worker would not service the new buildings."
+**AI Response**: Confirmed TODO-08: two same-type buildings share indoors.Name ("Barn"/"Coop"), so Distinct() drops the duplicate AND the runtime animal→home matching (ResolveHomeLocation by Name) can't distinguish them. Asked the user to paste the [Dayswork][building-outline] diagnostic lines (name vs uniqueName vs tile) to decide the fix: if uniqueName is distinct per building → lightweight NameOrUniqueName keying across outline/resolver/ResolveHomeLocation (no save change, fallback for old contracts); if uniqueName collides → tile-coordinate discriminator (animal.home carries the same coords). Fix must be consistent end-to-end.
+**Context**: CONSTRUCTION — U-SVE-04 Step 4 (TODO-08): duplicate confirmed, awaiting uniqueName evidence
+
+---
+
+## U-SVE-04 TODO-08 — building-outline evidence; unique-name keying implemented
+**Timestamp**: 2026-05-30T07:10:00Z
+**User Input**: [building-outline logs] two Coops uniqueName='Coop1bc97e5f-...' / 'Coopd3136445-...', two Barns 'Barn1e65de34-...' / 'Barn157d6ffd-...', premium GUID-suffixed; Name is just the type. "Everything was working when I had a premium coop, premium barn, coop, and barn. I added an additional coop and barn, but the worker would not service the new buildings."
+**AI Response**: Evidence confirmed distinct GUID-suffixed NameOrUniqueName per interior → lightweight keying works (no coord scheme). Implemented unique-name keying end-to-end: ChestResolver.GetBuildingOutlines keys BuildingOutline.LocationName on indoors.NameOrUniqueName; BuildingLocationResolver.MatchesExactly/BuildingMatchInfo gained InteriorUniqueName and NormalizeLocationName returns NameOrUniqueName; AnimalTaskHandler matches an animal's home by {unique name, type name, building type} (HomeLocationKeys) with the precise unique name as AnimalRef.HomeLocation — new contracts service the specific building, legacy contracts (type-name) still service all same-type (backward compatible, no save change); ZoneAndChestMenu.FormatAnimalScopeSummary strips the trailing GUID for display. Verified UI shows animal buildings by count/this-summary (no other GUID leak). Extended BuildingLocationResolverTests (two same-type coops resolve by unique name; legacy type-name still resolves). Verification: build 0/0; tests 378 passed / 1 skip / 0 failed (was 375). TODO-08 closed. Remaining U-SVE-04 item: Step 3 Grandpa's Shed (pending location-graph evidence).
+**Context**: CONSTRUCTION — U-SVE-04 Step 4 (TODO-08) DONE; only Grandpa's Shed (Step 3) remains
+
+---
+
+## U-SVE-04 TODO-08 — base-building keying follow-up fix
+**Timestamp**: 2026-05-30T07:35:00Z
+**User Input**: building-select log showing premium buildings keyed by uniqueName (worked) but two base coops/barns still DROPPED as duplicates (draft = [PremiumCoop<guid>; PremiumBarn<guid>; Coop; Barn]); "it's still dropping duplicate barns and coops".
+**AI Response**: Root cause of the remaining drop: LegacyScopeBootstrapper.TryClassify's vanilla path built the selection via TryInferAnimalBuildingSelection(outline.DisplayName), which embeds the DisplayName (building type "Coop") as the selection LocationName — so base buildings kept collapsing to "Coop"/"Barn" even though GetBuildingOutlines now supplies a unique outline.LocationName (the premium path already used outline.LocationName, which is why premium worked). Fix: infer only the Tier from DisplayName/LocationName, then rebuild the selection with the unique outline.LocationName. Now both base and premium same-type buildings get distinct selection keys. Verification: build 0/0; tests 378 passed / 1 skip / 0 failed. (TryApplySelectedBuildings is ModEntry.ModMonitor-coupled so not unit-tested; resolver + animal-matching keep their tests; confirmed by playtest.) Redeploying.
+**Context**: CONSTRUCTION — U-SVE-04 TODO-08 base-building keying fixed
+---
+
+## U-SVE-04 — Work Scope UI overflow fix
+**Timestamp**: 2026-05-30T07:55:00Z
+**User Input**: [screenshot] Work Scope screen — animal buildings line "Barn, Barn, Coop, Coop, SVE_PremiumBarn, SVE_PremiumCoop" runs off the right edge of the panel; "need a UI fix. In work scope, the animal buildings are coming off of the UI". (Confirms TODO-08 works: all 6 buildings listed, GUIDs stripped.)
+**AI Response**: ZoneAndChestMenu.DrawScopeSection drew the value as a single unwrapped line at fixed Y offsets, so a long animal-building list overflowed horizontally. Reworked DrawScopeSection to wrap value + detail to the panel width (Game1.parseText with maxWidth = width - 96) and return the consumed height; draw() now lays the three scope sections out dynamically (outdoor → animal → greenhouse) with a gap, so wrapped multi-line values no longer collide with the next section. Verification: build 0/0; tests 378 passed / 1 skip / 0 failed (lint green). Deploying.
+**Context**: CONSTRUCTION — U-SVE-04 Work Scope UI overflow fixed (text wrapping + dynamic layout)
+---
+
+## U-SVE-04 — inter-building "warping" regression: diagnostics added
+**Timestamp**: 2026-05-30T08:30:00Z
+**User Input**: "There's been a regression (not from the UI fix). the worker is now warping to the different animal buildings instead of walking between them."
+**AI Response**: Traced the only teleport mechanism in inter-building travel: stuck-detection → step-2 teleport recovery (QueueStuckTeleport → IntentTeleportToTile), which fires when the worker can't make progress walking to its target (e.g., PathFindController can't path to a building door, so WorkerMovementDriver sets NavigationFailed and the worker doesn't move → stuck timer → teleport). Hypothesis: TODO-08 now services all duplicate/clustered buildings, and the foot route to one of the newly-serviced doors fails, triggering the recovery teleport (looks like warping). Door entry/exit themselves are intentional door-warps. Added two Info diagnostics: [Dayswork][building-travel] (logs target building, door tile, worker tile, navFailed, fallback at each building-entry navigation) and [Dayswork][stuck] (logs the step-2 teleport-recovery and the home-teleport). Build 0/0; deployed. Awaiting reproduction logs to confirm whether the walk-to-door is failing (navFailed=True) and at which building.
+**Context**: CONSTRUCTION — U-SVE-04 inter-building warping regression under diagnosis
+---
+
+## U-SVE-04 — inter-building "warping" root cause + fix
+**Timestamp**: 2026-05-30T08:55:00Z
+**User Input**: [building-travel logs] all six buildings resolved to door=(106,49); from=(106,49) for every building after the first; navFailed=False throughout; work happened in each (correct interiors).
+**AI Response**: Root cause: NOT stuck-recovery. BuildingLocationResolver.TryResolveWith resolved each candidate building's interior via TryGetInteriorForBuilding(building, requestedName, ...), whose final fallback is `?? Game1.getLocationFromName(requestedName)`. Post-TODO-08 the selection keys are unique interior names that ARE registered locations, so for the FIRST-iterated building (whose own-interior lookups don't match the request) the fallback returned the *requested* interior — making the first building falsely match every request. Result: match.Interior was correct (via the fallback) but match.OutdoorDoorTile came from the first building → every building's door = the first building's door (106,49). The worker walked there once, then door==from for all → no walking, just door-warps into each correct interior (so work still happened, no nav failure). Before TODO-08 the request was a type name that getLocationFromName didn't resolve, so the poison never fired. Fix: TryResolveWith now resolves each building's OWN interior via TryGetInteriorForBuilding(building, out interior) (no requestedName fallback) for matching, so the matched building and its door correspond to the requested interior. Verification: build 0/0; tests 378 passed / 1 skip / 0 failed. Diagnostics kept for confirming playtest (doors should now differ per building). Deploying.
+**Context**: CONSTRUCTION — U-SVE-04 inter-building door mis-resolution fixed
+---
+
+## U-SVE-04 — inter-building walk fix confirmed; TODO-09 added
+**Timestamp**: 2026-05-30T09:10:00Z
+**User Input**: "It looks good now. u-sve-03 is approved. Add a todo task for the worker to perform all inside and outside animal building tasks before moving to the next animal building. Right now it does the indoor tasks for each building, then does the outdoor tasks for all at once, but that wouldn't make sense if the animal buildings are spread out over the farm."
+**AI Response**: User confirmed the door-resolution fix — worker now walks between animal buildings correctly. Recorded approval of the SVE animal-building work (premium tiers, exact-first + unique-name building resolution, multi-building servicing). Added TODO-09 (per-building animal work ordering: do all of a building's indoor + that building's outdoor/grazing animals before moving to the next building, vs. the current indoor-per-building-then-all-outdoor pass) as a future scheduling/UX improvement (no correctness bug). Also marked TODO-07 CLOSED (category-based pickup shipped in U-SVE-04 Step 1). Remaining before U-SVE-04 closeout: Grandpa's Shed (Step 3, pending) + strip the temporary [building-travel]/[building-outline]/[building-select] debug diagnostics.
+**Context**: CONSTRUCTION — U-SVE-04: inter-building walk confirmed; TODO-09 logged; Grandpa's Shed + diagnostic cleanup remain
+---
+
+## U-SVE-04 — Grandpa's Shed deferred; unit finalized
+**Timestamp**: 2026-05-31T00:00:00Z
+**User Input**: "Do the recommended option" (after AskUserQuestion: Grandpa's Shed = "Investigate a lighter path")
+**AI Response**: Investigated the lighter path and found none: SVE Custom_GrandpasShedGreenhouse is quest-gated and multi-hop (Farm → shed → greenhouse) via farm-type-specific tile-action warps (Warps_GrandpasShed_GF/_IF2R/_NF) whose map-level Warp properties are off-map placeholders, so farm.warps doesn't carry a reachable warp and the resolver's standalone TryFindFarmWarpTo path can't find it. No single-warp option exists; servicing it needs multi-hop navigation the worker lacks. The standard Grandpa's Farm greenhouse (named "Greenhouse") is already covered by existing greenhouse support, so the common crop-work case is served. Per the user's choice, deferred the shed greenhouse (S-25) to TODO-10 and finalized U-SVE-04 on Steps 1/2/4. Diagnostics already stripped; build 0/0; tests 378 passed / 1 skip / 0 failed; deployed. All four SVE units (U-SVE-01..04) now complete. Next: global Build & Test (final stage).
+**Context**: CONSTRUCTION — U-SVE-04 COMPLETE; S-25 shed greenhouse → TODO-10; advancing to Build & Test
+---
+
+## Build and Test Stage (SVE Compatibility)
+**Timestamp**: 2026-05-31T00:30:00Z
+**User Input**: "continue"
+**Build Status**: Success — `dotnet build Dayswork.sln /p:EnableModDeploy=false` 0 warnings / 0 errors; deployed build succeeds.
+**Test Status**: Pass — `dotnet test Dayswork.sln` 378 passed / 1 expected skip / 0 failed.
+**AI Response**: Kicked off the final Build & Test stage for the SVE compatibility change (all four units complete). Base build/unit-test instructions unchanged (dotnet build/test). Generated SVE-specific artifacts: sve-integration-test-instructions.md (manual matrix S1–S8 across vanilla + SVE environments) and sve-build-and-test-summary.md (build/test status, per-unit completion, deviations DEV-SVE-01/02/03, ready-for-operations). Captured deferrals as TODO-09 (animal work ordering) and TODO-10 (shed greenhouse / multi-hop navigation). Presenting the 2-option completion; Operations is a placeholder (SMAPI mod — deploy = build to Mods folder, already automated).
+**Files Generated**:
+- sve-integration-test-instructions.md
+- sve-build-and-test-summary.md
+**Context**: CONSTRUCTION — Build & Test (SVE) artifacts generated; awaiting approval
+---
+
+## Build and Test (SVE) — Approval; SVE change COMPLETE
+**Timestamp**: 2026-05-31T01:00:00Z
+**User Input**: "approved"
+**AI Response**: Build & Test stage APPROVED. The Stardew Valley Expanded compatibility change is COMPLETE — all four units (U-SVE-01 provider foundation, U-SVE-02 farm maps + entrance, U-SVE-03 premium animal buildings, U-SVE-04 new content + multi-building) plus Build & Test are done; vanilla invariance preserved (null-object profile). Final verification: build 0/0; tests 378 passed / 1 expected skip / 0 failed; deployed to the Mods folder. Operations is a placeholder for this SMAPI mod (deploy = automated build copy). Open follow-ups carried forward: TODO-09 (per-building animal work ordering) and TODO-10 (SVE Grandpa's Shed greenhouse — needs multi-hop worker navigation). Marked the active SVE change COMPLETE in aidlc-state.md.
+**Context**: CONSTRUCTION → COMPLETE — SVE compatibility change closed out
+---
+
+## New Change — TODO-09 Per-Building Animal Work Ordering — Workspace Detection + Requirements Analysis start
+**Timestamp**: 2026-05-31T00:00:00Z
+**User Input**: "Using ai-dlc, pick up TODO-09"
+**AI Response**: Started AI-DLC workflow for TODO-09 (per-building animal work ordering). Workspace Detection: resumed existing brownfield project (aidlc-state.md present); no re-scan or reverse engineering needed. Confirmed scope from the open TODO-09 entry and grounded it in source: `ShiftPlanBuilder.BuildBatchPlan` currently emits one `AnimalBuilding` batch per selected building (ordered by LocationName/Tier) then a single trailing `OutdoorAnimals` ("Farm") batch that handles every selected building's grazing animals plus farm-wide animal-product forage (truffles via `ScanWholeLocation`). `ShiftOrchestrator` enters each building interior for feed/pet/collect, then runs the one outdoor pass with a late-truffle pre-completion rescan (`TryRescanOutdoorAnimalProductsBeforeBatchComplete`). Grazing animals are already attributable to their home building via `AnimalTaskHandler.ResolveHomeLocation` (`homeInterior.NameOrUniqueName`), the same key used for selection matching (TODO-08). Began Requirements Analysis (Standard depth) — created `aidlc-docs/inception/requirements/todo-09-requirement-verification-questions.md` with 7 questions (5 functional/scheduling + 2 extension opt-in carry-forward). Presented welcome message + question file; STOP at the Requirements gate awaiting answers.
+**Context**: CONSTRUCTION (new change) — Requirements Analysis question gate
+---
+
+## TODO-09 — Requirements Analysis answers received
+**Timestamp**: 2026-05-31T00:10:00Z
+**User Input**: "done" (answered the 7-question file: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A, Q6=B, Q7=A)
+**AI Response**: Validated answers — no contradictions (Q3=A keeps the no-dropped-work guarantee; Q4=A keeps scope tight; extensions carry forward project defaults: Security off, PBT full). Wrote `aidlc-docs/inception/requirements/todo-09-requirements.md` (intent analysis, grounded current behavior, FR-T09-01..08, NFR-T09-01..04, extension config, out-of-scope). Recorded extension config for this change in aidlc-state. Presenting the Requirements Analysis completion gate with an "Add User Stories" option (User Stories will otherwise be skipped — pure scheduling refinement of existing worker behavior already covered by S-23). Expected onward plan: SKIP Application Design + Units Generation (single change inside existing ShiftPlanBuilder/ShiftOrchestrator), EXECUTE Functional Design + NFR Requirements/Design (light) + Code Generation, then Build & Test.
+**Context**: CONSTRUCTION (TODO-09) — Requirements Analysis complete; awaiting approval
+---
+
+## TODO-09 — Approved + delegated; design stages executed at recommended; Code Gen plan gate
+**Timestamp**: 2026-05-31T00:20:00Z
+**User Input**: "continue and use recommended"
+**AI Response**: Recorded Requirements Analysis approval + delegation to recommended options. Executed the inception/design stages at their recommended outputs without per-stage approval (precedent: the SVE "continue with recommended" delegation), pausing at the Code Generation plan gate (the checkpoint before code is written). Produced: Workflow Planning [todo-09-execution-plan.md](inception/plans/todo-09-execution-plan.md) (SKIP User Stories/Application Design/Units Generation/Infrastructure Design; EXECUTE FD/NFR-Req/NFR-Design/Code Gen/Build&Test; risk Low–Medium, two files + tests); Functional Design [functional-design/](construction/u-t09-animal-ordering/functional-design/) (business-logic-model, business-rules BR-T09-01..11 + properties P-T09-1..6, domain-entities — adds `BatchKind.FarmForage`, narrows `OutdoorAnimals` to per-building); NFR Requirements [nfr-requirements/](construction/u-t09-animal-ordering/nfr-requirements/) (NFRU-T09-01..06 — determinism, no added scans, no-dropped-work, PBT full, back-compat); NFR Design [nfr-design/](construction/u-t09-animal-ordering/nfr-design/) (P-T09-01..05 — pure ordering authority in Core, thin runtime adapter, single-home partition, idempotent re-service safety, forage rescan relocation); Code Generation plan [u-t09-animal-ordering-code-generation-plan.md](construction/plans/u-t09-animal-ordering-code-generation-plan.md) (13 numbered steps). Verified existing test impact: U22 `ScopeDrivenRuntimeAlignmentTests` single-Barn Pet-only case stays `[AnimalBuilding, OutdoorAnimals]` (still valid); `ShiftPlanBuilderTests` MixedScopes example + PBT property need updating.
+**AI Prompt**: "Code Generation plan complete for u-t09-animal-ordering. Approve the plan so I can generate the code, or request changes?"
+**Context**: CONSTRUCTION (TODO-09) — Code Generation Part 1 (plan) gate; awaiting approval before writing code
+---
+
+## TODO-09 — Code Generation Part 2 executed; verified green
+**Timestamp**: 2026-05-31T00:40:00Z
+**User Input**: "approve and continue"
+**Build Status**: Success — `dotnet build Dayswork.sln -p:EnableModDeploy=false` 0 warnings / 0 errors.
+**Test Status**: Pass — `dotnet test Dayswork.sln -p:EnableModDeploy=false` 382 passed / 1 expected skip / 0 failed (was 378; +4 example tests, PBT property rewritten).
+**AI Response**: Code Generation plan approved; executed all 13 steps. Modified `Dayswork.Core/Shifts/WorkBatch.cs` (added `BatchKind.FarmForage`), `Dayswork.Core/Shifts/ShiftPlanBuilder.cs` (per-building `AnimalBuilding`+`OutdoorAnimals` interleave + trailing `FarmForage` when Collect enabled), `Dayswork/Orchestration/ShiftOrchestrator.cs` (per-building grazing fill from single home; new `FarmForage` fill; split `RefreshOutdoorAnimalWork` → `RefreshBuildingGrazingWork`/`RefreshFarmForageWork`; rescan re-pointed to `FarmForage` via `TryRescanFarmForageBeforeBatchComplete`; removed unused `selectedAnimalHomes`; extended all-outdoor-empty guard), and `Dayswork.Tests/Shifts/ShiftPlanBuilderTests.cs` (rewrote mixed example + PBT property `AnyScopeShape_ProducesPerBuildingGroupedPlan` for P-T09-1..6; added EX-T09-1..4). U22 `ScopeDrivenRuntimeAlignmentTests` unchanged (still valid). Wrote [code-summary.md](construction/u-t09-animal-ordering/code/code-summary.md); marked all plan checkboxes [x]; updated aidlc-state. Presenting Code Generation completion (2-option) — next stage Build & Test (incl. manual in-game routing confirmation).
+**Context**: CONSTRUCTION (TODO-09) — Code Generation complete; awaiting approval to proceed to Build & Test
+---
+
+## TODO-09 — Code Generation approved + Build & Test approved; change COMPLETE
+**Timestamp**: 2026-05-31T01:00:00Z
+**User Input**: "I deployed and tested, everything is approved and tested"
+**AI Response**: Recorded Code Generation approval. Ran the final Build & Test stage: base build/unit-test instructions unchanged; generated [todo-09-build-and-test-summary.md](construction/build-and-test/todo-09-build-and-test-summary.md) capturing automated verification (build 0/0; tests 382 passed / 1 skip / 0 failed), the added/updated example + PBT coverage, and the maintainer-confirmed manual in-game scenario (per-building grouping: worker fully services one spread-out building — interior then its grazing animals — before the next; truffles still collected; no animal unserviced). No deviations. Marked TODO-09 CLOSED in Open TODOs and the active change COMPLETE in aidlc-state. AI-DLC workflow for TODO-09 finished. Operations is a placeholder (SMAPI deploy = build-to-Mods, automated).
+**Context**: CONSTRUCTION → COMPLETE — TODO-09 closed out
+---
+
+## New Change — TODO-10 SVE Grandpa's Shed Greenhouse — Workspace Detection start
+**Timestamp**: 2026-05-31T13:35:14Z
+**User Input**: "using ai-dlc, do task TODO-10"
+**AI Response**: Started AI-DLC workflow for TODO-10. Loaded common AI-DLC rules (`process-overview`, `session-continuity`, `content-validation`, `question-format-guide`, and `welcome-message`), scanned extension opt-ins (Security Baseline, Property-Based Testing), confirmed existing `aidlc-docs/aidlc-state.md`, and began Workspace Detection against the existing Dayswork brownfield project. Content validation for this audit append: markdown only, no Mermaid or ASCII diagrams.
+**Context**: INCEPTION — Workspace Detection
+---
+
+## TODO-10 — Workspace Detection complete; Requirements Analysis question gate
+**Timestamp**: 2026-05-31T13:38:50Z
+**User Input**: "(none; workflow action after initial TODO-10 request)"
+**AI Response**: Workspace Detection complete. Findings: existing AI-DLC project resumed; source code present in `Dayswork`, `Dayswork.Core`, and `Dayswork.Tests`; build system is MSBuild / `dotnet`; reverse-engineering artifacts directory is absent, but targeted SVE and routing artifacts are already present and loaded, so no broad reverse-engineering refresh was executed for this focused TODO continuation. Loaded the enabled Property-Based Testing rules (full mode); skipped loading Security Baseline full rules because project state has Security disabled. Requirements Analysis started at comprehensive depth because TODO-10 requires multi-hop cross-location navigation, SVE source-grounded route data, scope-selection behavior, failure handling, and item-safety guarantees. Created `aidlc-docs/inception/requirements/todo-10-requirement-verification-questions.md` with 11 questions, including extension opt-ins. Content validation: markdown only, no Mermaid or ASCII diagrams, question format follows `[Answer]:` tags with `X) Other` options.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/inception/requirements/todo-10-requirement-verification-questions.md` and tell me when you are done."
+**Context**: INCEPTION — Requirements Analysis question gate; awaiting user answers
+---
+
+## TODO-10 — Requirements Analysis answers received and requirements generated
+**Timestamp**: 2026-05-31T13:54:25Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/requirements/todo-10-requirement-verification-questions.md` and validated all 11 answers: Q1=B, Q2=A, Q3=A, Q4=A, Q5=A, Q6=A, Q7=A, Q8=A, Q9=A, Q10=B, Q11=B. No contradictions detected; Q1 and Q7 combine into shed-greenhouse crop work with main-shed/greenhouse chest deposit support. Security Baseline is disabled for TODO-10; Property-Based Testing is enabled in partial mode (PBT-02, PBT-03, PBT-07, PBT-08, PBT-09 blocking where applicable). Generated `aidlc-docs/inception/requirements/todo-10-requirements.md` at comprehensive depth, covering explicit SVE multi-hop routes for IF2R, Grandpa's Farm, and Frontier Farm; runtime route validation rather than direct quest-flag authority; single-greenhouse alternative selection; greenhouse Water/Harvest only; graceful skip/continue on route failure; item-safe deposit support; and manual SVE playtest requirements. Updated `aidlc-state.md` with TODO-10 Requirements Analysis review status and extension configuration. Content validation: markdown tables/lists only, no Mermaid or ASCII diagrams.
+**AI Prompt**: "Requirements Analysis complete. Please review `aidlc-docs/inception/requirements/todo-10-requirements.md`; approve to proceed to User Stories or request changes."
+**Context**: INCEPTION — Requirements Analysis complete; awaiting approval
+---
+
+## TODO-10 — Requirements Analysis approved; User Stories start
+**Timestamp**: 2026-05-31T13:57:46Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 Requirements Analysis and moved into User Stories. Loaded User Stories rule details, question-format rules, content-validation rules, TODO-10 requirements, existing SVE stories, existing personas, and current extension configuration. Determined User Stories should execute in minimal update mode because TODO-10 is user-facing and refines S-25 with multi-hop route, shed-greenhouse scope, deposit, item-safety, and route-failure acceptance criteria. Content validation for planned artifacts: markdown only, no Mermaid or ASCII diagrams.
+**Context**: INCEPTION — User Stories Part 1 start
+---
+
+## TODO-10 — User Stories assessment and planning question gate
+**Timestamp**: 2026-05-31T13:57:46Z
+**User Input**: "(none; workflow action after requirements approval)"
+**AI Response**: Created `aidlc-docs/inception/plans/todo-10-user-stories-assessment.md` and `aidlc-docs/inception/plans/todo-10-story-generation-plan.md`. Updated `aidlc-state.md` to User Stories Part 1 question gate. Extension compliance: Security Baseline skipped because disabled for TODO-10; Property-Based Testing partial mode remains applicable to story criteria and route-model testability expectations. Content validation: markdown tables/lists only, no Mermaid or ASCII diagrams; questions use required `[Answer]:` tags and `X) Other` options.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/inception/plans/todo-10-story-generation-plan.md` and tell me when you are done."
+**Context**: INCEPTION — User Stories Part 1 question gate; awaiting story-plan answers
+---
+
+## TODO-10 — User Stories plan answers received; approval gate
+**Timestamp**: 2026-05-31T14:07:17Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/plans/todo-10-story-generation-plan.md` and validated all four answers: Q1=A, Q2=A, Q3=A, Q4=A. All answers are complete, valid, and mutually consistent. No clarification question file is required. Updated the plan checklist to mark answer collection, ambiguity analysis, and clarification evaluation complete; added answer analysis and resolved generation approach. Updated `aidlc-state.md` to User Stories Part 1 plan approval gate. Content validation: markdown tables/lists only, no Mermaid or ASCII diagrams.
+**AI Prompt**: "Story plan answers are complete and unambiguous. Please approve the TODO-10 story-generation plan so I can update `stories.md` and `personas.md`, or request changes."
+**Context**: INCEPTION — User Stories Part 1 plan approval gate; awaiting explicit approval
+---
+
+## TODO-10 — User Stories plan approved; generation started
+**Timestamp**: 2026-05-31T14:11:33Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of the resolved TODO-10 story-generation plan. Marked the plan approval checkbox complete and started User Stories Part 2 generation. Loaded the approved plan and identified the next unchecked generation step: update `stories.md` using the selected story-scope approach. Content validation for planned edits: markdown only, no Mermaid or ASCII diagrams.
+**Context**: INCEPTION — User Stories Part 2 generation
+---
+
+## TODO-10 — User Stories generation complete
+**Timestamp**: 2026-05-31T14:13:40Z
+**User Input**: "(none; workflow action after story-plan approval)"
+**AI Response**: Completed TODO-10 User Stories generation. Updated `stories.md`: refined S-25 as "Grandpa's Shed greenhouse is a selectable crop-work location"; added criteria for single greenhouse selection, source-grounded multi-hop route use, no direct farm-to-greenhouse success warp, runtime route validation, graceful skip/continue route failure, shed greenhouse/main shed deposit routing, item safety, vanilla invariance, manual SVE playtest, and route-model PBT expectations; updated S-26 for explicit route-provider data and pure route-model property tests; updated coverage summary for TODO-10 traceability. Updated `personas.md` to document that TODO-10 keeps P-01/P-02/P-03 unchanged and maps P-03 to the route-provider/testability surface. Marked all story-generation plan checklist items complete and updated `aidlc-state.md` to User Stories review required. Content validation: markdown only, no Mermaid or ASCII diagrams. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode reflected through S-25/S-26 criteria.
+**AI Prompt**: "# 📚 User Stories Complete\n\nUser stories generation has refined the existing SVE story set for TODO-10: S-25 now describes the selected Grandpa's Shed greenhouse crop-work flow, S-26 now carries the explicit route-provider and pure route-model testability expectations, and the existing P-01/P-02/P-03 personas were reviewed without adding a new persona.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the user stories and personas at: `aidlc-docs/inception/user-stories/stories.md` and `aidlc-docs/inception/user-stories/personas.md`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** -  Ask for modifications to the stories or personas based on your review  \n> ✅ **Approve & Continue** - Approve user stories and proceed to **Workflow Planning**\n\n---"
+**Context**: INCEPTION — User Stories complete; awaiting approval
+---
+
+## TODO-10 — User Stories approved; Workflow Planning complete
+**Timestamp**: 2026-05-31T14:26:56Z
+**User Input**: "approved"
+**AI Response**: Recorded explicit approval of TODO-10 User Stories and executed Workflow Planning. Loaded workflow-planning rules, content-validation rules, TODO-10 requirements, approved story plan, refined stories/personas, and current extension configuration. Generated `aidlc-docs/inception/plans/todo-10-execution-plan.md`. Recommended execution: Application Design, Functional Design, NFR Requirements, NFR Design, Code Generation, and Build and Test. Recommended skips: Reverse Engineering, Units Generation, and Infrastructure Design. Package sequence: `Dayswork.Core` pure route model first, `Dayswork` runtime wiring second, `Dayswork.Tests` coverage third. Updated `aidlc-state.md` to Workflow Planning review required. Content validation: Mermaid diagram validated manually with alphanumeric node IDs, valid flowchart syntax, no unescaped quotes, and text fallback; no ASCII diagrams. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode carried into planned NFR/design/code/test stages.
+**AI Prompt**: "Workflow Planning complete. Please review `aidlc-docs/inception/plans/todo-10-execution-plan.md`; approve to proceed to Application Design, request changes, or ask to add a skipped stage."
+**Context**: INCEPTION — Workflow Planning complete; awaiting approval
+---
+
+## TODO-10 — Workflow Planning approved; Application Design question gate
+**Timestamp**: 2026-05-31T16:01:06Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of the TODO-10 workflow plan and started Application Design. Loaded application-design rules, content-validation rules, question-format rules, the TODO-10 execution plan, current requirements/stories/personas context, the existing SVE application design, and the current compat/navigation/scope/deposit seams in code. Created `aidlc-docs/inception/plans/todo-10-application-design-plan.md` with four questions covering route-definition ownership, multi-hop route execution coordination, shed greenhouse/chest discovery, and route-failure decision ownership. Updated `aidlc-state.md` to Application Design question gate. Content validation: markdown only, no Mermaid or ASCII diagrams; questions use required `[Answer]:` tags and `X) Other` options. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode preserved through pure route-definition and validation design questions.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/inception/plans/todo-10-application-design-plan.md` and tell me when you are done."
+**Context**: INCEPTION — Application Design question gate; awaiting design answers
+---
+
+## TODO-10 — Application Design answers received and artifacts generated
+**Timestamp**: 2026-05-31T16:09:20Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/inception/plans/todo-10-application-design-plan.md` and validated all four answers: Q1=A, Q2=A, Q3=A, Q4=A. Answers are complete, valid, and mutually consistent; no clarification questions are required. Generated Application Design addenda: `todo-10-components.md`, `todo-10-component-methods.md`, `todo-10-services.md`, `todo-10-component-dependency.md`, and consolidated `todo-10-application-design.md`. Design decisions: extend `IExpansionProfile`/`SveExpansionProfile` with pure route definitions; add `CrossLocationRouteNavigator`; expose virtual shed greenhouse/main shed discovery through the compat seam; keep route-failure policy in `ShiftOrchestrator`. Marked all application-design plan checkboxes complete and updated `aidlc-state.md` to Application Design review required. Content validation: markdown only; no Mermaid or ASCII diagrams; C# code blocks are signature sketches only. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode supported by pure route model/profile boundaries.
+**AI Prompt**: "# 🏗️ Application Design Complete\n\nApplication design has created TODO-10 addenda for components, methods, services, dependencies, and the consolidated design summary. The design keeps SVE route data centralized in the existing profile seam, live validation in `ExpansionCompatService`, route execution in a narrow `CrossLocationRouteNavigator`, and route-failure decisions in `ShiftOrchestrator`.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the application design artifacts at: `aidlc-docs/inception/application-design/`\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the application design if required\n> 📝 **Add Units Generation** - Choose to include **Units Generation** stage (currently skipped)\n> ✅ **Approve & Continue** - Approve design and proceed to **CONSTRUCTION PHASE / Functional Design**"
+**Context**: INCEPTION — Application Design complete; awaiting approval
+---
+
+## TODO-10 — Application Design approved; Functional Design question gate
+**Timestamp**: 2026-05-31T17:10:18Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 Application Design. Skipped Units Generation per the approved workflow plan and started Construction / Functional Design for unit `u-t10-shed-greenhouse-routing`. Loaded Functional Design, content-validation, question-format, and Property-Based Testing rule details; loaded TODO-10 requirements and application-design context; reviewed current route/scope/deposit seams. Created `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-functional-design-plan.md` with six Functional Design questions and plan-level checkboxes. Updated `aidlc-state.md` to the Functional Design question gate. Content validation: markdown only, no Mermaid or ASCII diagrams, questions use `[Answer]:` tags with `X) Other` as the last option. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode carried forward with no blocking finding at question gate.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-functional-design-plan.md` and tell me when you are done."
+**Context**: CONSTRUCTION — Functional Design question gate; awaiting functional-design answers
+---
+
+## TODO-10 — Functional Design answers received and artifacts generated
+**Timestamp**: 2026-05-31T17:22:43Z
+**User Input**: "done"
+**AI Response**: Read `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-functional-design-plan.md` and validated all six answers: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A, Q6=A. All answers are complete, valid, and mutually consistent; no clarification questions are required. Updated the plan checkboxes for answer collection, validation, clarification evaluation, artifact generation, state/audit updates, and review presentation. Generated Functional Design artifacts: `business-logic-model.md`, `business-rules.md`, `domain-entities.md`, and `frontend-components.md` under `aidlc-docs/construction/u-t10-shed-greenhouse-routing/functional-design/`. Updated `aidlc-state.md` to Functional Design review required. Content validation: markdown tables/lists only; no Mermaid diagrams, ASCII diagrams, or parser-sensitive embedded code blocks. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode compliant with PBT-02 N/A, PBT-03 invariants documented, PBT-07 domain-generator obligations documented, and PBT-08/PBT-09 carried forward with FsCheck.
+**AI Prompt**: "# 🔧 Functional Design Complete - u-t10-shed-greenhouse-routing\n\nFunctional design has created the route, work-scope, deposit, failure-policy, domain-entity, UI-discovery, and property-test boundary artifacts for TODO-10.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the functional design artifacts at: `aidlc-docs/construction/u-t10-shed-greenhouse-routing/functional-design/`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the functional design based on your review  \n> ✅ **Continue to Next Stage** - Approve functional design and proceed to **NFR Requirements**\n\n---"
+**Context**: CONSTRUCTION — Functional Design complete; awaiting approval
+---
+
+## TODO-10 — Functional Design approved; NFR Requirements question gate
+**Timestamp**: 2026-05-31T17:28:59Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 Functional Design and started NFR Requirements for unit `u-t10-shed-greenhouse-routing`. Loaded NFR Requirements, content-validation, question-format, and Property-Based Testing rule details; loaded the TODO-10 Functional Design artifacts; analyzed NFR categories for scalability, performance, availability, security, tech stack, reliability, maintainability, and usability. Created `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-nfr-requirements-plan.md` with six NFR questions and plan-level checkboxes. Updated `aidlc-state.md` to the NFR Requirements question gate. Content validation: markdown only, no Mermaid or ASCII diagrams, questions use `[Answer]:` tags with `X) Other` as the last option. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode carried forward with PBT-09 directly applicable to NFR Requirements and no blocking finding at question gate.
+**AI Prompt**: "Please answer the questions in `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-nfr-requirements-plan.md` and tell me when you are done."
+**Context**: CONSTRUCTION — NFR Requirements question gate; awaiting NFR answers
+---
+
+## TODO-10 — NFR Requirements answers received and artifacts generated
+**Timestamp**: 2026-05-31T17:37:21Z
+**User Input**: "use recommended"
+**AI Response**: Applied the recommended `A` option to all six questions in `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-nfr-requirements-plan.md`. Validated all answers as complete, valid, unambiguous, and mutually consistent; no clarification question file is required. Generated `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-requirements/nfr-requirements.md` and `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-requirements/tech-stack-decisions.md`. Updated `aidlc-state.md` to the NFR Requirements review gate. Content validation: markdown tables/lists only; no Mermaid diagrams, ASCII diagrams, or parser-sensitive embedded code blocks. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode compliant with PBT-02 N/A unless reversible transforms are introduced, PBT-03 invariants required, PBT-07 generators required, PBT-08 shrinking/reproducibility required, and PBT-09 satisfied by FsCheck.
+**AI Prompt**: "# 📊 NFR Requirements Complete - u-t10-shed-greenhouse-routing\n\nNFR requirements assessment has identified bounded route-validation, fresh live readiness, item-safe non-throwing failures, existing-stack tech decisions, and FsCheck-backed property-test obligations for TODO-10.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the NFR requirements at: `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-requirements/`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the NFR requirements based on your review  \n> ✅ **Continue to Next Stage** - Approve NFR requirements and proceed to **NFR Design**\n\n---"
+**Context**: CONSTRUCTION — NFR Requirements complete; awaiting review approval
+---
+
+## TODO-10 — NFR Requirements approved; NFR Design generated
+**Timestamp**: 2026-05-31T17:43:04Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 NFR Requirements and executed NFR Design for unit `u-t10-shed-greenhouse-routing`. Loaded NFR Design, content-validation, question-format, and Property-Based Testing rule details; loaded approved NFR Requirements, Tech Stack Decisions, Functional Design, and Application Design context. Created `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-nfr-design-plan.md`; evaluated resilience, scalability, performance, security, and logical-component categories; determined no additional question round was needed because the approved artifacts already fixed the pattern set. Generated `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-design/nfr-design-patterns.md` and `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-design/logical-components.md`. Updated `aidlc-state.md` to the NFR Design review gate. Content validation: markdown tables/lists only; no Mermaid diagrams, ASCII diagrams, or parser-sensitive embedded code blocks. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode has no blocking findings, with PBT-02 N/A unless reversible transforms are introduced, PBT-03/PBT-07/PBT-08 carried into Code Generation and Build/Test, and PBT-09 satisfied by FsCheck.
+**AI Prompt**: "# 🎨 NFR Design Complete - u-t10-shed-greenhouse-routing\n\nNFR design has incorporated profile-owned route tables, per-attempt live validation, ordered-hop navigation, orchestrator-owned route-failure policy, item-safe deposit failure handling, draft-aware expansion destination filtering, one-warning route failure aggregation, and the pure route-property test seam.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the NFR design at: `aidlc-docs/construction/u-t10-shed-greenhouse-routing/nfr-design/`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the NFR design based on your review  \n> ✅ **Continue to Next Stage** - Approve NFR design and proceed to **Code Generation**\n\n---"
+**Context**: CONSTRUCTION — NFR Design complete; awaiting review approval
+---
+
+## TODO-10 — NFR Design approved; Code Generation plan created
+**Timestamp**: 2026-05-31T17:51:46Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of TODO-10 NFR Design and started Code Generation Part 1 planning for unit `u-t10-shed-greenhouse-routing`. Loaded Code Generation, content-validation, question-format, and Property-Based Testing rule details; loaded approved NFR Design artifacts; inspected existing Core compat profile files, Mod compat service, building navigation, chest discovery, scope bootstrap, output destination, shift orchestration, and existing test/FsCheck patterns. Created `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-code-generation-plan.md` with 16 implementation steps covering SVE source verification, Core route model/profile data, live validation, cross-location navigation, UI/destination discovery, shift work/deposit route integration, warning policy, example tests, FsCheck generators/properties, verification, and code summary. Updated `aidlc-state.md` to the Code Generation planning approval gate. Content validation: markdown tables/lists only; no Mermaid diagrams, ASCII diagrams, or parser-sensitive embedded code blocks. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing partial mode planned with PBT-02 N/A unless reversible transforms are introduced, PBT-03/PBT-07/PBT-08 carried into planned tests and verification, and PBT-09 satisfied by FsCheck.
+**AI Prompt**: "Code Generation plan complete. Please review `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-code-generation-plan.md`; approve to begin implementation, or request changes."
+**Context**: CONSTRUCTION — Code Generation Part 1 planning approval gate; awaiting explicit plan approval
+---
+
+## TODO-10 — Code Generation plan approved; implementation started
+**Timestamp**: 2026-05-31T18:05:41Z
+**User Input**: "continue"
+**AI Response**: Recorded explicit approval of the TODO-10 Code Generation plan. Marked Code Generation Part 1 planning checklist items complete in `aidlc-docs/construction/plans/u-t10-shed-greenhouse-routing-code-generation-plan.md` and updated `aidlc-state.md` to Code Generation Part 2 in progress. Started implementation with Step 1 source verification from the local SVE repository before encoding route data.
+**Context**: CONSTRUCTION — Code Generation Part 2 started; executing Step 1 source verification
+---
+
+## TODO-10 — Code Generation complete
+**Timestamp**: 2026-05-31T18:33:18Z
+**User Input**: "continue"
+**AI Response**: Completed TODO-10 Code Generation for unit `u-t10-shed-greenhouse-routing`. Verified SVE route source data from the local `C:\Users\kwood\Repos\StardewValleyExpanded` checkout; implemented the pure Core expansion route model, SVE route/descriptors, live route validation, `CrossLocationRouteNavigator`, route-gated shed greenhouse discovery, draft-aware expansion chest filtering, shed greenhouse work/deposit routing, item-safe failure handling, one-warning route failure logging, example tests, and FsCheck route generators/properties. Created `aidlc-docs/construction/u-t10-shed-greenhouse-routing/code/code-summary.md`; updated the Code Generation plan, `aidlc-state.md`, and audit trail. Verification: `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with 397 passed / 1 skipped / 0 failed; `dotnet build Dayswork.sln /p:EnableModDeploy=false` succeeded with 0 warnings / 0 errors.
+**AI Prompt**: "Code Generation complete for `u-t10-shed-greenhouse-routing`. Please review the code summary and choose Request Changes or Continue to Next Stage."
+**Context**: CONSTRUCTION — Code Generation complete; awaiting review approval
+---

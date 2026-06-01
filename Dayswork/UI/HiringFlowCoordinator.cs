@@ -11,8 +11,6 @@ namespace Dayswork.UI;
 
 internal sealed class HiringFlowCoordinator
 {
-    private readonly IRateCalculator _rateCalc;
-    private readonly IDepositCalculator _depositCalc;
     private readonly IContractTermsBuilder _termsBuilder;
     private readonly ModConfigManager _configManager;
     private readonly IContractStore _contractStore;
@@ -20,16 +18,12 @@ internal sealed class HiringFlowCoordinator
     private readonly IModHelper _helper;
 
     public HiringFlowCoordinator(
-        IRateCalculator rateCalc,
-        IDepositCalculator depositCalc,
         IContractTermsBuilder termsBuilder,
         ModConfigManager configManager,
         IContractStore contractStore,
         ChestResolver chestResolver,
         IModHelper helper)
     {
-        _rateCalc = rateCalc;
-        _depositCalc = depositCalc;
         _termsBuilder = termsBuilder;
         _configManager = configManager;
         _contractStore = contractStore;
@@ -154,7 +148,7 @@ internal sealed class HiringFlowCoordinator
     {
         draft.OutdoorZones.Clear();
         draft.AnimalBuildings.Clear();
-        draft.Greenhouse = null;
+        draft.Greenhouses.Clear();
         RefreshPreview(draft);
     }
 
@@ -199,12 +193,7 @@ internal sealed class HiringFlowCoordinator
             Game1.player.Money -= totalPrice;
         }
 
-        var compatibilityFinancials = BuildCompatibilityFinancialBridge(draft);
-        var builtContract = BuildContract(
-            draft,
-            proposedTerms,
-            compatibilityFinancials.depositAmount,
-            compatibilityFinancials.hourlyRate);
+        var builtContract = BuildContract(draft, proposedTerms);
 
         if (draft.EditingId.HasValue)
         {
@@ -226,36 +215,13 @@ internal sealed class HiringFlowCoordinator
         CloseFlow();
     }
 
-    private (int depositAmount, int hourlyRate) BuildCompatibilityFinancialBridge(ContractDraft draft)
-    {
-        var compatibilityZones = LegacyScopeBootstrapper.ProjectCompatibilityZones(draft.ScopeSelection);
-        // Transitional persistence fields still expect the legacy hourly model, but the inputs now
-        // come only from internal compatibility defaults on the runtime snapshot, never from GMCM.
-        var rate = _rateCalc.Calculate(draft.EnabledTasks, _configManager.CurrentSnapshot, isRaining: false);
-        var hours = DepositHoursPolicy.EstimateBillableHours(
-            compatibilityZones,
-            draft.EnabledTasks.Count,
-            _configManager.CurrentSnapshot);
-        var deposit = _depositCalc.Calculate(hours, rate) is PositiveDeposit positive
-            ? positive.Amount
-            : 0;
-
-        return (deposit, rate);
-    }
-
     private static Contract BuildContract(
         ContractDraft draft,
-        ContractTermsSnapshot proposedTerms,
-        int compatibilityDeposit,
-        int compatibilityHourlyRate)
+        ContractTermsSnapshot proposedTerms)
     {
-        var scopeSelection = draft.ScopeSelection;
-        var compatibilityZones = LegacyScopeBootstrapper.ProjectCompatibilityZones(scopeSelection);
-
         return new Contract(
             Id: ContractId.New(),
             EnabledTasks: draft.EnabledTasks.ToHashSet(),
-            Zones: compatibilityZones,
             TaskDestinations: draft.Destinations.Count > 0
                 ? new Dictionary<TaskKind, DestinationKey>(draft.Destinations)
                 : new Dictionary<TaskKind, DestinationKey>(),
@@ -265,9 +231,7 @@ internal sealed class HiringFlowCoordinator
                 Game1.Date.DayOfMonth,
                 Enum.Parse<Dayswork.Core.Domain.Season>(Game1.currentSeason, ignoreCase: true),
                 Game1.year),
-            DepositAmount: compatibilityDeposit,
-            HourlyRate: compatibilityHourlyRate,
-            ScopeSelection: scopeSelection,
+            ScopeSelection: draft.ScopeSelection,
             TermsSnapshot: proposedTerms);
     }
 

@@ -16,7 +16,7 @@ public sealed class ShiftContextTests
 
         var context = new ShiftContext(
             ContractId.New(),
-            new WorkScopeSet(null, Array.Empty<AnimalBuildingScope>(), null),
+            WorkScopeSet.WithSingleGreenhouse(null, Array.Empty<AnimalBuildingScope>(), null),
             new HashSet<TaskKind>(),
             new Dictionary<TaskKind, DestinationKey>(),
             contractTerms: terms,

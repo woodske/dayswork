@@ -111,3 +111,40 @@ Examples:
 - `S-18` multiplayer guard is historically unchanged, but `U-24` explicitly regression-verifies it after the pricing overhaul
 - `S-04` destination assignment UI already existed, but `U-22` must ensure typed scopes do not break how those destinations are consumed at runtime
 - `S-17` invulnerability is historically unchanged, but `U-21` touches the worker runtime deeply enough that regression coverage is warranted
+
+---
+
+# SVE Compatibility Units — Story Map (appended 2026-05-29)
+
+Maps the SVE story set (S-21..S-26 from [stories.md](../user-stories/stories.md) Section 6 + S-26) to the SVE units.
+
+| Story | Primary unit | Supporting units | Role |
+|---|---|---|---|
+| `S-21` Vanilla stays vanilla; SVE support auto-detects | `U-SVE-01` | — | Detection + vanilla-invariance is the foundation's core deliverable |
+| `S-22` Farmhand arrives correctly on SVE farm maps | `U-SVE-02` | `U-SVE-01` | Entrance override consumption; seam supplied by the foundation |
+| `S-23` Premium Barn/Coop fully serviced | `U-SVE-03` | `U-SVE-01` | Data-driven capacity + premium-tier mapping; policy from the foundation |
+| `S-24` New SVE crops/trees/animals/products | `U-SVE-04` | `U-SVE-01` | Classification overrides + graceful skip; seam from the foundation |
+| `S-25` Grandpa's Shed is a usable work location | `U-SVE-04` | `U-SVE-01` | Work-location membership + navigation; seam from the foundation |
+| `S-26` Add expansion compatibility via one isolated provider | `U-SVE-01` | `U-SVE-02`, `U-SVE-03`, `U-SVE-04` | The provider seam itself; each override unit exercises the extensibility contract |
+
+## Coverage verification
+
+| Story | Assigned to at least one SVE unit? |
+|---|---|
+| `S-21` | ✅ `U-SVE-01` |
+| `S-22` | ✅ `U-SVE-02` |
+| `S-23` | ✅ `U-SVE-03` |
+| `S-24` | ✅ `U-SVE-04` |
+| `S-25` | ✅ `U-SVE-04` |
+| `S-26` | ✅ `U-SVE-01` (+ exercised by U-SVE-02/03/04) |
+
+**All SVE stories are assigned to at least one SVE unit.**
+
+## Stories by SVE unit
+
+| SVE unit | Stories touched |
+|---|---|
+| `U-SVE-01` Provider Foundation + Detection | `S-21`, `S-26` |
+| `U-SVE-02` Farm Maps + Worker Entrance | `S-22` |
+| `U-SVE-03` Animal Buildings | `S-23` |
+| `U-SVE-04` New Content + Grandpa's Shed | `S-24`, `S-25` |

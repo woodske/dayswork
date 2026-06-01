@@ -10,9 +10,6 @@ namespace Dayswork.Core.Persistence;
 public sealed class SaveDataSerializer : ISaveDataSerializer
 {
     private const int CurrentSchemaVersion = 2;
-    private static readonly TileCoord CompatibilityPlaceholderTopLeft = new(0, 0);
-    private static readonly TileCoord CompatibilityPlaceholderBottomRight = new(999, 999);
-    private static readonly IConfigSnapshot DefaultConfigSnapshot = ConfigDefaults.Build();
 
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
@@ -73,12 +70,6 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
         var schemaVersion = ReadSchemaVersion(envelopeObject);
         if (schemaVersion is null)
             return Array.Empty<Contract>();
-
-        if (schemaVersion.Value == 1)
-        {
-            _logWarning("Dayswork save data schema version 1 is legacy pre-release hourly contract data and was dropped.");
-            return Array.Empty<Contract>();
-        }
 
         if (schemaVersion.Value > CurrentSchemaVersion)
         {
@@ -144,12 +135,8 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
         return schemaToken.Value<int>();
     }
 
-    private static ContractDtoV2 MapDomainToDtoV2(Contract contract)
-    {
-        var authoritativeScope = contract.ScopeSelection ?? DeriveCompatibilityScopeSelection(contract);
-        var authoritativeTerms = contract.TermsSnapshot ?? DeriveCompatibilityTermsSnapshot(contract);
-
-        return new ContractDtoV2
+    private static ContractDtoV2 MapDomainToDtoV2(Contract contract) =>
+        new()
         {
             Id = contract.Id.Value.ToString(),
             EnabledTasks = contract.EnabledTasks
@@ -166,15 +153,9 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             Schedule = contract.Schedule.ToString(),
             Status = contract.Status.ToString(),
             HireDate = MapDate(contract.HireDate),
-            ScopeSelection = MapScopeSelection(authoritativeScope),
-            TermsSnapshot = MapTermsSnapshot(authoritativeTerms),
-            LegacyFinancialBridge = new LegacyFinancialBridgeDto
-            {
-                DepositAmount = contract.DepositAmount,
-                HourlyRate = contract.HourlyRate,
-            },
+            ScopeSelection = MapScopeSelection(contract.ScopeSelection),
+            TermsSnapshot = MapTermsSnapshot(contract.TermsSnapshot),
         };
-    }
 
     private static Contract MapDtoV2ToDomain(ContractDtoV2 dto)
     {
@@ -190,65 +171,16 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
 
         var scopeSelection = MapScopeSelection(dto.ScopeSelection ?? throw new JsonException("ScopeSelection was null."));
         var termsSnapshot = MapTermsSnapshot(dto.TermsSnapshot ?? throw new JsonException("TermsSnapshot was null."));
-        var financialBridge = dto.LegacyFinancialBridge ?? throw new JsonException("LegacyFinancialBridge was null.");
 
         return new Contract(
             Id: id,
             EnabledTasks: enabledTasks,
-            Zones: ProjectCompatibilityZones(scopeSelection),
             TaskDestinations: destinations,
             Schedule: Enum.Parse<ContractSchedule>(dto.Schedule),
             Status: Enum.Parse<ContractStatus>(dto.Status),
             HireDate: MapDate(dto.HireDate ?? throw new JsonException("HireDate was null.")),
-            DepositAmount: financialBridge.DepositAmount,
-            HourlyRate: financialBridge.HourlyRate,
             ScopeSelection: scopeSelection,
             TermsSnapshot: termsSnapshot);
-    }
-
-    private static ContractScopeSelection DeriveCompatibilityScopeSelection(Contract contract)
-    {
-        var outdoorZones = contract.Zones
-            .Where(zone => string.Equals(zone.LocationName, "Farm", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(DescribeZone, StringComparer.Ordinal)
-            .ToList();
-
-        var greenhouseZone = contract.Zones.FirstOrDefault(zone => IsGreenhouseLocation(zone.LocationName));
-        var greenhouse = greenhouseZone is null ? null : new GreenhouseSelection(greenhouseZone.LocationName);
-
-        var animalBuildings = contract.Zones
-            .Where(zone =>
-                !string.Equals(zone.LocationName, "Farm", StringComparison.OrdinalIgnoreCase)
-                && !IsGreenhouseLocation(zone.LocationName))
-            .Select(zone => TryInferAnimalBuildingSelection(zone.LocationName))
-            .Where(selection => selection is not null)
-            .Cast<AnimalBuildingSelection>()
-            .Distinct()
-            .OrderBy(selection => selection.LocationName, StringComparer.Ordinal)
-            .ThenBy(selection => selection.Tier)
-            .ToList();
-
-        return new ContractScopeSelection(
-            OutdoorZones: outdoorZones.AsReadOnly(),
-            AnimalBuildings: animalBuildings.AsReadOnly(),
-            Greenhouse: greenhouse);
-    }
-
-    private static ContractTermsSnapshot DeriveCompatibilityTermsSnapshot(Contract contract)
-    {
-        var pricing = new PricingSnapshot(
-            LineItems: Array.Empty<PricingLineItem>(),
-            OutdoorSubtotal: 0,
-            AnimalSubtotal: 0,
-            GreenhouseSubtotal: 0,
-            TotalPrice: contract.DepositAmount);
-
-        var actionCosts = DefaultConfigSnapshot.WorkActionCosts
-            .OrderBy(kvp => kvp.Key.ToString(), StringComparer.Ordinal)
-            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-
-        var energy = new WorkerEnergyProfile(DefaultConfigSnapshot.WorkerDailyEnergyCapacity, actionCosts);
-        return new ContractTermsSnapshot(pricing, energy);
     }
 
     private static ContractScopeSelectionDto MapScopeSelection(ContractScopeSelection selection) =>
@@ -267,9 +199,10 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
                     Tier = building.Tier.ToString(),
                 })
                 .ToList(),
-            Greenhouse = selection.Greenhouse is null
-                ? null
-                : new GreenhouseSelectionDto { LocationName = selection.Greenhouse.LocationName },
+            Greenhouses = selection.Greenhouses
+                .OrderBy(greenhouse => greenhouse.LocationName, StringComparer.Ordinal)
+                .Select(greenhouse => new GreenhouseSelectionDto { LocationName = greenhouse.LocationName })
+                .ToList(),
         };
 
     private static ContractScopeSelection MapScopeSelection(ContractScopeSelectionDto dto)
@@ -288,14 +221,18 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             .ThenBy(building => building.Tier)
             .ToList();
 
-        var greenhouse = dto.Greenhouse is null
-            ? null
-            : new GreenhouseSelection(dto.Greenhouse.LocationName);
+        var greenhouses = (dto.Greenhouses ?? new List<GreenhouseSelectionDto>())
+            .Select(greenhouse => greenhouse.LocationName)
+            .Where(locationName => !string.IsNullOrWhiteSpace(locationName))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(locationName => locationName, StringComparer.Ordinal)
+            .Select(locationName => new GreenhouseSelection(locationName))
+            .ToList();
 
         return new ContractScopeSelection(
             OutdoorZones: outdoorZones.AsReadOnly(),
             AnimalBuildings: animalBuildings.AsReadOnly(),
-            Greenhouse: greenhouse);
+            Greenhouses: greenhouses.AsReadOnly());
     }
 
     private static ContractTermsSnapshotDto MapTermsSnapshot(ContractTermsSnapshot snapshot) =>
@@ -382,32 +319,6 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
         return new ContractTermsSnapshot(pricing, energy);
     }
 
-    private static IReadOnlyList<Zone> ProjectCompatibilityZones(ContractScopeSelection selection)
-    {
-        var compatibilityZones = new List<Zone>();
-        compatibilityZones.AddRange(selection.OutdoorZones);
-
-        compatibilityZones.AddRange(selection.AnimalBuildings.Select(building =>
-            new Zone(
-                building.LocationName,
-                CompatibilityPlaceholderTopLeft,
-                CompatibilityPlaceholderBottomRight)));
-
-        if (selection.Greenhouse is not null)
-        {
-            compatibilityZones.Add(new Zone(
-                selection.Greenhouse.LocationName,
-                CompatibilityPlaceholderTopLeft,
-                CompatibilityPlaceholderBottomRight));
-        }
-
-        return compatibilityZones
-            .Distinct()
-            .OrderBy(DescribeZone, StringComparer.Ordinal)
-            .ToList()
-            .AsReadOnly();
-    }
-
     private static DestinationDtoV1 MapDestinationToDto(DestinationKey destination) =>
         destination switch
         {
@@ -457,48 +368,6 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
 
     private static GameDate MapDate(GameDateDtoV1 dto) =>
         new(dto.Day, Enum.Parse<Season>(dto.Season), dto.Year);
-
-    private static bool IsGreenhouseLocation(string locationName) =>
-        locationName.Contains("Greenhouse", StringComparison.OrdinalIgnoreCase);
-
-    private static AnimalBuildingSelection? TryInferAnimalBuildingSelection(string locationName)
-    {
-        if (string.IsNullOrWhiteSpace(locationName))
-            return null;
-
-        var normalized = locationName.Trim();
-        if (normalized.Contains("Coop3", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("Deluxe Coop", StringComparison.OrdinalIgnoreCase))
-        {
-            return new AnimalBuildingSelection(locationName, AnimalBuildingTier.DeluxeCoop);
-        }
-
-        if (normalized.Contains("Coop2", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("Big Coop", StringComparison.OrdinalIgnoreCase))
-        {
-            return new AnimalBuildingSelection(locationName, AnimalBuildingTier.BigCoop);
-        }
-
-        if (normalized.Contains("Coop", StringComparison.OrdinalIgnoreCase))
-            return new AnimalBuildingSelection(locationName, AnimalBuildingTier.Coop);
-
-        if (normalized.Contains("Barn3", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("Deluxe Barn", StringComparison.OrdinalIgnoreCase))
-        {
-            return new AnimalBuildingSelection(locationName, AnimalBuildingTier.DeluxeBarn);
-        }
-
-        if (normalized.Contains("Barn2", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("Big Barn", StringComparison.OrdinalIgnoreCase))
-        {
-            return new AnimalBuildingSelection(locationName, AnimalBuildingTier.BigBarn);
-        }
-
-        if (normalized.Contains("Barn", StringComparison.OrdinalIgnoreCase))
-            return new AnimalBuildingSelection(locationName, AnimalBuildingTier.Barn);
-
-        return null;
-    }
 
     private static string DescribeZone(Zone zone) =>
         $"{zone.LocationName}|{zone.TopLeft.X}|{zone.TopLeft.Y}|{zone.BottomRight.X}|{zone.BottomRight.Y}";

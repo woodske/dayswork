@@ -1,4 +1,6 @@
 using Dayswork.Core.Config;
+using Dayswork.Compat;
+using Dayswork.Core.Compat;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
@@ -19,6 +21,15 @@ namespace Dayswork.Orchestration;
 
 internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 {
+    private enum PendingExpansionRouteKind
+    {
+        None,
+        WorkEntry,
+        WorkExit,
+        DepositEntry,
+        DepositExit,
+    }
+
     // Shipping bin tile on Standard Farm.
     private static readonly TileCoord ShippingBinTile = new(71, 13);
 
@@ -54,6 +65,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private readonly WorkUnitBoundaryClassifier _boundaryClassifier = new();
     private readonly OverflowCategorizer _overflowCategorizer = new();
     private readonly WorkerRouteSelector _routeSelector = new();
+    private readonly CrossLocationRouteNavigator _expansionRouteNavigator;
 
     private ShiftContext? _ctx;
     private FarmhandNpc?  _farmhand;
@@ -67,6 +79,14 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     // Multi-trip deposit loop state (Pattern N): the ordered remaining trips and the in-flight one.
     private readonly Queue<DepositTrip> _depositTrips = new();
     private DepositTrip? _currentTrip;
+
+    // Guards the FarmForage pre-completion rescan against re-enqueuing the same tile forever.
+    // A forage tile the worker cannot reach (or cannot remove) would otherwise be re-detected on
+    // every completion cycle once ClearRemainingActiveBatchWork drops it from the work queues,
+    // producing an infinite "rescan picked up 1 new tile item" loop. We enqueue each tile at most
+    // once per batch; the set resets when the active batch index changes.
+    private int _rescanBatchIndex = -1;
+    private readonly HashSet<TileCoord> _rescanEnqueuedTiles = new();
 
     // Per-stack paced execution within the in-flight trip. Each stack is one beat gated by
     // _toolAnimator.IsSwinging (duration == WorkerActionAnimationMs), so the deposit cadence
@@ -82,6 +102,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     // Set while the worker is walking to the interior exit door after depositing in a building.
     // Cleared when we cross the door (warp back to the farm) on arrival.
     private bool          _pendingDepositExit;
+    private PendingExpansionRouteKind _pendingExpansionRouteKind;
+    private WorkBatch? _pendingExpansionRouteBatch;
 
     // Per-WorkItem state — the nav tile and task tile are tracked separately (trellis crops).
     private bool      _actionPending;
@@ -147,6 +169,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _chestResolver     = chestResolver;
         _depositPlanner    = depositPlanner;
         _mailDispatcher    = mailDispatcher;
+        _expansionRouteNavigator = new CrossLocationRouteNavigator(nav);
         _stuck             = new StuckDetector(config.StuckInitialWaitMinutes);
     }
 
@@ -163,6 +186,13 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     /// </summary>
     private static TileCoord FindFarmExitTile(Farm farm)
     {
+        // SVE/expansion entrance override (U-SVE-02): consult the compat seam first. If it supplies
+        // a verified per-map entrance for this farm's signature, use it; otherwise fall through to
+        // the existing warp heuristic (FR-SVE-06). The override is best-effort and never throws.
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryGetFarmEntranceOverride(farm, out var overrideTile))
+            return ResolvePassableNearby(new TileCoord(overrideTile.X, overrideTile.Y), farm);
+
         // Build the set of interior location names so we can skip building-entry warps.
         var interiorNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var building in farm.buildings)
@@ -250,18 +280,51 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         return new TileCoord(77, 15);
     }
 
-    private ContractTermsSnapshot ResolveContractTerms(Contract contract, IConfigSnapshot runtimeConfig)
+    /// <summary>
+    /// Returns <paramref name="preferred"/> when a worker can stand on it; otherwise searches outward
+    /// in expanding rings for the nearest passable tile, clamped to the map. Used for expansion
+    /// entrance overrides, where the configured spawn tile is a preference that may be blocked at
+    /// spawn time (placed objects, seasonal debris). Falls back to the preferred tile if nothing
+    /// passable is found within the search radius (HandleExit logs if navigation then fails).
+    /// </summary>
+    private static TileCoord ResolvePassableNearby(TileCoord preferred, Farm farm)
     {
-        if (contract.TermsSnapshot is not null)
-            return contract.TermsSnapshot;
+        var mapLayer = farm.Map.Layers[0];
+        int w = mapLayer.LayerWidth, h = mapLayer.LayerHeight;
+
+        bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < w && y < h;
+
+        if (InBounds(preferred.X, preferred.Y) &&
+            WorkerMovementDriver.IsTilePassableForWorker(new Point(preferred.X, preferred.Y), farm))
+            return preferred;
+
+        const int maxRadius = 12;
+        for (int r = 1; r <= maxRadius; r++)
+        {
+            for (int dx = -r; dx <= r; dx++)
+            for (int dy = -r; dy <= r; dy++)
+            {
+                // Only the tiles on the ring at Chebyshev distance r (inner rings already searched).
+                if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r)
+                    continue;
+
+                int x = preferred.X + dx, y = preferred.Y + dy;
+                if (!InBounds(x, y))
+                    continue;
+                if (!WorkerMovementDriver.IsTilePassableForWorker(new Point(x, y), farm))
+                    continue;
+
+                ModEntry.ModMonitor.Log(
+                    $"[Dayswork] Entrance override ({preferred.X},{preferred.Y}) blocked — using nearby passable tile ({x},{y}).",
+                    LogLevel.Debug);
+                return new TileCoord(x, y);
+            }
+        }
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork] Contract {contract.Id.Value} has no stored terms snapshot; falling back to the current runtime energy profile.",
+            $"[Dayswork] Entrance override ({preferred.X},{preferred.Y}) blocked and no passable tile found within {maxRadius} tiles — using it anyway.",
             LogLevel.Warn);
-
-        return new ContractTermsSnapshot(
-            new PricingSnapshot(Array.Empty<PricingLineItem>(), 0, 0, 0, contract.DepositAmount),
-            new WorkerEnergyProfile(runtimeConfig.WorkerDailyEnergyCapacity, runtimeConfig.WorkActionCosts));
+        return preferred;
     }
 
     private bool HasBoundaryStopRequested() => _ctx?.PendingStopReason is not null;
@@ -414,28 +477,20 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         _config = runtimeConfig;
-        var contractTerms = ResolveContractTerms(contract, runtimeConfig);
+        var contractTerms = contract.TermsSnapshot;
         var energyState = _energyLedger.StartShift(contractTerms.Energy);
         var pacingProfile = WorkerPacingProfile.FromConfig(runtimeConfig);
 
         var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
         var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
-        if (runtimeScopeSelection is null)
-        {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork] Contract {contract.Id.Value} has no authoritative typed scope selection; refusing to start runtime execution.",
-                LogLevel.Warn);
-            return;
-        }
-
         var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks);
 
         _farmExitTile = FindFarmExitTile(farm);
         var batches = BuildInitialBatches(contract, workScopes, farm, snapshot);
 
         if (batches.Count == 0 ||
-            batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing &&
+            batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing or BatchKind.FarmForage &&
                                  batch.TileWork.Count == 0 &&
                                  batch.AnimalWork.Count == 0 &&
                                  !batch.FeedBuilding))
@@ -475,6 +530,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _pendingDebrisSweeps.Clear();
         _pendingBeatOutcome = null;
         _pendingOutputProvenance = OutputScopeProvenance.Unknown;
+        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
+        _pendingExpansionRouteBatch = null;
+        _expansionRouteNavigator.Clear();
 
         _ctx = new ShiftContext(
             contractId:       contract.Id,
@@ -493,13 +551,10 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         BeginCurrentBatch();
     }
 
-    private static ContractScopeSelection? NormalizeRuntimeScopeSelection(
-        ContractScopeSelection? selection,
+    private static ContractScopeSelection NormalizeRuntimeScopeSelection(
+        ContractScopeSelection selection,
         Farm farm)
     {
-        if (selection is null)
-            return null;
-
         var outdoorZones = selection.OutdoorZones
             .Select(zone => zone with { LocationName = "Farm" })
             .ToList();
@@ -515,11 +570,30 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             .ThenBy(building => building.Tier)
             .ToList();
 
-        var greenhouse = selection.Greenhouse is null
-            ? null
-            : new GreenhouseSelection(BuildingLocationResolver.NormalizeLocationName(farm, selection.Greenhouse.LocationName));
+        var greenhouses = selection.Greenhouses
+            .Select(greenhouse => NormalizeGreenhouseLocationName(farm, greenhouse.LocationName))
+            .Where(locationName => !string.IsNullOrWhiteSpace(locationName))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(locationName => locationName, StringComparer.Ordinal)
+            .Select(locationName => new GreenhouseSelection(locationName))
+            .ToList();
 
-        return new ContractScopeSelection(outdoorZones, animalBuildings, greenhouse);
+        return new ContractScopeSelection(outdoorZones, animalBuildings, greenhouses);
+    }
+
+    // Expansion greenhouse work locations (e.g. SVE's Custom_GrandpasShedGreenhouse) are standalone
+    // game locations, not farm buildings. The vanilla building resolver's loose substring fallback
+    // would collapse "Custom_GrandpasShedGreenhouse" onto the vanilla "Greenhouse" building (the
+    // request string contains "Greenhouse"), rewriting the batch location and sending the worker to
+    // the wrong greenhouse so the expansion route never fires. Leave expansion location names
+    // untouched; only vanilla greenhouse selections go through the building resolver.
+    private static string NormalizeGreenhouseLocationName(Farm farm, string requestedName)
+    {
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryGetExpansionLocationDescriptor(requestedName, out _))
+            return requestedName;
+
+        return BuildingLocationResolver.NormalizeLocationName(farm, requestedName);
     }
 
     private IReadOnlyList<WorkBatch> BuildInitialBatches(
@@ -529,9 +603,6 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         ToolSnapshot snapshot)
     {
         var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks);
-        var selectedAnimalHomes = workScopes.AnimalBuildings
-            .Select(building => building.LocationName)
-            .ToHashSet(StringComparer.Ordinal);
         var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
         var outdoorProvenance = OutputScopeProvenance.Outdoor();
         var greenhouseLocation = workScopes.GreenhouseWork?.LocationName ?? "Greenhouse";
@@ -548,17 +619,26 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
                 case BatchKind.OutdoorAnimals:
                 {
+                    // Per-building grazing pass (TODO-09): service only the grazing animals whose
+                    // home key matches this batch's building. Farm-wide forage is handled separately
+                    // by the trailing FarmForage batch.
                     var batchTasks = batch.Tasks.ToHashSet();
-                    var tileWork = batchTasks.Contains(TaskKind.CollectAnimalProducts)
-                        ? _workAreaScanner.ScanWholeLocation(
-                            farm,
-                            batchTasks,
-                            snapshot,
-                            _farmExitTile,
-                            OutputScopeProvenance.AnimalBuilding(string.Empty))
-                        : Array.Empty<WorkItem>();
-                    var animalWork = BuildAnimalWork(farm, selectedAnimalHomes, batchTasks);
-                    batches.Add(batch with { TileWork = tileWork, AnimalWork = animalWork });
+                    var buildingHomes = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
+                    var animalWork = BuildAnimalWork(farm, buildingHomes, batchTasks);
+                    batches.Add(batch with { TileWork = Array.Empty<WorkItem>(), AnimalWork = animalWork });
+                    break;
+                }
+
+                case BatchKind.FarmForage:
+                {
+                    // Single farm-wide ground-forage (truffle) sweep after all building visits.
+                    var tileWork = _workAreaScanner.ScanWholeLocation(
+                        farm,
+                        batch.Tasks.ToHashSet(),
+                        snapshot,
+                        _farmExitTile,
+                        OutputScopeProvenance.AnimalBuilding(string.Empty));
+                    batches.Add(batch with { TileWork = tileWork, AnimalWork = Array.Empty<AnimalWorkItem>() });
                     break;
                 }
 
@@ -646,6 +726,21 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        if (IsExpansionGreenhouseBatch(batch))
+        {
+            if (TryStartExpansionRoute(
+                    "Farm",
+                    batch.LocationName,
+                    ExpansionRoutePurpose.WorkEntry,
+                    PendingExpansionRouteKind.WorkEntry,
+                    batch))
+                return;
+
+            _ctx.CurrentBatchIndex++;
+            BeginCurrentBatch();
+            return;
+        }
+
         if (BatchRequiresInteriorEntry(batch))
         {
             if (!_buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out var interior))
@@ -668,26 +763,40 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
         _currentLocation = Game1.getFarm();
         if (batch.Kind == BatchKind.OutdoorAnimals)
-            batch = RefreshOutdoorAnimalWork(batch, _currentLocation);
+            batch = RefreshBuildingGrazingWork(batch, _currentLocation);
+        else if (batch.Kind == BatchKind.FarmForage)
+            batch = RefreshFarmForageWork(batch, _currentLocation);
         QueueBatchWork(batch, _currentLocation);
         StartNextAnimalOrTileOrAdvance();
     }
 
-    private WorkBatch RefreshOutdoorAnimalWork(WorkBatch batch, GameLocation farm)
+    private WorkBatch RefreshBuildingGrazingWork(WorkBatch batch, GameLocation farm)
     {
         if (_ctx is null || batch.Kind != BatchKind.OutdoorAnimals)
             return batch;
 
-        var selectedAnimalHomes = _ctx.WorkScopes.AnimalBuildings
-            .Select(candidate => candidate.LocationName)
-            .ToHashSet(StringComparer.Ordinal);
-
+        // Per-building grazing pass (TODO-09): rebuild this one building's grazing-animal work at
+        // batch start (animals roam, so the shift-start snapshot is stale). Scoped to the single
+        // building's home key; farm-wide forage is handled by the separate FarmForage batch.
+        var buildingHomes = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
         var batchTasks = batch.Tasks.ToHashSet();
-        var refreshedAnimalWork = BuildAnimalWork(farm, selectedAnimalHomes, batchTasks);
+        var refreshedAnimalWork = BuildAnimalWork(farm, buildingHomes, batchTasks);
 
-        // Truffles spawn on the farm continuously through the day as pigs forage. The
-        // initial shift-start scan in BuildInitialBatches is hours stale by the time we
-        // actually start this batch, so re-scan for forage-style animal products here.
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][building-grazing] home={batch.LocationName} animalWork={refreshedAnimalWork.Count}.",
+            refreshedAnimalWork.Count == 0 ? LogLevel.Trace : LogLevel.Info);
+        return batch with { TileWork = Array.Empty<WorkItem>(), AnimalWork = refreshedAnimalWork };
+    }
+
+    private WorkBatch RefreshFarmForageWork(WorkBatch batch, GameLocation farm)
+    {
+        if (_ctx is null || batch.Kind != BatchKind.FarmForage)
+            return batch;
+
+        // Truffles spawn on the farm continuously through the day as pigs forage. The initial
+        // shift-start scan in BuildInitialBatches is hours stale by the time we actually start this
+        // final farm-wide pass, so re-scan for forage-style animal products here.
+        var batchTasks = batch.Tasks.ToHashSet();
         var refreshedTileWork = batchTasks.Contains(TaskKind.CollectAnimalProducts)
             ? _workAreaScanner.ScanWholeLocation(
                 farm,
@@ -698,9 +807,189 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             : (IReadOnlyList<WorkItem>)Array.Empty<WorkItem>();
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][outdoor-animals] refreshed homes={selectedAnimalHomes.Count} animalWork={refreshedAnimalWork.Count} tileWork={refreshedTileWork.Count}.",
-            (refreshedAnimalWork.Count == 0 && refreshedTileWork.Count == 0) ? LogLevel.Trace : LogLevel.Info);
-        return batch with { TileWork = refreshedTileWork, AnimalWork = refreshedAnimalWork };
+            $"[Dayswork][farm-forage] tileWork={refreshedTileWork.Count}.",
+            refreshedTileWork.Count == 0 ? LogLevel.Trace : LogLevel.Info);
+        return batch with { TileWork = refreshedTileWork, AnimalWork = Array.Empty<AnimalWorkItem>() };
+    }
+
+    private bool IsExpansionGreenhouseBatch(WorkBatch batch) =>
+        batch.Kind == BatchKind.Greenhouse &&
+        ModEntry.ExpansionCompat is { } compat &&
+        compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
+        descriptor.Role == ExpansionLocationRole.GreenhouseWork;
+
+    private bool TryStartExpansionRoute(
+        string sourceLocationName,
+        string targetLocationName,
+        ExpansionRoutePurpose purpose,
+        PendingExpansionRouteKind routeKind,
+        WorkBatch? batch)
+    {
+        if (_farmhand is null || ModEntry.ExpansionCompat is not { } compat)
+            return false;
+
+        var farm = Game1.getFarm();
+        if (!compat.TryValidateRoute(
+                farm,
+                sourceLocationName,
+                targetLocationName,
+                purpose,
+                out var route,
+                out var failure))
+        {
+            LogExpansionRouteFailure(failure);
+            return false;
+        }
+
+        _pendingExpansionRouteKind = routeKind;
+        _pendingExpansionRouteBatch = batch;
+        _toolAnimator.StopSwing();
+        EnsureWorkingIntent(new IntentMoveToTile(route.Hops[0].Hop.ApproachTile));
+        _expansionRouteNavigator.Start(route, _farmhand);
+        _currentLocation = route.Hops[0].Source;
+        return true;
+    }
+
+    private void HandleExpansionRouteMovement()
+    {
+        _expansionRouteNavigator.Update();
+        if (_farmhand?.currentLocation is { } location)
+            _currentLocation = location;
+
+        if (_expansionRouteNavigator.NavigationFailed)
+        {
+            FailPendingExpansionRoute(_expansionRouteNavigator.Failure);
+            return;
+        }
+
+        if (!_expansionRouteNavigator.IsComplete)
+            return;
+
+        var completedKind = _pendingExpansionRouteKind;
+        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
+        _expansionRouteNavigator.Clear();
+
+        switch (completedKind)
+        {
+            case PendingExpansionRouteKind.WorkEntry:
+                CompleteExpansionWorkEntry();
+                break;
+            case PendingExpansionRouteKind.WorkExit:
+                CompleteExpansionWorkExit();
+                break;
+            case PendingExpansionRouteKind.DepositEntry:
+                CompleteExpansionDepositEntry();
+                break;
+            case PendingExpansionRouteKind.DepositExit:
+                FinalizeAndAdvanceTrip(Game1.getFarm());
+                break;
+        }
+    }
+
+    private void CompleteExpansionWorkEntry()
+    {
+        if (_ctx is null || _farmhand is null)
+            return;
+
+        var batch = _pendingExpansionRouteBatch ?? _ctx.Batches[_ctx.CurrentBatchIndex];
+        _pendingExpansionRouteBatch = null;
+        var location = _farmhand.currentLocation ?? Game1.getLocationFromName(batch.LocationName);
+        if (location is null)
+        {
+            _ctx.CurrentBatchIndex++;
+            BeginCurrentBatch();
+            return;
+        }
+
+        _currentLocation = location;
+        var batchTasks = batch.Tasks.ToHashSet();
+        var tileWork = _indoorScanner.ScanInterior(
+            location,
+            batchTasks,
+            _ctx.ToolSnapshot,
+            OutputScopeProvenance.Greenhouse(batch.LocationName));
+
+        QueueBatchWork(batch with { TileWork = tileWork, AnimalWork = Array.Empty<AnimalWorkItem>() }, location);
+        StartNextAnimalOrTileOrAdvance();
+    }
+
+    private void CompleteExpansionWorkExit()
+    {
+        _pendingExpansionRouteBatch = null;
+        _currentLocation = Game1.getFarm();
+        if (_ctx is null)
+            return;
+
+        _ctx.CurrentBatchIndex++;
+        BeginCurrentBatch();
+    }
+
+    private void CompleteExpansionDepositEntry()
+    {
+        if (_currentTrip is not { Destination: ChestDestination chestDest })
+        {
+            FinalizeAndAdvanceTrip(Game1.getFarm());
+            return;
+        }
+
+        _ctx!.StateMachine.SetIntent(ToDepositIntent(_currentTrip));
+        StartChestDepositNavigation(_currentTrip, chestDest, _currentLocation ?? Game1.getFarm());
+    }
+
+    private void FailPendingExpansionRoute(ExpansionRouteFailure? failure)
+    {
+        if (failure is not null)
+            LogExpansionRouteFailure(failure);
+
+        var failedKind = _pendingExpansionRouteKind;
+        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
+        _pendingExpansionRouteBatch = null;
+        _expansionRouteNavigator.Clear();
+
+        switch (failedKind)
+        {
+            case PendingExpansionRouteKind.WorkEntry:
+                if (_ctx is not null)
+                {
+                    _ctx.CurrentBatchIndex++;
+                    BeginCurrentBatch();
+                }
+                break;
+            case PendingExpansionRouteKind.WorkExit:
+                WarpExpansionWorkerToFarm();
+                CompleteExpansionWorkExit();
+                break;
+            case PendingExpansionRouteKind.DepositEntry:
+                if (_currentTrip is not null)
+                    MarkDepositTripUndelivered(_currentTrip);
+                FinalizeAndAdvanceTrip(Game1.getFarm());
+                break;
+            case PendingExpansionRouteKind.DepositExit:
+                WarpExpansionWorkerToFarm();
+                FinalizeAndAdvanceTrip(Game1.getFarm());
+                break;
+        }
+    }
+
+    private void LogExpansionRouteFailure(ExpansionRouteFailure failure) =>
+        ModEntry.ModMonitor.Log(ExpansionCompatService.FormatRouteFailure(failure), LogLevel.Warn);
+
+    private void WarpExpansionWorkerToFarm()
+    {
+        if (_farmhand is null)
+            return;
+
+        var farm = Game1.getFarm();
+        var from = _farmhand.currentLocation ?? _currentLocation ?? farm;
+        if (from == farm)
+        {
+            _currentLocation = farm;
+            _nav.Clear();
+            return;
+        }
+
+        _nav.WarpWorker(_farmhand, from, farm, _farmExitTile);
+        _currentLocation = farm;
     }
 
     private void CompleteBuildingEntry()
@@ -820,26 +1109,33 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             ClearRemainingActiveBatchWork();
         }
 
-        // Before we declare the OutdoorAnimals batch finished, give the pigs one more
-        // chance: re-scan the farm for any truffles (or other animal-product forage) that
-        // spawned while the worker was picking up the earlier ones. If new work appears,
-        // requeue it and let the next tick route to it instead of completing the batch.
-        if (TryRescanOutdoorAnimalProductsBeforeBatchComplete())
+        // Before we declare the FarmForage batch finished, give the pigs one more chance: re-scan
+        // the farm for any truffles (or other animal-product forage) that spawned while the worker
+        // was picking up the earlier ones. If new work appears, requeue it and let the next tick
+        // route to it instead of completing the batch.
+        if (TryRescanFarmForageBeforeBatchComplete())
             return;
 
         CompleteCurrentBatch();
     }
 
-    private bool TryRescanOutdoorAnimalProductsBeforeBatchComplete()
+    private bool TryRescanFarmForageBeforeBatchComplete()
     {
         if (_ctx is null) return false;
         if (_ctx.CurrentBatchIndex >= _ctx.Batches.Count) return false;
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
-        if (batch.Kind != BatchKind.OutdoorAnimals) return false;
+        if (batch.Kind != BatchKind.FarmForage) return false;
 
         var batchTasks = batch.Tasks.ToHashSet();
         if (!batchTasks.Contains(TaskKind.CollectAnimalProducts)) return false;
+
+        // Reset the per-batch re-enqueue guard whenever we start rescanning a different batch.
+        if (_ctx.CurrentBatchIndex != _rescanBatchIndex)
+        {
+            _rescanBatchIndex = _ctx.CurrentBatchIndex;
+            _rescanEnqueuedTiles.Clear();
+        }
 
         var farm = _currentLocation ?? Game1.getFarm();
         var freshTileWork = _workAreaScanner.ScanWholeLocation(
@@ -864,9 +1160,14 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var added = 0;
         foreach (var item in freshTileWork)
         {
-            if (seen.Add((item.Task, item.TaskTile)))
+            // Skip tiles this batch's rescan already enqueued once — they were either unreachable or
+            // not actually removable, so re-adding them would loop forever (Bug: continuous
+            // "rescan picked up 1 new tile item"). Genuinely new forage at fresh tiles still flows.
+            if (!_rescanEnqueuedTiles.Contains(item.TaskTile) &&
+                seen.Add((item.Task, item.TaskTile)))
             {
                 _ctx.WorkList.Enqueue(item);
+                _rescanEnqueuedTiles.Add(item.TaskTile);
                 added++;
             }
         }
@@ -876,7 +1177,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _activeBatchSelectionAttempts = 0;
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][outdoor-animals] pre-completion rescan picked up {added} new tile item(s); batch continues.",
+            $"[Dayswork][farm-forage] pre-completion rescan picked up {added} new tile item(s); batch continues.",
             LogLevel.Info);
         return true;
     }
@@ -1190,6 +1491,29 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             return;
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        if (IsExpansionGreenhouseBatch(batch))
+        {
+            var currentName = (_currentLocation ?? _farmhand.currentLocation)?.NameOrUniqueName
+                              ?? batch.LocationName;
+            if (string.Equals(currentName, "Farm", StringComparison.OrdinalIgnoreCase))
+            {
+                CompleteExpansionWorkExit();
+                return;
+            }
+
+            if (TryStartExpansionRoute(
+                    currentName,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    PendingExpansionRouteKind.WorkExit,
+                    batch))
+                return;
+
+            WarpExpansionWorkerToFarm();
+            CompleteExpansionWorkExit();
+            return;
+        }
+
         if (BatchRequiresInteriorEntry(batch))
         {
             var interior = _currentLocation;
@@ -1513,6 +1837,12 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     private void HandleMovement(GameLocation location)
     {
+        if (_pendingExpansionRouteKind != PendingExpansionRouteKind.None)
+        {
+            HandleExpansionRouteMovement();
+            return;
+        }
+
         if (_nav.NavigationFailed)
         {
             if (_pendingBuildingExit)
@@ -1821,6 +2151,24 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (_farmhand is null ||
             _currentTrip is not { Destination: ChestDestination { Ref.LocationName: not "Farm" } })
             return false;
+
+        if (_currentTrip.Destination is ChestDestination expansionChest &&
+            ModEntry.ExpansionCompat is { } compat &&
+            compat.IsExpansionDepositLocation(expansionChest.Ref.LocationName))
+        {
+            var routeSource = (_currentLocation ?? _farmhand.currentLocation)?.NameOrUniqueName
+                              ?? expansionChest.Ref.LocationName;
+            if (TryStartExpansionRoute(
+                    routeSource,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    PendingExpansionRouteKind.DepositExit,
+                    batch: null))
+                return true;
+
+            WarpExpansionWorkerToFarm();
+            return false;
+        }
 
         var interior = _currentLocation;
         if (interior is null || interior == Game1.getFarm())
@@ -2169,6 +2517,23 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var farm = Game1.getFarm();
         if (trip.Destination is ChestDestination { Ref.LocationName: not "Farm" } chestDest)
         {
+            if (ModEntry.ExpansionCompat is { } compat &&
+                compat.IsExpansionDepositLocation(chestDest.Ref.LocationName))
+            {
+                var source = (_currentLocation ?? farm).NameOrUniqueName;
+                if (TryStartExpansionRoute(
+                        source,
+                        chestDest.Ref.LocationName,
+                        ExpansionRoutePurpose.DepositEntry,
+                        PendingExpansionRouteKind.DepositEntry,
+                        batch: null))
+                    return;
+
+                MarkDepositTripUndelivered(trip);
+                FinalizeAndAdvanceTrip(farm);
+                return;
+            }
+
             if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out var interior))
             {
                 // Walk across the farm to the building's outdoor door first; we only cross the
@@ -2252,6 +2617,10 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             trip.Destination is not ChestDestination { Ref.LocationName: not "Farm" } chestDest)
             return;
 
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.IsExpansionDepositLocation(chestDest.Ref.LocationName))
+            return;
+
         if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out _))
         {
             _buildingNavigator.ExitToFarm(_farmhand, outdoorDoor);
@@ -2268,6 +2637,30 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if ((_farmhand.currentLocation ?? farm) == farm)
         {
             _currentLocation = farm;
+            return;
+        }
+
+        var currentLocation = _farmhand.currentLocation ?? _currentLocation;
+        if (currentLocation is not null &&
+            ModEntry.ExpansionCompat is { } compat &&
+            compat.IsExpansionDepositLocation(currentLocation.NameOrUniqueName))
+        {
+            if (compat.TryValidateRoute(
+                    farm,
+                    currentLocation.NameOrUniqueName,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    out var route,
+                    out var failure))
+            {
+                var farmArrival = route.Hops[^1].Hop.ArrivalTile;
+                _nav.WarpWorker(_farmhand, currentLocation, farm, farmArrival);
+                _currentLocation = farm;
+                return;
+            }
+
+            LogExpansionRouteFailure(failure);
+            WarpExpansionWorkerToFarm();
             return;
         }
 
@@ -2385,6 +2778,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _currentTripChestAnimated = false;
         _pendingDepositInterior = null;
         _pendingDepositExit = false;
+        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
+        _pendingExpansionRouteBatch = null;
+        _expansionRouteNavigator.Clear();
         _nav.Clear();
     }
 

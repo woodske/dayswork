@@ -22,18 +22,6 @@ public sealed class ConfigCleanupPropertyTests
         return first.Equals(second);
     }
 
-    [Property(Arbitrary = new[] { typeof(U24PropertyGenerators) }, MaxTest = 250)]
-    public bool BuildSnapshot_keeps_legacy_hourly_compatibility_values_on_internal_defaults(ModConfig config)
-    {
-        var snapshot = RuntimeConfigSnapshotMapper.BuildSnapshot(config);
-        var defaults = ConfigDefaults.Build();
-
-        return snapshot.BaseRate == defaults.BaseRate
-               && snapshot.AverageSpeedConstant == defaults.AverageSpeedConstant
-               && snapshot.TaskIncrements.Count == defaults.TaskIncrements.Count
-               && snapshot.TaskIncrements.All(kvp => defaults.TaskIncrements.TryGetValue(kvp.Key, out var value) && value == kvp.Value);
-    }
-
     private static bool Equivalent(ModConfig left, ModConfig right) =>
         left.HardCapTime == right.HardCapTime
         && left.StuckInitialWaitMinutes == right.StuckInitialWaitMinutes

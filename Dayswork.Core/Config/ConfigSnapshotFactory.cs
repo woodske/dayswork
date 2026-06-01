@@ -7,9 +7,6 @@ using Dayswork.Core.Energy;
 public static class ConfigSnapshotFactory
 {
     public static ConfigSnapshot Create(
-        int baseRate,
-        IReadOnlyDictionary<TaskKind, int> taskIncrements,
-        double averageSpeedConstant,
         int hardCapTime,
         int stuckInitialWaitMinutes,
         int stuckPostTeleportWaitMinutes,
@@ -23,12 +20,6 @@ public static class ConfigSnapshotFactory
         int workerDailyEnergyCapacity,
         IReadOnlyDictionary<WorkActionKind, int> workActionCosts)
     {
-        if (baseRate < 0)
-            throw new ArgumentOutOfRangeException(nameof(baseRate), "BaseRate must be non-negative.");
-
-        if (averageSpeedConstant <= 0)
-            throw new ArgumentOutOfRangeException(nameof(averageSpeedConstant), "AverageSpeedConstant must be greater than zero.");
-
         if (hardCapTime < 1000 || hardCapTime > 2600)
             throw new ArgumentOutOfRangeException(nameof(hardCapTime), "HardCapTime must be in Stardew HHMM range [1000, 2600].");
 
@@ -49,12 +40,6 @@ public static class ConfigSnapshotFactory
 
         if (workerDailyEnergyCapacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(workerDailyEnergyCapacity), "WorkerDailyEnergyCapacity must be greater than zero.");
-
-        var normalizedIncrements = NormalizeExactNonNegativeDictionary(
-            taskIncrements,
-            Enum.GetValues<TaskKind>(),
-            nameof(taskIncrements),
-            kind => kind.ToString());
 
         var normalizedThresholds = NormalizeThresholdDictionary(outdoorBandThresholds);
         var normalizedOutdoorPrices = NormalizeExactNonNegativeDictionary(
@@ -79,9 +64,6 @@ public static class ConfigSnapshotFactory
             action => action.ToString());
 
         return new ConfigSnapshot(
-            baseRate,
-            new ReadOnlyDictionary<TaskKind, int>(normalizedIncrements),
-            averageSpeedConstant,
             hardCapTime,
             stuckInitialWaitMinutes,
             stuckPostTeleportWaitMinutes,

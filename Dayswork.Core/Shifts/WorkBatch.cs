@@ -5,7 +5,14 @@ namespace Dayswork.Core.Shifts;
 public enum BatchKind
 {
     AnimalBuilding,
+
+    // Per-building grazing pass (TODO-09): services the grazing animals belonging to the building
+    // named by WorkBatch.LocationName. (Previously a single farm-wide pass for all buildings.)
     OutdoorAnimals,
+
+    // Single farm-wide ground-forage sweep (truffles) that runs once after all building visits.
+    FarmForage,
+
     Greenhouse,
     OutdoorCrops,
     OutdoorClearing,

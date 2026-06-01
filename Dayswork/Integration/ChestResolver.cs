@@ -1,3 +1,4 @@
+using Dayswork.Core.Compat;
 using Dayswork.Core.Domain;
 using Dayswork.UI;
 using Microsoft.Xna.Framework;
@@ -17,7 +18,7 @@ internal sealed class ChestResolver
 
     // Returns all accessible chests on the farm and in buildings.
     // Called once when ZoneAndChestMenu opens — never per frame (NFR-PERF-01).
-    internal List<ChestEntry> GetAllChests(GameLocation farm)
+    internal List<ChestEntry> GetAllChests(GameLocation farm, IReadOnlyList<GreenhouseSelection>? selectedGreenhouses = null)
     {
         var result = new List<ChestEntry>();
         string farmGroup = I18nHelper.Get("ui.zone_chest.group_farm");
@@ -56,6 +57,43 @@ internal sealed class ChestResolver
             }
         }
 
+        if (farm is Farm expansionFarm && ModEntry.ExpansionCompat is { } compat)
+        {
+            foreach (var descriptor in compat.GetExpansionLocationDescriptors())
+            {
+                if (selectedGreenhouses is null ||
+                    !selectedGreenhouses.Any(greenhouse => compat.IsExpansionChestVisibleForScope(descriptor, greenhouse)))
+                    continue;
+
+                if (!compat.TryValidateRoute(
+                        expansionFarm,
+                        "Farm",
+                        descriptor.LocationName,
+                        ExpansionRoutePurpose.DepositEntry,
+                        out _,
+                        out _))
+                    continue;
+
+                var location = Game1.getLocationFromName(descriptor.LocationName);
+                if (location is null)
+                    continue;
+
+                foreach (var (tile, obj) in location.Objects.Pairs)
+                {
+                    if (obj is not Chest chest)
+                        continue;
+
+                    var tileX = (int)tile.X;
+                    var tileY = (int)tile.Y;
+                    var chestRef = new ChestRef(location.NameOrUniqueName, new TileCoord(tileX, tileY));
+                    result.Add(new ChestEntry(
+                        chestRef,
+                        GetDisplayName(chest, location, tileX, tileY),
+                        descriptor.DisplayName));
+                }
+            }
+        }
+
         return result;
     }
 
@@ -89,12 +127,41 @@ internal sealed class ChestResolver
             if (!BuildingLocationResolver.TryGetInteriorForBuilding(building, out var indoors))
                 continue;
 
+            // Key the selection by the interior's UNIQUE name (distinct per building instance) so two
+            // same-type buildings (two Coops/Barns) are distinct selections and each is serviced.
+            // DisplayName stays the building type for premium-tier classification + friendly display.
+            // (U-SVE-04 / TODO-08)
             result.Add(new BuildingOutline(
-                indoors.Name,
+                indoors.NameOrUniqueName,
                 new Rectangle(building.tileX.Value, building.tileY.Value,
                                building.tilesWide.Value, building.tilesHigh.Value),
                 building.buildingType.Value));
         }
+
+        if (ModEntry.ExpansionCompat is { } compat)
+        {
+            foreach (var descriptor in compat.GetExpansionLocationDescriptors())
+            {
+                if (!descriptor.IsWorkScopeEligible)
+                    continue;
+
+                if (!compat.TryValidateRoute(
+                        farm,
+                        "Farm",
+                        descriptor.LocationName,
+                        ExpansionRoutePurpose.WorkEntry,
+                        out var route,
+                        out _))
+                    continue;
+
+                var firstApproach = route.Hops[0].Hop.ApproachTile;
+                result.Add(new BuildingOutline(
+                    descriptor.LocationName,
+                    new Rectangle(firstApproach.X - 1, firstApproach.Y - 1, 3, 3),
+                    descriptor.DisplayName));
+            }
+        }
+
         return result;
     }
 }

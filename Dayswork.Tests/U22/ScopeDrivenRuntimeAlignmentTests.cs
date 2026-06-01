@@ -11,7 +11,7 @@ public sealed class ScopeDrivenRuntimeAlignmentTests
     [Fact]
     public void AnimalBuildingScopes_Create_AnimalBatches_Without_OutdoorZones()
     {
-        var scopes = new WorkScopeSet(
+        var scopes = WorkScopeSet.WithSingleGreenhouse(
             null,
             new[] { new AnimalBuildingScope("Barn", AnimalBuildingTier.Barn) },
             null);
@@ -26,7 +26,7 @@ public sealed class ScopeDrivenRuntimeAlignmentTests
     [Fact]
     public void GreenhouseCropWork_Stays_Separate_From_OutdoorCropWork()
     {
-        var scopes = new WorkScopeSet(
+        var scopes = WorkScopeSet.WithSingleGreenhouse(
             new OutdoorWorkScope(new[] { Zone("Farm") }, 1),
             Array.Empty<AnimalBuildingScope>(),
             new GreenhouseWorkScope("Greenhouse"));

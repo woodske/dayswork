@@ -67,7 +67,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         _onAdvance = onAdvance;
         _onBack = onBack;
 
-        _chestList = chestResolver.GetAllChests(Game1.getFarm());
+        _chestList = chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
         _enabledOutputTasks = OutputTasks.Where(task => draft.EnabledTasks.Contains(task)).ToArray();
 
         foreach (var (task, destination) in draft.Destinations)
@@ -376,7 +376,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         if (ShippingBinEligible.Contains(task))
             _pickerOptions.Add((I18nHelper.Get("ui.zone_chest.shipping_bin_option"), ShippingBinDestination.Instance));
 
-        foreach (var entry in _chestList)
+        foreach (var entry in _chestList.Where(entry => IsDestinationEligibleForTask(entry, task)))
             _pickerOptions.Add((entry.DisplayName, new ChestDestination(entry.Ref)));
 
         const int rowH = 44;
@@ -515,5 +515,14 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
                                       ?? chest.Ref.ToString(),
             _ => I18nHelper.Get("ui.zone_chest.no_chest_assigned"),
         };
+    }
+
+    private static bool IsDestinationEligibleForTask(ChestEntry entry, TaskKind task)
+    {
+        if (ModEntry.ExpansionCompat is not { } compat ||
+            !compat.IsExpansionDepositLocation(entry.Ref.LocationName))
+            return true;
+
+        return TaskKindSets.IsGreenhouseService(task);
     }
 }

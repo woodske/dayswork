@@ -90,9 +90,6 @@ internal static class RuntimeConfigSnapshotMapper
             key => normalized.WorkActionCosts[ContractTermsConfigKeyCodec.EncodeWorkActionKey(key)]);
 
         return ConfigSnapshotFactory.Create(
-            DefaultSnapshot.BaseRate,
-            DefaultSnapshot.TaskIncrements,
-            DefaultSnapshot.AverageSpeedConstant,
             normalized.HardCapTime,
             normalized.StuckInitialWaitMinutes,
             normalized.StuckPostTeleportWaitMinutes,

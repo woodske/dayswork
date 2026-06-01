@@ -4,5 +4,5 @@ public sealed class ContractScopeSelectionDto
 {
     public List<ZoneDtoV1> OutdoorZones { get; set; } = new();
     public List<AnimalBuildingSelectionDto> AnimalBuildings { get; set; } = new();
-    public GreenhouseSelectionDto? Greenhouse { get; set; }
+    public List<GreenhouseSelectionDto> Greenhouses { get; set; } = new();
 }
