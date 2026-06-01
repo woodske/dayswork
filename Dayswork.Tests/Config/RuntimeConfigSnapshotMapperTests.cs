@@ -52,7 +52,7 @@ public class RuntimeConfigSnapshotMapperTests
     }
 
     [Fact]
-    public void BuildSnapshot_uses_internal_compatibility_defaults_for_legacy_hourly_values()
+    public void BuildSnapshot_applies_edited_values()
     {
         var config = ModConfig.CreateDefaults();
         config.OutdoorBandThresholds["Small"] = 90;
@@ -60,11 +60,7 @@ public class RuntimeConfigSnapshotMapperTests
         config.WorkActionCosts["AxeSwing"] = 7;
 
         var snapshot = RuntimeConfigSnapshotMapper.BuildSnapshot(config);
-        var defaults = ConfigDefaults.Build();
 
-        Assert.Equal(defaults.BaseRate, snapshot.BaseRate);
-        Assert.Equal(defaults.TaskIncrements, snapshot.TaskIncrements);
-        Assert.Equal(defaults.AverageSpeedConstant, snapshot.AverageSpeedConstant);
         Assert.Equal(90, snapshot.OutdoorBandThresholds[OutdoorBandSize.Small]);
         Assert.Equal(333, snapshot.WorkerDailyEnergyCapacity);
         Assert.Equal(7, snapshot.WorkActionCosts[WorkActionKind.AxeSwing]);

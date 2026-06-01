@@ -39,8 +39,6 @@ public sealed class ModEntry : Mod
         var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, LogLevel.Warn));
         var config      = configManager.CurrentSnapshot;
         var configResolver = new ConfigValueResolver();
-        var rateCalc    = new RateCalculator();
-        var depositCalc = new DepositCalculator();
         var workScopeClassifier = new WorkScopeClassifier();
         var contractTermsBuilder = new ContractTermsBuilder(
             workScopeClassifier,
@@ -54,7 +52,7 @@ public sealed class ModEntry : Mod
 
         // ── Mod singletons ───────────────────────────────────────────────────
         var chestResolver = new ChestResolver(Helper);
-        Coordinator = new HiringFlowCoordinator(rateCalc, depositCalc, contractTermsBuilder, configManager, store, chestResolver, Helper);
+        Coordinator = new HiringFlowCoordinator(contractTermsBuilder, configManager, store, chestResolver, Helper);
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
@@ -165,7 +163,7 @@ public sealed class ModEntry : Mod
                     this.Monitor.Log(
                         $"[{c.Id.Value}] status={c.Status} tasks={string.Join(",", c.EnabledTasks)} " +
                         $"hired={c.HireDate.Day} {c.HireDate.Season} Y{c.HireDate.Year} " +
-                        $"deposit={c.DepositAmount}g rate={c.HourlyRate}g/hr",
+                        $"price={c.TermsSnapshot.Pricing.TotalPrice}g",
                         LogLevel.Info);
                 }
             });

@@ -11,7 +11,6 @@ internal sealed class ContractDraft
     public Dictionary<TaskKind, DestinationKey> Destinations { get; } = new();
     public ContractSchedule Schedule { get; set; } = ContractSchedule.OneTime;
     public ContractId? EditingId { get; set; }
-    public DraftHydrationMode HydrationMode { get; set; } = DraftHydrationMode.NewDraft;
     public List<GreenhouseSelection> Greenhouses { get; } = new();
     public DraftPreviewState PreviewState { get; set; } = DraftPreviewState.Empty;
 
@@ -38,13 +37,6 @@ internal sealed class ContractDraft
 
     private static string DescribeZone(Zone zone) =>
         $"{zone.LocationName}|{zone.TopLeft.X}|{zone.TopLeft.Y}|{zone.BottomRight.X}|{zone.BottomRight.Y}";
-}
-
-internal enum DraftHydrationMode
-{
-    NewDraft,
-    HydratedFromAuthoritativeScope,
-    DerivedFromCompatibilityZones,
 }
 
 internal sealed record DraftPreviewState(

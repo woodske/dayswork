@@ -8,25 +8,17 @@ internal static class ContractStructuralComparer
     public static bool ContractsEqual(Contract left, Contract right) =>
         left.Id == right.Id
         && left.EnabledTasks.SetEquals(right.EnabledTasks)
-        && ZonesEqual(left.Zones, right.Zones)
         && DestinationMapsEqual(left.TaskDestinations, right.TaskDestinations)
         && left.Schedule == right.Schedule
         && left.Status == right.Status
         && left.HireDate == right.HireDate
-        && left.DepositAmount == right.DepositAmount
-        && left.HourlyRate == right.HourlyRate
         && ScopeSelectionsEqual(left.ScopeSelection, right.ScopeSelection)
         && TermsSnapshotsEqual(left.TermsSnapshot, right.TermsSnapshot);
 
-    public static bool ScopeSelectionsEqual(ContractScopeSelection? left, ContractScopeSelection? right)
-    {
-        if (left is null || right is null)
-            return left is null && right is null;
-
-        return ZonesEqual(left.OutdoorZones, right.OutdoorZones)
+    public static bool ScopeSelectionsEqual(ContractScopeSelection left, ContractScopeSelection right) =>
+        ZonesEqual(left.OutdoorZones, right.OutdoorZones)
             && left.AnimalBuildings.SequenceEqual(right.AnimalBuildings)
             && left.Greenhouses.SequenceEqual(right.Greenhouses);
-    }
 
     public static bool TermsSnapshotsEqual(ContractTermsSnapshot? left, ContractTermsSnapshot? right)
     {
@@ -52,25 +44,20 @@ internal static class ContractStructuralComparer
     public static string DescribeContract(Contract contract)
     {
         var enabledTasks = string.Join(",", contract.EnabledTasks.OrderBy(task => task));
-        var zones = string.Join(";", contract.Zones.Select(DescribeZone));
         var destinations = string.Join(
             ";",
             contract.TaskDestinations
                 .OrderBy(kvp => kvp.Key)
                 .Select(kvp => $"{kvp.Key}:{kvp.Value}"));
 
-        var scope = contract.ScopeSelection is null
-            ? "none"
-            : $"{string.Join(";", contract.ScopeSelection.OutdoorZones.Select(DescribeZone))}|"
+        var scope = $"{string.Join(";", contract.ScopeSelection.OutdoorZones.Select(DescribeZone))}|"
               + $"{string.Join(";", contract.ScopeSelection.AnimalBuildings.Select(building => $"{building.LocationName}:{building.Tier}"))}|"
               + $"{(contract.ScopeSelection.Greenhouses.Count == 0 ? "none" : string.Join(",", contract.ScopeSelection.Greenhouses.Select(greenhouse => greenhouse.LocationName)))}";
 
-        var terms = contract.TermsSnapshot is null
-            ? "none"
-            : $"{contract.TermsSnapshot.Pricing.TotalPrice}|{contract.TermsSnapshot.Energy.DailyCapacity}|"
+        var terms = $"{contract.TermsSnapshot.Pricing.TotalPrice}|{contract.TermsSnapshot.Energy.DailyCapacity}|"
               + $"{string.Join(";", contract.TermsSnapshot.Energy.ActionCosts.OrderBy(kvp => kvp.Key).Select(kvp => $"{kvp.Key}:{kvp.Value}"))}";
 
-        return $"{contract.Id}|{enabledTasks}|{zones}|{destinations}|{contract.Schedule}|{contract.Status}|{contract.HireDate.Day}:{contract.HireDate.Season}:{contract.HireDate.Year}|{contract.DepositAmount}|{contract.HourlyRate}|{scope}|{terms}";
+        return $"{contract.Id}|{enabledTasks}|{destinations}|{contract.Schedule}|{contract.Status}|{contract.HireDate.Day}:{contract.HireDate.Season}:{contract.HireDate.Year}|{scope}|{terms}";
     }
 
     private static bool ZonesEqual(IReadOnlyList<Zone> left, IReadOnlyList<Zone> right) =>

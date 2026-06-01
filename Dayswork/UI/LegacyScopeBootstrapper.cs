@@ -4,12 +4,9 @@ namespace Dayswork.UI;
 
 internal static class LegacyScopeBootstrapper
 {
-    private static readonly TileCoord CompatibilityPlaceholderTopLeft = new(0, 0);
-    private static readonly TileCoord CompatibilityPlaceholderBottomRight = new(999, 999);
-
     public static void HydrateDraft(ContractDraft draft, Contract contract)
     {
-        var selection = contract.ScopeSelection ?? Bootstrap(contract.Zones);
+        var selection = contract.ScopeSelection;
 
         draft.OutdoorZones.Clear();
         draft.OutdoorZones.AddRange(selection.OutdoorZones);
@@ -17,65 +14,6 @@ internal static class LegacyScopeBootstrapper
         draft.AnimalBuildings.AddRange(selection.AnimalBuildings);
         draft.Greenhouses.Clear();
         draft.Greenhouses.AddRange(selection.Greenhouses);
-        draft.HydrationMode = contract.ScopeSelection is null
-            ? DraftHydrationMode.DerivedFromCompatibilityZones
-            : DraftHydrationMode.HydratedFromAuthoritativeScope;
-    }
-
-    public static ContractScopeSelection Bootstrap(IReadOnlyList<Zone> compatibilityZones)
-    {
-        var outdoorZones = compatibilityZones
-            .Where(zone => string.Equals(zone.LocationName, "Farm", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(DescribeZone, StringComparer.Ordinal)
-            .ToList();
-
-        var greenhouses = compatibilityZones
-            .Where(zone => IsGreenhouseLocation(zone.LocationName))
-            .Select(zone => new GreenhouseSelection(zone.LocationName))
-            .Distinct()
-            .OrderBy(greenhouse => greenhouse.LocationName, StringComparer.Ordinal)
-            .ToList();
-
-        var animalBuildings = compatibilityZones
-            .Where(zone =>
-                !string.Equals(zone.LocationName, "Farm", StringComparison.OrdinalIgnoreCase)
-                && !IsGreenhouseLocation(zone.LocationName))
-            .Select(zone => TryInferAnimalBuildingSelection(zone.LocationName))
-            .Where(selection => selection is not null)
-            .Cast<AnimalBuildingSelection>()
-            .Distinct()
-            .OrderBy(selection => selection.LocationName, StringComparer.Ordinal)
-            .ThenBy(selection => selection.Tier)
-            .ToList();
-
-        return new ContractScopeSelection(
-            OutdoorZones: outdoorZones.AsReadOnly(),
-            AnimalBuildings: animalBuildings.AsReadOnly(),
-            Greenhouses: greenhouses.AsReadOnly());
-    }
-
-    public static IReadOnlyList<Zone> ProjectCompatibilityZones(ContractScopeSelection selection)
-    {
-        var zones = new List<Zone>();
-        zones.AddRange(selection.OutdoorZones);
-
-        zones.AddRange(selection.AnimalBuildings.Select(building =>
-            new Zone(
-                building.LocationName,
-                CompatibilityPlaceholderTopLeft,
-                CompatibilityPlaceholderBottomRight)));
-
-        zones.AddRange(selection.Greenhouses.Select(greenhouse =>
-            new Zone(
-                greenhouse.LocationName,
-                CompatibilityPlaceholderTopLeft,
-                CompatibilityPlaceholderBottomRight)));
-
-        return zones
-            .Distinct()
-            .OrderBy(DescribeZone, StringComparer.Ordinal)
-            .ToList()
-            .AsReadOnly();
     }
 
     public static IReadOnlyList<BuildingOutline> FilterSupportedBuildings(IEnumerable<BuildingOutline> outlines) =>
@@ -191,7 +129,4 @@ internal static class LegacyScopeBootstrapper
 
         return null;
     }
-
-    private static string DescribeZone(Zone zone) =>
-        $"{zone.LocationName}|{zone.TopLeft.X}|{zone.TopLeft.Y}|{zone.BottomRight.X}|{zone.BottomRight.Y}";
 }

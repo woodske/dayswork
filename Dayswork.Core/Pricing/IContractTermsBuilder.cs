@@ -10,10 +10,6 @@ public interface IContractTermsBuilder
         IReadOnlySet<TaskKind> enabledTasks,
         IConfigSnapshot config);
 
-    ContractTermsSnapshot RebuildTerms(
-        Contract contract,
-        IConfigSnapshot config);
-
     ContractPreview BuildPreview(
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,

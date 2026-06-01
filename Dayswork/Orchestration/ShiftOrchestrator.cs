@@ -327,20 +327,6 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         return preferred;
     }
 
-    private ContractTermsSnapshot ResolveContractTerms(Contract contract, IConfigSnapshot runtimeConfig)
-    {
-        if (contract.TermsSnapshot is not null)
-            return contract.TermsSnapshot;
-
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork] Contract {contract.Id.Value} has no stored terms snapshot; falling back to the current runtime energy profile.",
-            LogLevel.Warn);
-
-        return new ContractTermsSnapshot(
-            new PricingSnapshot(Array.Empty<PricingLineItem>(), 0, 0, 0, contract.DepositAmount),
-            new WorkerEnergyProfile(runtimeConfig.WorkerDailyEnergyCapacity, runtimeConfig.WorkActionCosts));
-    }
-
     private bool HasBoundaryStopRequested() => _ctx?.PendingStopReason is not null;
 
     private bool IsWorkUnitInProgress() => _actionPending;
@@ -491,21 +477,13 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         _config = runtimeConfig;
-        var contractTerms = ResolveContractTerms(contract, runtimeConfig);
+        var contractTerms = contract.TermsSnapshot;
         var energyState = _energyLedger.StartShift(contractTerms.Energy);
         var pacingProfile = WorkerPacingProfile.FromConfig(runtimeConfig);
 
         var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
         var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
-        if (runtimeScopeSelection is null)
-        {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork] Contract {contract.Id.Value} has no authoritative typed scope selection; refusing to start runtime execution.",
-                LogLevel.Warn);
-            return;
-        }
-
         var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks);
 
         _farmExitTile = FindFarmExitTile(farm);
@@ -573,13 +551,10 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         BeginCurrentBatch();
     }
 
-    private static ContractScopeSelection? NormalizeRuntimeScopeSelection(
-        ContractScopeSelection? selection,
+    private static ContractScopeSelection NormalizeRuntimeScopeSelection(
+        ContractScopeSelection selection,
         Farm farm)
     {
-        if (selection is null)
-            return null;
-
         var outdoorZones = selection.OutdoorZones
             .Select(zone => zone with { LocationName = "Farm" })
             .ToList();

@@ -18,20 +18,6 @@ public sealed class RecurringDayStartDecisionEngine
         bool festivalToday,
         int availableGold)
     {
-        if (contract.ScopeSelection is null)
-        {
-            return new RecurringDayStartOutcome(
-                Refresh: new RecurringTermsRefreshOutcome(
-                    RecurringTermsRefreshStatus.Unsupported,
-                    TermsSnapshot: null),
-                DailyPrice: 0,
-                Shortfall: 0,
-                ShouldPersistTermsSnapshot: false,
-                ShouldChargePlayer: false,
-                ShouldStartShift: false,
-                NoticeKind: RecurringDayStartNoticeKind.NeedsAttention);
-        }
-
         var preview = _termsBuilder.BuildPreview(contract.ScopeSelection, contract.EnabledTasks, config);
         if (!preview.IsValid || preview.ProposedTerms is null)
         {

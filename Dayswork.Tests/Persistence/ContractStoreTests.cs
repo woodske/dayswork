@@ -17,26 +17,12 @@ public sealed class ContractStoreTests
 
     // ── helpers ────────────────────────────────────────────────────────────
 
-    private static Contract MakeContract(ContractStatus status = ContractStatus.Active)
-    {
-        var id = ContractId.New();
-        var tasks = new HashSet<TaskKind> { TaskKind.ClearWeeds };
-        var zones = new List<Zone> { new("Farm", new TileCoord(0, 0), new TileCoord(9, 9)) };
-        var destinations = new Dictionary<TaskKind, DestinationKey>
+    private static Contract MakeContract(ContractStatus status = ContractStatus.Active) =>
+        U19PersistenceGen.CreateExampleCurrentSchemaContract() with
         {
-            [TaskKind.ClearWeeds] = ShippingBinDestination.Instance,
+            Id = ContractId.New(),
+            Status = status,
         };
-        return new Contract(
-            Id: id,
-            EnabledTasks: tasks,
-            Zones: zones.AsReadOnly(),
-            TaskDestinations: destinations,
-            Schedule: ContractSchedule.OneTime,
-            Status: status,
-            HireDate: new GameDate(1, Season.Spring, 1),
-            DepositAmount: 100,
-            HourlyRate: 70);
-    }
 
     // ── Add ────────────────────────────────────────────────────────────────
 
@@ -71,9 +57,9 @@ public sealed class ContractStoreTests
     {
         var contract = MakeContract();
         _store.Add(contract);
-        var updated = contract with { HourlyRate = 999 };
+        var updated = contract with { Schedule = ContractSchedule.Recurring };
         _store.Update(contract.Id, updated);
-        Assert.Equal(999, _store.Get(contract.Id).HourlyRate);
+        Assert.Equal(ContractSchedule.Recurring, _store.Get(contract.Id).Schedule);
     }
 
     [Fact]
@@ -244,8 +230,12 @@ public sealed class ContractStoreTests
     [Fact]
     public void ListActiveForDate_ReturnsActiveContractScheduledForTomorrow()
     {
-        // MakeContract uses HireDate = Spring 1 Yr1; next game day is Spring 2 Yr1.
-        var contract = MakeContract(ContractStatus.Active);
+        // A OneTime contract hired Spring 1 Yr1 is scheduled for the next game day, Spring 2 Yr1.
+        var contract = MakeContract(ContractStatus.Active) with
+        {
+            Schedule = ContractSchedule.OneTime,
+            HireDate = new GameDate(1, Season.Spring, 1),
+        };
         _store.Add(contract);
 
         var result = _store.ListActiveForDate(2, Season.Spring, 1);
@@ -257,7 +247,11 @@ public sealed class ContractStoreTests
     [Fact]
     public void ListActiveForDate_ExcludesContractNotScheduledForDate()
     {
-        var contract = MakeContract(ContractStatus.Active);
+        var contract = MakeContract(ContractStatus.Active) with
+        {
+            Schedule = ContractSchedule.OneTime,
+            HireDate = new GameDate(1, Season.Spring, 1),
+        };
         _store.Add(contract);
 
         // Spring 3 is not the day after Spring 1 — should not be returned.

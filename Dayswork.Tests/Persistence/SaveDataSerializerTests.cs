@@ -51,40 +51,6 @@ public sealed class SaveDataSerializerTests
     }
 
     [Fact]
-    public void Deserialize_LegacySchemaV1_ReturnsEmptyAndWarns()
-    {
-        var legacyEnvelope = new DaysworkSaveDataV1
-        {
-            SchemaVersion = 1,
-            ModVersion = "0.1.0",
-            Contracts = new List<ContractDtoV1>
-            {
-                new()
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    EnabledTasks = new List<string> { TaskKind.ClearWeeds.ToString() },
-                    Zones = new List<ZoneDtoV1> { new() { LocationName = "Farm", TopLeftX = 0, TopLeftY = 0, BottomRightX = 9, BottomRightY = 9 } },
-                    TaskDestinations = new Dictionary<string, DestinationDtoV1>
-                    {
-                        [TaskKind.ClearWeeds.ToString()] = new() { Type = "ShippingBin" },
-                    },
-                    Schedule = ContractSchedule.OneTime.ToString(),
-                    Status = ContractStatus.Active.ToString(),
-                    HireDate = new GameDateDtoV1 { Day = 1, Season = Season.Spring.ToString(), Year = 1 },
-                    DepositAmount = 100,
-                    HourlyRate = 70,
-                },
-            },
-        };
-
-        var result = _serializer.Deserialize(JsonConvert.SerializeObject(legacyEnvelope));
-
-        Assert.Empty(result);
-        Assert.Single(_warnings);
-        Assert.Contains("legacy pre-release hourly contract data", _warnings[0]);
-    }
-
-    [Fact]
     public void Deserialize_FutureSchemaVersion_ReturnsEmptyAndWarns()
     {
         var result = _serializer.Deserialize(@"{""SchemaVersion"":3,""ModVersion"":""9.9.9"",""Contracts"":[]}");
@@ -122,8 +88,7 @@ public sealed class SaveDataSerializerTests
           ""DailyCapacity"": 270,
           ""ActionCosts"": { ""ScytheSwing"": 1 }
         }
-      },
-      ""LegacyFinancialBridge"": { ""DepositAmount"": 100, ""HourlyRate"": 70 }
+      }
     }
   ]
 }";
@@ -163,11 +128,6 @@ public sealed class SaveDataSerializerTests
                 ["OutdoorZones"] = new JArray(),
                 ["AnimalBuildings"] = new JArray(),
             },
-            ["LegacyFinancialBridge"] = new JObject
-            {
-                ["DepositAmount"] = 100,
-                ["HourlyRate"] = 70,
-            },
         });
 
         var result = _serializer.Deserialize(validEnvelope.ToString(Formatting.None));
@@ -178,7 +138,7 @@ public sealed class SaveDataSerializerTests
     }
 
     [Fact]
-    public void Deserialize_CurrentSchemaContract_ProjectsCompatibilityFields()
+    public void Deserialize_CurrentSchemaContract_RoundTrips()
     {
         var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
 
@@ -186,9 +146,6 @@ public sealed class SaveDataSerializerTests
 
         var hydrated = Assert.Single(result);
         Assert.True(ContractStructuralComparer.ContractsEqual(contract, hydrated));
-        Assert.Equal(contract.Zones, hydrated.Zones);
-        Assert.Equal(contract.DepositAmount, hydrated.DepositAmount);
-        Assert.Equal(contract.HourlyRate, hydrated.HourlyRate);
     }
 
     [Fact]
@@ -208,6 +165,5 @@ public sealed class SaveDataSerializerTests
 
         Assert.NotNull(dto["ScopeSelection"]);
         Assert.NotNull(dto["TermsSnapshot"]);
-        Assert.NotNull(dto["LegacyFinancialBridge"]);
     }
 }

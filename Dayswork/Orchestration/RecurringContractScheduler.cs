@@ -91,7 +91,7 @@ internal sealed class RecurringContractScheduler
         if (contract.Schedule == ContractSchedule.OneTime)
         {
             _store.Update(contract.Id, contract with { Status = ContractStatus.Executed });
-            _mail.QueueFestivalNotice(contract, FestivalRefundAmount(contract));
+            _mail.QueueFestivalNotice(contract, contract.TermsSnapshot.Pricing.TotalPrice);
         }
         else
         {
@@ -141,14 +141,6 @@ internal sealed class RecurringContractScheduler
                 : contract with { TermsSnapshot = outcome.Refresh.TermsSnapshot };
             _orchestrator.StartShift(refreshedContract, config);
         }
-    }
-
-    private static int FestivalRefundAmount(Contract contract)
-    {
-        if (contract.TermsSnapshot is not null)
-            return contract.TermsSnapshot.Pricing.TotalPrice;
-
-        return contract.DepositAmount;
     }
 
     private static GameDate CurrentGameDate()
