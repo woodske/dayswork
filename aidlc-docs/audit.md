@@ -5271,3 +5271,53 @@ Never make assumptions, always reference the SVE source code and/or the vanilla 
 **AI Prompt**: "Code Generation complete for `u-t10-shed-greenhouse-routing`. Please review the code summary and choose Request Changes or Continue to Next Stage."
 **Context**: CONSTRUCTION — Code Generation complete; awaiting review approval
 ---
+
+## Worker Player Action Isolation — Implementation request recorded
+**Timestamp**: 2026-06-01T17:26:04Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Fix Player Action Isolation During Farmhand Work
+
+## Summary
+Fix the farmhand action guard so worker actions cannot restart, loop, or otherwise disturb the real player's in-progress tool animations. The likely root cause is that the snapshot restore path recreates the player's current animation with a reset-style API, which restarts the animation every worker beat while the player is actively using a tool.
+
+## Key Changes
+- Follow the minimal AIDLC path for this bug fix: append the raw request to `aidlc-docs/audit.md`, update workflow/state docs and checkboxes as execution progresses, skip user stories/design/decomposition as this is a single existing-component bug fix.
+- Update `WorkerActionPlayerStateSnapshot` and its internal state interface to preserve full animation progress, including current animation frames, animation index, timer/interval values, current frame, single-animation flags, tool/action flags, movement flags, jitter, and velocities.
+- Restore player animation state without calling the reset-style `setCurrentAnimation` path. Reapply the saved animation list and progress counters directly so an active player axe/pickaxe/scythe/tool swing continues from the same point after a worker action.
+- Keep the existing behavior for idle players: worker-induced transient action/animation state is cleared so the player remains movable and unaffected.
+- Add low-noise diagnostics around guarded worker actions. Log at debug/trace level when a worker task mutates real-player action or animation state, including task type, tile, location, player tool, before/after/restore animation progress, and movement/action flags.
+- No public config, manifest, save data, or player-facing API changes unless a tiny debug console toggle is needed to keep logs opt-in.
+
+## Tests And Verification
+- Add unit tests for active-player animation preservation: a saved animation with nonzero index/timer must restore exactly after worker-induced mutation.
+- Add tests for idle-player cleanup, ensuring worker-injected animation/tool flags are cleared when the player had no active animation.
+- Add tests for action/movement flag restoration: `UsingTool`, `CanMove`, `CanReleaseTool`, jitter, and velocity values return to their captured values.
+- Add an FsCheck property-style test over the pure snapshot seam where practical: capture, mutate, restore must return observable player action state to the captured state.
+- Run:
+  - `dotnet build Dayswork.sln /p:EnableModDeploy=false`
+  - `dotnet test Dayswork.sln /p:EnableModDeploy=false`
+  - `dotnet build Dayswork.sln` for deployment if the game is not locking mod DLLs.
+- Manual playtest against `X:\Steam\steamapps\common\Stardew Valley`: run farmhand outdoor work while the player repeatedly uses axe, pickaxe, scythe, and watering can. Confirm the player’s actions complete normally, perform real work only from player input, and never get stuck in nonfunctional animation loops.
+
+## Assumptions And Defaults
+- The fix targets the existing worker action isolation path rather than changing farmhand scheduling or task behavior.
+- Crop/vanilla APIs that still touch `Game1.player` remain wrapped by the snapshot guard.
+- Diagnostics stay quiet by default and become useful when the issue recurs.
+- Security extension rules are disabled for this workspace state; property-based testing rules apply only to the pure snapshot restoration logic."
+**AI Response**: Recorded the focused review-fix request, created `aidlc-docs/construction/plans/worker-player-action-isolation-code-generation-plan.md`, and updated `aidlc-state.md` to show focused Code Generation in progress. Content validation: markdown lists only, no Mermaid diagrams, no ASCII diagrams. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing applicable to the pure snapshot restore invariant.
+**Context**: CONSTRUCTION — Focused Code Generation review fix started
+---
+
+## Worker Player Action Isolation — Code Generation complete
+**Timestamp**: 2026-06-01T17:34:29Z
+**User Input**: "(none; implementation work after approved plan)"
+**AI Response**: Completed the focused worker player-action isolation fix. `WorkerActionPlayerStateSnapshot` now captures and restores animation progress without calling the reset-style `setCurrentAnimation` path; `ShiftOrchestrator` now emits debug-only player-action-guard diagnostics when worker callbacks mutate real-player action state; snapshot example tests and an FsCheck property cover active animation preservation, idle cleanup, transient flag restoration, and capture/mutate/restore invariance. Created `aidlc-docs/construction/worker-player-action-isolation/code/code-summary.md` and marked all checklist items complete in `aidlc-docs/construction/plans/worker-player-action-isolation-code-generation-plan.md`. Verification: `dotnet test Dayswork.sln /p:EnableModDeploy=false` passed with 349 passed / 1 skipped / 0 failed; `dotnet build Dayswork.sln /p:EnableModDeploy=false` succeeded with 0 warnings / 0 errors; `dotnet build Dayswork.sln` succeeded with 0 warnings / 0 errors and copied the mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`. Content validation: markdown lists only, no Mermaid diagrams, no ASCII diagrams. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing compliant for the pure snapshot restore invariant.
+**Context**: CONSTRUCTION — Focused Code Generation complete
+---
+
+## Worker Player Action Isolation — Playtest confirmation
+**Timestamp**: 2026-06-01T19:17:55Z
+**User Input**: "looks good, bug fixed"
+**AI Response**: Recorded playtest confirmation that the player/farmhand animation isolation bug is fixed. Updated `aidlc-state.md` to mark the focused review fix as approved by playtest confirmation.
+**Context**: CONSTRUCTION — Focused review fix confirmed
+---

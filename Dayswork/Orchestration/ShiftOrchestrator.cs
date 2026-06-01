@@ -2824,7 +2824,15 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
         finally
         {
+            var playerStateChanged = savedState.DiffersFrom(playerState);
+            var changedStateDescription = playerStateChanged
+                ? WorkerActionPlayerStateSnapshot.Describe(playerState)
+                : "";
+
             savedState.Restore(playerState);
+            var restoredStateDescription = playerStateChanged
+                ? WorkerActionPlayerStateSnapshot.Describe(playerState)
+                : "";
 
             // Trim any HUD messages enqueued during the worker beat. The beat runs
             // synchronously inside OnUpdateTicked, so nothing else queues messages
@@ -2832,7 +2840,32 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             // callbacks we just invoked.
             while (Game1.hudMessages.Count > hudMessageCountBefore)
                 Game1.hudMessages.RemoveAt(Game1.hudMessages.Count - 1);
+
+            if (playerStateChanged)
+                LogWorkerActionPlayerStateRestore(task, tile, location, savedState.Describe(), changedStateDescription, restoredStateDescription);
         }
+    }
+
+    private static void LogWorkerActionPlayerStateRestore(
+        TaskKind task,
+        TileCoord tile,
+        GameLocation location,
+        string savedState,
+        string changedState,
+        string restoredState)
+    {
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][player-action-guard] Worker task {task} at ({tile.X},{tile.Y}) in {location.NameOrUniqueName} changed Game1.player action state while playerTool={DescribePlayerTool(Game1.player)}; restored. saved={{ {savedState} }} changed={{ {changedState} }} restored={{ {restoredState} }}",
+            LogLevel.Debug);
+    }
+
+    private static string DescribePlayerTool(Farmer player)
+    {
+        var tool = player.CurrentTool;
+        if (tool is null)
+            return "<none>";
+
+        return $"{tool.GetType().Name}:{tool.Name ?? "<unnamed>"}:{tool.QualifiedItemId ?? "<no-id>"}";
     }
 
     private LaborBeatOutcome InvokeTaskAction(TileCoord tile, TaskKind task, GameLocation location)
