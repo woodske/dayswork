@@ -14,7 +14,30 @@ internal sealed class ContractDraft
     public List<GreenhouseSelection> Greenhouses { get; } = new();
     public DraftPreviewState PreviewState { get; set; } = DraftPreviewState.Empty;
 
+    /// <summary>Purchased energy tier (sets the worker's daily capacity and the contract price).</summary>
+    public EnergyTier Tier { get; set; } = EnergyTier.FullDay;
+
+    /// <summary>Player-ordered work categories (highest priority first). Seeded with the default order.</summary>
+    public List<TaskCategory> CategoryPriority { get; } = new(TaskKindSets.DefaultCategoryPriority);
+
     public bool IsEditing => EditingId.HasValue;
+
+    public void CycleTier(int direction)
+    {
+        var tiers = Enum.GetValues<EnergyTier>();
+        var index = Array.IndexOf(tiers, Tier);
+        Tier = tiers[((index + direction) % tiers.Length + tiers.Length) % tiers.Length];
+    }
+
+    public void MoveCategory(TaskCategory category, int direction)
+    {
+        var index = CategoryPriority.IndexOf(category);
+        var target = index + direction;
+        if (index < 0 || target < 0 || target >= CategoryPriority.Count)
+            return;
+
+        (CategoryPriority[index], CategoryPriority[target]) = (CategoryPriority[target], CategoryPriority[index]);
+    }
 
     public ContractScopeSelection ScopeSelection =>
         new(
@@ -64,6 +87,8 @@ internal sealed record DraftPreviewState(
                     Array.Empty<GreenhouseSelection>()),
                 null,
                 null,
+                EnergyTier.FullDay,
+                TaskKindSets.DefaultCategoryPriority,
                 PaymentTimingKind.OneTimeChargeNow,
                 Array.Empty<ValidationDisplayMessage>(),
                 false));
@@ -71,9 +96,7 @@ internal sealed record DraftPreviewState(
 
 internal sealed record ServiceContributionRow(
     TaskKind Service,
-    ServiceContributionState RowState,
-    IReadOnlyList<PricingLineItem> PricingLines,
-    int? DisplayAmount);
+    ServiceContributionState RowState);
 
 internal enum ServiceContributionState
 {
@@ -96,6 +119,8 @@ internal sealed record SummaryReviewModel(
     ScopeSummaryModel ScopeSummary,
     PricingSnapshot? Pricing,
     WorkerEnergyProfile? WorkerEnergy,
+    EnergyTier Tier,
+    IReadOnlyList<TaskCategory> CategoryPriority,
     PaymentTimingKind PaymentTimingKind,
     IReadOnlyList<ValidationDisplayMessage> ValidationMessages,
     bool CanConfirm);

@@ -37,7 +37,7 @@ public sealed class HiringFlowViewModelPropertyTests
             ConfigSnapshotGen.Snapshot(),
             (selection, enabledTasks, config) =>
             {
-                var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, config);
+                var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
                 if (!preview.IsValid || preview.ProposedTerms is null)
                     return true;
 
@@ -55,7 +55,7 @@ public sealed class HiringFlowViewModelPropertyTests
             ConfigSnapshotGen.Snapshot(),
             (selection, enabledTasks, config) =>
             {
-                var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, config);
+                var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
                 if (!preview.IsValid || preview.ProposedTerms is null)
                     return true;
 
@@ -78,7 +78,7 @@ public sealed class HiringFlowViewModelPropertyTests
         ContractId? editingId)
     {
         var draft = CreateDraft(selection, enabledTasks, schedule, editingId);
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, config);
+        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
         return HiringFlowViewModelBuilder.Build(draft, preview);
     }
 
@@ -116,7 +116,7 @@ public sealed class HiringFlowViewModelPropertyTests
     {
         var rows = string.Join(
             ";",
-            state.ServiceRows.Select(row => $"{row.Service}:{row.RowState}:{row.DisplayAmount ?? -1}"));
+            state.ServiceRows.Select(row => $"{row.Service}:{row.RowState}"));
         var validation = string.Join(
             ";",
             state.ReviewModel.ValidationMessages.Select(message => $"{message.Code}:{message.RelatedTask?.ToString() ?? "none"}"));
@@ -128,7 +128,7 @@ public sealed class HiringFlowViewModelPropertyTests
     {
         var pricing = state.ReviewModel.Pricing is null
             ? "none"
-            : $"{state.ReviewModel.Pricing.OutdoorSubtotal}:{state.ReviewModel.Pricing.AnimalSubtotal}:{state.ReviewModel.Pricing.GreenhouseSubtotal}:{state.ReviewModel.Pricing.TotalPrice}";
+            : $"{state.ReviewModel.Pricing.TotalPrice}";
         var energy = state.ReviewModel.WorkerEnergy is null
             ? "none"
             : $"{state.ReviewModel.WorkerEnergy.DailyCapacity}:{string.Join(",", state.ReviewModel.WorkerEnergy.ActionCosts.OrderBy(kvp => kvp.Key).Select(kvp => $"{kvp.Key}:{kvp.Value}"))}";

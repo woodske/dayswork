@@ -13,14 +13,14 @@ public sealed class WorkerEnergyProfileBuilder : IWorkerEnergyProfileBuilder
         _resolver = resolver;
     }
 
-    public WorkerEnergyProfile BuildProfile(IReadOnlySet<TaskKind> enabledTasks, IConfigSnapshot config)
+    public WorkerEnergyProfile BuildProfile(IReadOnlySet<TaskKind> enabledTasks, EnergyTier tier, IConfigSnapshot config)
     {
         var actionCosts = new Dictionary<WorkActionKind, int>();
         foreach (var action in Enum.GetValues<WorkActionKind>())
             actionCosts[action] = _resolver.ResolveWorkActionCost(config, action).Value;
 
         return new WorkerEnergyProfile(
-            DailyCapacity: _resolver.ResolveWorkerDailyEnergyCapacity(config).Value,
+            DailyCapacity: _resolver.ResolveEnergyTierEnergy(config, tier).Value,
             ActionCosts: new ReadOnlyDictionary<WorkActionKind, int>(actionCosts));
     }
 }

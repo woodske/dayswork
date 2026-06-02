@@ -9,90 +9,56 @@ using Xunit;
 public sealed class ConfigValueResolverTests
 {
     [Fact]
-    public void ResolveOutdoorServiceBandPrice_FallsBackToDefault_WhenKeyMissing()
+    public void ResolveEnergyTierEnergy_FallsBackToDefault_WhenKeyMissing()
     {
         var defaults = (ConfigSnapshot)ConfigDefaults.Build();
-        var missingPrices = defaults with
+        var missing = defaults with
         {
-            OutdoorServiceBandPrices = new ReadOnlyDictionary<OutdoorPriceKey, int>(
-                new Dictionary<OutdoorPriceKey, int>()),
+            EnergyTierEnergy = new ReadOnlyDictionary<EnergyTier, int>(new Dictionary<EnergyTier, int>()),
         };
 
         var resolver = new ConfigValueResolver();
-        var key = new OutdoorPriceKey(TaskKind.HarvestCrops, OutdoorBandSize.Medium);
-
-        var actual = resolver.ResolveOutdoorServiceBandPrice(missingPrices, key);
+        var actual = resolver.ResolveEnergyTierEnergy(missing, EnergyTier.FullDay);
 
         Assert.True(actual.UsedDefault);
-        Assert.Equal(defaults.OutdoorServiceBandPrices[key], actual.Value);
+        Assert.Equal(defaults.EnergyTierEnergy[EnergyTier.FullDay], actual.Value);
     }
 
     [Fact]
-    public void ResolveOutdoorBandThreshold_FallsBackToDefault_WhenKeyMissing()
+    public void ResolveEnergyTierEnergy_UsesConfiguredValue_WhenPresent()
     {
         var defaults = (ConfigSnapshot)ConfigDefaults.Build();
-        var missingThresholds = defaults with
+        var custom = defaults with
         {
-            OutdoorBandThresholds = new ReadOnlyDictionary<OutdoorBandSize, int>(
-                new Dictionary<OutdoorBandSize, int>()),
+            EnergyTierEnergy = new ReadOnlyDictionary<EnergyTier, int>(new Dictionary<EnergyTier, int>
+            {
+                [EnergyTier.HalfDay] = 111,
+                [EnergyTier.FullDay] = 222,
+                [EnergyTier.Overtime] = 333,
+            }),
         };
 
         var resolver = new ConfigValueResolver();
-        var actual = resolver.ResolveOutdoorBandThreshold(missingThresholds, OutdoorBandSize.Medium);
+        var actual = resolver.ResolveEnergyTierEnergy(custom, EnergyTier.Overtime);
 
-        Assert.True(actual.UsedDefault);
-        Assert.Equal(defaults.OutdoorBandThresholds[OutdoorBandSize.Medium], actual.Value);
+        Assert.False(actual.UsedDefault);
+        Assert.Equal(333, actual.Value);
     }
 
     [Fact]
-    public void ResolveAnimalBuildingPrice_FallsBackToDefault_WhenKeyMissing()
+    public void ResolveEnergyTierPrice_FallsBackToDefault_WhenKeyMissing()
     {
         var defaults = (ConfigSnapshot)ConfigDefaults.Build();
-        var missingPrices = defaults with
+        var missing = defaults with
         {
-            AnimalBuildingPrices = new ReadOnlyDictionary<AnimalBuildingPriceKey, int>(
-                new Dictionary<AnimalBuildingPriceKey, int>()),
+            EnergyTierPrice = new ReadOnlyDictionary<EnergyTier, int>(new Dictionary<EnergyTier, int>()),
         };
 
         var resolver = new ConfigValueResolver();
-        var key = new AnimalBuildingPriceKey(TaskKind.PetAnimals, AnimalBuildingTier.DeluxeBarn);
-
-        var actual = resolver.ResolveAnimalBuildingPrice(missingPrices, key);
+        var actual = resolver.ResolveEnergyTierPrice(missing, EnergyTier.HalfDay);
 
         Assert.True(actual.UsedDefault);
-        Assert.Equal(defaults.AnimalBuildingPrices[key], actual.Value);
-    }
-
-    [Fact]
-    public void ResolveGreenhouseServicePrice_FallsBackToDefault_WhenKeyMissing()
-    {
-        var defaults = (ConfigSnapshot)ConfigDefaults.Build();
-        var missingPrices = defaults with
-        {
-            GreenhouseServicePrices = new ReadOnlyDictionary<GreenhousePriceKey, int>(
-                new Dictionary<GreenhousePriceKey, int>()),
-        };
-
-        var resolver = new ConfigValueResolver();
-        var key = new GreenhousePriceKey(TaskKind.CollectFruit);
-
-        var actual = resolver.ResolveGreenhouseServicePrice(missingPrices, key);
-
-        Assert.True(actual.UsedDefault);
-        Assert.Equal(defaults.GreenhouseServicePrices[key], actual.Value);
-    }
-
-    [Fact]
-    public void ResolveWorkerDailyEnergyCapacity_FallsBackToDefault_WhenInvalid()
-    {
-        var defaults = (ConfigSnapshot)ConfigDefaults.Build();
-        var invalidCapacity = defaults with { WorkerDailyEnergyCapacity = 0 };
-
-        var resolver = new ConfigValueResolver();
-        var actual = resolver.ResolveWorkerDailyEnergyCapacity(invalidCapacity);
-
-        Assert.True(actual.UsedDefault);
-        Assert.Equal(defaults.WorkerDailyEnergyCapacity, actual.Value);
+        Assert.Equal(defaults.EnergyTierPrice[EnergyTier.HalfDay], actual.Value);
     }
 
     [Fact]

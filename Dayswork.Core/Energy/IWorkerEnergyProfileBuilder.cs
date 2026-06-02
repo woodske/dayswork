@@ -5,5 +5,9 @@ using Dayswork.Core.Domain;
 
 public interface IWorkerEnergyProfileBuilder
 {
-    WorkerEnergyProfile BuildProfile(IReadOnlySet<TaskKind> enabledTasks, IConfigSnapshot config);
+    /// <summary>
+    /// Builds the worker energy profile for a contract: daily capacity comes from the purchased
+    /// <paramref name="tier"/>, action costs come from config.
+    /// </summary>
+    WorkerEnergyProfile BuildProfile(IReadOnlySet<TaskKind> enabledTasks, EnergyTier tier, IConfigSnapshot config);
 }

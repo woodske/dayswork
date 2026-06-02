@@ -7,31 +7,26 @@ using Dayswork.Core.Energy;
 public sealed class ContractTermsBuilder : IContractTermsBuilder
 {
     private readonly IWorkScopeClassifier _scopeClassifier;
-    private readonly IOutdoorServiceBandClassifier _outdoorBandClassifier;
-    private readonly IContractPriceCalculator _priceCalculator;
-    private readonly IPriceBreakdownBuilder _priceBreakdownBuilder;
     private readonly IWorkerEnergyProfileBuilder _energyProfileBuilder;
+    private readonly ConfigValueResolver _resolver;
 
     public ContractTermsBuilder(
         IWorkScopeClassifier scopeClassifier,
-        IOutdoorServiceBandClassifier outdoorBandClassifier,
-        IContractPriceCalculator priceCalculator,
-        IPriceBreakdownBuilder priceBreakdownBuilder,
-        IWorkerEnergyProfileBuilder energyProfileBuilder)
+        IWorkerEnergyProfileBuilder energyProfileBuilder,
+        ConfigValueResolver resolver)
     {
         _scopeClassifier = scopeClassifier;
-        _outdoorBandClassifier = outdoorBandClassifier;
-        _priceCalculator = priceCalculator;
-        _priceBreakdownBuilder = priceBreakdownBuilder;
         _energyProfileBuilder = energyProfileBuilder;
+        _resolver = resolver;
     }
 
     public ContractTermsSnapshot BuildTerms(
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
+        EnergyTier tier,
         IConfigSnapshot config)
     {
-        var preview = BuildPreview(selection, enabledTasks, config);
+        var preview = BuildPreview(selection, enabledTasks, tier, config);
         if (!preview.IsValid || preview.ProposedTerms is null)
             throw new InvalidOperationException("Cannot build contract terms for a selection with no chargeable scope-task pairs.");
 
@@ -41,6 +36,7 @@ public sealed class ContractTermsBuilder : IContractTermsBuilder
     public ContractPreview BuildPreview(
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
+        EnergyTier tier,
         IConfigSnapshot config)
     {
         var scopes = _scopeClassifier.Classify(selection, enabledTasks);
@@ -58,10 +54,8 @@ public sealed class ContractTermsBuilder : IContractTermsBuilder
                 ProposedTerms: null);
         }
 
-        var outdoorBands = _outdoorBandClassifier.ClassifyBands(scopes, enabledTasks, config);
-        var totals = _priceCalculator.Calculate(scopes, enabledTasks, outdoorBands, config);
-        var pricingSnapshot = _priceBreakdownBuilder.BuildSnapshot(scopes, enabledTasks, outdoorBands, totals, config);
-        var energyProfile = _energyProfileBuilder.BuildProfile(enabledTasks, config);
+        var pricingSnapshot = new PricingSnapshot(_resolver.ResolveEnergyTierPrice(config, tier).Value);
+        var energyProfile = _energyProfileBuilder.BuildProfile(enabledTasks, tier, config);
         var proposedTerms = new ContractTermsSnapshot(pricingSnapshot, energyProfile);
 
         return new ContractPreview(

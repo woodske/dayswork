@@ -9,7 +9,7 @@ namespace Dayswork.Core.Persistence;
 
 public sealed class SaveDataSerializer : ISaveDataSerializer
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
 
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
@@ -90,7 +90,7 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
         }
         catch (JsonException ex)
         {
-            _logWarning($"Dayswork save data schema v2 payload could not be mapped — starting fresh. ({ex.Message})");
+            _logWarning($"Dayswork save data schema v3 payload could not be mapped — starting fresh. ({ex.Message})");
             return Array.Empty<Contract>();
         }
 
@@ -110,7 +110,7 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             catch (Exception ex)
             {
                 var contractId = string.IsNullOrWhiteSpace(dto?.Id) ? "<unknown>" : dto.Id;
-                _logWarning($"Skipping schema v2 contract '{contractId}': {ex.Message}");
+                _logWarning($"Skipping schema v3 contract '{contractId}': {ex.Message}");
             }
         }
 
@@ -155,6 +155,8 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             HireDate = MapDate(contract.HireDate),
             ScopeSelection = MapScopeSelection(contract.ScopeSelection),
             TermsSnapshot = MapTermsSnapshot(contract.TermsSnapshot),
+            Tier = contract.Tier.ToString(),
+            CategoryPriority = contract.CategoryPriority.Select(category => category.ToString()).ToList(),
         };
 
     private static Contract MapDtoV2ToDomain(ContractDtoV2 dto)
@@ -172,6 +174,12 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
         var scopeSelection = MapScopeSelection(dto.ScopeSelection ?? throw new JsonException("ScopeSelection was null."));
         var termsSnapshot = MapTermsSnapshot(dto.TermsSnapshot ?? throw new JsonException("TermsSnapshot was null."));
 
+        var tier = string.IsNullOrWhiteSpace(dto.Tier)
+            ? throw new JsonException("Tier was null or empty.")
+            : Enum.Parse<EnergyTier>(dto.Tier);
+
+        var categoryPriority = MapCategoryPriority(dto.CategoryPriority);
+
         return new Contract(
             Id: id,
             EnabledTasks: enabledTasks,
@@ -180,7 +188,28 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             Status: Enum.Parse<ContractStatus>(dto.Status),
             HireDate: MapDate(dto.HireDate ?? throw new JsonException("HireDate was null.")),
             ScopeSelection: scopeSelection,
-            TermsSnapshot: termsSnapshot);
+            TermsSnapshot: termsSnapshot,
+            Tier: tier,
+            CategoryPriority: categoryPriority);
+    }
+
+    // Player category priority. Parse the saved order, dropping unknown/duplicate entries, then
+    // append any categories the save omitted (in default order) so the result always covers every
+    // TaskCategory deterministically.
+    private static IReadOnlyList<TaskCategory> MapCategoryPriority(IReadOnlyList<string>? saved)
+    {
+        var ordered = new List<TaskCategory>();
+        foreach (var name in saved ?? Array.Empty<string>())
+        {
+            if (Enum.TryParse<TaskCategory>(name, out var category) && !ordered.Contains(category))
+                ordered.Add(category);
+        }
+
+        foreach (var category in TaskKindSets.DefaultCategoryPriority)
+            if (!ordered.Contains(category))
+                ordered.Add(category);
+
+        return ordered.AsReadOnly();
     }
 
     private static ContractScopeSelectionDto MapScopeSelection(ContractScopeSelection selection) =>
@@ -240,28 +269,6 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
         {
             Pricing = new PricingSnapshotDto
             {
-                LineItems = snapshot.Pricing.LineItems
-                    .OrderBy(line => line.Family)
-                    .ThenBy(line => line.Service)
-                    .ThenBy(line => line.OutdoorBand)
-                    .ThenBy(line => line.AnimalTier)
-                    .ThenBy(line => line.Quantity)
-                    .ThenBy(line => line.UnitPrice)
-                    .ThenBy(line => line.LineTotal)
-                    .Select(line => new PricingLineItemDto
-                    {
-                        Family = line.Family.ToString(),
-                        Service = line.Service.ToString(),
-                        Quantity = line.Quantity,
-                        UnitPrice = line.UnitPrice,
-                        LineTotal = line.LineTotal,
-                        OutdoorBand = line.OutdoorBand?.ToString(),
-                        AnimalTier = line.AnimalTier?.ToString(),
-                    })
-                    .ToList(),
-                OutdoorSubtotal = snapshot.Pricing.OutdoorSubtotal,
-                AnimalSubtotal = snapshot.Pricing.AnimalSubtotal,
-                GreenhouseSubtotal = snapshot.Pricing.GreenhouseSubtotal,
                 TotalPrice = snapshot.Pricing.TotalPrice,
             },
             Energy = new WorkerEnergyProfileDto
@@ -279,35 +286,8 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
 
     private static ContractTermsSnapshot MapTermsSnapshot(ContractTermsSnapshotDto dto)
     {
-        var lineItems = (dto.Pricing?.LineItems ?? throw new JsonException("Pricing.LineItems was null."))
-            .Select(line => new PricingLineItem(
-                Family: Enum.Parse<PricingFamily>(line.Family),
-                Service: Enum.Parse<TaskKind>(line.Service),
-                Quantity: line.Quantity,
-                UnitPrice: line.UnitPrice,
-                LineTotal: line.LineTotal,
-                OutdoorBand: string.IsNullOrWhiteSpace(line.OutdoorBand)
-                    ? null
-                    : Enum.Parse<OutdoorBandSize>(line.OutdoorBand),
-                AnimalTier: string.IsNullOrWhiteSpace(line.AnimalTier)
-                    ? null
-                    : Enum.Parse<AnimalBuildingTier>(line.AnimalTier)))
-            .OrderBy(line => line.Family)
-            .ThenBy(line => line.Service)
-            .ThenBy(line => line.OutdoorBand)
-            .ThenBy(line => line.AnimalTier)
-            .ThenBy(line => line.Quantity)
-            .ThenBy(line => line.UnitPrice)
-            .ThenBy(line => line.LineTotal)
-            .ToList();
-
         var pricingSnapshotDto = dto.Pricing ?? throw new JsonException("Pricing was null.");
-        var pricing = new PricingSnapshot(
-            LineItems: lineItems.AsReadOnly(),
-            OutdoorSubtotal: pricingSnapshotDto.OutdoorSubtotal,
-            AnimalSubtotal: pricingSnapshotDto.AnimalSubtotal,
-            GreenhouseSubtotal: pricingSnapshotDto.GreenhouseSubtotal,
-            TotalPrice: pricingSnapshotDto.TotalPrice);
+        var pricing = new PricingSnapshot(pricingSnapshotDto.TotalPrice);
 
         var energyDto = dto.Energy ?? throw new JsonException("Energy was null.");
         var actionCosts = (energyDto.ActionCosts ?? throw new JsonException("Energy.ActionCosts was null."))

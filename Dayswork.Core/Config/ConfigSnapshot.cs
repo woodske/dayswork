@@ -10,11 +10,8 @@ public sealed record ConfigSnapshot(
     float WorkerWalkPixelsPerTick,
     int WorkerActionAnimationMs,
     int WorkerEntranceHoldTicks,
-    IReadOnlyDictionary<OutdoorBandSize, int> OutdoorBandThresholds,
-    IReadOnlyDictionary<OutdoorPriceKey, int> OutdoorServiceBandPrices,
-    IReadOnlyDictionary<AnimalBuildingPriceKey, int> AnimalBuildingPrices,
-    IReadOnlyDictionary<GreenhousePriceKey, int> GreenhouseServicePrices,
-    int WorkerDailyEnergyCapacity,
+    IReadOnlyDictionary<EnergyTier, int> EnergyTierEnergy,
+    IReadOnlyDictionary<EnergyTier, int> EnergyTierPrice,
     IReadOnlyDictionary<WorkActionKind, int> WorkActionCosts
 ) : IConfigSnapshot
 {
@@ -27,11 +24,8 @@ public sealed record ConfigSnapshot(
         && WorkerWalkPixelsPerTick.Equals(other.WorkerWalkPixelsPerTick)
         && WorkerActionAnimationMs == other.WorkerActionAnimationMs
         && WorkerEntranceHoldTicks == other.WorkerEntranceHoldTicks
-        && WorkerDailyEnergyCapacity == other.WorkerDailyEnergyCapacity
-        && DictionaryEquals(OutdoorBandThresholds, other.OutdoorBandThresholds)
-        && DictionaryEquals(OutdoorServiceBandPrices, other.OutdoorServiceBandPrices)
-        && DictionaryEquals(AnimalBuildingPrices, other.AnimalBuildingPrices)
-        && DictionaryEquals(GreenhouseServicePrices, other.GreenhouseServicePrices)
+        && DictionaryEquals(EnergyTierEnergy, other.EnergyTierEnergy)
+        && DictionaryEquals(EnergyTierPrice, other.EnergyTierPrice)
         && DictionaryEquals(WorkActionCosts, other.WorkActionCosts);
 
     public override int GetHashCode()
@@ -43,11 +37,8 @@ public sealed record ConfigSnapshot(
         hash.Add(WorkerWalkPixelsPerTick);
         hash.Add(WorkerActionAnimationMs);
         hash.Add(WorkerEntranceHoldTicks);
-        hash.Add(WorkerDailyEnergyCapacity);
-        hash.Add(OutdoorBandThresholds.Count);
-        hash.Add(OutdoorServiceBandPrices.Count);
-        hash.Add(AnimalBuildingPrices.Count);
-        hash.Add(GreenhouseServicePrices.Count);
+        hash.Add(EnergyTierEnergy.Count);
+        hash.Add(EnergyTierPrice.Count);
         hash.Add(WorkActionCosts.Count);
         return hash.ToHashCode();
     }

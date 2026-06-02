@@ -285,9 +285,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
 
         return row.RowState switch
         {
-            ServiceContributionState.Charged => I18nHelper.Get(
-                "ui.task_selection.row_charged",
-                new { amount = row.DisplayAmount ?? 0 }),
+            ServiceContributionState.Charged => I18nHelper.Get("ui.task_selection.row_charged"),
             ServiceContributionState.NeedsAnimalBuildingScope => I18nHelper.Get("ui.task_selection.row_needs_animal"),
             ServiceContributionState.NeedsGreenhouseScope => I18nHelper.Get("ui.task_selection.row_needs_greenhouse"),
             ServiceContributionState.NeedsOutdoorScope when TaskKindSets.IsGreenhouseService(task)

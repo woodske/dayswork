@@ -8,32 +8,21 @@ public static class ConfigDefaults
 {
     public static IConfigSnapshot Build()
     {
-        var outdoorBandThresholds = new Dictionary<OutdoorBandSize, int>
+        // Purchased energy tiers: Energy becomes the worker's daily capacity; Price is paid up front
+        // (one-time) or each eligible morning (recurring). Overtime is priced at a premium per energy.
+        // Starting values — tuned via playtest.
+        var energyTierEnergy = new Dictionary<EnergyTier, int>
         {
-            [OutdoorBandSize.Small] = 64,
-            [OutdoorBandSize.Medium] = 160,
-            [OutdoorBandSize.Large] = 500,
+            [EnergyTier.HalfDay] = 100,
+            [EnergyTier.FullDay] = 200,
+            [EnergyTier.Overtime] = 300,
         };
 
-        var outdoorPrices = new Dictionary<OutdoorPriceKey, int>();
-        AddOutdoorPrices(TaskKind.WaterCrops, 150, 300, 500);
-        AddOutdoorPrices(TaskKind.HarvestCrops, 200, 400, 650);
-        AddOutdoorPrices(TaskKind.CollectFruit, 120, 240, 400);
-        AddOutdoorPrices(TaskKind.CutTrees, 250, 450, 700);
-        AddOutdoorPrices(TaskKind.ClearRocks, 200, 375, 600);
-        AddOutdoorPrices(TaskKind.ClearWeeds, 125, 225, 375);
-        AddOutdoorPrices(TaskKind.ClearGrass, 100, 200, 325);
-
-        var animalPrices = new Dictionary<AnimalBuildingPriceKey, int>();
-        AddAnimalPrices(TaskKind.FeedAnimals, 90, 120, 150, 120, 150, 180);
-        AddAnimalPrices(TaskKind.PetAnimals, 70, 100, 130, 100, 130, 160);
-        AddAnimalPrices(TaskKind.CollectAnimalProducts, 110, 150, 190, 150, 190, 230);
-
-        var greenhousePrices = new Dictionary<GreenhousePriceKey, int>
+        var energyTierPrice = new Dictionary<EnergyTier, int>
         {
-            [new GreenhousePriceKey(TaskKind.WaterCrops)] = 200,
-            [new GreenhousePriceKey(TaskKind.HarvestCrops)] = 250,
-            [new GreenhousePriceKey(TaskKind.CollectFruit)] = 225,
+            [EnergyTier.HalfDay] = 250,
+            [EnergyTier.FullDay] = 450,
+            [EnergyTier.Overtime] = 750,
         };
 
         var workActionCosts = new Dictionary<WorkActionKind, int>
@@ -56,35 +45,8 @@ public static class ConfigDefaults
             workerWalkPixelsPerTick: 2f,
             workerActionAnimationMs: 650,
             workerEntranceHoldTicks: 120,
-            outdoorBandThresholds: new ReadOnlyDictionary<OutdoorBandSize, int>(outdoorBandThresholds),
-            outdoorServiceBandPrices: new ReadOnlyDictionary<OutdoorPriceKey, int>(outdoorPrices),
-            animalBuildingPrices: new ReadOnlyDictionary<AnimalBuildingPriceKey, int>(animalPrices),
-            greenhouseServicePrices: new ReadOnlyDictionary<GreenhousePriceKey, int>(greenhousePrices),
-            workerDailyEnergyCapacity: 270,
+            energyTierEnergy: new ReadOnlyDictionary<EnergyTier, int>(energyTierEnergy),
+            energyTierPrice: new ReadOnlyDictionary<EnergyTier, int>(energyTierPrice),
             workActionCosts: new ReadOnlyDictionary<WorkActionKind, int>(workActionCosts));
-
-        void AddOutdoorPrices(TaskKind service, int small, int medium, int large)
-        {
-            outdoorPrices[new OutdoorPriceKey(service, OutdoorBandSize.Small)] = small;
-            outdoorPrices[new OutdoorPriceKey(service, OutdoorBandSize.Medium)] = medium;
-            outdoorPrices[new OutdoorPriceKey(service, OutdoorBandSize.Large)] = large;
-        }
-
-        void AddAnimalPrices(
-            TaskKind service,
-            int coop,
-            int bigCoop,
-            int deluxeCoop,
-            int barn,
-            int bigBarn,
-            int deluxeBarn)
-        {
-            animalPrices[new AnimalBuildingPriceKey(service, AnimalBuildingTier.Coop)] = coop;
-            animalPrices[new AnimalBuildingPriceKey(service, AnimalBuildingTier.BigCoop)] = bigCoop;
-            animalPrices[new AnimalBuildingPriceKey(service, AnimalBuildingTier.DeluxeCoop)] = deluxeCoop;
-            animalPrices[new AnimalBuildingPriceKey(service, AnimalBuildingTier.Barn)] = barn;
-            animalPrices[new AnimalBuildingPriceKey(service, AnimalBuildingTier.BigBarn)] = bigBarn;
-            animalPrices[new AnimalBuildingPriceKey(service, AnimalBuildingTier.DeluxeBarn)] = deluxeBarn;
-        }
     }
 }

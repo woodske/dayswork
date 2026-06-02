@@ -33,29 +33,31 @@ public class ConfigDefaultsTests
     }
 
     [Fact]
-    public void Build_OutdoorBandThresholds_cover_every_band()
+    public void Build_EnergyTierEnergy_covers_every_tier_with_positive_values()
     {
         var snapshot = ConfigDefaults.Build();
-        var allBands = Enum.GetValues<OutdoorBandSize>();
-        Assert.Equal(allBands.Length, snapshot.OutdoorBandThresholds.Count);
-        foreach (var band in allBands)
-            Assert.True(snapshot.OutdoorBandThresholds.ContainsKey(band));
+        var allTiers = Enum.GetValues<EnergyTier>();
+        Assert.Equal(allTiers.Length, snapshot.EnergyTierEnergy.Count);
+        foreach (var tier in allTiers)
+            Assert.True(snapshot.EnergyTierEnergy[tier] > 0);
     }
 
     [Fact]
-    public void Build_OutdoorServiceBandPrices_cover_every_expected_key()
+    public void Build_EnergyTierPrice_covers_every_tier()
     {
         var snapshot = ConfigDefaults.Build();
-        var expectedCount = TaskKindSets.OutdoorServices.Count * Enum.GetValues<OutdoorBandSize>().Length;
-        Assert.Equal(expectedCount, snapshot.OutdoorServiceBandPrices.Count);
+        var allTiers = Enum.GetValues<EnergyTier>();
+        Assert.Equal(allTiers.Length, snapshot.EnergyTierPrice.Count);
+        foreach (var tier in allTiers)
+            Assert.True(snapshot.EnergyTierPrice.ContainsKey(tier));
     }
 
     [Fact]
-    public void Build_AnimalBuildingPrices_cover_every_expected_key()
+    public void Build_EnergyTiers_increase_with_capacity()
     {
         var snapshot = ConfigDefaults.Build();
-        var expectedCount = TaskKindSets.AnimalServices.Count * Enum.GetValues<AnimalBuildingTier>().Length;
-        Assert.Equal(expectedCount, snapshot.AnimalBuildingPrices.Count);
+        Assert.True(snapshot.EnergyTierEnergy[EnergyTier.HalfDay] < snapshot.EnergyTierEnergy[EnergyTier.FullDay]);
+        Assert.True(snapshot.EnergyTierEnergy[EnergyTier.FullDay] < snapshot.EnergyTierEnergy[EnergyTier.Overtime]);
     }
 
     [Fact]
@@ -66,12 +68,6 @@ public class ConfigDefaultsTests
         Assert.Equal(allActions.Length, snapshot.WorkActionCosts.Count);
         foreach (var action in allActions)
             Assert.True(snapshot.WorkActionCosts.ContainsKey(action));
-    }
-
-    [Fact]
-    public void Build_WorkerDailyEnergyCapacity_is_positive()
-    {
-        Assert.True(ConfigDefaults.Build().WorkerDailyEnergyCapacity > 0);
     }
 
     [Fact]

@@ -8,26 +8,6 @@ internal static class RuntimeConfigSnapshotMapper
     public static ModConfig Normalize(ModConfig config, Action<string>? logWarning = null)
     {
         var defaults = ModConfig.CreateDefaults();
-        var normalizedThresholds = NormalizePositiveDictionary(
-            config.OutdoorBandThresholds,
-            defaults.OutdoorBandThresholds,
-            nameof(ModConfig.OutdoorBandThresholds),
-            logWarning);
-        if (normalizedThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(OutdoorBandSize.Medium)]
-            < normalizedThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(OutdoorBandSize.Small)])
-        {
-            logWarning?.Invoke("ConfigFallback_OutdoorBandThresholds_Medium");
-            normalizedThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(OutdoorBandSize.Medium)] =
-                defaults.OutdoorBandThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(OutdoorBandSize.Medium)];
-        }
-
-        if (normalizedThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(OutdoorBandSize.Large)]
-            < normalizedThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(OutdoorBandSize.Medium)])
-        {
-            logWarning?.Invoke("ConfigFallback_OutdoorBandThresholds_Large");
-            normalizedThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(OutdoorBandSize.Large)] =
-                defaults.OutdoorBandThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(OutdoorBandSize.Large)];
-        }
 
         return new ModConfig
         {
@@ -39,25 +19,16 @@ internal static class RuntimeConfigSnapshotMapper
                 : defaults.WorkerWalkPixelsPerTick,
             WorkerActionAnimationMs = Math.Max(1, config.WorkerActionAnimationMs),
             WorkerEntranceHoldTicks = Math.Max(0, config.WorkerEntranceHoldTicks),
-            OutdoorBandThresholds = normalizedThresholds,
-            OutdoorServiceBandPrices = NormalizeNonNegativeDictionary(
-                config.OutdoorServiceBandPrices,
-                defaults.OutdoorServiceBandPrices,
-                nameof(ModConfig.OutdoorServiceBandPrices),
+            EnergyTierEnergy = NormalizePositiveDictionary(
+                config.EnergyTierEnergy,
+                defaults.EnergyTierEnergy,
+                nameof(ModConfig.EnergyTierEnergy),
                 logWarning),
-            AnimalBuildingPrices = NormalizeNonNegativeDictionary(
-                config.AnimalBuildingPrices,
-                defaults.AnimalBuildingPrices,
-                nameof(ModConfig.AnimalBuildingPrices),
+            EnergyTierPrice = NormalizeNonNegativeDictionary(
+                config.EnergyTierPrice,
+                defaults.EnergyTierPrice,
+                nameof(ModConfig.EnergyTierPrice),
                 logWarning),
-            GreenhouseServicePrices = NormalizeNonNegativeDictionary(
-                config.GreenhouseServicePrices,
-                defaults.GreenhouseServicePrices,
-                nameof(ModConfig.GreenhouseServicePrices),
-                logWarning),
-            WorkerDailyEnergyCapacity = config.WorkerDailyEnergyCapacity > 0
-                ? config.WorkerDailyEnergyCapacity
-                : defaults.WorkerDailyEnergyCapacity,
             WorkActionCosts = NormalizeNonNegativeDictionary(
                 config.WorkActionCosts,
                 defaults.WorkActionCosts,
@@ -69,21 +40,14 @@ internal static class RuntimeConfigSnapshotMapper
     public static ConfigSnapshot BuildSnapshot(ModConfig config)
     {
         var normalized = Normalize(config);
-        var outdoorBandThresholds = DefaultSnapshot.OutdoorBandThresholds.Keys.ToDictionary(
-            key => key,
-            key => normalized.OutdoorBandThresholds[ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(key)]);
 
-        var outdoorServiceBandPrices = DefaultSnapshot.OutdoorServiceBandPrices.Keys.ToDictionary(
+        var energyTierEnergy = DefaultSnapshot.EnergyTierEnergy.Keys.ToDictionary(
             key => key,
-            key => normalized.OutdoorServiceBandPrices[ContractTermsConfigKeyCodec.EncodeOutdoorPriceKey(key)]);
+            key => normalized.EnergyTierEnergy[ContractTermsConfigKeyCodec.EncodeEnergyTierKey(key)]);
 
-        var animalBuildingPrices = DefaultSnapshot.AnimalBuildingPrices.Keys.ToDictionary(
+        var energyTierPrice = DefaultSnapshot.EnergyTierPrice.Keys.ToDictionary(
             key => key,
-            key => normalized.AnimalBuildingPrices[ContractTermsConfigKeyCodec.EncodeAnimalBuildingPriceKey(key)]);
-
-        var greenhouseServicePrices = DefaultSnapshot.GreenhouseServicePrices.Keys.ToDictionary(
-            key => key,
-            key => normalized.GreenhouseServicePrices[ContractTermsConfigKeyCodec.EncodeGreenhousePriceKey(key)]);
+            key => normalized.EnergyTierPrice[ContractTermsConfigKeyCodec.EncodeEnergyTierKey(key)]);
 
         var workActionCosts = DefaultSnapshot.WorkActionCosts.Keys.ToDictionary(
             key => key,
@@ -96,11 +60,8 @@ internal static class RuntimeConfigSnapshotMapper
             normalized.WorkerWalkPixelsPerTick,
             normalized.WorkerActionAnimationMs,
             normalized.WorkerEntranceHoldTicks,
-            outdoorBandThresholds,
-            outdoorServiceBandPrices,
-            animalBuildingPrices,
-            greenhouseServicePrices,
-            normalized.WorkerDailyEnergyCapacity,
+            energyTierEnergy,
+            energyTierPrice,
             workActionCosts);
     }
 

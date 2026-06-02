@@ -24,13 +24,15 @@ public static class U19PersistenceGen
          let canonicalScope = CanonicalizeScopeSelection(scope)
          from enabledTasks in EnabledTasksFor(canonicalScope)
          from config in ConfigSnapshotGen.Snapshot().Generator
-         let preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, config)
+         from tier in TierGen()
+         let preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, tier, config)
          where preview.IsValid && preview.ProposedTerms is not null
          from id in Arb.Generate<Guid>().Where(guid => guid != Guid.Empty)
          from schedule in Gen.Elements(ContractSchedule.OneTime, ContractSchedule.Recurring)
          from status in Gen.Elements(ContractStatus.Active, ContractStatus.Paused, ContractStatus.Cancelled)
          from hireDate in GameDateGen()
          from taskDestinations in TaskDestinationsGen(enabledTasks)
+         from categoryPriority in CategoryPriorityGen()
          select new Contract(
              Id: new ContractId(id),
              EnabledTasks: enabledTasks,
@@ -39,7 +41,9 @@ public static class U19PersistenceGen
              Status: status,
              HireDate: hireDate,
              ScopeSelection: canonicalScope,
-             TermsSnapshot: preview.ProposedTerms!))
+             TermsSnapshot: preview.ProposedTerms!,
+             Tier: tier,
+             CategoryPriority: categoryPriority))
         .ToArbitrary();
 
     public static Arbitrary<ContractTermsSnapshot> TermsSnapshot() =>
@@ -47,7 +51,8 @@ public static class U19PersistenceGen
          let canonicalScope = CanonicalizeScopeSelection(scope)
          from enabledTasks in EnabledTasksFor(canonicalScope)
          from config in ConfigSnapshotGen.Snapshot().Generator
-         let preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, config)
+         from tier in TierGen()
+         let preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, tier, config)
          where preview.IsValid && preview.ProposedTerms is not null
          select preview.ProposedTerms)
         .ToArbitrary();
@@ -89,7 +94,9 @@ public static class U19PersistenceGen
             Status: ContractStatus.Active,
             HireDate: new GameDate(12, Season.Fall, 2),
             ScopeSelection: scope,
-            TermsSnapshot: BuildTerms(scope, enabledTasks));
+            TermsSnapshot: BuildTerms(scope, enabledTasks, EnergyTier.FullDay),
+            Tier: EnergyTier.FullDay,
+            CategoryPriority: TaskKindSets.DefaultCategoryPriority);
     }
 
     public static ContractTermsSnapshot CreateAlternateTermsSnapshot()
@@ -109,7 +116,7 @@ public static class U19PersistenceGen
             TaskKind.ClearGrass,
         };
 
-        return BuildTerms(scope, enabledTasks);
+        return BuildTerms(scope, enabledTasks, EnergyTier.HalfDay);
     }
 
     public static Arbitrary<IReadOnlyList<Contract>> CurrentSchemaContractList() =>
@@ -181,6 +188,14 @@ public static class U19PersistenceGen
         from year in Gen.Choose(1, 10)
         select new GameDate(day, season, year);
 
+    private static Gen<EnergyTier> TierGen() =>
+        Gen.Elements(EnergyTier.HalfDay, EnergyTier.FullDay, EnergyTier.Overtime);
+
+    // A shuffled-but-complete category priority order.
+    private static Gen<IReadOnlyList<TaskCategory>> CategoryPriorityGen() =>
+        Gen.Constant(Enum.GetValues<TaskCategory>())
+            .Select(categories => categories.OrderBy(_ => Guid.NewGuid()).ToList().AsReadOnly() as IReadOnlyList<TaskCategory>);
+
     private static ContractScopeSelection CanonicalizeScopeSelection(ContractScopeSelection selection) =>
         new(
             OutdoorZones: selection.OutdoorZones
@@ -198,6 +213,7 @@ public static class U19PersistenceGen
 
     private static ContractTermsSnapshot BuildTerms(
         ContractScopeSelection scopeSelection,
-        IReadOnlySet<TaskKind> enabledTasks) =>
-        U18BuilderFactory.CreateTermsBuilder().BuildTerms(scopeSelection, enabledTasks, ConfigDefaults.Build());
+        IReadOnlySet<TaskKind> enabledTasks,
+        EnergyTier tier) =>
+        U18BuilderFactory.CreateTermsBuilder().BuildTerms(scopeSelection, enabledTasks, tier, ConfigDefaults.Build());
 }

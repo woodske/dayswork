@@ -49,7 +49,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     private readonly ToolLevelReader      _toolReader;
     private readonly ToolSwapAnimator     _toolAnimator;
-    private readonly ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
+    // Rebuilt per shift from the active contract's player-defined category priority (see StartShift).
+    private ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
     private readonly ShiftPlanBuilder     _shiftPlanBuilder = new();
     private readonly IWorkScopeClassifier _scopeClassifier;
     private IConfigSnapshot               _config;
@@ -477,6 +478,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         _config = runtimeConfig;
+        _priorityOrderer = new TaskPriorityOrderer(contract.CategoryPriority);
         var contractTerms = contract.TermsSnapshot;
         var energyState = _energyLedger.StartShift(contractTerms.Energy);
         var pacingProfile = WorkerPacingProfile.FromConfig(runtimeConfig);

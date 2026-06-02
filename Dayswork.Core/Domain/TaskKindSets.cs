@@ -86,4 +86,31 @@ public static class TaskKindSets
         TaskKind.CollectFruit => true,
         _ => false,
     };
+
+    /// <summary>The default category priority order for a new contract (highest priority first).</summary>
+    public static IReadOnlyList<TaskCategory> DefaultCategoryPriority { get; } = new[]
+    {
+        TaskCategory.AnimalCare,
+        TaskCategory.Crops,
+        TaskCategory.Fieldwork,
+    };
+
+    /// <summary>
+    /// Maps a task to its coarse priority category. Watering is folded into <see cref="TaskCategory.Crops"/>.
+    /// Greenhouse crop services share the same crop <see cref="TaskKind"/> values and therefore the same category.
+    /// </summary>
+    public static TaskCategory CategoryOf(TaskKind kind) => kind switch
+    {
+        TaskKind.FeedAnimals => TaskCategory.AnimalCare,
+        TaskKind.PetAnimals => TaskCategory.AnimalCare,
+        TaskKind.CollectAnimalProducts => TaskCategory.AnimalCare,
+        TaskKind.WaterCrops => TaskCategory.Crops,
+        TaskKind.HarvestCrops => TaskCategory.Crops,
+        TaskKind.CollectFruit => TaskCategory.Crops,
+        TaskKind.CutTrees => TaskCategory.Fieldwork,
+        TaskKind.ClearRocks => TaskCategory.Fieldwork,
+        TaskKind.ClearWeeds => TaskCategory.Fieldwork,
+        TaskKind.ClearGrass => TaskCategory.Fieldwork,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unmapped TaskKind has no priority category."),
+    };
 }

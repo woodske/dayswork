@@ -8,11 +8,15 @@ namespace Dayswork.Core.Shifts;
 /// </summary>
 public sealed class WorkerRouteSelector
 {
+    // Player-ordered category priority is authoritative: pick the highest-priority category that
+    // still has reachable work, then the nearest candidate within it. Route cost breaks ties only
+    // among same-category candidates (which share a PriorityRank), giving strict ordering between
+    // categories and nearest-first within a category.
     public WorkerRouteCandidate? Select(IEnumerable<WorkerRouteCandidate> candidates) =>
         candidates
             .Where(candidate => candidate.Reachable)
-            .OrderBy(candidate => candidate.RouteCost)
-            .ThenBy(candidate => candidate.PriorityRank)
+            .OrderBy(candidate => candidate.PriorityRank)
+            .ThenBy(candidate => candidate.RouteCost)
             .ThenBy(candidate => candidate.StableOrder)
             .FirstOrDefault();
 

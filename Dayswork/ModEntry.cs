@@ -42,10 +42,8 @@ public sealed class ModEntry : Mod
         var workScopeClassifier = new WorkScopeClassifier();
         var contractTermsBuilder = new ContractTermsBuilder(
             workScopeClassifier,
-            new OutdoorServiceBandClassifier(configResolver),
-            new ContractPriceCalculator(configResolver),
-            new PriceBreakdownBuilder(configResolver),
-            new WorkerEnergyProfileBuilder(configResolver));
+            new WorkerEnergyProfileBuilder(configResolver),
+            configResolver);
         var recurringDecisionEngine = new RecurringDayStartDecisionEngine(contractTermsBuilder);
         var store       = new ContractStore(logWarning);
         var serializer  = new SaveDataSerializer(logWarning);

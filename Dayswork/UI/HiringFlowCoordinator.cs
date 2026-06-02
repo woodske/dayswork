@@ -113,7 +113,23 @@ internal sealed class HiringFlowCoordinator
         Game1.activeClickableMenu = new SummaryMenu(
             draft,
             onConfirm: ConfirmContract,
-            onBack: d => ShowSchedule(d));
+            onBack: d => ShowSchedule(d),
+            onCycleTier: (d, direction) => CycleTier(d, direction),
+            onMoveCategory: (d, category, direction) => MoveCategory(d, category, direction));
+    }
+
+    private void CycleTier(ContractDraft draft, int direction)
+    {
+        draft.CycleTier(direction);
+        RefreshPreview(draft);
+        ShowSummary(draft);
+    }
+
+    private void MoveCategory(ContractDraft draft, Core.Domain.TaskCategory category, int direction)
+    {
+        draft.MoveCategory(category, direction);
+        RefreshViewModels(draft);
+        ShowSummary(draft);
     }
 
     private void BeginZoneDraw(ContractDraft draft)
@@ -163,6 +179,7 @@ internal sealed class HiringFlowCoordinator
         var preview = _termsBuilder.BuildPreview(
             draft.ScopeSelection,
             draft.EnabledTasks,
+            draft.Tier,
             _configManager.CurrentSnapshot);
 
         draft.PreviewState = HiringFlowViewModelBuilder.Build(draft, preview);
@@ -232,7 +249,9 @@ internal sealed class HiringFlowCoordinator
                 Enum.Parse<Dayswork.Core.Domain.Season>(Game1.currentSeason, ignoreCase: true),
                 Game1.year),
             ScopeSelection: draft.ScopeSelection,
-            TermsSnapshot: proposedTerms);
+            TermsSnapshot: proposedTerms,
+            Tier: draft.Tier,
+            CategoryPriority: draft.CategoryPriority.ToList().AsReadOnly());
     }
 
     private void CloseFlow() => Game1.activeClickableMenu = null;

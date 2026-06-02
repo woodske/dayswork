@@ -3,20 +3,20 @@ using Dayswork.Core.Domain;
 namespace Dayswork.Core.Shifts;
 
 /// <summary>
-/// Orders a set of enabled tasks according to the fixed FR-WORK-03 priority sequence.
+/// Orders a set of enabled tasks by the contract's player-defined category priority.
 /// </summary>
 public interface ITaskPriorityOrderer
 {
     /// <summary>
-    /// Returns only the provided tasks, in FR-WORK-03 priority order.
+    /// Returns only the provided tasks, in category-priority order (ties broken by enum order).
     /// Tasks absent from the input are absent from the output.
     /// Empty input returns an empty list.
     /// </summary>
     IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> enabledTasks);
 
     /// <summary>
-    /// Returns the FR-WORK-03 priority rank for a task. Lower numbers run first
-    /// when route costs are tied.
+    /// Returns the priority rank for a task (its category's index in the contract's order).
+    /// Lower numbers run first; same-category tasks share a rank, so route cost breaks the tie.
     /// </summary>
     int Rank(TaskKind task);
 }

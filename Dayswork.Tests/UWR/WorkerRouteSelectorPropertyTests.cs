@@ -9,7 +9,7 @@ public sealed class WorkerRouteSelectorPropertyTests
     private readonly WorkerRouteSelector _selector = new();
 
     [Property(Arbitrary = new[] { typeof(UWRPropertyGenerators) }, MaxTest = 500)]
-    public void Selected_candidate_has_minimum_reachable_route_cost(
+    public void Selected_candidate_has_best_priority_then_minimum_cost(
         IReadOnlyList<WorkerRouteCandidate> candidates)
     {
         var selected = _selector.Select(candidates);
@@ -22,17 +22,26 @@ public sealed class WorkerRouteSelectorPropertyTests
         }
 
         Assert.NotNull(selected);
-        Assert.Equal(reachable.Min(candidate => candidate.RouteCost), selected!.RouteCost);
+
+        // Strict between categories: selected is in the best (lowest) priority rank present...
+        var bestRank = reachable.Min(candidate => candidate.PriorityRank);
+        Assert.Equal(bestRank, selected!.PriorityRank);
+
+        // ...and nearest within that rank.
+        var minCostInBestRank = reachable
+            .Where(candidate => candidate.PriorityRank == bestRank)
+            .Min(candidate => candidate.RouteCost);
+        Assert.Equal(minCostInBestRank, selected.RouteCost);
     }
 
     [Property(Arbitrary = new[] { typeof(UWRPropertyGenerators) }, MaxTest = 500)]
-    public void Selection_matches_minimum_cost_tie_break_oracle(
+    public void Selection_matches_priority_then_cost_tie_break_oracle(
         IReadOnlyList<WorkerRouteCandidate> candidates)
     {
         var expected = candidates
             .Where(candidate => candidate.Reachable)
-            .OrderBy(candidate => candidate.RouteCost)
-            .ThenBy(candidate => candidate.PriorityRank)
+            .OrderBy(candidate => candidate.PriorityRank)
+            .ThenBy(candidate => candidate.RouteCost)
             .ThenBy(candidate => candidate.StableOrder)
             .FirstOrDefault();
 
@@ -55,26 +64,23 @@ public sealed class WorkerRouteSelectorPropertyTests
     }
 
     [Property(Arbitrary = new[] { typeof(UWRPropertyGenerators) }, MaxTest = 500)]
-    public void Zero_cost_reachable_candidate_beats_positive_cost_candidates(
+    public void Best_priority_zero_cost_candidate_wins(
         IReadOnlyList<WorkerRouteCandidate> candidates)
     {
         var reachable = candidates.Where(candidate => candidate.Reachable).ToList();
         if (reachable.Count == 0)
             return;
 
-        var zero = reachable[0] with
+        // Highest possible priority (lowest rank) and zero cost: must win outright.
+        var winner = reachable[0] with
         {
             CandidateId = 10_000,
             RouteCost = 0,
-            PriorityRank = int.MaxValue,
-            StableOrder = int.MaxValue,
+            PriorityRank = int.MinValue,
+            StableOrder = int.MinValue,
         };
-        var positives = candidates.Select(candidate => candidate with
-        {
-            RouteCost = candidate.Reachable ? Math.Max(1, candidate.RouteCost) : candidate.RouteCost,
-        });
-        var selected = _selector.Select(positives.Append(zero));
+        var selected = _selector.Select(candidates.Append(winner));
 
-        Assert.Equal(zero, selected);
+        Assert.Equal(winner, selected);
     }
 }

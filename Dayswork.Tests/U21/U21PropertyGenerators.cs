@@ -34,7 +34,7 @@ public static class U21PropertyGenerators
     public static ContractTermsSnapshot BuildTermsSnapshot(int capacity)
     {
         return new ContractTermsSnapshot(
-            new PricingSnapshot(Array.Empty<PricingLineItem>(), 0, 0, 0, 0),
+            new PricingSnapshot(0),
             BuildProfile(capacity));
     }
 }

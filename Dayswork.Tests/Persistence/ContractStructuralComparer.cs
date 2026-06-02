@@ -12,6 +12,8 @@ internal static class ContractStructuralComparer
         && left.Schedule == right.Schedule
         && left.Status == right.Status
         && left.HireDate == right.HireDate
+        && left.Tier == right.Tier
+        && left.CategoryPriority.SequenceEqual(right.CategoryPriority)
         && ScopeSelectionsEqual(left.ScopeSelection, right.ScopeSelection)
         && TermsSnapshotsEqual(left.TermsSnapshot, right.TermsSnapshot);
 
@@ -30,11 +32,7 @@ internal static class ContractStructuralComparer
     }
 
     public static bool PricingSnapshotsEqual(PricingSnapshot left, PricingSnapshot right) =>
-        left.OutdoorSubtotal == right.OutdoorSubtotal
-        && left.AnimalSubtotal == right.AnimalSubtotal
-        && left.GreenhouseSubtotal == right.GreenhouseSubtotal
-        && left.TotalPrice == right.TotalPrice
-        && left.LineItems.SequenceEqual(right.LineItems);
+        left.TotalPrice == right.TotalPrice;
 
     public static bool WorkerEnergyProfilesEqual(WorkerEnergyProfile left, WorkerEnergyProfile right) =>
         left.DailyCapacity == right.DailyCapacity
@@ -57,7 +55,9 @@ internal static class ContractStructuralComparer
         var terms = $"{contract.TermsSnapshot.Pricing.TotalPrice}|{contract.TermsSnapshot.Energy.DailyCapacity}|"
               + $"{string.Join(";", contract.TermsSnapshot.Energy.ActionCosts.OrderBy(kvp => kvp.Key).Select(kvp => $"{kvp.Key}:{kvp.Value}"))}";
 
-        return $"{contract.Id}|{enabledTasks}|{destinations}|{contract.Schedule}|{contract.Status}|{contract.HireDate.Day}:{contract.HireDate.Season}:{contract.HireDate.Year}|{scope}|{terms}";
+        var priority = $"{contract.Tier}|{string.Join(",", contract.CategoryPriority)}";
+
+        return $"{contract.Id}|{enabledTasks}|{destinations}|{contract.Schedule}|{contract.Status}|{contract.HireDate.Day}:{contract.HireDate.Season}:{contract.HireDate.Year}|{scope}|{terms}|{priority}";
     }
 
     private static bool ZonesEqual(IReadOnlyList<Zone> left, IReadOnlyList<Zone> right) =>

@@ -7,44 +7,20 @@ public sealed class ConfigValueResolver
 {
     private static readonly IConfigSnapshot DefaultSnapshot = ConfigDefaults.Build();
 
-    public ResolvedIntValue ResolveOutdoorBandThreshold(IConfigSnapshot config, OutdoorBandSize band)
+    public ResolvedIntValue ResolveEnergyTierEnergy(IConfigSnapshot config, EnergyTier tier)
     {
-        if (config.OutdoorBandThresholds.TryGetValue(band, out var value) && value > 0)
+        if (config.EnergyTierEnergy.TryGetValue(tier, out var value) && value > 0)
             return new ResolvedIntValue(value, false);
 
-        return new ResolvedIntValue(DefaultSnapshot.OutdoorBandThresholds[band], true);
+        return new ResolvedIntValue(DefaultSnapshot.EnergyTierEnergy[tier], true);
     }
 
-    public ResolvedIntValue ResolveOutdoorServiceBandPrice(IConfigSnapshot config, OutdoorPriceKey key)
+    public ResolvedIntValue ResolveEnergyTierPrice(IConfigSnapshot config, EnergyTier tier)
     {
-        if (config.OutdoorServiceBandPrices.TryGetValue(key, out var value) && value >= 0)
+        if (config.EnergyTierPrice.TryGetValue(tier, out var value) && value >= 0)
             return new ResolvedIntValue(value, false);
 
-        return new ResolvedIntValue(DefaultSnapshot.OutdoorServiceBandPrices[key], true);
-    }
-
-    public ResolvedIntValue ResolveAnimalBuildingPrice(IConfigSnapshot config, AnimalBuildingPriceKey key)
-    {
-        if (config.AnimalBuildingPrices.TryGetValue(key, out var value) && value >= 0)
-            return new ResolvedIntValue(value, false);
-
-        return new ResolvedIntValue(DefaultSnapshot.AnimalBuildingPrices[key], true);
-    }
-
-    public ResolvedIntValue ResolveGreenhouseServicePrice(IConfigSnapshot config, GreenhousePriceKey key)
-    {
-        if (config.GreenhouseServicePrices.TryGetValue(key, out var value) && value >= 0)
-            return new ResolvedIntValue(value, false);
-
-        return new ResolvedIntValue(DefaultSnapshot.GreenhouseServicePrices[key], true);
-    }
-
-    public ResolvedIntValue ResolveWorkerDailyEnergyCapacity(IConfigSnapshot config)
-    {
-        if (config.WorkerDailyEnergyCapacity > 0)
-            return new ResolvedIntValue(config.WorkerDailyEnergyCapacity, false);
-
-        return new ResolvedIntValue(DefaultSnapshot.WorkerDailyEnergyCapacity, true);
+        return new ResolvedIntValue(DefaultSnapshot.EnergyTierPrice[tier], true);
     }
 
     public ResolvedIntValue ResolveWorkActionCost(IConfigSnapshot config, WorkActionKind action)

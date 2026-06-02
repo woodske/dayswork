@@ -13,11 +13,8 @@ public static class ConfigSnapshotFactory
         float workerWalkPixelsPerTick,
         int workerActionAnimationMs,
         int workerEntranceHoldTicks,
-        IReadOnlyDictionary<OutdoorBandSize, int> outdoorBandThresholds,
-        IReadOnlyDictionary<OutdoorPriceKey, int> outdoorServiceBandPrices,
-        IReadOnlyDictionary<AnimalBuildingPriceKey, int> animalBuildingPrices,
-        IReadOnlyDictionary<GreenhousePriceKey, int> greenhouseServicePrices,
-        int workerDailyEnergyCapacity,
+        IReadOnlyDictionary<EnergyTier, int> energyTierEnergy,
+        IReadOnlyDictionary<EnergyTier, int> energyTierPrice,
         IReadOnlyDictionary<WorkActionKind, int> workActionCosts)
     {
         if (hardCapTime < 1000 || hardCapTime > 2600)
@@ -38,25 +35,16 @@ public static class ConfigSnapshotFactory
         if (workerEntranceHoldTicks < 0)
             throw new ArgumentOutOfRangeException(nameof(workerEntranceHoldTicks), "WorkerEntranceHoldTicks must be non-negative.");
 
-        if (workerDailyEnergyCapacity <= 0)
-            throw new ArgumentOutOfRangeException(nameof(workerDailyEnergyCapacity), "WorkerDailyEnergyCapacity must be greater than zero.");
-
-        var normalizedThresholds = NormalizeThresholdDictionary(outdoorBandThresholds);
-        var normalizedOutdoorPrices = NormalizeExactNonNegativeDictionary(
-            outdoorServiceBandPrices,
-            ExpectedOutdoorPriceKeys(),
-            nameof(outdoorServiceBandPrices),
-            key => $"{key.Service}:{key.Band}");
-        var normalizedAnimalPrices = NormalizeExactNonNegativeDictionary(
-            animalBuildingPrices,
-            ExpectedAnimalBuildingPriceKeys(),
-            nameof(animalBuildingPrices),
-            key => $"{key.Service}:{key.Tier}");
-        var normalizedGreenhousePrices = NormalizeExactNonNegativeDictionary(
-            greenhouseServicePrices,
-            ExpectedGreenhousePriceKeys(),
-            nameof(greenhouseServicePrices),
-            key => key.Service.ToString());
+        var normalizedTierEnergy = NormalizeExactPositiveDictionary(
+            energyTierEnergy,
+            Enum.GetValues<EnergyTier>(),
+            nameof(energyTierEnergy),
+            tier => tier.ToString());
+        var normalizedTierPrice = NormalizeExactNonNegativeDictionary(
+            energyTierPrice,
+            Enum.GetValues<EnergyTier>(),
+            nameof(energyTierPrice),
+            tier => tier.ToString());
         var normalizedActionCosts = NormalizeExactNonNegativeDictionary(
             workActionCosts,
             Enum.GetValues<WorkActionKind>(),
@@ -70,30 +58,9 @@ public static class ConfigSnapshotFactory
             workerWalkPixelsPerTick,
             workerActionAnimationMs,
             workerEntranceHoldTicks,
-            new ReadOnlyDictionary<OutdoorBandSize, int>(normalizedThresholds),
-            new ReadOnlyDictionary<OutdoorPriceKey, int>(normalizedOutdoorPrices),
-            new ReadOnlyDictionary<AnimalBuildingPriceKey, int>(normalizedAnimalPrices),
-            new ReadOnlyDictionary<GreenhousePriceKey, int>(normalizedGreenhousePrices),
-            workerDailyEnergyCapacity,
+            new ReadOnlyDictionary<EnergyTier, int>(normalizedTierEnergy),
+            new ReadOnlyDictionary<EnergyTier, int>(normalizedTierPrice),
             new ReadOnlyDictionary<WorkActionKind, int>(normalizedActionCosts));
-    }
-
-    private static Dictionary<OutdoorBandSize, int> NormalizeThresholdDictionary(
-        IReadOnlyDictionary<OutdoorBandSize, int> thresholds)
-    {
-        var normalized = NormalizeExactPositiveDictionary(
-            thresholds,
-            Enum.GetValues<OutdoorBandSize>(),
-            nameof(thresholds),
-            band => band.ToString());
-
-        if (normalized[OutdoorBandSize.Small] > normalized[OutdoorBandSize.Medium])
-            throw new ArgumentOutOfRangeException(nameof(thresholds), "Outdoor band thresholds must be non-decreasing from Small to Medium.");
-
-        if (normalized[OutdoorBandSize.Medium] > normalized[OutdoorBandSize.Large])
-            throw new ArgumentOutOfRangeException(nameof(thresholds), "Outdoor band thresholds must be non-decreasing from Medium to Large.");
-
-        return normalized;
     }
 
     private static Dictionary<TKey, int> NormalizeExactNonNegativeDictionary<TKey>(
@@ -139,19 +106,4 @@ public static class ConfigSnapshotFactory
 
         return normalized;
     }
-
-    private static IReadOnlyList<OutdoorPriceKey> ExpectedOutdoorPriceKeys() =>
-        (from service in TaskKindSets.OutdoorServices
-         from band in Enum.GetValues<OutdoorBandSize>()
-         select new OutdoorPriceKey(service, band)).ToList();
-
-    private static IReadOnlyList<AnimalBuildingPriceKey> ExpectedAnimalBuildingPriceKeys() =>
-        (from service in TaskKindSets.AnimalServices
-         from tier in Enum.GetValues<AnimalBuildingTier>()
-         select new AnimalBuildingPriceKey(service, tier)).ToList();
-
-    private static IReadOnlyList<GreenhousePriceKey> ExpectedGreenhousePriceKeys() =>
-        TaskKindSets.GreenhouseServices
-            .Select(service => new GreenhousePriceKey(service))
-            .ToList();
 }
