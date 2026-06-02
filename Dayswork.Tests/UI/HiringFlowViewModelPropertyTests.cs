@@ -62,7 +62,7 @@ public sealed class HiringFlowViewModelPropertyTests
                 var withoutDestinations = CreateDraft(selection, enabledTasks);
                 var withDestinations = CreateDraft(selection, enabledTasks);
                 foreach (var task in enabledTasks.Where(IsOutputTask))
-                    withDestinations.Destinations[task] = MailDestination.Instance;
+                    withDestinations.Destinations[task] = AutomaticOutputDestination.Instance;
 
                 var left = HiringFlowViewModelBuilder.Build(withoutDestinations, preview);
                 var right = HiringFlowViewModelBuilder.Build(withDestinations, preview);

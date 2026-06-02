@@ -9,7 +9,7 @@ public sealed record ShippingBinDestination : DestinationKey
     public static readonly ShippingBinDestination Instance = new();
 }
 
-public sealed record MailDestination : DestinationKey
+public sealed record AutomaticOutputDestination : DestinationKey
 {
-    public static readonly MailDestination Instance = new();
+    public static readonly AutomaticOutputDestination Instance = new();
 }

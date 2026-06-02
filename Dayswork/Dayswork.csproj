@@ -8,8 +8,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AssemblyName>Dayswork</AssemblyName>
     <RootNamespace>Dayswork</RootNamespace>
-    <!-- Required for BulletinBoardPatch (M-02) added in U-08 -->
-    <EnableHarmony>true</EnableHarmony>
     <!-- Auto-deploy built mod to <StardewModsPath>/Dayswork/ after each build -->
     <EnableModDeploy>true</EnableModDeploy>
     <!-- Release zip deferred until U-16 (v1 release candidate) -->
@@ -19,7 +17,7 @@
   <ItemGroup>
     <!--
       Pathoschild.Stardew.ModBuildConfig resolves the Stardew Valley install path
-      automatically and brings in SMAPI, StardewValley, and Harmony references.
+      automatically and brings in SMAPI and StardewValley references.
       Version 4.x targets SMAPI 4.x / Stardew 1.6.x (Q2 decision).
     -->
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.1.1" />
@@ -35,6 +33,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="i18n\default.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="assets\**\*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

@@ -370,7 +370,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
 
         _pickerOptions = new List<(string Label, DestinationKey Dest)>
         {
-            (I18nHelper.Get("ui.zone_chest.picker_mail_option"), MailDestination.Instance),
+            (I18nHelper.Get("ui.zone_chest.picker_automatic_output_option"), AutomaticOutputDestination.Instance),
         };
 
         if (ShippingBinEligible.Contains(task))
@@ -414,7 +414,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         foreach (var task in _enabledOutputTasks)
         {
             if (!_draft.Destinations.ContainsKey(task))
-                _draft.Destinations[task] = MailDestination.Instance;
+                _draft.Destinations[task] = AutomaticOutputDestination.Instance;
         }
 
         _onAdvance(_draft);
@@ -506,14 +506,14 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     private string GetDestinationLabel(TaskKind task)
     {
         if (!_outputAssignments.TryGetValue(task, out var destination))
-            return I18nHelper.Get("ui.zone_chest.no_chest_assigned");
+            return I18nHelper.Get("ui.zone_chest.automatic_output_label");
 
         return destination switch
         {
             ShippingBinDestination => I18nHelper.Get("ui.zone_chest.shipping_bin_option"),
             ChestDestination chest => _chestList.FirstOrDefault(entry => entry.Ref == chest.Ref)?.DisplayName
                                       ?? chest.Ref.ToString(),
-            _ => I18nHelper.Get("ui.zone_chest.no_chest_assigned"),
+            _ => I18nHelper.Get("ui.zone_chest.automatic_output_label"),
         };
     }
 

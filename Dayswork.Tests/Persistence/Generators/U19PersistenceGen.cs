@@ -81,7 +81,7 @@ public static class U19PersistenceGen
 
         var taskDestinations = new Dictionary<TaskKind, DestinationKey>
         {
-            [TaskKind.HarvestCrops] = MailDestination.Instance,
+            [TaskKind.HarvestCrops] = AutomaticOutputDestination.Instance,
             [TaskKind.CollectAnimalProducts] = ShippingBinDestination.Instance,
             [TaskKind.CutTrees] = new ChestDestination(new ChestRef("Farm", new TileCoord(8, 8))),
         };
@@ -174,7 +174,7 @@ public static class U19PersistenceGen
         Gen.OneOf(
             ChestDestinationGen().Select(destination => (DestinationKey)destination),
             Gen.Constant((DestinationKey)ShippingBinDestination.Instance),
-            Gen.Constant((DestinationKey)MailDestination.Instance));
+            Gen.Constant((DestinationKey)AutomaticOutputDestination.Instance));
 
     private static Gen<ChestDestination> ChestDestinationGen() =>
         from locationName in Gen.Elements("Farm", "Greenhouse", "Barn", "Coop")

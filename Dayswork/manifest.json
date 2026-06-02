@@ -8,10 +8,6 @@
   "EntryDll": "Dayswork.dll",
   "Dependencies": [
     {
-      "UniqueID": "DIGUS.MailFrameworkMod",
-      "MinimumVersion": "1.20.0"
-    },
-    {
       "UniqueID": "spacechase0.GenericModConfigMenu",
       "MinimumVersion": "1.16.0",
       "IsRequired": false

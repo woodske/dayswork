@@ -31,8 +31,8 @@ public sealed class ShiftContext
     public int RecoveryAttempts { get; set; }
 
     // The single sink for everything undeliverable this shift (Pattern O / FD-Q5/Q6=A):
-    // seeded with mail-bound items at planning, appended on chest-full/missing and on
-    // sleep-stop interruption, flushed to one settlement letter at exit or sleep.
+    // seeded with automatic-overflow items at planning, appended on chest-full/missing and on
+    // sleep-stop interruption, flushed through the shift outcome dispatcher at exit or sleep.
     public List<OverflowItem> Overflow { get; } = new();
     public ShiftStopReason? PendingStopReason { get; set; }
 

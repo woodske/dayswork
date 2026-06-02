@@ -4,8 +4,27 @@
 
 **Progress**:
 - ✅ **Workstream 1 COMPLETE** (energy-tier pricing + category priority + v3 persistence + hire UI + config plumbing). Whole solution builds; `dotnet test` = 343 passed / 0 failed / 1 skipped. Branch `u-25-worker-redesign`.
-- ⏳ Workstream 2 (building/chest/spawn/mail removal) — not started; gated on building art.
-- ⏳ Requirements-doc update for the FR-PAY supersession — not started.
+- ✅ **Requirements-doc amended** — see `requirements.md` §1.5 "U-25 Worker Redesign Amendment" (removed FR-PAY-03/04/05; superseded entry-point/mail/spawn/priority FRs; added FR-PAY-13/14, FR-PRIORITY-01, FR-HIRE-17, FR-OUT-06, FR-NOTIF-01, FR-WORK-20).
+- ✅ **Workstream 2 COMPLETE in code** (placeholder art); whole solution builds, `dotnet test` = 340 passed / 0 failed / 1 skipped:
+  - ✅ **Building** (`HiringBuilding`): `Data/Buildings` entry `Bindicle.Dayswork_Office`, buildable from Robin (5000g + wood/stone), 3×3, placeholder texture `assets/hq-building.png`. **Playtested** — places from Robin's menu.
+  - ✅ **Entry point** (`HiringBuildingInteraction`): action-click → `Coordinator.OpenFromBuilding()` (manage if a contract exists, else hire). SP-guarded. Replaces the bulletin board.
+  - ✅ **Static output chest**: built-in `BuildingData.Chests` entry `Bindicle.Dayswork_Output`; `HiringBuilding.TryGetOutputChest`.
+  - ✅ **Spawn/exit from door** (2B): `ShiftOrchestrator.ResolveSpawnExitTile` uses the building's human door, falling back to the old entrance heuristic only if no building.
+  - ✅ **Mail removed** (2C): `ShiftOutcomeDispatcher` deposits overflow into the office chest (fallback shipping bin) + HUD notices + direct festival-refund gold. `Integration/MailFramework/` deleted; **MFM dependency removed** from `manifest.json`.
+  - ✅ **Bulletin board removed** (2D): `BulletinBoardPatch`, `BulletinBoardInteractionPolicy` (+tests) deleted.
+  - ✅ **Output chest access fixed**: action-clicking the office chest display tile opens the built-in output chest; action-clicking the rest of the building opens hire/manage.
+  - ⚠️ **In-game verification still needed** for: the office chest (open/deposit), worker spawn/exit at the door, overflow-to-chest, HUD notices, and that hiring now works only via the building.
+
+### Known follow-up cleanup (non-blocking)
+- [x] Legacy mail naming removed: `IMailDispatcher`/`MailDispatcher` became `IShiftOutcomeDispatcher`/`ShiftOutcomeDispatcher`, and `MailDestination` became `AutomaticOutputDestination`.
+- [x] Stale i18n keys (`bulletin.*`, `mail.*`) and the lint test's now-dead `/Integration/MailFramework/` exclusion removed before playtesting.
+- [x] `EnableHarmony`/`PatchAll()` removed now that no Harmony patches are left.
+
+### Pre-playtest cleanup verification
+- [x] `dotnet build Dayswork.sln /p:EnableModDeploy=false` — 0 warnings / 0 errors.
+- [x] `dotnet test Dayswork.sln /p:EnableModDeploy=false` — 340 passed / 0 failed / 1 skipped.
+- [x] `dotnet build Dayswork.sln` — 0 warnings / 0 errors; deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
+- [x] Source search confirms no remaining Harmony setup, no `bulletin.*` / `mail.*` i18n keys, and no mail-named output/dispatcher classes.
 
 **Scope**: Replace per-scope pricing with purchased energy tiers; add player-ordered task-category priority; move hiring/contract terms onto a placeable farm building with a static item chest; spawn/exit the worker at the building door; remove the Mail Framework Mod dependency, the bulletin-board Harmony patch, and the farm-entrance heuristics.
 
@@ -104,7 +123,7 @@
 
 ### 2C. Remove mail -> chest + HUD
 
-- **Delete**: `MailDispatcher`(+`IMailDispatcher`), `Integration/MailFramework/` (adapter + records), the `Dayswork.PendingSettlements` save-data flow, MFM dependency in `manifest.json`.
+- **Replace/delete**: legacy mail dispatcher types, `Integration/MailFramework/` (adapter + records), the `Dayswork.PendingSettlements` save-data flow, MFM dependency in `manifest.json`.
 - **Reroute**: overflow/missed items -> static chest (promote the existing shipping-bin fallback to the primary path, retargeted at the chest). Text notices (cannot-afford, needs-attention, festival) -> `Game1.addHUDMessage`. Festival one-time refund -> direct `Money` credit.
 - Touch points: `RecurringContractScheduler` (notice calls), `ShiftOrchestrator` (settlement/overflow), `CalendarHandlers`.
 

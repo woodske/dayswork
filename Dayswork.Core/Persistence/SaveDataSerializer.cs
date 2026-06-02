@@ -310,7 +310,7 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
                 Y = chest.Ref.Tile.Y,
             },
             ShippingBinDestination => new DestinationDtoV1 { Type = "ShippingBin" },
-            MailDestination => new DestinationDtoV1 { Type = "Mail" },
+            AutomaticOutputDestination => new DestinationDtoV1 { Type = "AutomaticOutput" },
             _ => throw new JsonException($"Unknown DestinationKey type: {destination.GetType().Name}"),
         };
 
@@ -323,7 +323,8 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
                     dto.X ?? throw new JsonException("Chest destination missing X."),
                     dto.Y ?? throw new JsonException("Chest destination missing Y.")))),
             "ShippingBin" => ShippingBinDestination.Instance,
-            "Mail" => MailDestination.Instance,
+            "AutomaticOutput" => AutomaticOutputDestination.Instance,
+            "Mail" => AutomaticOutputDestination.Instance,
             _ => throw new JsonException($"Unknown destination type: '{dto.Type}'."),
         };
 

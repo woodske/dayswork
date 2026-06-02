@@ -69,6 +69,15 @@ internal sealed class HiringFlowCoordinator
         Game1.activeClickableMenu = new ContractListMenu(_contractStore, _helper);
     }
 
+    /// <summary>Entry point from the hiring building's tile action: manage an existing contract, else hire.</summary>
+    public void OpenFromBuilding()
+    {
+        if (_contractStore.List().Any(c => c.Status is ContractStatus.Active or ContractStatus.Paused))
+            OpenManageFlow();
+        else
+            OpenHiringFlow();
+    }
+
     private void ShowTaskSelection(ContractDraft draft)
     {
         Game1.activeClickableMenu = new TaskSelectionMenu(

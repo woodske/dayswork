@@ -113,9 +113,9 @@ public class ZoneGeometryTests
     }
 
     [Fact]
-    public void MailDestination_DifferentFromShippingBin()
+    public void AutomaticOutputDestination_DifferentFromShippingBin()
     {
-        Assert.NotEqual<DestinationKey>(MailDestination.Instance, ShippingBinDestination.Instance);
+        Assert.NotEqual<DestinationKey>(AutomaticOutputDestination.Instance, ShippingBinDestination.Instance);
     }
 
     // ── PBT-02: Zone JSON round-trip ─────────────────────────────────────────
