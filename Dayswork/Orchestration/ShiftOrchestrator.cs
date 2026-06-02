@@ -49,7 +49,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     private readonly ToolLevelReader      _toolReader;
     private readonly ToolSwapAnimator     _toolAnimator;
-    private readonly ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
+    // Rebuilt per shift from the active contract's player-defined category priority (see StartShift).
+    private ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
     private readonly ShiftPlanBuilder     _shiftPlanBuilder = new();
     private readonly IWorkScopeClassifier _scopeClassifier;
     private IConfigSnapshot               _config;
@@ -60,7 +61,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private readonly BuildingWorkNavigator _buildingNavigator;
     private readonly ChestResolver        _chestResolver;
     private readonly IDepositPlanner      _depositPlanner;
-    private readonly IMailDispatcher      _mailDispatcher;
+    private readonly IShiftOutcomeDispatcher _shiftOutcomeDispatcher;
     private readonly WorkerEnergyLedger _energyLedger = new();
     private readonly WorkUnitBoundaryClassifier _boundaryClassifier = new();
     private readonly OverflowCategorizer _overflowCategorizer = new();
@@ -155,7 +156,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         BuildingWorkNavigator buildingNavigator,
         ChestResolver chestResolver,
         IDepositPlanner depositPlanner,
-        IMailDispatcher mailDispatcher)
+        IShiftOutcomeDispatcher shiftOutcomeDispatcher)
     {
         _toolReader        = toolReader;
         _config            = config;
@@ -168,13 +169,30 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         _buildingNavigator = buildingNavigator;
         _chestResolver     = chestResolver;
         _depositPlanner    = depositPlanner;
-        _mailDispatcher    = mailDispatcher;
+        _shiftOutcomeDispatcher = shiftOutcomeDispatcher;
         _expansionRouteNavigator = new CrossLocationRouteNavigator(nav);
         _stuck             = new StuckDetector(config.StuckInitialWaitMinutes);
     }
 
     private static int Manhattan(TileCoord a, TileCoord b) =>
         Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
+
+    /// <summary>
+    /// The worker spawns at 6am and exits end-of-day at the hiring building's door (U-25 WS2).
+    /// Falls back to the farm-entrance heuristic only if no hiring building is present (e.g. the
+    /// building was demolished while a contract persisted).
+    /// </summary>
+    private static TileCoord ResolveSpawnExitTile(Farm farm)
+    {
+        var building = HiringBuildingInteraction.FindHiringBuilding(farm);
+        if (building is not null)
+        {
+            var door = building.getPointForHumanDoor();
+            return ResolvePassableNearby(new TileCoord(door.X, door.Y + 1), farm);
+        }
+
+        return FindFarmExitTile(farm);
+    }
 
     /// <summary>
     /// Locates the best navigable approach tile for the farm's external exit by scanning
@@ -477,6 +495,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         _config = runtimeConfig;
+        _priorityOrderer = new TaskPriorityOrderer(contract.CategoryPriority);
         var contractTerms = contract.TermsSnapshot;
         var energyState = _energyLedger.StartShift(contractTerms.Energy);
         var pacingProfile = WorkerPacingProfile.FromConfig(runtimeConfig);
@@ -486,7 +505,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
         var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks);
 
-        _farmExitTile = FindFarmExitTile(farm);
+        _farmExitTile = ResolveSpawnExitTile(farm);
         var batches = BuildInitialBatches(contract, workScopes, farm, snapshot);
 
         if (batches.Count == 0 ||
@@ -1655,8 +1674,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     }
 
     // Called by CalendarHandlers.OnSavingHook when the player sleeps. v1 treats sleep as a hard stop:
-    // no remaining tasks run headlessly, but collected/undelivered items are settled (mailed) before
-    // contracts persist and the day rolls over. U-21 BR-SLEEP-02 removed refund semantics from this path.
+    // no remaining tasks run headlessly, but collected/undelivered items are delivered through
+    // automatic overflow before contracts persist and the day rolls over. U-21 BR-SLEEP-02 removed
+    // refund semantics from this path.
     public void StopForSleepAndSettle()
     {
         if (_ctx is null)
@@ -1675,11 +1695,12 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                 LogLevel.Info);
         }
 
-        // Mail every collected-but-undelivered item next morning; do not run remaining tasks or dump to bin.
+        // Route every collected-but-undelivered item through automatic overflow; do not run
+        // remaining tasks or dump directly to the bin.
         AppendUndeliveredToOverflow();
 
         _ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
-        SettleShiftMail();
+        DispatchShiftOverflow();
 
         ClearWorker();
         _ctx = null;
@@ -2107,7 +2128,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
         // First arrival at the trip's stand tile: open the chest visually (if applicable),
         // resolve mutex/liveness, and start the first beat. The mutex/missing-chest paths
-        // already mail the items inside BeginTripExecution and return false so we skip the loop.
+        // already route the items to overflow inside BeginTripExecution and return false so we skip the loop.
         if (!_currentTripExecutionStarted)
         {
             if (!BeginTripExecution(_currentTrip, _currentLocation ?? farm))
@@ -2227,23 +2248,23 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             var chest = _chestResolver.ResolveChest(chestDest.Ref);
             if (chest is null)
             {
-                // Chest moved/destroyed (FR-OUT-03): everything for it mails (ChestMissing).
+                // Chest moved/destroyed (FR-OUT-03): everything for it goes to automatic overflow.
                 foreach (var stack in trip.Items)
                     _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
                 ModEntry.ModMonitor.Log(
-                    $"[Dayswork][deposit] chest missing at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) → mail.",
+                    $"[Dayswork][deposit] chest missing at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) routed to automatic overflow.",
                     LogLevel.Trace);
                 return false;
             }
 
             if (chest.GetMutex().IsLocked())
             {
-                // A farmer (player) has the chest UI open. Defer the whole trip to mail
+                // A farmer (player) has the chest UI open. Defer the whole trip to overflow
                 // rather than mutating items behind the player's back.
                 foreach (var stack in trip.Items)
                     _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestBusy));
                 ModEntry.ModMonitor.Log(
-                    $"[Dayswork][deposit] chest busy at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) → mail.",
+                    $"[Dayswork][deposit] chest busy at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) routed to automatic overflow.",
                     LogLevel.Trace);
                 return false;
             }
@@ -2279,14 +2300,14 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (_currentTripChest is { } chest)
         {
             // Re-check the mutex per stack: if the player just opened the chest UI in the
-            // middle of our deposit, abort the rest of the trip and mail what remains.
+            // middle of our deposit, abort the rest of the trip and route what remains to overflow.
             if (chest.GetMutex().IsLocked())
             {
                 for (var i = _currentTripStackIndex; i < _currentTrip.Items.Count; i++)
                     _ctx.Overflow.Add(new OverflowItem(_currentTrip.Items[i], OverflowReason.ChestBusy));
                 _currentTripStackIndex = _currentTrip.Items.Count;  // skip ahead to "trip complete"
                 ModEntry.ModMonitor.Log(
-                    $"[Dayswork][deposit] chest became busy mid-trip; remaining stacks → mail.",
+                    $"[Dayswork][deposit] chest became busy mid-trip; remaining stacks routed to automatic overflow.",
                     LogLevel.Trace);
                 return;
             }
@@ -2357,7 +2378,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][deposit] could not reach deposit destination at ({trip.Tile.X},{trip.Tile.Y}); mailing {trip.Items.Count} stack(s).",
+            $"[Dayswork][deposit] could not reach deposit destination at ({trip.Tile.X},{trip.Tile.Y}); routing {trip.Items.Count} stack(s) to automatic overflow.",
             LogLevel.Warn);
     }
 
@@ -2385,12 +2406,12 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var leftover = chest.addItem(item);
         if (leftover is not null && leftover.Stack > 0)
         {
-            // Chest full (FR-OUT-02): mail the remainder (ChestFull).
+            // Chest full (FR-OUT-02): route the remainder to automatic overflow.
             _ctx!.Overflow.Add(new OverflowItem(
                 new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance),
                 OverflowReason.ChestFull));
             ModEntry.ModMonitor.Log(
-                $"[Dayswork][deposit] chest full; {leftover.Stack}x {stack.QualifiedItemId} → mail.",
+                $"[Dayswork][deposit] chest full; {leftover.Stack}x {stack.QualifiedItemId} routed to automatic overflow.",
                 LogLevel.Trace);
         }
     }
@@ -2428,7 +2449,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             LogLevel.Info);
 
         // One settlement letter next morning for overflow items only; U-21 removes refund settlement.
-        SettleShiftMail();
+        DispatchShiftOverflow();
 
         ClearWorker();
         _ctx.StateMachine.Transition(ShiftPhase.Done);
@@ -2481,8 +2502,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             workerTile,
             Manhattan);
 
-        // Items resolved straight to mail are seeded into the overflow set (Pattern O / FD-Q2=A).
-        foreach (var stack in plan.PreMailedOverflow)
+        // Items resolved straight to automatic delivery are seeded into the overflow set (Pattern O / FD-Q2=A).
+        foreach (var stack in plan.AutomaticOverflow)
             _ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NoChestAssigned));
 
         // The buffer is now consumed into the plan; clear it so nothing is double-counted.
@@ -2681,12 +2702,12 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     private static bool BatchRequiresInteriorEntry(WorkBatch batch) =>
         batch.Kind is BatchKind.AnimalBuilding or BatchKind.Greenhouse;
 
-    // ── Overflow / mail helpers (Pattern O) ───────────────────────────────────
+    // ── Overflow delivery helpers (Pattern O) ────────────────────────────────
 
-    // One settlement letter per shift carrying any overflow items. Sends nothing when there are
-    // no overflow items (Pattern U). U-21 BR-END-03 removed the shift-end refund settlement —
-    // the player already paid the contract price for the day.
-    private void SettleShiftMail()
+    // One shift-end dispatch for any overflow items. Sends nothing when there are no overflow
+    // items (Pattern U). U-21 BR-END-03 removed the shift-end refund settlement — the player
+    // already paid the contract price for the day.
+    private void DispatchShiftOverflow()
     {
         if (_ctx is null) return;
 
@@ -2695,7 +2716,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             : Array.Empty<ItemStack>();
         var categories = _overflowCategorizer.Categorize(_ctx.Overflow);
 
-        _mailDispatcher.QueueSettlement(items, categories);
+        _shiftOutcomeDispatcher.DispatchOverflowDelivery(items, categories);
         _ctx.Overflow.Clear();
     }
 

@@ -13,9 +13,7 @@ internal static class U18BuilderFactory
         var resolver = CreateResolver();
         return new ContractTermsBuilder(
             new WorkScopeClassifier(),
-            new OutdoorServiceBandClassifier(resolver),
-            new ContractPriceCalculator(resolver),
-            new PriceBreakdownBuilder(resolver),
-            new WorkerEnergyProfileBuilder(resolver));
+            new WorkerEnergyProfileBuilder(resolver),
+            resolver);
     }
 }

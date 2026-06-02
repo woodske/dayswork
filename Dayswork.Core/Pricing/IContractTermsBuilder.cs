@@ -8,10 +8,12 @@ public interface IContractTermsBuilder
     ContractTermsSnapshot BuildTerms(
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
+        EnergyTier tier,
         IConfigSnapshot config);
 
     ContractPreview BuildPreview(
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
+        EnergyTier tier,
         IConfigSnapshot config);
 }

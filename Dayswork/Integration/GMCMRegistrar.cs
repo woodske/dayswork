@@ -8,8 +8,7 @@ internal sealed class GMCMRegistrar
 {
     private const string GmcmUniqueId = "spacechase0.GenericModConfigMenu";
 
-    private static readonly IReadOnlyList<OutdoorBandSize> OutdoorBandOrder = Enum.GetValues<OutdoorBandSize>();
-    private static readonly IReadOnlyList<AnimalBuildingTier> AnimalTierOrder = Enum.GetValues<AnimalBuildingTier>();
+    private static readonly IReadOnlyList<EnergyTier> EnergyTierOrder = Enum.GetValues<EnergyTier>();
     private static readonly IReadOnlyList<WorkActionKind> WorkActionOrder = Enum.GetValues<WorkActionKind>();
 
     private readonly IModHelper _helper;
@@ -43,100 +42,33 @@ internal sealed class GMCMRegistrar
             () => I18nHelper.Get("gmcm.section.pricing.name"),
             () => I18nHelper.Get("gmcm.section.pricing.tooltip"));
 
-        foreach (var band in OutdoorBandOrder)
+        foreach (var tier in EnergyTierOrder)
         {
-            // Skip the Large threshold slider: the classifier's final fall-through returns
-            // Large for any tile count above the Medium threshold (see
-            // OutdoorServiceBandClassifier.ClassifyBand line 49), so a Large ceiling has no
-            // effect on classification today. Bring this back if/when a "Huge" band is added.
-            if (band == OutdoorBandSize.Large)
-                continue;
+            var encodedKey = ContractTermsConfigKeyCodec.EncodeEnergyTierKey(tier);
 
-            var encodedKey = ContractTermsConfigKeyCodec.EncodeOutdoorBandKey(band);
             RegisterIntOption(
                 api,
                 new IntOptionSpec(
-                    () => _config.Editable.OutdoorBandThresholds[encodedKey],
-                    value => _config.Editable.OutdoorBandThresholds[encodedKey] = value,
-                    () => I18nHelper.Get("gmcm.pricing.outdoor_threshold.name", new { band = OutdoorBandLabel(band) }),
-                    () => I18nHelper.Get("gmcm.pricing.outdoor_threshold.tooltip", new { band = OutdoorBandLabel(band) }),
+                    () => _config.Editable.EnergyTierEnergy[encodedKey],
+                    value => _config.Editable.EnergyTierEnergy[encodedKey] = value,
+                    () => I18nHelper.Get("gmcm.pricing.tier_energy.name", new { tier = EnergyTierLabel(tier) }),
+                    () => I18nHelper.Get("gmcm.pricing.tier_energy.tooltip", new { tier = EnergyTierLabel(tier) }),
                     1,
-                    2000,
-                    1,
-                    $"pricing-outdoor-threshold-{BandKey(band)}"));
-        }
+                    1000,
+                    10,
+                    $"pricing-tier-energy-{EnergyTierKey(tier)}"));
 
-        foreach (var service in TaskKindSets.OutdoorServices)
-        {
-            foreach (var band in OutdoorBandOrder)
-            {
-                var key = new OutdoorPriceKey(service, band);
-                var encodedKey = ContractTermsConfigKeyCodec.EncodeOutdoorPriceKey(key);
-                RegisterIntOption(
-                    api,
-                    new IntOptionSpec(
-                        () => _config.Editable.OutdoorServiceBandPrices[encodedKey],
-                        value => _config.Editable.OutdoorServiceBandPrices[encodedKey] = value,
-                        () => I18nHelper.Get("gmcm.pricing.outdoor_price.name", new
-                        {
-                            service = TaskLabel(service),
-                            band = OutdoorBandLabel(band),
-                        }),
-                        () => I18nHelper.Get("gmcm.pricing.outdoor_price.tooltip", new
-                        {
-                            service = TaskLabel(service),
-                            band = OutdoorBandLabel(band),
-                        }),
-                        0,
-                        2000,
-                        5,
-                        $"pricing-outdoor-{TaskKey(service)}-{BandKey(band)}"));
-            }
-        }
-
-        foreach (var service in TaskKindSets.AnimalServices)
-        {
-            foreach (var tier in AnimalTierOrder)
-            {
-                var key = new AnimalBuildingPriceKey(service, tier);
-                var encodedKey = ContractTermsConfigKeyCodec.EncodeAnimalBuildingPriceKey(key);
-                RegisterIntOption(
-                    api,
-                    new IntOptionSpec(
-                        () => _config.Editable.AnimalBuildingPrices[encodedKey],
-                        value => _config.Editable.AnimalBuildingPrices[encodedKey] = value,
-                        () => I18nHelper.Get("gmcm.pricing.animal_price.name", new
-                        {
-                            service = TaskLabel(service),
-                            tier = AnimalTierLabel(tier),
-                        }),
-                        () => I18nHelper.Get("gmcm.pricing.animal_price.tooltip", new
-                        {
-                            service = TaskLabel(service),
-                            tier = AnimalTierLabel(tier),
-                        }),
-                        0,
-                        2000,
-                        5,
-                        $"pricing-animal-{TaskKey(service)}-{AnimalTierKey(tier)}"));
-            }
-        }
-
-        foreach (var service in TaskKindSets.GreenhouseServices)
-        {
-            var key = new GreenhousePriceKey(service);
-            var encodedKey = ContractTermsConfigKeyCodec.EncodeGreenhousePriceKey(key);
             RegisterIntOption(
                 api,
                 new IntOptionSpec(
-                    () => _config.Editable.GreenhouseServicePrices[encodedKey],
-                    value => _config.Editable.GreenhouseServicePrices[encodedKey] = value,
-                    () => I18nHelper.Get("gmcm.pricing.greenhouse_price.name", new { service = TaskLabel(service) }),
-                    () => I18nHelper.Get("gmcm.pricing.greenhouse_price.tooltip", new { service = TaskLabel(service) }),
+                    () => _config.Editable.EnergyTierPrice[encodedKey],
+                    value => _config.Editable.EnergyTierPrice[encodedKey] = value,
+                    () => I18nHelper.Get("gmcm.pricing.tier_price.name", new { tier = EnergyTierLabel(tier) }),
+                    () => I18nHelper.Get("gmcm.pricing.tier_price.tooltip", new { tier = EnergyTierLabel(tier) }),
                     0,
-                    2000,
-                    5,
-                    $"pricing-greenhouse-{TaskKey(service)}"));
+                    100000,
+                    10,
+                    $"pricing-tier-price-{EnergyTierKey(tier)}"));
         }
     }
 
@@ -146,18 +78,6 @@ internal sealed class GMCMRegistrar
             _manifest,
             () => I18nHelper.Get("gmcm.section.stamina.name"),
             () => I18nHelper.Get("gmcm.section.stamina.tooltip"));
-
-        RegisterIntOption(
-            api,
-            new IntOptionSpec(
-                () => _config.Editable.WorkerDailyEnergyCapacity,
-                value => _config.Editable.WorkerDailyEnergyCapacity = value,
-                () => I18nHelper.Get("gmcm.stamina.daily_capacity.name"),
-                () => I18nHelper.Get("gmcm.stamina.daily_capacity.tooltip"),
-                1,
-                1000,
-                5,
-                "stamina-daily-capacity"));
 
         foreach (var action in WorkActionOrder)
         {
@@ -284,45 +204,15 @@ internal sealed class GMCMRegistrar
             fieldId: option.FieldId);
     }
 
-    private static string TaskLabel(TaskKind task) => I18nHelper.Get($"ui.task_selection.{TaskKey(task)}");
-
-    private static string OutdoorBandLabel(OutdoorBandSize band) => I18nHelper.Get($"gmcm.common.band.{BandKey(band)}");
-
-    private static string AnimalTierLabel(AnimalBuildingTier tier) => I18nHelper.Get($"gmcm.common.tier.{AnimalTierKey(tier)}");
+    private static string EnergyTierLabel(EnergyTier tier) => I18nHelper.Get($"gmcm.common.tier.{EnergyTierKey(tier)}");
 
     private static string WorkActionLabel(WorkActionKind action) => I18nHelper.Get($"gmcm.common.action.{WorkActionKey(action)}");
 
-    private static string TaskKey(TaskKind task) => task switch
+    private static string EnergyTierKey(EnergyTier tier) => tier switch
     {
-        TaskKind.WaterCrops => "water_crops",
-        TaskKind.HarvestCrops => "harvest_crops",
-        TaskKind.CollectFruit => "collect_fruit",
-        TaskKind.FeedAnimals => "feed_animals",
-        TaskKind.PetAnimals => "pet_animals",
-        TaskKind.CollectAnimalProducts => "collect_animal_products",
-        TaskKind.CutTrees => "cut_trees",
-        TaskKind.ClearRocks => "clear_rocks",
-        TaskKind.ClearWeeds => "clear_weeds",
-        TaskKind.ClearGrass => "clear_grass",
-        _ => throw new ArgumentOutOfRangeException(nameof(task), task, null),
-    };
-
-    private static string BandKey(OutdoorBandSize band) => band switch
-    {
-        OutdoorBandSize.Small => "small",
-        OutdoorBandSize.Medium => "medium",
-        OutdoorBandSize.Large => "large",
-        _ => throw new ArgumentOutOfRangeException(nameof(band), band, null),
-    };
-
-    private static string AnimalTierKey(AnimalBuildingTier tier) => tier switch
-    {
-        AnimalBuildingTier.Coop => "coop",
-        AnimalBuildingTier.BigCoop => "big_coop",
-        AnimalBuildingTier.DeluxeCoop => "deluxe_coop",
-        AnimalBuildingTier.Barn => "barn",
-        AnimalBuildingTier.BigBarn => "big_barn",
-        AnimalBuildingTier.DeluxeBarn => "deluxe_barn",
+        EnergyTier.HalfDay => "half_day",
+        EnergyTier.FullDay => "full_day",
+        EnergyTier.Overtime => "overtime",
         _ => throw new ArgumentOutOfRangeException(nameof(tier), tier, null),
     };
 

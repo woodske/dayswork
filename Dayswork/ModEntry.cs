@@ -11,7 +11,6 @@ using Dayswork.Integration;
 using Dayswork.Orchestration;
 using Dayswork.UI;
 using Dayswork.Worker;
-using HarmonyLib;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -42,10 +41,8 @@ public sealed class ModEntry : Mod
         var workScopeClassifier = new WorkScopeClassifier();
         var contractTermsBuilder = new ContractTermsBuilder(
             workScopeClassifier,
-            new OutdoorServiceBandClassifier(configResolver),
-            new ContractPriceCalculator(configResolver),
-            new PriceBreakdownBuilder(configResolver),
-            new WorkerEnergyProfileBuilder(configResolver));
+            new WorkerEnergyProfileBuilder(configResolver),
+            configResolver);
         var recurringDecisionEngine = new RecurringDayStartDecisionEngine(contractTermsBuilder);
         var store       = new ContractStore(logWarning);
         var serializer  = new SaveDataSerializer(logWarning);
@@ -53,6 +50,7 @@ public sealed class ModEntry : Mod
         // ── Mod singletons ───────────────────────────────────────────────────
         var chestResolver = new ChestResolver(Helper);
         Coordinator = new HiringFlowCoordinator(contractTermsBuilder, configManager, store, chestResolver, Helper);
+        var buildingInteraction = new HiringBuildingInteraction(helper);
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
@@ -64,11 +62,9 @@ public sealed class ModEntry : Mod
         var buildingNavigator = new BuildingWorkNavigator(this.Monitor, movementDriver);
         var depositPlanner  = new DepositPlanner();
         var playerTileStepLogger = new PlayerTileStepLogger(this.Monitor);
-        // MFM is a required dependency (manifest). Mod-provided APIs must be fetched after all mods
-        // initialize (GameLaunched), NOT in Entry() — so construct the dispatcher now and inject the
-        // API on GameLaunched below. If it's ever null, MailDispatcher logs and falls back so no
-        // items are lost (REL-U14-05).
-        var mailDispatcher  = new MailDispatcher(helper.Data);
+        // U-25 WS2: missed/overflow items are deposited into the hiring building's static chest and
+        // notices are shown as HUD messages — no Mail Framework Mod, no mailbox delivery.
+        var shiftOutcomeDispatcher = new ShiftOutcomeDispatcher();
         var orchestrator    = new ShiftOrchestrator(
             toolReader,
             config,
@@ -81,12 +77,12 @@ public sealed class ModEntry : Mod
             buildingNavigator,
             chestResolver,
             depositPlanner,
-            mailDispatcher);
+            shiftOutcomeDispatcher);
         Orchestrator = orchestrator;
         var sessionResetHandler = new SessionResetHandler(orchestrator);
         var calendarHandlers = new CalendarHandlers(orchestrator);
         var scheduler       = new RecurringContractScheduler(
-            store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, mailDispatcher);
+            store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, shiftOutcomeDispatcher);
         var gmcmRegistrar = new GMCMRegistrar(helper, this.ModManifest, configManager);
 
         // ── Expansion compatibility (U-SVE-01) ───────────────────────────────
@@ -101,10 +97,9 @@ public sealed class ModEntry : Mod
         ExpansionCompat = expansionCompat;
 
         // ── Event registrations ──────────────────────────────────────────────
-        // Fetch the MFM API after all mods are initialised (never in Entry()).
+        // Register optional integrations after all mods are initialised.
         helper.Events.GameLoop.GameLaunched += (_, _) =>
         {
-            mailDispatcher.SetApi(helper.ModRegistry.GetApi("DIGUS.MailFrameworkMod"));
             gmcmRegistrar.RegisterIfAvailable();
             expansionCompat.SetActiveProfile(expansionDetector.ResolveActiveProfile());
         };
@@ -112,9 +107,8 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.ReturnedToTitle += (_, _) => playerTileStepLogger.Reset();
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
-        helper.Events.GameLoop.SaveLoaded   += mailDispatcher.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += (_, _) => playerTileStepLogger.Reset();
-        // Stop and settle any in-flight shift (sleep-stop + mailed overflow items) BEFORE contracts
+        // Stop and settle any in-flight shift (sleep-stop + overflow delivery) BEFORE contracts
         // persist and before the day rolls over — handler order is authoritative (Pattern S /
         // REL-U15-02). U-21 BR-END-03 / BR-SLEEP-02 removed refund settlement from this path.
         helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;
@@ -124,9 +118,7 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;
         helper.Events.GameLoop.TimeChanged  += orchestrator.OnTimeChanged;
         helper.Events.Content.AssetRequested += OnAssetRequested;
-
-        // ── Harmony patches ──────────────────────────────────────────────────
-        new Harmony(this.ModManifest.UniqueID).PatchAll();
+        helper.Events.Input.ButtonPressed += buildingInteraction.OnButtonPressed;
 
         // TODO: REMOVE before release — debug command for verifying save/load persistence (task #1 play-test)
         RegisterDebugCommands(helper, store, playerTileStepLogger);
@@ -142,6 +134,9 @@ public sealed class ModEntry : Mod
             e.LoadFrom(
                 () => Game1.content.Load<Texture2D>(FarmhandNpc.PlaceholderPortraitPath),
                 AssetLoadPriority.Medium);
+
+        // The hiring building's texture + Data/Buildings entry (U-25 WS2).
+        HiringBuilding.OnAssetRequested(e, this.Helper);
     }
 
     // TODO: REMOVE before release — see RegisterDebugCommands call above

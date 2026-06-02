@@ -6,21 +6,9 @@ internal static class HiringFlowViewModelBuilder
 {
     public static DraftPreviewState Build(ContractDraft draft, ContractPreview preview)
     {
-        var lineItemsByService = (preview.ProposedTerms?.Pricing.LineItems ?? Array.Empty<PricingLineItem>())
-            .GroupBy(line => line.Service)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyList<PricingLineItem>)group
-                    .OrderBy(line => line.Family)
-                    .ThenBy(line => line.OutdoorBand)
-                    .ThenBy(line => line.AnimalTier)
-                    .ThenBy(line => line.LineTotal)
-                    .ToList()
-                    .AsReadOnly());
-
         var serviceRows = TaskPresentation.TaskOrder
             .Where(draft.EnabledTasks.Contains)
-            .Select(task => BuildServiceRow(draft, task, lineItemsByService))
+            .Select(task => BuildServiceRow(draft, task))
             .ToList()
             .AsReadOnly();
 
@@ -46,6 +34,8 @@ internal static class HiringFlowViewModelBuilder
             ScopeSummary: scopeSummary,
             Pricing: preview.ProposedTerms?.Pricing,
             WorkerEnergy: preview.ProposedTerms?.Energy,
+            Tier: draft.Tier,
+            CategoryPriority: draft.CategoryPriority.ToList().AsReadOnly(),
             PaymentTimingKind: DeterminePaymentTiming(draft),
             ValidationMessages: validationMessages,
             CanConfirm: preview.IsValid);
@@ -57,36 +47,28 @@ internal static class HiringFlowViewModelBuilder
             ReviewModel: reviewModel);
     }
 
-    private static ServiceContributionRow BuildServiceRow(
-        ContractDraft draft,
-        TaskKind task,
-        IReadOnlyDictionary<TaskKind, IReadOnlyList<PricingLineItem>> lineItemsByService)
+    private static ServiceContributionRow BuildServiceRow(ContractDraft draft, TaskKind task)
     {
-        if (lineItemsByService.TryGetValue(task, out var pricingLines))
-        {
-            return new ServiceContributionRow(
-                Service: task,
-                RowState: ServiceContributionState.Charged,
-                PricingLines: pricingLines,
-                DisplayAmount: pricingLines.Sum(line => line.LineTotal));
-        }
-
-        return new ServiceContributionRow(
-            Service: task,
-            RowState: DetermineMissingScopeState(draft, task),
-            PricingLines: Array.Empty<PricingLineItem>(),
-            DisplayAmount: null);
+        var state = DetermineMissingScopeState(draft, task);
+        return new ServiceContributionRow(task, state);
     }
 
+    // A service is "Charged" (will be worked) when its scope family has a matching selection;
+    // otherwise it reports which scope is missing.
     private static ServiceContributionState DetermineMissingScopeState(ContractDraft draft, TaskKind task)
     {
         if (TaskKindSets.IsAnimalService(task))
-            return ServiceContributionState.NeedsAnimalBuildingScope;
+            return draft.AnimalBuildings.Count > 0
+                ? ServiceContributionState.Charged
+                : ServiceContributionState.NeedsAnimalBuildingScope;
 
-        if (TaskKindSets.IsOutdoorService(task) && draft.OutdoorZones.Count == 0)
-            return ServiceContributionState.NeedsOutdoorScope;
+        if (TaskKindSets.IsOutdoorService(task) && draft.OutdoorZones.Count > 0)
+            return ServiceContributionState.Charged;
 
-        if (TaskKindSets.IsGreenhouseService(task) && draft.Greenhouses.Count == 0)
+        if (TaskKindSets.IsGreenhouseService(task) && draft.Greenhouses.Count > 0)
+            return ServiceContributionState.Charged;
+
+        if (TaskKindSets.IsGreenhouseService(task) && !TaskKindSets.IsOutdoorService(task))
             return ServiceContributionState.NeedsGreenhouseScope;
 
         return ServiceContributionState.NeedsOutdoorScope;

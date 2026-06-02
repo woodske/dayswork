@@ -10,7 +10,8 @@ public class TaskPriorityOrdererTests
 {
     private readonly ITaskPriorityOrderer _sut = new TaskPriorityOrderer();
 
-    // FR-WORK-03 expected order for reference in tests
+    // Default category priority [AnimalCare, Crops, Fieldwork], with tasks ordered by enum value
+    // within each category (the within-category tie-break in TaskPriorityOrderer.Order).
     private static readonly TaskKind[] Fr_Work_03_Order = new[]
     {
         TaskKind.FeedAnimals,
@@ -19,10 +20,10 @@ public class TaskPriorityOrdererTests
         TaskKind.WaterCrops,
         TaskKind.HarvestCrops,
         TaskKind.CollectFruit,
+        TaskKind.CutTrees,
+        TaskKind.ClearRocks,
         TaskKind.ClearWeeds,
         TaskKind.ClearGrass,
-        TaskKind.ClearRocks,
-        TaskKind.CutTrees,
     };
 
     // ── Fact tests ───────────────────────────────────────────────────────────

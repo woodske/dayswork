@@ -18,7 +18,7 @@ public sealed class RecurringDayStartDecisionEngine
         bool festivalToday,
         int availableGold)
     {
-        var preview = _termsBuilder.BuildPreview(contract.ScopeSelection, contract.EnabledTasks, config);
+        var preview = _termsBuilder.BuildPreview(contract.ScopeSelection, contract.EnabledTasks, contract.Tier, config);
         if (!preview.IsValid || preview.ProposedTerms is null)
         {
             return new RecurringDayStartOutcome(

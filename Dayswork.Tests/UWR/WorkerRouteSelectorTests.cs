@@ -21,14 +21,28 @@ public sealed class WorkerRouteSelectorTests
     }
 
     [Fact]
-    public void Equal_route_cost_uses_task_priority()
+    public void Equal_route_cost_uses_category_priority()
     {
-        var product = Candidate(1, TaskKind.CollectAnimalProducts, routeCost: 4, stableOrder: 0);
-        var pet = Candidate(2, TaskKind.PetAnimals, routeCost: 4, stableOrder: 1);
+        // FeedAnimals is in AnimalCare (default rank 0); WaterCrops is in Crops (rank 1).
+        // With equal route cost, the higher-priority category wins.
+        var crops = Candidate(1, TaskKind.WaterCrops, routeCost: 4, stableOrder: 0);
+        var animal = Candidate(2, TaskKind.FeedAnimals, routeCost: 4, stableOrder: 1);
 
-        var selected = _selector.Select(new[] { product, pet });
+        var selected = _selector.Select(new[] { crops, animal });
 
-        Assert.Equal(pet, selected);
+        Assert.Equal(animal, selected);
+    }
+
+    [Fact]
+    public void Higher_priority_category_wins_over_nearer_lower_priority()
+    {
+        // Category priority is strict: a far AnimalCare task beats a near Fieldwork task.
+        var nearFieldwork = Candidate(1, TaskKind.ClearWeeds, routeCost: 1, stableOrder: 0);
+        var farAnimal = Candidate(2, TaskKind.FeedAnimals, routeCost: 9, stableOrder: 1);
+
+        var selected = _selector.Select(new[] { nearFieldwork, farAnimal });
+
+        Assert.Equal(farAnimal, selected);
     }
 
     [Fact]

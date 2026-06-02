@@ -53,7 +53,7 @@ public sealed class SaveDataSerializerTests
     [Fact]
     public void Deserialize_FutureSchemaVersion_ReturnsEmptyAndWarns()
     {
-        var result = _serializer.Deserialize(@"{""SchemaVersion"":3,""ModVersion"":""9.9.9"",""Contracts"":[]}");
+        var result = _serializer.Deserialize(@"{""SchemaVersion"":4,""ModVersion"":""9.9.9"",""Contracts"":[]}");
         Assert.Empty(result);
         Assert.Single(_warnings);
     }
@@ -62,7 +62,7 @@ public sealed class SaveDataSerializerTests
     public void Deserialize_MalformedCurrentSchemaContract_SkipsItAndWarns()
     {
         var json = @"{
-  ""SchemaVersion"": 2,
+  ""SchemaVersion"": 3,
   ""ModVersion"": ""0.2.0"",
   ""Contracts"": [
     {
@@ -77,18 +77,14 @@ public sealed class SaveDataSerializerTests
         ""AnimalBuildings"": []
       },
       ""TermsSnapshot"": {
-        ""Pricing"": {
-          ""LineItems"": [],
-          ""OutdoorSubtotal"": 0,
-          ""AnimalSubtotal"": 0,
-          ""GreenhouseSubtotal"": 0,
-          ""TotalPrice"": 100
-        },
+        ""Pricing"": { ""TotalPrice"": 100 },
         ""Energy"": {
-          ""DailyCapacity"": 270,
+          ""DailyCapacity"": 200,
           ""ActionCosts"": { ""ScytheSwing"": 1 }
         }
-      }
+      },
+      ""Tier"": ""FullDay"",
+      ""CategoryPriority"": [ ""AnimalCare"", ""Crops"", ""Fieldwork"" ]
     }
   ]
 }";
@@ -97,7 +93,7 @@ public sealed class SaveDataSerializerTests
 
         Assert.Empty(result);
         Assert.Single(_warnings);
-        Assert.Contains("Skipping schema v2 contract", _warnings[0]);
+        Assert.Contains("Skipping schema v3 contract", _warnings[0]);
     }
 
     [Fact]
@@ -149,10 +145,10 @@ public sealed class SaveDataSerializerTests
     }
 
     [Fact]
-    public void Serialize_ProducesSchemaVersion2()
+    public void Serialize_ProducesSchemaVersion3()
     {
         var json = _serializer.Serialize(Array.Empty<Contract>(), "0.2.0");
-        Assert.Contains(@"""SchemaVersion"": 2", json);
+        Assert.Contains(@"""SchemaVersion"": 3", json);
     }
 
     [Fact]

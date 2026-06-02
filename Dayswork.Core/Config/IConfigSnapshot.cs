@@ -11,10 +11,12 @@ public interface IConfigSnapshot
     float WorkerWalkPixelsPerTick { get; }
     int WorkerActionAnimationMs { get; }
     int WorkerEntranceHoldTicks { get; }
-    IReadOnlyDictionary<OutdoorBandSize, int> OutdoorBandThresholds { get; }
-    IReadOnlyDictionary<OutdoorPriceKey, int> OutdoorServiceBandPrices { get; }
-    IReadOnlyDictionary<AnimalBuildingPriceKey, int> AnimalBuildingPrices { get; }
-    IReadOnlyDictionary<GreenhousePriceKey, int> GreenhouseServicePrices { get; }
-    int WorkerDailyEnergyCapacity { get; }
+
+    /// <summary>Worker energy (daily capacity) granted by each purchasable tier.</summary>
+    IReadOnlyDictionary<EnergyTier, int> EnergyTierEnergy { get; }
+
+    /// <summary>Gold price the player pays for each purchasable tier.</summary>
+    IReadOnlyDictionary<EnergyTier, int> EnergyTierPrice { get; }
+
     IReadOnlyDictionary<WorkActionKind, int> WorkActionCosts { get; }
 }

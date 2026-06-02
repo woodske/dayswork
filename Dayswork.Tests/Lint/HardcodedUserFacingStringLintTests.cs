@@ -144,8 +144,7 @@ public class HardcodedUserFacingStringLintTests
     {
         var normalized = path.Replace('\\', '/');
         return normalized.Contains("/bin/", StringComparison.Ordinal) ||
-               normalized.Contains("/obj/", StringComparison.Ordinal) ||
-               normalized.Contains("/Integration/MailFramework/", StringComparison.Ordinal);
+               normalized.Contains("/obj/", StringComparison.Ordinal);
     }
 
     private static string FindWorkspaceRoot()

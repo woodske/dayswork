@@ -12,7 +12,7 @@ namespace Dayswork.Orchestration;
 
 // M-13 RecurringContractScheduler (Pattern R / Service S-D). Promoted from the U-10 one-time stub to
 // the rebuilt fixed-price day-start lifecycle: recurring terms refresh at 6am, affordability/notice
-// decisions from the rebuilt terms snapshot, festival no-charge skips, and same-day no-worker mail.
+// decisions from the rebuilt terms snapshot, festival no-charge skips, and same-day HUD notices.
 // Single-active-contract invariant (DEV-U15-01) is enforced at hire time, so the loop processes at
 // most one contract per day.
 internal sealed class RecurringContractScheduler
@@ -22,7 +22,7 @@ internal sealed class RecurringContractScheduler
     private readonly CalendarHandlers _calendar;
     private readonly RecurringDayStartDecisionEngine _decisionEngine;
     private readonly ModConfigManager _configManager;
-    private readonly IMailDispatcher _mail;
+    private readonly IShiftOutcomeDispatcher _shiftOutcomes;
 
     public RecurringContractScheduler(
         IContractStore store,
@@ -30,14 +30,14 @@ internal sealed class RecurringContractScheduler
         CalendarHandlers calendar,
         RecurringDayStartDecisionEngine decisionEngine,
         ModConfigManager configManager,
-        IMailDispatcher mail)
+        IShiftOutcomeDispatcher shiftOutcomes)
     {
         _store = store;
         _orchestrator = orchestrator;
         _calendar = calendar;
         _decisionEngine = decisionEngine;
         _configManager = configManager;
-        _mail = mail;
+        _shiftOutcomes = shiftOutcomes;
     }
 
     public void OnDayStarted(object? sender, DayStartedEventArgs e)
@@ -56,7 +56,7 @@ internal sealed class RecurringContractScheduler
             try
             {
                 // Festival gate for one-time contracts: the contract is consumed and the already-paid
-                // fixed price is returned by same-day mail.
+                // fixed price is returned by direct refund plus a same-day HUD notice.
                 if (festival && contract.Schedule == ContractSchedule.OneTime)
                 {
                     HandleFestival(contract);
@@ -85,17 +85,17 @@ internal sealed class RecurringContractScheduler
     }
 
     // Festival day handling: recurring contracts stay Active with no charge, while a one-time contract
-    // is consumed (Executed) and its already-paid contract price is refunded by same-day mail.
+    // is consumed (Executed) and its already-paid contract price is refunded directly.
     private void HandleFestival(Contract contract)
     {
         if (contract.Schedule == ContractSchedule.OneTime)
         {
             _store.Update(contract.Id, contract with { Status = ContractStatus.Executed });
-            _mail.QueueFestivalNotice(contract, contract.TermsSnapshot.Pricing.TotalPrice);
+            _shiftOutcomes.ShowFestivalNotice(contract, contract.TermsSnapshot.Pricing.TotalPrice);
         }
         else
         {
-            _mail.QueueFestivalNotice(contract, 0);
+            _shiftOutcomes.ShowFestivalNotice(contract, 0);
         }
 
         ModEntry.ModMonitor.Log(I18nHelper.Get("log.festival.skipped"), LogLevel.Info);
@@ -112,19 +112,19 @@ internal sealed class RecurringContractScheduler
         switch (outcome.NoticeKind)
         {
             case RecurringDayStartNoticeKind.NeedsAttention:
-                _mail.QueueNeedsAttentionNotice(contract);
+                _shiftOutcomes.ShowNeedsAttentionNotice(contract);
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Recurring contract {contract.Id.Value} needs attention before it can be rebuilt for today — skipped with no charge.",
                     LogLevel.Info);
                 return;
             case RecurringDayStartNoticeKind.FestivalSkip:
-                _mail.QueueFestivalNotice(contract, 0);
+                _shiftOutcomes.ShowFestivalNotice(contract, 0);
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Recurring contract {contract.Id.Value} refreshed for a festival day — no charge taken and no worker spawned.",
                     LogLevel.Info);
                 return;
             case RecurringDayStartNoticeKind.CannotAfford:
-                _mail.QueueCannotAffordNotice(contract, outcome.DailyPrice, outcome.Shortfall);
+                _shiftOutcomes.ShowCannotAffordNotice(contract, outcome.DailyPrice, outcome.Shortfall);
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Recurring contract {contract.Id.Value} is unaffordable today (price {outcome.DailyPrice}g, short by {outcome.Shortfall}g) — skipped with refreshed terms preserved.",
                     LogLevel.Info);

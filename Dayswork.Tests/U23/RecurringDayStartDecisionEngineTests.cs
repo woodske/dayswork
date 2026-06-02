@@ -35,7 +35,7 @@ public sealed class RecurringDayStartDecisionEngineTests
     {
         var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
         var config = ConfigDefaults.Build();
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(contract.ScopeSelection!, contract.EnabledTasks, config);
+        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(contract.ScopeSelection!, contract.EnabledTasks, contract.Tier, config);
         var exactGold = preview.ProposedTerms!.Pricing.TotalPrice;
 
         var outcome = _engine.Evaluate(contract, config, festivalToday: false, availableGold: exactGold);
@@ -54,7 +54,7 @@ public sealed class RecurringDayStartDecisionEngineTests
     {
         var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
         var config = ConfigDefaults.Build();
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(contract.ScopeSelection!, contract.EnabledTasks, config);
+        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(contract.ScopeSelection!, contract.EnabledTasks, contract.Tier, config);
         var dailyPrice = preview.ProposedTerms!.Pricing.TotalPrice;
 
         var outcome = _engine.Evaluate(contract, config, festivalToday: false, availableGold: Math.Max(0, dailyPrice - 1));

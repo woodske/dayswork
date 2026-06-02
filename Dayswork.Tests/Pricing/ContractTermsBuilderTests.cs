@@ -10,48 +10,43 @@ public sealed class ContractTermsBuilderTests
     private readonly IContractTermsBuilder _builder = U18BuilderFactory.CreateTermsBuilder();
     private readonly IConfigSnapshot _config = ConfigDefaults.Build();
 
-    [Fact]
-    public void BuildPreview_TwoDeluxeCoops_AggregatesToSingleAnimalLine()
+    [Theory]
+    [InlineData(EnergyTier.HalfDay)]
+    [InlineData(EnergyTier.FullDay)]
+    [InlineData(EnergyTier.Overtime)]
+    public void BuildPreview_ValidSelection_PricesAndCapacitiesFromTier(EnergyTier tier)
     {
         var preview = _builder.BuildPreview(
             new ContractScopeSelection(
                 OutdoorZones: Array.Empty<Zone>(),
-                AnimalBuildings: new[]
-                {
-                    new AnimalBuildingSelection("Coop A", AnimalBuildingTier.DeluxeCoop),
-                    new AnimalBuildingSelection("Coop B", AnimalBuildingTier.DeluxeCoop),
-                },
+                AnimalBuildings: new[] { new AnimalBuildingSelection("Coop A", AnimalBuildingTier.DeluxeCoop) },
                 Greenhouse: null),
             new HashSet<TaskKind> { TaskKind.PetAnimals },
+            tier,
             _config);
 
         Assert.True(preview.IsValid);
-        var line = Assert.Single(preview.ProposedTerms!.Pricing.LineItems);
-        Assert.Equal(PricingFamily.AnimalBuilding, line.Family);
-        Assert.Equal(TaskKind.PetAnimals, line.Service);
-        Assert.Equal(2, line.Quantity);
-        Assert.Equal(line.UnitPrice * 2, line.LineTotal);
+        Assert.Equal(_config.EnergyTierPrice[tier], preview.ProposedTerms!.Pricing.TotalPrice);
+        Assert.Equal(_config.EnergyTierEnergy[tier], preview.ProposedTerms.Energy.DailyCapacity);
     }
 
     [Fact]
-    public void BuildPreview_GreenhouseWaterAndHarvest_ProducesSeparatePackageLines()
+    public void BuildPreview_PriceIsIndependentOfScopeSize()
     {
-        var preview = _builder.BuildPreview(
-            new ContractScopeSelection(
-                OutdoorZones: Array.Empty<Zone>(),
-                AnimalBuildings: Array.Empty<AnimalBuildingSelection>(),
-                Greenhouse: new GreenhouseSelection("Greenhouse")),
-            new HashSet<TaskKind> { TaskKind.WaterCrops, TaskKind.HarvestCrops },
-            _config);
+        var smallScope = new ContractScopeSelection(
+            OutdoorZones: new[] { new Zone("Farm", new TileCoord(0, 0), new TileCoord(0, 0)) },
+            AnimalBuildings: Array.Empty<AnimalBuildingSelection>(),
+            Greenhouse: null);
+        var largeScope = new ContractScopeSelection(
+            OutdoorZones: new[] { new Zone("Farm", new TileCoord(0, 0), new TileCoord(40, 40)) },
+            AnimalBuildings: Array.Empty<AnimalBuildingSelection>(),
+            Greenhouse: null);
+        var tasks = new HashSet<TaskKind> { TaskKind.WaterCrops };
 
-        Assert.True(preview.IsValid);
-        var greenhouseLines = preview.ProposedTerms!.Pricing.LineItems
-            .Where(line => line.Family == PricingFamily.Greenhouse)
-            .ToList();
+        var small = _builder.BuildPreview(smallScope, tasks, EnergyTier.FullDay, _config);
+        var large = _builder.BuildPreview(largeScope, tasks, EnergyTier.FullDay, _config);
 
-        Assert.Equal(2, greenhouseLines.Count);
-        Assert.Contains(greenhouseLines, line => line.Service == TaskKind.WaterCrops);
-        Assert.Contains(greenhouseLines, line => line.Service == TaskKind.HarvestCrops);
+        Assert.Equal(small.ProposedTerms!.Pricing.TotalPrice, large.ProposedTerms!.Pricing.TotalPrice);
     }
 
     [Fact]
@@ -63,6 +58,7 @@ public sealed class ContractTermsBuilderTests
                 AnimalBuildings: Array.Empty<AnimalBuildingSelection>(),
                 Greenhouse: null),
             new HashSet<TaskKind> { TaskKind.HarvestCrops },
+            EnergyTier.FullDay,
             _config);
 
         Assert.False(preview.IsValid);
@@ -81,6 +77,7 @@ public sealed class ContractTermsBuilderTests
                 AnimalBuildings: Array.Empty<AnimalBuildingSelection>(),
                 Greenhouse: null),
             new HashSet<TaskKind> { TaskKind.ClearRocks },
+            EnergyTier.FullDay,
             _config));
 
         Assert.Contains("no chargeable scope-task pairs", ex.Message, StringComparison.OrdinalIgnoreCase);

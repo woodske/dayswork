@@ -14,7 +14,7 @@ public sealed class DepositPlanner : IDepositPlanner
     {
         // Walkable destinations grouped by key → (representative tile, item id → qty).
         var walkable = new Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int> Items)>();
-        var preMail  = new Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int>();
+        var automaticOverflow = new Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int>();
 
         foreach (var item in snapshot)
         {
@@ -27,8 +27,8 @@ public sealed class DepositPlanner : IDepositPlanner
                 case ShippingBinDestination:
                     AddToGroup(walkable, dest, shippingBinTile, item);
                     break;
-                default: // MailDestination or unresolved ⇒ mail next morning (FD-Q2=A / FR-OUT-04)
-                    Accumulate(preMail, (item.QualifiedItemId, item.SourceTask, item.Provenance), item.Quantity);
+                default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow (FD-Q2=A / FR-OUT-04)
+                    Accumulate(automaticOverflow, (item.QualifiedItemId, item.SourceTask, item.Provenance), item.Quantity);
                     break;
             }
         }
@@ -39,7 +39,7 @@ public sealed class DepositPlanner : IDepositPlanner
 
         var ordered = OrderNearestNeighbor(unordered, workerStart, distance);
 
-        return new DepositPlan(ordered, ToStacks(preMail));
+        return new DepositPlan(ordered, ToStacks(automaticOverflow));
     }
 
     private static DestinationKey ResolveDestination(
@@ -47,7 +47,7 @@ public sealed class DepositPlanner : IDepositPlanner
         IReadOnlyDictionary<TaskKind, DestinationKey> assignments) =>
         assignments.TryGetValue(task, out var dest) && dest is not null
             ? dest
-            : MailDestination.Instance;
+            : AutomaticOutputDestination.Instance;
 
     private static void AddToGroup(
         Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int> Items)> walkable,

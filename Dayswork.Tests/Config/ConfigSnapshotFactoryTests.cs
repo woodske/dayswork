@@ -1,5 +1,6 @@
 namespace Dayswork.Tests.Config;
 
+using System.Collections.ObjectModel;
 using Dayswork.Core.Config;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
@@ -7,32 +8,36 @@ using Xunit;
 
 public class ConfigSnapshotFactoryTests
 {
+    private static ConfigSnapshot CreateWith(
+        int hardCapTime = 2000,
+        float workerWalkPixelsPerTick = 2f,
+        IReadOnlyDictionary<EnergyTier, int>? tierEnergy = null,
+        IReadOnlyDictionary<EnergyTier, int>? tierPrice = null)
+    {
+        var defaults = (ConfigSnapshot)ConfigDefaults.Build();
+        return ConfigSnapshotFactory.Create(
+            hardCapTime: hardCapTime,
+            stuckInitialWaitMinutes: 10,
+            stuckPostTeleportWaitMinutes: 10,
+            workerWalkPixelsPerTick: workerWalkPixelsPerTick,
+            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
+            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
+            energyTierEnergy: tierEnergy ?? defaults.EnergyTierEnergy,
+            energyTierPrice: tierPrice ?? defaults.EnergyTierPrice,
+            workActionCosts: defaults.WorkActionCosts);
+    }
+
     [Fact]
     public void Create_returns_snapshot_for_valid_values()
     {
         var defaults = ConfigDefaults.Build();
-
-        var snapshot = ConfigSnapshotFactory.Create(
-            hardCapTime: 2000,
-            stuckInitialWaitMinutes: 10,
-            stuckPostTeleportWaitMinutes: 10,
-            workerWalkPixelsPerTick: defaults.WorkerWalkPixelsPerTick,
-            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
-            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
-            outdoorBandThresholds: defaults.OutdoorBandThresholds,
-            outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
-            animalBuildingPrices: defaults.AnimalBuildingPrices,
-            greenhouseServicePrices: defaults.GreenhouseServicePrices,
-            workerDailyEnergyCapacity: defaults.WorkerDailyEnergyCapacity,
-            workActionCosts: defaults.WorkActionCosts);
+        var snapshot = CreateWith();
 
         Assert.Equal(2000, snapshot.HardCapTime);
         Assert.Equal(10, snapshot.StuckInitialWaitMinutes);
         Assert.Equal(10, snapshot.StuckPostTeleportWaitMinutes);
-        Assert.Equal(defaults.WorkerWalkPixelsPerTick, snapshot.WorkerWalkPixelsPerTick);
-        Assert.Equal(defaults.WorkerActionAnimationMs, snapshot.WorkerActionAnimationMs);
-        Assert.Equal(defaults.WorkerEntranceHoldTicks, snapshot.WorkerEntranceHoldTicks);
-        Assert.Equal(defaults.WorkerDailyEnergyCapacity, snapshot.WorkerDailyEnergyCapacity);
+        Assert.Equal(defaults.EnergyTierEnergy[EnergyTier.FullDay], snapshot.EnergyTierEnergy[EnergyTier.FullDay]);
+        Assert.Equal(defaults.EnergyTierPrice[EnergyTier.FullDay], snapshot.EnergyTierPrice[EnergyTier.FullDay]);
     }
 
     [Theory]
@@ -40,41 +45,31 @@ public class ConfigSnapshotFactoryTests
     [InlineData(2610)]
     public void Create_throws_when_hard_cap_time_is_out_of_range(int invalidHardCapTime)
     {
-        var defaults = ConfigDefaults.Build();
-
-        Assert.Throws<ArgumentOutOfRangeException>(() => ConfigSnapshotFactory.Create(
-            hardCapTime: invalidHardCapTime,
-            stuckInitialWaitMinutes: 10,
-            stuckPostTeleportWaitMinutes: 10,
-            workerWalkPixelsPerTick: defaults.WorkerWalkPixelsPerTick,
-            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
-            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
-            outdoorBandThresholds: defaults.OutdoorBandThresholds,
-            outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
-            animalBuildingPrices: defaults.AnimalBuildingPrices,
-            greenhouseServicePrices: defaults.GreenhouseServicePrices,
-            workerDailyEnergyCapacity: defaults.WorkerDailyEnergyCapacity,
-            workActionCosts: defaults.WorkActionCosts));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CreateWith(hardCapTime: invalidHardCapTime));
     }
 
     [Fact]
-    public void Create_throws_when_energy_capacity_is_not_positive()
+    public void Create_throws_when_a_tier_energy_is_not_positive()
     {
-        var defaults = ConfigDefaults.Build();
+        var invalid = new ReadOnlyDictionary<EnergyTier, int>(new Dictionary<EnergyTier, int>
+        {
+            [EnergyTier.HalfDay] = 100,
+            [EnergyTier.FullDay] = 0,
+            [EnergyTier.Overtime] = 300,
+        });
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => ConfigSnapshotFactory.Create(
-            hardCapTime: 2000,
-            stuckInitialWaitMinutes: 10,
-            stuckPostTeleportWaitMinutes: 10,
-            workerWalkPixelsPerTick: defaults.WorkerWalkPixelsPerTick,
-            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
-            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
-            outdoorBandThresholds: defaults.OutdoorBandThresholds,
-            outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
-            animalBuildingPrices: defaults.AnimalBuildingPrices,
-            greenhouseServicePrices: defaults.GreenhouseServicePrices,
-            workerDailyEnergyCapacity: 0,
-            workActionCosts: defaults.WorkActionCosts));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CreateWith(tierEnergy: invalid));
+    }
+
+    [Fact]
+    public void Create_throws_when_a_tier_energy_key_is_missing()
+    {
+        var incomplete = new ReadOnlyDictionary<EnergyTier, int>(new Dictionary<EnergyTier, int>
+        {
+            [EnergyTier.HalfDay] = 100,
+        });
+
+        Assert.Throws<InvalidOperationException>(() => CreateWith(tierEnergy: incomplete));
     }
 
     [Theory]
@@ -82,20 +77,6 @@ public class ConfigSnapshotFactoryTests
     [InlineData(-1f)]
     public void Create_throws_when_worker_walk_pixels_per_tick_is_not_positive(float invalidValue)
     {
-        var defaults = ConfigDefaults.Build();
-
-        Assert.Throws<ArgumentOutOfRangeException>(() => ConfigSnapshotFactory.Create(
-            hardCapTime: 2000,
-            stuckInitialWaitMinutes: 10,
-            stuckPostTeleportWaitMinutes: 10,
-            workerWalkPixelsPerTick: invalidValue,
-            workerActionAnimationMs: defaults.WorkerActionAnimationMs,
-            workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
-            outdoorBandThresholds: defaults.OutdoorBandThresholds,
-            outdoorServiceBandPrices: defaults.OutdoorServiceBandPrices,
-            animalBuildingPrices: defaults.AnimalBuildingPrices,
-            greenhouseServicePrices: defaults.GreenhouseServicePrices,
-            workerDailyEnergyCapacity: defaults.WorkerDailyEnergyCapacity,
-            workActionCosts: defaults.WorkActionCosts));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CreateWith(workerWalkPixelsPerTick: invalidValue));
     }
 }

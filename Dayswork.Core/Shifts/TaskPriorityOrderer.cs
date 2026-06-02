@@ -5,25 +5,34 @@ namespace Dayswork.Core.Shifts;
 /// <inheritdoc/>
 public sealed class TaskPriorityOrderer : ITaskPriorityOrderer
 {
-    // FR-WORK-03 priority table — lower number = higher priority
-    private static readonly Dictionary<TaskKind, int> s_rank = new Dictionary<TaskKind, int>
+    // Lower rank = higher priority. Rank is the index of a task's category in the contract's
+    // player-ordered category list; tasks sharing a category share a rank, so route cost
+    // (distance) breaks ties — i.e. strict ordering between categories, nearest-first within one.
+    private readonly IReadOnlyDictionary<TaskCategory, int> _categoryRank;
+
+    public TaskPriorityOrderer(IReadOnlyList<TaskCategory> categoryPriority)
     {
-        { TaskKind.FeedAnimals,            0 },
-        { TaskKind.PetAnimals,             1 },
-        { TaskKind.CollectAnimalProducts,  2 },
-        { TaskKind.WaterCrops,             3 },
-        { TaskKind.HarvestCrops,           4 },
-        { TaskKind.CollectFruit,           5 },
-        { TaskKind.ClearWeeds,             6 },
-        { TaskKind.ClearGrass,             7 },
-        { TaskKind.ClearRocks,             8 },
-        { TaskKind.CutTrees,               9 },
-    };
+        var rank = new Dictionary<TaskCategory, int>();
+        for (var i = 0; i < categoryPriority.Count; i++)
+            rank.TryAdd(categoryPriority[i], i);
+
+        // Any category the player order omits sorts last, deterministically.
+        foreach (var category in Enum.GetValues<TaskCategory>())
+            rank.TryAdd(category, categoryPriority.Count);
+
+        _categoryRank = rank;
+    }
+
+    /// <summary>Uses the default category priority (<see cref="TaskKindSets.DefaultCategoryPriority"/>).</summary>
+    public TaskPriorityOrderer() : this(TaskKindSets.DefaultCategoryPriority) { }
 
     /// <inheritdoc/>
     public IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> enabledTasks) =>
-        enabledTasks.OrderBy(t => s_rank[t]).ToList();
+        enabledTasks
+            .OrderBy(task => _categoryRank[TaskKindSets.CategoryOf(task)])
+            .ThenBy(task => task)
+            .ToList();
 
     /// <inheritdoc/>
-    public int Rank(TaskKind task) => s_rank[task];
+    public int Rank(TaskKind task) => _categoryRank[TaskKindSets.CategoryOf(task)];
 }

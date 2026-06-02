@@ -23,6 +23,7 @@ public sealed class HiringFlowViewModelBuilderTests
         var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(
             draft.ScopeSelection,
             draft.EnabledTasks,
+            draft.Tier,
             _config);
 
         var state = HiringFlowViewModelBuilder.Build(draft, preview);
@@ -46,6 +47,7 @@ public sealed class HiringFlowViewModelBuilderTests
         var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(
             draft.ScopeSelection,
             draft.EnabledTasks,
+            draft.Tier,
             _config);
 
         var state = HiringFlowViewModelBuilder.Build(draft, preview);
@@ -53,7 +55,6 @@ public sealed class HiringFlowViewModelBuilderTests
         Assert.True(state.ReviewModel.CanConfirm);
         var row = Assert.Single(state.ServiceRows);
         Assert.Equal(ServiceContributionState.Charged, row.RowState);
-        Assert.NotNull(row.DisplayAmount);
         Assert.NotNull(state.ReviewModel.Pricing);
         Assert.NotNull(state.ReviewModel.WorkerEnergy);
     }
@@ -73,6 +74,7 @@ public sealed class HiringFlowViewModelBuilderTests
         var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(
             draft.ScopeSelection,
             draft.EnabledTasks,
+            draft.Tier,
             _config);
 
         var state = HiringFlowViewModelBuilder.Build(draft, preview);

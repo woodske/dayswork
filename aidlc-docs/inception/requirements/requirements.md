@@ -17,9 +17,46 @@
 
 ---
 
+## 1.5 U-25 Worker Redesign Amendment (2026-06-01)
+
+> A major design pivot supersedes parts of the original pricing, entry-point, and notification model.
+> See [`aidlc-docs/construction/plans/u-25-worker-redesign-implementation-plan.md`](../../construction/plans/u-25-worker-redesign-implementation-plan.md).
+> Where this amendment conflicts with an FR below, **this amendment wins**. The original FR text is kept
+> for history. Status: **Workstream 1 implemented**; Workstream 2 (building/chest/spawn/mail) pending.
+
+### Removed requirements
+- **FR-PAY-03, FR-PAY-04, FR-PAY-05** (per-scope outdoor band / animal-building / greenhouse-package pricing) — **removed**. Price no longer derives from scope.
+
+### Superseded / amended requirements
+- **FR-PAY-06, FR-PAY-09** — price now derives from the **purchased energy tier**, not from scope or from the morning's actionable work. "Capacity reserved" becomes literal: the player buys an energy budget.
+- **FR-HIRE-01** — hiring entry point moves from the **bulletin board (Harmony patch)** to a **placeable farm building's tile action**. The bulletin-board patch is removed.
+- **FR-HIRE-04, FR-HIRE-13, FR-HIRE-16** — the live per-service price breakdown is replaced by a **tier picker + single tier price** plus a **category-priority reorder** control.
+- **FR-HIRE-11, FR-HIRE-12** — schedules (one-time / recurring) and pause/cancel-before-6am still apply, but management happens at the **building**, not the bulletin board.
+- **FR-WORK-01, FR-WORK-07** — the worker **spawns and exits at the building door**, not the farm entrance. The entrance-finding heuristics (and the SVE entrance-override seam) are retired.
+- **FR-WORK-03** — the fixed animal→crop→clearing order becomes a **player-ordered set of three categories** (AnimalCare, Crops, Fieldwork); execution is strict between categories, nearest-first within one. Default order `[AnimalCare, Crops, Fieldwork]`.
+- **FR-HIRE-10, FR-OUT-02, FR-OUT-03, FR-OUT-04, FR-OUT-05, FR-TASK-09, FR-TOOL-03, FR-WORK-19, FR-PAY-08, FR-DAY-01** — **all mail delivery is removed**. Missed/overflow **items** go to the building's static chest; **text notices** (cannot-afford, needs-attention, festival, tool-missing) become in-game HUD messages; festival one-time **refunds** are credited directly to gold.
+- **NFR-COMPAT-02** — no longer "no new buildings required": the redesign **adds one custom building** as the hiring anchor.
+- **NFR-COMPAT-04** — the **Mail Framework Mod dependency is removed**. The bulletin-board Harmony patch is removed (Harmony may remain for other patches).
+- **NFR-UX-04** — satisfied directly: "buy a Half / Full / Overtime day of labor" is the most legible pricing model.
+
+### New requirements
+- **FR-PAY-13** — Labor capacity is purchased as a fixed **energy tier** (Half = 100 / Full = 200 / Overtime = 300 energy, Overtime at a gold premium; all tunable). The tier's energy becomes the worker's daily capacity and limits daily output regardless of scope size.
+- **FR-PAY-14** — **Per-action energy costs** are the sole tuning lever for how much a given energy budget accomplishes; configurable via GMCM/`config.json`, with no location/scope weighting.
+- **FR-PRIORITY-01** — The player orders the three work categories per contract; the order is persisted and drives execution priority (strict between categories, nearest-first within).
+- **FR-HIRE-17** — Hiring and contract management are accessed via a cheap building bought from Robin's shop; its front tile action opens the hire/manage flow.
+- **FR-OUT-06** — Missed/overflow items (sleeping early, unassigned/full chest) deposit to the building's persistent static chest. No item is ever lost.
+- **FR-NOTIF-01** — Player-facing notices are delivered as in-game HUD messages (and direct gold credit for refunds), not mail.
+- **FR-WORK-20** — The worker spawns at 6am and exits end-of-day at the building door.
+
+### Persistence note
+- Save schema bumped to **v3**; `Contract` gains `Tier` and `CategoryPriority`; the terms snapshot collapses to a single price. **No migration** — pre-v3 saves are discarded (project in development).
+
+---
+
 ## 2. Functional Requirements
 
 > Each FR has an ID, a one-line rule, and a "Source" pointer (spec section or Q-number).
+> NOTE: Some FRs below are superseded by the **U-25 Amendment** in §1.5.
 
 ### 2.1 Hiring entry point and menu
 | ID | Requirement | Source |

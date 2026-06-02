@@ -6,7 +6,7 @@ namespace Dayswork.Tests.Generators;
 
 // PBT-U14-05 shared generator: produces (buffer snapshot, task→destination map) pairs for
 // DepositPlanner properties. Composes ZoneGen.ChestRef so chests can be shared across tasks
-// (exercising consolidation) and so some tasks are left unassigned (exercising FD-Q2=A → mail).
+// (exercising consolidation) and so some tasks are left unassigned (exercising FD-Q2=A → overflow).
 public static class DepositInputGen
 {
     private static readonly TaskKind[] AllTasks = Enum.GetValues<TaskKind>();
@@ -23,14 +23,14 @@ public static class DepositInputGen
     public static Gen<IReadOnlyList<BufferedItem>> BufferedItems() =>
         Gen.ListOf(BufferedItem()).Select(l => (IReadOnlyList<BufferedItem>)l.ToList());
 
-    // A destination for one task, or null = "absent from the map" (resolves to mail).
+    // A destination for one task, or null = "absent from the map" (resolves to automatic overflow).
     private static Gen<DestinationKey?> DestinationOrAbsent(IReadOnlyList<ChestRef> chestPool) =>
         from pick in Gen.Choose(0, 6)
         from chestIdx in chestPool.Count == 0 ? Gen.Constant(0) : Gen.Choose(0, chestPool.Count - 1)
         select pick switch
         {
-            0      => (DestinationKey?)null,                          // absent ⇒ mail (FD-Q2=A)
-            1      => MailDestination.Instance,                       // explicit mail
+            0      => (DestinationKey?)null,                    // absent ⇒ automatic overflow (FD-Q2=A)
+            1      => AutomaticOutputDestination.Instance,      // explicit automatic overflow
             2 or 3 => ShippingBinDestination.Instance,               // shipping bin
             _      => chestPool.Count == 0                            // chest (or bin if no chests)
                           ? ShippingBinDestination.Instance

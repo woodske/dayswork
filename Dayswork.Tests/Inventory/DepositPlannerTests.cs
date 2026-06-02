@@ -17,7 +17,7 @@ public sealed class DepositPlannerTests
 
     private static DestinationKey Resolve(
         TaskKind task, IReadOnlyDictionary<TaskKind, DestinationKey> assignments) =>
-        assignments.TryGetValue(task, out var d) && d is not null ? d : MailDestination.Instance;
+        assignments.TryGetValue(task, out var d) && d is not null ? d : AutomaticOutputDestination.Instance;
 
     private static Dictionary<string, int> Totals(IEnumerable<(string id, int qty)> items)
     {
@@ -30,7 +30,7 @@ public sealed class DepositPlannerTests
     private static BufferedItem Buffered(string itemId, int quantity, TaskKind task, OutputScopeProvenance? provenance = null) =>
         new(itemId, quantity, task, provenance ?? OutputScopeProvenance.Unknown);
 
-    // PBT-U14-01: conservation — every buffered item appears exactly once across trips ∪ pre-mail.
+    // PBT-U14-01: conservation — every buffered item appears exactly once across trips ∪ automatic overflow.
     [Property(MaxTest = 1000, Replay = "")]
     public Property Conservation_Holds()
     {
@@ -41,7 +41,7 @@ public sealed class DepositPlannerTests
 
             var inTotals = Totals(snapshot.Select(b => (b.QualifiedItemId, b.Quantity)));
             var outTotals = Totals(
-                plan.Trips.SelectMany(t => t.Items).Concat(plan.PreMailedOverflow)
+                plan.Trips.SelectMany(t => t.Items).Concat(plan.AutomaticOverflow)
                     .Select(s => (s.QualifiedItemId, s.Quantity)));
 
             bool equal = inTotals.Count == outTotals.Count
@@ -72,16 +72,16 @@ public sealed class DepositPlannerTests
         });
     }
 
-    // PBT-U14-03: no trip is empty and no trip targets MailDestination.
+    // PBT-U14-03: no trip is empty and no trip targets AutomaticOutputDestination.
     [Property(MaxTest = 1000, Replay = "")]
-    public Property No_Empty_Or_Mail_Trips()
+    public Property No_Empty_Or_AutomaticOutput_Trips()
     {
         return Prop.ForAll(DepositInputGen.PlannerInput(), input =>
         {
             var (snapshot, assignments) = input;
             var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
 
-            return plan.Trips.All(t => t.Items.Count > 0 && t.Destination is not MailDestination)
+            return plan.Trips.All(t => t.Items.Count > 0 && t.Destination is not AutomaticOutputDestination)
                 .Label($"trips={plan.Trips.Count}");
         });
     }
@@ -97,7 +97,7 @@ public sealed class DepositPlannerTests
 
             int inQty  = snapshot.Sum(b => b.Quantity);
             int outQty = plan.Trips.SelectMany(t => t.Items).Sum(s => s.Quantity)
-                         + plan.PreMailedOverflow.Sum(s => s.Quantity);
+                         + plan.AutomaticOverflow.Sum(s => s.Quantity);
 
             return (inQty == outQty).Label($"in={inQty} out={outQty}");
         });
@@ -127,9 +127,9 @@ public sealed class DepositPlannerTests
         Assert.Equal(far.Tile, plan.Trips[1].Tile);
     }
 
-    // Unassigned output resolves to mail, not a trip (FD-Q2=A / FR-OUT-04).
+    // Unassigned output resolves to automatic overflow, not a trip (FD-Q2=A / FR-OUT-04).
     [Fact]
-    public void Unassigned_Task_Output_Goes_To_PreMail()
+    public void Unassigned_Task_Output_Goes_To_AutomaticOverflow()
     {
         var snapshot = new List<BufferedItem> { Buffered("(O)709", 5, TaskKind.CutTrees) };
         var assignments = new Dictionary<TaskKind, DestinationKey>(); // empty → CutTrees unassigned
@@ -137,8 +137,8 @@ public sealed class DepositPlannerTests
         var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
 
         Assert.Empty(plan.Trips);
-        Assert.Single(plan.PreMailedOverflow);
-        Assert.Equal(5, plan.PreMailedOverflow[0].Quantity);
+        Assert.Single(plan.AutomaticOverflow);
+        Assert.Equal(5, plan.AutomaticOverflow[0].Quantity);
     }
 
     [Fact]
@@ -164,7 +164,7 @@ public sealed class DepositPlannerTests
     }
 
     [Fact]
-    public void MailFallback_Preserves_Provenance_For_NextMorning_Overflow()
+    public void AutomaticOutput_Preserves_Provenance_For_Overflow()
     {
         var snapshot = new List<BufferedItem>
         {
@@ -173,8 +173,8 @@ public sealed class DepositPlannerTests
 
         var plan = new DepositPlanner().Plan(snapshot, new Dictionary<TaskKind, DestinationKey>(), BinTile, Start, Manhattan);
 
-        var mailed = Assert.Single(plan.PreMailedOverflow);
-        Assert.Equal(OutputScopeFamily.AnimalBuilding, mailed.Provenance.Family);
-        Assert.Equal("Barn", mailed.Provenance.ScopeName);
+        var overflow = Assert.Single(plan.AutomaticOverflow);
+        Assert.Equal(OutputScopeFamily.AnimalBuilding, overflow.Provenance.Family);
+        Assert.Equal("Barn", overflow.Provenance.ScopeName);
     }
 }

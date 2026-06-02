@@ -5321,3 +5321,50 @@ Fix the farmhand action guard so worker actions cannot restart, loop, or otherwi
 **AI Response**: Recorded playtest confirmation that the player/farmhand animation isolation bug is fixed. Updated `aidlc-state.md` to mark the focused review fix as approved by playtest confirmation.
 **Context**: CONSTRUCTION — Focused review fix confirmed
 ---
+## U-25 Worker Redesign Cleanup
+**Timestamp**: 2026-06-02T02:47:09Z
+**User Input**: "I am in the middle of U-25 worker redisgn. Perform the last cleanup task before I start playtesting. aidlc-docs\construction\plans\u-25-worker-redesign-implementation-plan.md"
+**AI Response**: "Loaded the U-25 implementation plan, common AIDLC workflow rules, extension opt-in/configuration context, code generation rules, and current cleanup targets. Proceeding with the final pre-playtest cleanup: stale i18n keys, dead lint exclusion, and obsolete Harmony setup."
+**Context**: CONSTRUCTION / Code Generation continuation for U-25 worker redesign cleanup.
+
+---
+
+## U-25 Worker Redesign Cleanup Completion
+**Timestamp**: 2026-06-02T02:49:04Z
+**User Input**: "I am in the middle of U-25 worker redisgn. Perform the last cleanup task before I start playtesting. aidlc-docs\construction\plans\u-25-worker-redesign-implementation-plan.md"
+**AI Response**: "Completed the final pre-playtest cleanup. Removed stale bulletin/mail i18n keys, removed the dead Integration/MailFramework lint exclusion, removed obsolete Harmony using/PatchAll/EnableHarmony setup, updated the U-25 implementation plan checkboxes, updated aidlc-state.md, and verified with dotnet build and dotnet test. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing full mode N/A for this cleanup because no property-applicable business logic, serialization, or stateful algorithm changes were introduced."
+**Context**: CONSTRUCTION / Code Generation continuation for U-25 worker redesign cleanup verification.
+
+---
+
+## U-25 Worker Redesign Naming Cleanup
+**Timestamp**: 2026-06-02T02:50:05Z
+**User Input**: "please rename the mail classes to something more appropriate"
+**AI Response**: "Started the remaining U-25 naming cleanup. Inspecting mail-named dispatcher and destination types, then renaming them to behavior-accurate chest/HUD/automatic-delivery concepts without changing runtime behavior."
+**Context**: CONSTRUCTION / Code Generation continuation for U-25 worker redesign naming cleanup.
+
+---
+
+## U-25 Worker Redesign Naming Cleanup Completion
+**Timestamp**: 2026-06-02T02:54:36Z
+**User Input**: "please rename the mail classes to something more appropriate"
+**AI Response**: "Completed the legacy mail naming cleanup. Renamed dispatcher and destination classes to shift-outcome / automatic-output concepts, updated UI labels, comments, persistence serialization with legacy token compatibility, tests, the U-25 implementation plan checkbox, and aidlc-state.md. Verification passed with dotnet build and dotnet test. Extension compliance: Security Baseline skipped because disabled; Property-Based Testing full mode compliant for the existing deposit-planner invariant tests after the rename."
+**Context**: CONSTRUCTION / Code Generation continuation for U-25 worker redesign naming cleanup verification.
+
+---
+
+## U-25 Farmhand Office Chest Access Fix
+**Timestamp**: 2026-06-02T03:06:05Z
+**User Input**: "how am I supposed to retrieve items from the farmhand house? whenever I click it, it brings up the contract"
+**AI Response**: "Identified the issue: the building interaction handler opens the hire/manage contract flow for any action-click inside the farmhand office footprint, so the built-in output chest display tile is never reachable. Implementing a targeted chest-display-tile branch that opens the building output chest before falling back to the contract flow."
+**Context**: CONSTRUCTION / U-25 playtest feedback fix for farmhand office output chest access.
+
+---
+
+## U-25 Farmhand Office Chest Access Fix Completion
+**Timestamp**: 2026-06-02T03:08:01Z
+**User Input**: "how am I supposed to retrieve items from the farmhand house? whenever I click it, it brings up the contract"
+**AI Response**: "Completed the farmhand office chest access fix. Action-clicking the output chest display tile now opens the built-in office output chest via Chest.ShowMenu(); action-clicking the rest of the building still opens hire/manage. Updated the U-25 plan and aidlc-state.md. Verification passed with dotnet build, dotnet test, and deploy-enabled dotnet build to the Stardew Mods folder."
+**Context**: CONSTRUCTION / U-25 playtest feedback fix verification for farmhand office output chest access.
+
+---

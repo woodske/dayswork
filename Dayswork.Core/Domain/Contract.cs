@@ -8,5 +8,7 @@ public sealed record Contract(
     ContractStatus Status,
     GameDate HireDate,
     ContractScopeSelection ScopeSelection,
-    ContractTermsSnapshot TermsSnapshot
+    ContractTermsSnapshot TermsSnapshot,
+    EnergyTier Tier,
+    IReadOnlyList<TaskCategory> CategoryPriority
 );
