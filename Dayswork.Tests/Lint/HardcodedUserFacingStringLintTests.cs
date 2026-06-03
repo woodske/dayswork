@@ -43,6 +43,7 @@ public class HardcodedUserFacingStringLintTests
         new(@"string\.Equals\(", RegexOptions.Compiled),
         new(@"Guid\.NewGuid", RegexOptions.Compiled),
         new(@"TaskKind\.", RegexOptions.Compiled),
+        new(@"BUILDINGS_CONSTRUCTED", RegexOptions.Compiled),
         new(@"build=", RegexOptions.Compiled),
         new(@"\.Append\(", RegexOptions.Compiled),
     };

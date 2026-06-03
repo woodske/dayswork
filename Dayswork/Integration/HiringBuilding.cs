@@ -19,6 +19,7 @@ internal static class HiringBuilding
 {
     public const string BuildingType = "Bindicle.Dayswork_Office";
     public const string TextureAsset = "Mods/Bindicle.Dayswork/Building";
+    internal const string OnePerFarmBuildCondition = "!BUILDINGS_CONSTRUCTED All Bindicle.Dayswork_Office 1 2147483647 true";
     private const string TextureFile = "assets/hq-building.png";
 
     /// <summary>Id of the building's built-in output chest where missed/overflow items are deposited.</summary>
@@ -85,17 +86,18 @@ internal static class HiringBuilding
         }
     }
 
-    private static BuildingData BuildData() => new()
+    internal static BuildingData BuildData() => new()
     {
         Name = I18nHelper.Get("building.office.name"),
         Description = I18nHelper.Get("building.office.description"),
         Texture = TextureAsset,
         Builder = "Robin",
-        BuildCost = 5000,
+        BuildCondition = OnePerFarmBuildCondition,
+        BuildCost = 1000,
         BuildMaterials = new List<BuildingMaterial>
         {
-            new() { ItemId = "(O)388", Amount = 50 }, // Wood
-            new() { ItemId = "(O)390", Amount = 50 }, // Stone
+            new() { ItemId = "(O)388", Amount = 25 }, // Wood
+            new() { ItemId = "(O)390", Amount = 25 }, // Stone
         },
         BuildDays = 1,
         Size = new Point(TilesWide, TilesHigh),

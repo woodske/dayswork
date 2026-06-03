@@ -5368,3 +5368,48 @@ Fix the farmhand action guard so worker actions cannot restart, loop, or otherwi
 **Context**: CONSTRUCTION / U-25 playtest feedback fix verification for farmhand office output chest access.
 
 ---
+
+## U-25 Farmhand Cabin Build Limit
+**Timestamp**: 2026-06-03T15:38:46Z
+**User Input**:
+```markdown
+PLEASE IMPLEMENT THIS PLAN:
+# Limit Farmhand Cabin To One
+
+## Summary
+Fix Robin’s construction menu so `Farmhand Cabin` is available only when the farm has zero Dayswork cabins, including cabins currently under construction. This is a narrow U-25 playtest bug fix in the existing custom building registration.
+
+## Key Changes
+- Update `Dayswork/Integration/HiringBuilding.cs`:
+  - Add an internal constant for the one-per-farm Game State Query:
+    `!BUILDINGS_CONSTRUCTED All Bindicle.Dayswork_Office 1 2147483647 true`
+  - Set `BuildingData.BuildCondition` to that constant in `BuildData()`.
+  - Make `BuildData()` internal if needed so tests can inspect the generated `BuildingData`.
+- Leave placement, chest access, spawn/exit, and hire/manage interaction behavior unchanged.
+- Update AIDLC bookkeeping during implementation: append audit entries, mark the focused plan checkbox immediately after completion, and record verification/state summary.
+
+## Tests
+- Add a focused xUnit test under `Dayswork.Tests/Integration/` asserting the Dayswork office `BuildingData.BuildCondition` equals the one-per-farm query.
+- Assert the condition includes `includeUnderConstruction=true`, so the menu also hides while a cabin is being built.
+- Run:
+  - `dotnet build Dayswork.sln /p:EnableModDeploy=false`
+  - `dotnet test Dayswork.sln /p:EnableModDeploy=false`
+- Optional playtest: open Robin’s construction menu with one existing Farmhand Cabin and confirm the cabin is absent.
+
+## Assumptions
+- Desired behavior is farm-wide: one total Farmhand Cabin per save, not one per location.
+- Hiding the option while construction is in progress is preferred to prevent queueing a second cabin before the first completes.
+- Property-Based Testing is N/A for this fix because it only sets a static Stardew `BuildCondition` string, with no new algorithmic or stateful logic.
+```
+**AI Response**: "Implemented the focused build-limit change by setting the Dayswork office BuildingData.BuildCondition to the one-per-farm BUILDINGS_CONSTRUCTED Game State Query, exposed BuildData internally for tests, added a focused xUnit regression, and updated the U-25 plan checklist before verification."
+**Context**: CONSTRUCTION / U-25 playtest feedback fix for limiting Farmhand Cabin construction to one per farm.
+
+---
+
+## U-25 Farmhand Cabin Build Limit Completion
+**Timestamp**: 2026-06-03T15:41:48Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN: # Limit Farmhand Cabin To One ..."
+**AI Response**: "Completed the Farmhand Cabin build-limit fix. `HiringBuilding.BuildData()` now sets the one-per-farm `BUILDINGS_CONSTRUCTED` BuildCondition, focused regression coverage verifies the exact condition and under-construction flag, and the hardcoded-string lint allows this technical Game State Query syntax. Updated the U-25 plan checkboxes and aidlc-state.md. Verification passed with `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors) and `dotnet test Dayswork.sln /p:EnableModDeploy=false` (341 passed / 1 expected skip / 0 failed). Extension compliance: Security Baseline skipped because disabled; Property-Based Testing full mode N/A for this static building-data availability fix."
+**Context**: CONSTRUCTION / U-25 playtest feedback fix verification for limiting Farmhand Cabin construction to one per farm.
+
+---

@@ -19,12 +19,17 @@
 - [x] Legacy mail naming removed: `IMailDispatcher`/`MailDispatcher` became `IShiftOutcomeDispatcher`/`ShiftOutcomeDispatcher`, and `MailDestination` became `AutomaticOutputDestination`.
 - [x] Stale i18n keys (`bulletin.*`, `mail.*`) and the lint test's now-dead `/Integration/MailFramework/` exclusion removed before playtesting.
 - [x] `EnableHarmony`/`PatchAll()` removed now that no Harmony patches are left.
+- [x] Farmhand Cabin Robin menu limit added: `HiringBuilding.BuildData()` now sets `BuildCondition` so the building is hidden once one `Bindicle.Dayswork_Office` exists or is under construction, with focused regression coverage.
 
 ### Pre-playtest cleanup verification
 - [x] `dotnet build Dayswork.sln /p:EnableModDeploy=false` — 0 warnings / 0 errors.
 - [x] `dotnet test Dayswork.sln /p:EnableModDeploy=false` — 340 passed / 0 failed / 1 skipped.
 - [x] `dotnet build Dayswork.sln` — 0 warnings / 0 errors; deployed to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`.
 - [x] Source search confirms no remaining Harmony setup, no `bulletin.*` / `mail.*` i18n keys, and no mail-named output/dispatcher classes.
+
+### Farmhand Cabin limit verification
+- [x] `dotnet build Dayswork.sln /p:EnableModDeploy=false` — 0 warnings / 0 errors.
+- [x] `dotnet test Dayswork.sln /p:EnableModDeploy=false` — 341 passed / 0 failed / 1 skipped.
 
 **Scope**: Replace per-scope pricing with purchased energy tiers; add player-ordered task-category priority; move hiring/contract terms onto a placeable farm building with a static item chest; spawn/exit the worker at the building door; remove the Mail Framework Mod dependency, the bulletin-board Harmony patch, and the farm-entrance heuristics.
 
