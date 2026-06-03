@@ -21,8 +21,8 @@ public static class ConfigDefaults
         var energyTierPrice = new Dictionary<EnergyTier, int>
         {
             [EnergyTier.HalfDay] = 250,
-            [EnergyTier.FullDay] = 450,
-            [EnergyTier.Overtime] = 750,
+            [EnergyTier.FullDay] = 500,
+            [EnergyTier.Overtime] = 1000,
         };
 
         var workActionCosts = new Dictionary<WorkActionKind, int>

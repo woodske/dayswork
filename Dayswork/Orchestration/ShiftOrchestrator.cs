@@ -30,8 +30,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         DepositExit,
     }
 
-    // Shipping bin tile on Standard Farm.
-    private static readonly TileCoord ShippingBinTile = new(71, 13);
+    // Fallback shipping-bin stand tile for Standard Farm when the live building cannot be resolved.
+    private static readonly TileCoord FallbackShippingBinTile = new(71, 13);
 
     // Emote IDs — play-test TODO: confirm "?" and "!" are 8 and 2 in vanilla.
     // See code-summary.md play-test checklist.
@@ -1688,8 +1688,9 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                 LogLevel.Trace);
         }
 
-        // Route every collected-but-undelivered item through automatic overflow; do not run
-        // remaining tasks or dump directly to the bin.
+        // Route collected-but-undelivered items through their safe final destination; explicit
+        // shipping-bin output goes straight to the bin, while all other undelivered output uses
+        // automatic overflow.
         AppendUndeliveredToOverflow();
 
         _ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
@@ -2311,7 +2312,21 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
-        // Shipping bin path.
+        DepositIntoShippingBin(stack, animateWhenPlayerHere: playerHere);
+    }
+
+    // ItemRegistry.Create(badId) returns SDV's fallback Error Item (Name="Error Item",
+    // QualifiedItemId="(O)") rather than null when the id can't be resolved. This guard
+    // refuses to deposit Error Items into a chest/bin — those would otherwise survive into
+    // the player's world as "(O)" placeholders.
+    private static bool IsDepositErrorItem(Item item) =>
+        item is null
+        || string.IsNullOrEmpty(item.ItemId)
+        || item.QualifiedItemId == "(O)"
+        || string.Equals(item.Name, "Error Item", StringComparison.Ordinal);
+
+    private static void DepositIntoShippingBin(RoutedItemStack stack, bool animateWhenPlayerHere)
+    {
         var farm = Game1.getFarm();
         if (string.IsNullOrWhiteSpace(stack.QualifiedItemId))
         {
@@ -2331,21 +2346,11 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
-        if (playerHere)
-            farm.shipItem(item, Game1.player);          // vanilla lid animation + backpackIN + delayed "Ship"
+        if (animateWhenPlayerHere && Game1.player.currentLocation == farm)
+            farm.shipItem(item, Game1.player);           // vanilla lid animation + backpackIN + delayed "Ship"
         else
             farm.getShippingBin(Game1.player).Add(item); // silent fallback
     }
-
-    // ItemRegistry.Create(badId) returns SDV's fallback Error Item (Name="Error Item",
-    // QualifiedItemId="(O)") rather than null when the id can't be resolved. This guard
-    // refuses to deposit Error Items into a chest/bin — those would otherwise survive into
-    // the player's world as "(O)" placeholders.
-    private static bool IsDepositErrorItem(Item item) =>
-        item is null
-        || string.IsNullOrEmpty(item.ItemId)
-        || item.QualifiedItemId == "(O)"
-        || string.Equals(item.Name, "Error Item", StringComparison.Ordinal);
 
     private void EndTripExecution()
     {
@@ -2367,11 +2372,10 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
     private void MarkDepositTripUndelivered(DepositTrip trip)
     {
-        foreach (var stack in trip.Items)
-            _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
+        RouteUndeliveredTripStacks(trip, trip.Items);
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][deposit] could not reach deposit destination at ({trip.Tile.X},{trip.Tile.Y}); routing {trip.Items.Count} stack(s) to automatic overflow.",
+            $"[Dayswork][deposit] could not reach deposit destination at ({trip.Tile.X},{trip.Tile.Y}); routed {trip.Items.Count} undelivered stack(s).",
             LogLevel.Warn);
     }
 
@@ -2496,7 +2500,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var plan = _depositPlanner.Plan(
             _ctx!.Buffer.Snapshot(),
             _ctx.TaskDestinations,
-            ShippingBinTile,
+            ResolveShippingBinDepositTile(farm),
             workerTile,
             Manhattan);
 
@@ -2577,6 +2581,42 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         _nav.StartNavigation(trip.Tile, farm, _farmhand);
+    }
+
+    private static TileCoord ResolveShippingBinDepositTile(Farm farm)
+    {
+        foreach (var building in farm.buildings)
+        {
+            if (!string.Equals(building.buildingType.Value, "Shipping Bin", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var door = building.getPointForHumanDoor();
+            return ResolveShippingBinApproachTile(farm, new TileCoord(door.X, door.Y));
+        }
+
+        return FallbackShippingBinTile;
+    }
+
+    private static TileCoord ResolveShippingBinApproachTile(Farm farm, TileCoord doorTile)
+    {
+        TileCoord[] candidates =
+        {
+            doorTile,
+            new(doorTile.X, doorTile.Y + 1),
+            new(doorTile.X - 1, doorTile.Y + 1),
+            new(doorTile.X + 1, doorTile.Y + 1),
+            new(doorTile.X - 1, doorTile.Y),
+            new(doorTile.X + 1, doorTile.Y),
+            new(doorTile.X, doorTile.Y - 1),
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (WorkerMovementDriver.IsTilePassableForWorker(new Point(candidate.X, candidate.Y), farm))
+                return candidate;
+        }
+
+        return doorTile;
     }
 
     // Cross the building door (warp into the interior) and start walking to the chest.
@@ -2737,21 +2777,51 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         if (_ctx is null) return;
 
         foreach (var b in _ctx.Buffer.TakeAll())
-            _ctx.Overflow.Add(new OverflowItem(
-                new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance),
-                OverflowReason.NotDelivered));
+        {
+            var stack = new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance);
+            if (DepositFallbackPolicy.ResolveUndelivered(ResolveAssignedDestination(b.SourceTask, _ctx.TaskDestinations))
+                == UndeliveredDepositResolution.ShippingBin)
+                DepositIntoShippingBin(stack, animateWhenPlayerHere: false);
+            else
+                _ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
+        }
 
         if (_currentTrip is not null)
         {
-            foreach (var s in _currentTrip.Items)
-                _ctx.Overflow.Add(new OverflowItem(s, OverflowReason.NotDelivered));
+            RouteUndeliveredTripStacks(
+                _currentTrip,
+                _currentTrip.Items.Skip(Math.Clamp(_currentTripStackIndex, 0, _currentTrip.Items.Count)));
             _currentTrip = null;
         }
 
         while (_depositTrips.Count > 0)
-            foreach (var s in _depositTrips.Dequeue().Items)
-                _ctx.Overflow.Add(new OverflowItem(s, OverflowReason.NotDelivered));
+        {
+            var trip = _depositTrips.Dequeue();
+            RouteUndeliveredTripStacks(trip, trip.Items);
+        }
     }
+
+    private void RouteUndeliveredTripStacks(DepositTrip trip, IEnumerable<RoutedItemStack> stacks)
+    {
+        if (_ctx is null) return;
+
+        if (DepositFallbackPolicy.ResolveUndelivered(trip.Destination) == UndeliveredDepositResolution.ShippingBin)
+        {
+            foreach (var stack in stacks)
+                DepositIntoShippingBin(stack, animateWhenPlayerHere: false);
+            return;
+        }
+
+        foreach (var stack in stacks)
+            _ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
+    }
+
+    private static DestinationKey ResolveAssignedDestination(
+        TaskKind task,
+        IReadOnlyDictionary<TaskKind, DestinationKey> assignments) =>
+        assignments.TryGetValue(task, out var destination) && destination is not null
+            ? destination
+            : AutomaticOutputDestination.Instance;
 
     private void ClearWorker()
     {

@@ -49,17 +49,7 @@ internal sealed class HiringFlowCoordinator
     public void OpenEditFlow(ContractId existing)
     {
         var contract = _contractStore.Get(existing);
-        var draft = new ContractDraft
-        {
-            EditingId = existing,
-            Schedule = contract.Schedule,
-        };
-
-        draft.EnabledTasks.UnionWith(contract.EnabledTasks);
-        foreach (var (task, destination) in contract.TaskDestinations)
-            draft.Destinations[task] = destination;
-
-        LegacyScopeBootstrapper.HydrateDraft(draft, contract);
+        var draft = CreateEditDraft(existing, contract);
         RefreshPreview(draft);
         ShowSummary(draft);
     }
@@ -261,6 +251,26 @@ internal sealed class HiringFlowCoordinator
             TermsSnapshot: proposedTerms,
             Tier: draft.Tier,
             CategoryPriority: draft.CategoryPriority.ToList().AsReadOnly());
+    }
+
+    internal static ContractDraft CreateEditDraft(ContractId existing, Contract contract)
+    {
+        var draft = new ContractDraft
+        {
+            EditingId = existing,
+            Schedule = contract.Schedule,
+            Tier = contract.Tier,
+        };
+
+        draft.EnabledTasks.UnionWith(contract.EnabledTasks);
+        foreach (var (task, destination) in contract.TaskDestinations)
+            draft.Destinations[task] = destination;
+
+        draft.CategoryPriority.Clear();
+        draft.CategoryPriority.AddRange(contract.CategoryPriority);
+
+        LegacyScopeBootstrapper.HydrateDraft(draft, contract);
+        return draft;
     }
 
     private void CloseFlow() => Game1.activeClickableMenu = null;

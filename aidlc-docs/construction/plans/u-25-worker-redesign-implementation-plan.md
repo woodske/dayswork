@@ -20,6 +20,7 @@
 - [x] Stale i18n keys (`bulletin.*`, `mail.*`) and the lint test's now-dead `/Integration/MailFramework/` exclusion removed before playtesting.
 - [x] `EnableHarmony`/`PatchAll()` removed now that no Harmony patches are left.
 - [x] Farmhand Cabin Robin menu limit added: `HiringBuilding.BuildData()` now sets `BuildCondition` so the building is hidden once one `Bindicle.Dayswork_Office` exists or is under construction, with focused regression coverage.
+- [x] Shipping bin output routing fixed: explicit shipping-bin destinations now resolve the live shipping-bin building for deposit planning and direct undelivered shipping-bin stacks to the vanilla shipping bin instead of the Farmhand Cabin chest; focused planner/fallback tests added.
 
 ### Pre-playtest cleanup verification
 - [x] `dotnet build Dayswork.sln /p:EnableModDeploy=false` — 0 warnings / 0 errors.
@@ -30,6 +31,10 @@
 ### Farmhand Cabin limit verification
 - [x] `dotnet build Dayswork.sln /p:EnableModDeploy=false` — 0 warnings / 0 errors.
 - [x] `dotnet test Dayswork.sln /p:EnableModDeploy=false` — 341 passed / 0 failed / 1 skipped.
+
+### Shipping bin output routing verification
+- [x] `dotnet build Dayswork.sln /p:EnableModDeploy=false` — 0 warnings / 0 errors.
+- [x] `dotnet test Dayswork.sln /p:EnableModDeploy=false` — 343 passed / 0 failed / 1 skipped.
 
 **Scope**: Replace per-scope pricing with purchased energy tiers; add player-ordered task-category priority; move hiring/contract terms onto a placeable farm building with a static item chest; spawn/exit the worker at the building door; remove the Mail Framework Mod dependency, the bulletin-board Harmony patch, and the farm-entrance heuristics.
 

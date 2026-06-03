@@ -5413,3 +5413,55 @@ Fix Robin’s construction menu so `Farmhand Cabin` is available only when the f
 **Context**: CONSTRUCTION / U-25 playtest feedback fix verification for limiting Farmhand Cabin construction to one per farm.
 
 ---
+## Code Generation
+**Timestamp**: 2026-06-03T16:04:39Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Respect Shipping Bin Output For Collect Fruit
+
+## Summary
+Fix deposit routing so `Collect Fruit -> Shipping Bin` always ends in the shipping bin the player selected, not the Farmhand Cabin chest. The likely bug is that shipping-bin trips can become “undelivered” due to a hardcoded or unreachable bin tile, then fall through to the cabin-chest overflow path.
+
+## Key Changes
+- Resolve the shipping-bin deposit target dynamically from the live farm shipping-bin building instead of relying only on the hardcoded tile.
+- Preserve explicit shipping-bin output on failure paths:
+  - If a `ShippingBinDestination` trip cannot be reached, completed before wrap-up, or is otherwise marked undelivered, ship those items directly to the farm shipping bin.
+  - Keep chest destinations unchanged: missing/full/busy/unreachable chest deliveries can still fall back through the existing cabin-chest overflow behavior.
+- Keep UI selection, saved destination data, placement, hire/manage behavior, and normal chest deposit logic unchanged.
+- Update AIDLC bookkeeping during implementation: append audit entries, mark the focused plan checkbox immediately after completion, and record verification/state summary.
+
+## Interfaces
+- No public mod API changes.
+- Add a small internal helper or internal method for resolving the farm shipping-bin delivery tile and/or classifying undelivered shipping-bin trips as direct-to-bin instead of overflow.
+
+## Test Plan
+- Add a focused test proving `CollectFruit` with `ShippingBinDestination` produces a shipping-bin deposit trip, not `AutomaticOverflow`.
+- Add a focused test for the fallback policy: undelivered shipping-bin trips go directly to the shipping bin, while chest trips keep the existing overflow path.
+- Run:
+  - `dotnet build Dayswork.sln /p:EnableModDeploy=false`
+  - `dotnet test Dayswork.sln /p:EnableModDeploy=false`
+- Manual playtest: set `Collect Fruit` output to `Shipping Bin`, run a fruit collection shift, confirm fruit appears in the shipping bin/sold output and not in the Farmhand Cabin chest.
+
+## Assumptions
+- Explicit shipping-bin output is stronger than physical delivery failure: because the shipping bin has no capacity limit, selected shipping-bin items should never be redirected to the cabin chest.
+- The fix should apply to custom or moved shipping-bin layouts by resolving the live bin where possible.
+- Property-based testing is only needed if a reusable pure fallback helper is added; otherwise focused example tests are sufficient for this narrow routing bug."
+**AI Response**: "Loaded AIDLC workflow context, resumed the U-25 implementation plan, added the shipping-bin output routing fix, and marked the focused implementation checkbox complete. Verification is pending build and test."
+**Context**: U-25 focused Code Generation follow-up for explicit shipping-bin output routing.
+
+---
+
+## Build and Test
+**Timestamp**: 2026-06-03T16:06:58Z
+**User Input**: "N/A - verification executed from the approved implementation plan."
+**AI Response**: "Verification passed for the shipping-bin output routing fix. `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings and 0 errors. `dotnet test Dayswork.sln /p:EnableModDeploy=false` completed with 343 passed, 0 failed, and 1 expected skip. Updated the U-25 plan verification checkboxes and aidlc-state.md summary."
+**Context**: U-25 focused Build and Test verification for explicit shipping-bin output routing.
+
+---
+
+## Code Generation
+**Timestamp**: 2026-06-03T18:10:05Z
+**User Input**: "I am unable to edit the energy tier with a recurring contract. I can bring up the review contract UI and change the tier. After pressing confirm and opening the contract again, it remains on the previous value."
+**AI Response**: "Traced the recurring-contract edit flow, found that `OpenEditFlow` was not hydrating the draft from the saved contract tier or category priority, implemented the hydration fix in `HiringFlowCoordinator`, added focused regression coverage, and verified the change with a clean build and test run."
+**Context**: Focused recurring-contract review/edit fix for persisted energy tier and category-priority hydration.
+
+---

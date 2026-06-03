@@ -142,6 +142,28 @@ public sealed class DepositPlannerTests
     }
 
     [Fact]
+    public void CollectFruit_Assigned_To_ShippingBin_Creates_Bin_Trip_Not_AutomaticOverflow()
+    {
+        var snapshot = new List<BufferedItem> { Buffered("(O)634", 3, TaskKind.CollectFruit) };
+        var assignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.CollectFruit] = ShippingBinDestination.Instance,
+        };
+        var binTile = new TileCoord(12, 34);
+
+        var plan = new DepositPlanner().Plan(snapshot, assignments, binTile, Start, Manhattan);
+
+        var trip = Assert.Single(plan.Trips);
+        Assert.IsType<ShippingBinDestination>(trip.Destination);
+        Assert.Equal(binTile, trip.Tile);
+        Assert.Empty(plan.AutomaticOverflow);
+        var item = Assert.Single(trip.Items);
+        Assert.Equal("(O)634", item.QualifiedItemId);
+        Assert.Equal(3, item.Quantity);
+        Assert.Equal(TaskKind.CollectFruit, item.SourceTask);
+    }
+
+    [Fact]
     public void Provenance_Does_Not_Change_TaskOwned_Destination_Resolution()
     {
         var chest = new ChestRef("Farm", new TileCoord(4, 4));
@@ -176,5 +198,18 @@ public sealed class DepositPlannerTests
         var overflow = Assert.Single(plan.AutomaticOverflow);
         Assert.Equal(OutputScopeFamily.AnimalBuilding, overflow.Provenance.Family);
         Assert.Equal("Barn", overflow.Provenance.ScopeName);
+    }
+
+    [Fact]
+    public void UndeliveredFallbackPolicy_Ships_Bin_Trips_But_Overflows_Chest_Trips()
+    {
+        var chest = new ChestDestination(new ChestRef("Farm", new TileCoord(4, 4)));
+
+        Assert.Equal(
+            UndeliveredDepositResolution.ShippingBin,
+            DepositFallbackPolicy.ResolveUndelivered(ShippingBinDestination.Instance));
+        Assert.Equal(
+            UndeliveredDepositResolution.AutomaticOverflow,
+            DepositFallbackPolicy.ResolveUndelivered(chest));
     }
 }
