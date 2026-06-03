@@ -39,6 +39,21 @@ internal sealed class ContractDraft
         (CategoryPriority[index], CategoryPriority[target]) = (CategoryPriority[target], CategoryPriority[index]);
     }
 
+    /// <summary>Moves <paramref name="category"/> to an arbitrary slot (used by drag-and-drop reordering).</summary>
+    public void MoveCategoryToIndex(TaskCategory category, int targetIndex)
+    {
+        var index = CategoryPriority.IndexOf(category);
+        if (index < 0)
+            return;
+
+        var clamped = Math.Clamp(targetIndex, 0, CategoryPriority.Count - 1);
+        if (clamped == index)
+            return;
+
+        CategoryPriority.RemoveAt(index);
+        CategoryPriority.Insert(clamped, category);
+    }
+
     public ContractScopeSelection ScopeSelection =>
         new(
             OutdoorZones: OutdoorZones

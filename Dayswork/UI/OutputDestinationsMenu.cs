@@ -10,8 +10,6 @@ namespace Dayswork.UI;
 
 internal sealed class OutputDestinationsMenu : IClickableMenu
 {
-    private const int MenuWidth = 700;
-    private const int MenuHeight = 700;
     private const int OutputRowHeight = 72;
     private static readonly Color SecondaryTextColor = new(96, 72, 48);
 
@@ -33,7 +31,6 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     };
 
     private readonly ContractDraft _draft;
-    private readonly Action<ContractDraft> _onAdvance;
     private readonly Action<ContractDraft> _onBack;
     private readonly List<ChestEntry> _chestList;
     private readonly TaskKind[] _enabledOutputTasks;
@@ -52,19 +49,16 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     private Rectangle _pickerPanelRect;
     private List<ClickableComponent> _pickerRows = new();
 
-    private ClickableComponent _confirmBtn = null!;
     private ClickableComponent _backBtn = null!;
     private readonly List<ClickableComponent> _setOutputBtns = new();
 
     public OutputDestinationsMenu(
         ContractDraft draft,
         ChestResolver chestResolver,
-        Action<ContractDraft> onAdvance,
         Action<ContractDraft> onBack)
-        : base(0, 0, MenuWidth, MenuHeight)
+        : base(0, 0, ContractMenuLayout.Width, ContractMenuLayout.Height)
     {
         _draft = draft;
-        _onAdvance = onAdvance;
         _onBack = onBack;
 
         _chestList = chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
@@ -73,7 +67,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         foreach (var (task, destination) in draft.Destinations)
             _outputAssignments[task] = destination;
 
-        var topLeft = Utility.getTopLeftPositionForCenteringOnScreen(MenuWidth, MenuHeight);
+        var topLeft = ContractMenuLayout.GetTopLeft(width, height);
         xPositionOnScreen = (int)topLeft.X;
         yPositionOnScreen = (int)topLeft.Y;
 
@@ -89,12 +83,12 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         var setLabel = I18nHelper.Get("ui.zone_chest.set_output_btn");
         var setBtnW = (int)Math.Ceiling(Game1.smallFont.MeasureString(setLabel).X) + 40;
         const int setBtnH = 48;
-        var btnY = yPositionOnScreen + MenuHeight - 70;
+        var btnY = yPositionOnScreen + height - 70;
 
         _outputListRect = new Rectangle(
             xPositionOnScreen + 48,
             yPositionOnScreen + 95,
-            MenuWidth - 96 - MenuScrollBar.ReservedWidth,
+            width - 96 - MenuScrollBar.ReservedWidth,
             btnY - (yPositionOnScreen + 95) - 18);
         _maxOutputScrollIndex = Math.Max(0, _enabledOutputTasks.Length - GetVisibleOutputRowCount());
         _outputScrollIndex = Math.Clamp(_outputScrollIndex, 0, _maxOutputScrollIndex);
@@ -112,31 +106,20 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
                 setLabel)
             {
                 myID = 200 + i,
-                upNeighborID = i > 0 ? 199 + i : 900,
-                downNeighborID = i < _enabledOutputTasks.Length - 1 ? 201 + i : 900,
+                upNeighborID = i > 0 ? 199 + i : 901,
+                downNeighborID = i < _enabledOutputTasks.Length - 1 ? 201 + i : 901,
             });
         }
 
-        var lastSetId = _enabledOutputTasks.Length > 0 ? 200 + _enabledOutputTasks.Length - 1 : 900;
-
-        _confirmBtn = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + MenuWidth - 210, btnY, 170, 56),
-            "Next",
-            I18nHelper.Get("ui.zone_chest.confirm_btn"))
-        {
-            myID = 900,
-            upNeighborID = lastSetId,
-            leftNeighborID = 901,
-        };
+        var lastSetId = _enabledOutputTasks.Length > 0 ? 200 + _enabledOutputTasks.Length - 1 : 901;
 
         _backBtn = new ClickableComponent(
             new Rectangle(xPositionOnScreen + 40, btnY, 170, 56),
             "Back",
-            I18nHelper.Get("ui.zone_chest.back_btn"))
+            I18nHelper.Get("ui.common.back_btn"))
         {
             myID = 901,
             upNeighborID = lastSetId,
-            rightNeighborID = 900,
         };
     }
 
@@ -199,14 +182,8 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
             return;
         }
 
-        if (_confirmBtn.bounds.Contains(x, y))
-        {
-            ConfirmAndAdvance();
-            return;
-        }
-
         if (_backBtn.bounds.Contains(x, y))
-            _onBack(_draft);
+            ApplyDefaultsAndBack();
     }
 
     public override void leftClickHeld(int x, int y)
@@ -242,7 +219,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
             if (_showingPicker)
                 _showingPicker = false;
             else
-                _onBack(_draft);
+                ApplyDefaultsAndBack();
 
             return;
         }
@@ -263,7 +240,6 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         allClickableComponents ??= new List<ClickableComponent>();
         allClickableComponents.Clear();
         allClickableComponents.AddRange(_setOutputBtns);
-        allClickableComponents.Add(_confirmBtn);
         allClickableComponents.Add(_backBtn);
     }
 
@@ -278,7 +254,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
 
     public override void snapToDefaultClickableComponent()
     {
-        currentlySnappedComponent = _enabledOutputTasks.Length > 0 ? _setOutputBtns[0] : _confirmBtn;
+        currentlySnappedComponent = _enabledOutputTasks.Length > 0 ? _setOutputBtns[0] : _backBtn;
         snapCursorToCurrentSnappedComponent();
     }
 
@@ -351,7 +327,6 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         }
 
         MenuScrollBar.Draw(b, _outputListRect, GetVisibleOutputRowCount(), _enabledOutputTasks.Length, _outputScrollIndex);
-        DrawButton(b, _confirmBtn, enabled: true);
         DrawButton(b, _backBtn, enabled: true);
 
         if (_showingPicker)
@@ -381,11 +356,11 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
 
         const int rowH = 44;
         var maxLabelW = _pickerOptions.Max(option => Game1.smallFont.MeasureString(option.Label).X);
-        var panelW = Math.Min((int)Math.Ceiling(maxLabelW) + 32, MenuWidth - 16);
+        var panelW = Math.Min((int)Math.Ceiling(maxLabelW) + 32, width - 16);
         var panelH = _pickerOptions.Count * rowH + 16;
         var panelX = Math.Max(xPositionOnScreen + 8, setButtonBounds.X - panelW - 8);
         var panelY = Math.Max(yPositionOnScreen + 8, setButtonBounds.Y - panelH / 2);
-        panelY = Math.Max(yPositionOnScreen + 8, Math.Min(panelY, yPositionOnScreen + MenuHeight - panelH - 8));
+        panelY = Math.Max(yPositionOnScreen + 8, Math.Min(panelY, yPositionOnScreen + height - panelH - 8));
 
         _pickerPanelRect = new Rectangle(panelX, panelY, panelW, panelH);
         _pickerRows = new List<ClickableComponent>();
@@ -409,7 +384,9 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         _showingPicker = false;
     }
 
-    private void ConfirmAndAdvance()
+    // Returning to the hub locks in a default (cabin chest) for any output task left unset, matching
+    // the old "Next" behavior so output is always routed somewhere.
+    private void ApplyDefaultsAndBack()
     {
         foreach (var task in _enabledOutputTasks)
         {
@@ -417,7 +394,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
                 _draft.Destinations[task] = AutomaticOutputDestination.Instance;
         }
 
-        _onAdvance(_draft);
+        _onBack(_draft);
     }
 
     private void DrawPicker(SpriteBatch b)

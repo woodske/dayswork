@@ -42,16 +42,14 @@ internal sealed class HiringFlowCoordinator
         }
 
         var draft = new ContractDraft();
-        RefreshPreview(draft);
-        ShowTaskSelection(draft);
+        ShowHub(draft);
     }
 
     public void OpenEditFlow(ContractId existing)
     {
         var contract = _contractStore.Get(existing);
         var draft = CreateEditDraft(existing, contract);
-        RefreshPreview(draft);
-        ShowSummary(draft);
+        ShowHub(draft);
     }
 
     public void OpenManageFlow()
@@ -68,13 +66,30 @@ internal sealed class HiringFlowCoordinator
             OpenHiringFlow();
     }
 
+    // Hub-and-spoke navigation: the hub is the home page and every spoke returns to it. RefreshPreview
+    // here keeps the hub's per-section status and the Confirm gate current after any change.
+    private void ShowHub(ContractDraft draft)
+    {
+        RefreshPreview(draft);
+        Game1.activeClickableMenu = new HubMenu(
+            draft,
+            onTaskSelection: ShowTaskSelection,
+            onWorkScope: ShowZoneAndChest,
+            onOutput: ShowOutputDestinations,
+            onPriority: ShowTaskPriority,
+            onEnergy: ShowEnergy,
+            onRecurrence: ShowSchedule,
+            onSummary: ShowSummary,
+            onConfirm: ConfirmContract,
+            onCancel: CloseFlow);
+    }
+
     private void ShowTaskSelection(ContractDraft draft)
     {
         Game1.activeClickableMenu = new TaskSelectionMenu(
             draft,
             onToggleTask: task => ToggleTask(draft, task),
-            onAdvance: d => ShowZoneAndChest(d),
-            onCancel: CloseFlow);
+            onBack: ShowHub);
     }
 
     private void ShowZoneAndChest(ContractDraft draft)
@@ -82,10 +97,9 @@ internal sealed class HiringFlowCoordinator
         Game1.activeClickableMenu = new ZoneAndChestMenu(
             draft,
             _chestResolver,
-            onAdvance: d => ShowOutputDestinations(d),
-            onBack: d => ShowTaskSelection(d),
-            onBeginZoneDraw: d => BeginZoneDraw(d),
-            onClearScope: d => ClearScope(d));
+            onBack: ShowHub,
+            onBeginZoneDraw: BeginZoneDraw,
+            onClearScope: ClearScope);
     }
 
     private void ShowOutputDestinations(ContractDraft draft)
@@ -93,42 +107,64 @@ internal sealed class HiringFlowCoordinator
         Game1.activeClickableMenu = new OutputDestinationsMenu(
             draft,
             _chestResolver,
-            onAdvance: d => ShowSchedule(d),
-            onBack: d => ShowZoneAndChest(d));
+            onBack: ShowHub);
     }
 
     private void ShowSchedule(ContractDraft draft)
     {
         Game1.activeClickableMenu = new ScheduleMenu(
             draft,
-            onScheduleChanged: (d, schedule) => UpdateSchedule(d, schedule),
-            onAdvance: d => ShowSummary(d),
-            onBack: d => ShowOutputDestinations(d));
+            onScheduleChanged: UpdateSchedule,
+            onBack: ShowHub);
+    }
+
+    private void ShowEnergy(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new EnergyMenu(
+            draft,
+            BuildEnergyOptions(draft),
+            onSelectTier: SelectTier,
+            onBack: ShowHub);
+    }
+
+    private void ShowTaskPriority(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new TaskPriorityMenu(
+            draft,
+            onChanged: RefreshViewModels,
+            onBack: ShowHub);
     }
 
     private void ShowSummary(ContractDraft draft)
     {
         RefreshViewModels(draft);
-        Game1.activeClickableMenu = new SummaryMenu(
-            draft,
-            onConfirm: ConfirmContract,
-            onBack: d => ShowSchedule(d),
-            onCycleTier: (d, direction) => CycleTier(d, direction),
-            onMoveCategory: (d, category, direction) => MoveCategory(d, category, direction));
+        Game1.activeClickableMenu = new SummaryMenu(draft, onBack: ShowHub);
     }
 
-    private void CycleTier(ContractDraft draft, int direction)
+    private void SelectTier(ContractDraft draft, EnergyTier tier)
     {
-        draft.CycleTier(direction);
+        draft.Tier = tier;
         RefreshPreview(draft);
-        ShowSummary(draft);
+        ShowEnergy(draft);
     }
 
-    private void MoveCategory(ContractDraft draft, Core.Domain.TaskCategory category, int direction)
+    // Prices each energy tier against the current scope/tasks so the Energy page can show energy + cost
+    // per option. Tiers with no chargeable scope yet have null terms (the card shows just the name).
+    private IReadOnlyList<EnergyTierOption> BuildEnergyOptions(ContractDraft draft)
     {
-        draft.MoveCategory(category, direction);
-        RefreshViewModels(draft);
-        ShowSummary(draft);
+        var options = new List<EnergyTierOption>();
+        foreach (var tier in Enum.GetValues<EnergyTier>())
+        {
+            var preview = _termsBuilder.BuildPreview(
+                draft.ScopeSelection,
+                draft.EnabledTasks,
+                tier,
+                _configManager.CurrentSnapshot);
+            var terms = preview.ProposedTerms;
+            options.Add(new EnergyTierOption(tier, terms?.Energy.DailyCapacity, terms?.Pricing.TotalPrice));
+        }
+
+        return options;
     }
 
     private void BeginZoneDraw(ContractDraft draft)

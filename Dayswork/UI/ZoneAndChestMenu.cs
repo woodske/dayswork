@@ -10,37 +10,31 @@ namespace Dayswork.UI;
 
 internal sealed class ZoneAndChestMenu : IClickableMenu
 {
-    private const int MenuWidth = 700;
-    private const int MenuHeight = 700;
     private static readonly Color SecondaryTextColor = new(96, 72, 48);
 
     private readonly ContractDraft _draft;
-    private readonly Action<ContractDraft> _onAdvance;
     private readonly Action<ContractDraft> _onBack;
     private readonly Action<ContractDraft> _onBeginZoneDraw;
     private readonly Action<ContractDraft> _onClearScope;
 
     private ClickableComponent _workAreaBtn = null!;
     private ClickableComponent _clearScopeBtn = null!;
-    private ClickableComponent _confirmBtn = null!;
     private ClickableComponent _backBtn = null!;
 
     public ZoneAndChestMenu(
         ContractDraft draft,
         ChestResolver chestResolver,
-        Action<ContractDraft> onAdvance,
         Action<ContractDraft> onBack,
         Action<ContractDraft> onBeginZoneDraw,
         Action<ContractDraft> onClearScope)
-        : base(0, 0, MenuWidth, MenuHeight)
+        : base(0, 0, ContractMenuLayout.Width, ContractMenuLayout.Height)
     {
         _draft = draft;
-        _onAdvance = onAdvance;
         _onBack = onBack;
         _onBeginZoneDraw = onBeginZoneDraw;
         _onClearScope = onClearScope;
 
-        var topLeft = Utility.getTopLeftPositionForCenteringOnScreen(MenuWidth, MenuHeight);
+        var topLeft = ContractMenuLayout.GetTopLeft(width, height);
         xPositionOnScreen = (int)topLeft.X;
         yPositionOnScreen = (int)topLeft.Y;
 
@@ -68,7 +62,7 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         {
             myID = 100,
             rightNeighborID = 101,
-            downNeighborID = 900,
+            downNeighborID = 901,
         };
 
         _clearScopeBtn = new ClickableComponent(
@@ -78,29 +72,18 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         {
             myID = 101,
             leftNeighborID = 100,
-            downNeighborID = 900,
+            downNeighborID = 901,
         };
 
-        var btnY = yPositionOnScreen + MenuHeight - 70;
-
-        _confirmBtn = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + MenuWidth - 210, btnY, 170, 56),
-            "Next",
-            I18nHelper.Get("ui.zone_chest.confirm_btn"))
-        {
-            myID = 900,
-            upNeighborID = 100,
-            leftNeighborID = 901,
-        };
+        var btnY = yPositionOnScreen + height - 70;
 
         _backBtn = new ClickableComponent(
             new Rectangle(xPositionOnScreen + 40, btnY, 170, 56),
             "Back",
-            I18nHelper.Get("ui.zone_chest.back_btn"))
+            I18nHelper.Get("ui.common.back_btn"))
         {
             myID = 901,
             upNeighborID = 100,
-            rightNeighborID = 900,
         };
     }
 
@@ -117,12 +100,6 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         {
             _onClearScope(_draft);
             Game1.playSound("trashcan");
-            return;
-        }
-
-        if (_confirmBtn.bounds.Contains(x, y))
-        {
-            _onAdvance(_draft);
             return;
         }
 
@@ -147,7 +124,6 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         allClickableComponents.Clear();
         allClickableComponents.Add(_workAreaBtn);
         allClickableComponents.Add(_clearScopeBtn);
-        allClickableComponents.Add(_confirmBtn);
         allClickableComponents.Add(_backBtn);
     }
 
@@ -207,7 +183,6 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
             new Vector2(xPositionOnScreen + leftMargin, sectionY),
             I18nHelper.Get("ui.zone_chest.greenhouse_scope_detail"));
 
-        DrawButton(b, _confirmBtn, enabled: true);
         DrawButton(b, _backBtn, enabled: true);
         drawMouse(b);
     }

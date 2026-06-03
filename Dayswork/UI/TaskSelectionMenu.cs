@@ -10,14 +10,11 @@ namespace Dayswork.UI;
 
 internal sealed class TaskSelectionMenu : IClickableMenu
 {
-    private const int MenuWidth = 700;
-    private const int MenuHeight = 700;
     private const int RowHeight = 58;
 
     private readonly ContractDraft _draft;
     private readonly Action<TaskKind> _onToggleTask;
-    private readonly Action<ContractDraft> _onAdvance;
-    private readonly Action _onCancel;
+    private readonly Action<ContractDraft> _onBack;
 
     private readonly List<ClickableComponent> _toggleRows = new();
     private Rectangle _taskListRect;
@@ -27,22 +24,19 @@ internal sealed class TaskSelectionMenu : IClickableMenu
     private int _taskScrollDragOffset;
     private string _hoverText = string.Empty;
 
-    private ClickableComponent _nextBtn = null!;
-    private ClickableComponent _cancelBtn = null!;
+    private ClickableComponent _backBtn = null!;
 
     public TaskSelectionMenu(
         ContractDraft draft,
         Action<TaskKind> onToggleTask,
-        Action<ContractDraft> onAdvance,
-        Action onCancel)
-        : base(0, 0, MenuWidth, MenuHeight)
+        Action<ContractDraft> onBack)
+        : base(0, 0, ContractMenuLayout.Width, ContractMenuLayout.Height)
     {
         _draft = draft;
         _onToggleTask = onToggleTask;
-        _onAdvance = onAdvance;
-        _onCancel = onCancel;
+        _onBack = onBack;
 
-        var topLeft = Utility.getTopLeftPositionForCenteringOnScreen(MenuWidth, MenuHeight);
+        var topLeft = ContractMenuLayout.GetTopLeft(width, height);
         xPositionOnScreen = (int)topLeft.X;
         yPositionOnScreen = (int)topLeft.Y;
 
@@ -55,9 +49,9 @@ internal sealed class TaskSelectionMenu : IClickableMenu
         _toggleRows.Clear();
 
         var rowX = xPositionOnScreen + 48;
-        var rowW = MenuWidth - 96 - MenuScrollBar.ReservedWidth;
+        var rowW = width - 96 - MenuScrollBar.ReservedWidth;
         var startY = yPositionOnScreen + 75;
-        var btnY = yPositionOnScreen + MenuHeight - 70;
+        var btnY = yPositionOnScreen + height - 70;
         _taskListRect = new Rectangle(rowX, startY, rowW, btnY - startY - 20);
         _maxTaskScrollIndex = Math.Max(0, TaskPresentation.TaskOrder.Length - GetVisibleTaskRowCount());
         _taskScrollIndex = Math.Clamp(_taskScrollIndex, 0, _maxTaskScrollIndex);
@@ -73,26 +67,16 @@ internal sealed class TaskSelectionMenu : IClickableMenu
             {
                 myID = 100 + i,
                 upNeighborID = i > 0 ? 99 + i : -1,
-                downNeighborID = i < TaskPresentation.TaskOrder.Length - 1 ? 101 + i : 200,
+                downNeighborID = i < TaskPresentation.TaskOrder.Length - 1 ? 101 + i : 901,
             });
         }
 
-        _nextBtn = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + MenuWidth - 210, btnY, 170, 56),
-            "Next", I18nHelper.Get("ui.task_selection.confirm_btn"))
-        {
-            myID = 200,
-            upNeighborID = 109,
-            leftNeighborID = 201,
-        };
-
-        _cancelBtn = new ClickableComponent(
+        _backBtn = new ClickableComponent(
             new Rectangle(xPositionOnScreen + 40, btnY, 170, 56),
-            "Cancel", I18nHelper.Get("ui.task_selection.cancel_btn"))
+            "Back", I18nHelper.Get("ui.common.back_btn"))
         {
-            myID = 201,
+            myID = 901,
             upNeighborID = 109,
-            rightNeighborID = 200,
         };
     }
 
@@ -139,14 +123,8 @@ internal sealed class TaskSelectionMenu : IClickableMenu
             return;
         }
 
-        if (_nextBtn.bounds.Contains(x, y) && _draft.EnabledTasks.Count > 0)
-        {
-            _onAdvance(_draft);
-            return;
-        }
-
-        if (_cancelBtn.bounds.Contains(x, y))
-            _onCancel();
+        if (_backBtn.bounds.Contains(x, y))
+            _onBack(_draft);
     }
 
     public override void leftClickHeld(int x, int y)
@@ -179,7 +157,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
     {
         if (b == Buttons.B)
         {
-            _onCancel();
+            _onBack(_draft);
             return;
         }
 
@@ -199,8 +177,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
         allClickableComponents ??= new List<ClickableComponent>();
         allClickableComponents.Clear();
         allClickableComponents.AddRange(_toggleRows);
-        allClickableComponents.Add(_nextBtn);
-        allClickableComponents.Add(_cancelBtn);
+        allClickableComponents.Add(_backBtn);
     }
 
     public override void setCurrentlySnappedComponentTo(int id)
@@ -268,8 +245,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
 
         MenuScrollBar.Draw(b, _taskListRect, GetVisibleTaskRowCount(), TaskPresentation.TaskOrder.Length, _taskScrollIndex);
 
-        DrawButton(b, _nextBtn, enabled: _draft.EnabledTasks.Count > 0);
-        DrawButton(b, _cancelBtn, enabled: true);
+        DrawButton(b, _backBtn, enabled: true);
 
         if (!string.IsNullOrWhiteSpace(_hoverText))
             drawHoverText(b, _hoverText, Game1.smallFont);

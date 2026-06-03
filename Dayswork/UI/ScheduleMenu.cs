@@ -12,14 +12,11 @@ namespace Dayswork.UI;
 // Selected option is stored in ContractDraft.Schedule. draw() reads only pre-computed fields.
 internal sealed class ScheduleMenu : IClickableMenu
 {
-    private const int MenuWidth  = 700;
-    private const int MenuHeight = 380;
     private const int CardWidth  = 290;
     private const int CardHeight = 200;
 
     private readonly ContractDraft          _draft;
     private readonly Action<ContractDraft, ContractSchedule> _onScheduleChanged;
-    private readonly Action<ContractDraft>  _onAdvance;
     private readonly Action<ContractDraft>  _onBack;
 
     // Pre-computed labels (i18n keys resolved once in ctor — never in draw())
@@ -28,24 +25,20 @@ internal sealed class ScheduleMenu : IClickableMenu
     private readonly string _oneTimeDesc;
     private readonly string _recurringLabel;
     private readonly string _recurringDesc;
-    private readonly string _nextLabel;
     private readonly string _backLabel;
 
     private ClickableComponent _oneTimeCard   = null!;
     private ClickableComponent _recurringCard = null!;
-    private ClickableComponent _nextBtn       = null!;
     private ClickableComponent _backBtn       = null!;
 
     internal ScheduleMenu(
         ContractDraft          draft,
         Action<ContractDraft, ContractSchedule> onScheduleChanged,
-        Action<ContractDraft>  onAdvance,
         Action<ContractDraft>  onBack)
-        : base(0, 0, MenuWidth, MenuHeight)
+        : base(0, 0, ContractMenuLayout.Width, ContractMenuLayout.Height)
     {
         _draft     = draft;
         _onScheduleChanged = onScheduleChanged;
-        _onAdvance = onAdvance;
         _onBack    = onBack;
 
         _titleText      = I18nHelper.Get("ui.schedule.title");
@@ -53,10 +46,9 @@ internal sealed class ScheduleMenu : IClickableMenu
         _oneTimeDesc    = I18nHelper.Get("ui.schedule.one_time_description");
         _recurringLabel = I18nHelper.Get("ui.schedule.recurring");
         _recurringDesc  = I18nHelper.Get("ui.schedule.recurring_description");
-        _nextLabel      = I18nHelper.Get("ui.schedule.confirm_btn");
-        _backLabel      = I18nHelper.Get("ui.schedule.back_btn");
+        _backLabel      = I18nHelper.Get("ui.common.back_btn");
 
-        var topLeft = Utility.getTopLeftPositionForCenteringOnScreen(MenuWidth, MenuHeight);
+        var topLeft = ContractMenuLayout.GetTopLeft(width, height);
         xPositionOnScreen = (int)topLeft.X;
         yPositionOnScreen = (int)topLeft.Y;
 
@@ -66,9 +58,9 @@ internal sealed class ScheduleMenu : IClickableMenu
 
     private void BuildComponents()
     {
-        int cardY = yPositionOnScreen + 80;
+        int cardY = yPositionOnScreen + 100;
         int leftCardX  = xPositionOnScreen + 40;
-        int rightCardX = xPositionOnScreen + MenuWidth - CardWidth - 40;
+        int rightCardX = xPositionOnScreen + width - CardWidth - 40;
 
         _oneTimeCard = new ClickableComponent(
             new Rectangle(leftCardX, cardY, CardWidth, CardHeight),
@@ -76,7 +68,7 @@ internal sealed class ScheduleMenu : IClickableMenu
         {
             myID            = 100,
             rightNeighborID = 101,
-            downNeighborID  = 300,
+            downNeighborID  = 301,
         };
 
         _recurringCard = new ClickableComponent(
@@ -85,27 +77,17 @@ internal sealed class ScheduleMenu : IClickableMenu
         {
             myID           = 101,
             leftNeighborID = 100,
-            downNeighborID = 300,
+            downNeighborID = 301,
         };
 
-        int btnY = yPositionOnScreen + MenuHeight - 70;
-
-        _nextBtn = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + MenuWidth - 210, btnY, 170, 56),
-            "Next", _nextLabel)
-        {
-            myID           = 300,
-            leftNeighborID = 301,
-            upNeighborID   = 100,
-        };
+        int btnY = yPositionOnScreen + height - 70;
 
         _backBtn = new ClickableComponent(
             new Rectangle(xPositionOnScreen + 40, btnY, 170, 56),
             "Back", _backLabel)
         {
             myID            = 301,
-            rightNeighborID = 300,
-            upNeighborID    = 101,
+            upNeighborID    = 100,
         };
     }
 
@@ -123,7 +105,6 @@ internal sealed class ScheduleMenu : IClickableMenu
             _onScheduleChanged(_draft, ContractSchedule.Recurring);
             return;
         }
-        if (_nextBtn.bounds.Contains(x, y)) { _onAdvance(_draft); return; }
         if (_backBtn.bounds.Contains(x, y)) { _onBack(_draft);    return; }
     }
 
@@ -141,7 +122,6 @@ internal sealed class ScheduleMenu : IClickableMenu
         allClickableComponents.Clear();
         allClickableComponents.Add(_oneTimeCard);
         allClickableComponents.Add(_recurringCard);
-        allClickableComponents.Add(_nextBtn);
         allClickableComponents.Add(_backBtn);
     }
 
@@ -181,7 +161,6 @@ internal sealed class ScheduleMenu : IClickableMenu
             selected: _draft.Schedule == ContractSchedule.Recurring);
 
         // Navigation buttons
-        DrawButton(b, _nextBtn);
         DrawButton(b, _backBtn);
 
         drawMouse(b);

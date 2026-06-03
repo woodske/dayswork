@@ -8,20 +8,14 @@ using StardewValley.Menus;
 
 namespace Dayswork.UI;
 
+// Read-only review page. Energy tier, task priority, and the Confirm action now live elsewhere
+// (their own pages / the hub); this page just summarizes the contract and returns to the hub.
 internal sealed class SummaryMenu : IClickableMenu
 {
-    private const int MenuWidth = 760;
-    private const int MaxMenuHeight = 760;
-    private const int MinMenuHeight = 620;
     private const int LineSpacing = 34;
-    private const int CategoryRowHeight = 40;
-    private const int ArrowSize = 36;
 
     private readonly ContractDraft _draft;
-    private readonly Action<ContractDraft> _onConfirm;
     private readonly Action<ContractDraft> _onBack;
-    private readonly Action<ContractDraft, int> _onCycleTier;
-    private readonly Action<ContractDraft, TaskCategory, int> _onMoveCategory;
     private readonly SummaryReviewModel _reviewModel;
 
     private readonly List<string> _bodyLines = new();
@@ -31,131 +25,49 @@ internal sealed class SummaryMenu : IClickableMenu
     private bool _draggingBodyScrollBar;
     private int _bodyScrollDragOffset;
 
-    private ClickableComponent _tierPrevBtn = null!;
-    private ClickableComponent _tierNextBtn = null!;
-    private readonly List<CategoryRow> _categoryRows = new();
-
-    private ClickableComponent _confirmBtn = null!;
     private ClickableComponent _backBtn = null!;
 
     public SummaryMenu(
         ContractDraft draft,
-        Action<ContractDraft> onConfirm,
-        Action<ContractDraft> onBack,
-        Action<ContractDraft, int> onCycleTier,
-        Action<ContractDraft, TaskCategory, int> onMoveCategory)
-        : base(0, 0, MenuWidth, MinMenuHeight)
+        Action<ContractDraft> onBack)
+        : base(0, 0, ContractMenuLayout.Width, ContractMenuLayout.Height)
     {
         _draft = draft;
-        _onConfirm = onConfirm;
         _onBack = onBack;
-        _onCycleTier = onCycleTier;
-        _onMoveCategory = onMoveCategory;
         _reviewModel = draft.PreviewState.ReviewModel;
 
-        BuildBodyLines();
-        var maxAvailableHeight = Math.Max(MinMenuHeight, Game1.uiViewport.Height - 48);
-        height = Math.Min(MaxMenuHeight, maxAvailableHeight);
-
-        var topLeft = Utility.getTopLeftPositionForCenteringOnScreen(MenuWidth, height);
+        var topLeft = ContractMenuLayout.GetTopLeft(width, height);
         xPositionOnScreen = (int)topLeft.X;
         yPositionOnScreen = (int)topLeft.Y;
 
+        BuildBodyLines();
         BuildComponents();
         populateClickableComponentList();
     }
 
-    private int ControlTop => yPositionOnScreen + 64;
-    private int TierRowY => ControlTop;
-    private int PriorityHeaderY => ControlTop + 52;
-    private int CategoryRowsTop => ControlTop + 88;
-
     private void BuildComponents()
     {
-        // Tier selector arrows.
-        _tierPrevBtn = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + 220, TierRowY - 6, ArrowSize, ArrowSize),
-            "TierPrev",
-            "<") { myID = 310, rightNeighborID = 311 };
-        _tierNextBtn = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + MenuWidth - 80, TierRowY - 6, ArrowSize, ArrowSize),
-            "TierNext",
-            ">") { myID = 311, leftNeighborID = 310 };
-
-        // Category priority reorder rows (up/down per row).
-        _categoryRows.Clear();
-        for (var i = 0; i < _reviewModel.CategoryPriority.Count; i++)
-        {
-            var rowY = CategoryRowsTop + i * CategoryRowHeight;
-            var up = new ClickableComponent(
-                new Rectangle(xPositionOnScreen + 48, rowY, ArrowSize, ArrowSize),
-                $"CatUp{i}",
-                "^") { myID = 320 + i * 2 };
-            var down = new ClickableComponent(
-                new Rectangle(xPositionOnScreen + 48 + ArrowSize + 6, rowY, ArrowSize, ArrowSize),
-                $"CatDown{i}",
-                "v") { myID = 321 + i * 2 };
-            _categoryRows.Add(new CategoryRow(_reviewModel.CategoryPriority[i], i, up, down));
-        }
-
         var btnY = yPositionOnScreen + height - 70;
-        var bodyTop = CategoryRowsTop + _categoryRows.Count * CategoryRowHeight + 16;
+        var bodyTop = yPositionOnScreen + 72;
         _bodyRect = new Rectangle(
             xPositionOnScreen + 48,
             bodyTop,
-            MenuWidth - 96 - MenuScrollBar.ReservedWidth,
+            width - 96 - MenuScrollBar.ReservedWidth,
             btnY - bodyTop - 18);
         _maxBodyScrollIndex = Math.Max(0, _bodyLines.Count - GetVisibleBodyLineCount());
         _bodyScrollIndex = Math.Clamp(_bodyScrollIndex, 0, _maxBodyScrollIndex);
 
-        _confirmBtn = new ClickableComponent(
-            new Rectangle(xPositionOnScreen + MenuWidth - 210, btnY, 170, 56),
-            "Confirm",
-            I18nHelper.Get("ui.summary.confirm_btn"))
-        {
-            myID = 300,
-            leftNeighborID = 301,
-        };
-
         _backBtn = new ClickableComponent(
             new Rectangle(xPositionOnScreen + 40, btnY, 170, 56),
             "Back",
-            I18nHelper.Get("ui.summary.back_btn"))
+            I18nHelper.Get("ui.common.back_btn"))
         {
             myID = 301,
-            rightNeighborID = 300,
         };
     }
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
-        if (_tierPrevBtn.bounds.Contains(x, y))
-        {
-            _onCycleTier(_draft, -1);
-            return;
-        }
-
-        if (_tierNextBtn.bounds.Contains(x, y))
-        {
-            _onCycleTier(_draft, 1);
-            return;
-        }
-
-        foreach (var row in _categoryRows)
-        {
-            if (row.Index > 0 && row.Up.bounds.Contains(x, y))
-            {
-                _onMoveCategory(_draft, row.Category, -1);
-                return;
-            }
-
-            if (row.Index < _categoryRows.Count - 1 && row.Down.bounds.Contains(x, y))
-            {
-                _onMoveCategory(_draft, row.Category, 1);
-                return;
-            }
-        }
-
         if (MenuScrollBar.TryBeginDrag(_bodyRect, GetVisibleBodyLineCount(), _bodyLines.Count, _bodyScrollIndex, x, y, out _bodyScrollDragOffset))
         {
             _draggingBodyScrollBar = true;
@@ -182,12 +94,6 @@ internal sealed class SummaryMenu : IClickableMenu
                 _bodyLines.Count,
                 _bodyScrollIndex,
                 y);
-            return;
-        }
-
-        if (_confirmBtn.bounds.Contains(x, y) && _reviewModel.CanConfirm)
-        {
-            _onConfirm(_draft);
             return;
         }
 
@@ -237,20 +143,18 @@ internal sealed class SummaryMenu : IClickableMenu
     {
         allClickableComponents ??= new List<ClickableComponent>();
         allClickableComponents.Clear();
-        allClickableComponents.Add(_confirmBtn);
         allClickableComponents.Add(_backBtn);
-        allClickableComponents.Add(_tierPrevBtn);
-        allClickableComponents.Add(_tierNextBtn);
-        foreach (var row in _categoryRows)
-        {
-            allClickableComponents.Add(row.Up);
-            allClickableComponents.Add(row.Down);
-        }
     }
 
     public override void setCurrentlySnappedComponentTo(int id)
     {
         currentlySnappedComponent = getComponentWithID(id);
+        snapCursorToCurrentSnappedComponent();
+    }
+
+    public override void snapToDefaultClickableComponent()
+    {
+        currentlySnappedComponent = _backBtn;
         snapCursorToCurrentSnappedComponent();
     }
 
@@ -265,9 +169,6 @@ internal sealed class SummaryMenu : IClickableMenu
             new Vector2(xPositionOnScreen + 40, yPositionOnScreen + 20),
             Game1.textColor);
 
-        DrawTierSelector(b);
-        DrawCategoryPriority(b);
-
         var lineY = _bodyRect.Y;
         var visibleLineCount = GetVisibleBodyLineCount();
         for (var i = _bodyScrollIndex; i < _bodyLines.Count && i < _bodyScrollIndex + visibleLineCount; i++)
@@ -278,65 +179,9 @@ internal sealed class SummaryMenu : IClickableMenu
 
         MenuScrollBar.Draw(b, _bodyRect, visibleLineCount, _bodyLines.Count, _bodyScrollIndex);
 
-        DrawButton(b, _confirmBtn, _reviewModel.CanConfirm);
         DrawButton(b, _backBtn, true);
-        DrawArrow(b, _tierPrevBtn, true);
-        DrawArrow(b, _tierNextBtn, true);
-        foreach (var row in _categoryRows)
-        {
-            DrawArrow(b, row.Up, row.Index > 0);
-            DrawArrow(b, row.Down, row.Index < _categoryRows.Count - 1);
-        }
 
         drawMouse(b);
-    }
-
-    private void DrawTierSelector(SpriteBatch b)
-    {
-        Utility.drawTextWithShadow(
-            b,
-            I18nHelper.Get("ui.summary.energy_tier_label"),
-            Game1.smallFont,
-            new Vector2(xPositionOnScreen + 48, TierRowY),
-            Game1.textColor);
-
-        var tierName = I18nHelper.Get($"ui.summary.tier.{TierKey(_reviewModel.Tier)}");
-        var tierText = _reviewModel.Pricing is not null && _reviewModel.WorkerEnergy is not null
-            ? I18nHelper.Get("ui.summary.tier_value", new
-            {
-                tier = tierName,
-                energy = _reviewModel.WorkerEnergy.DailyCapacity,
-                price = _reviewModel.Pricing.TotalPrice,
-            })
-            : tierName;
-
-        Utility.drawTextWithShadow(
-            b,
-            tierText,
-            Game1.smallFont,
-            new Vector2(_tierPrevBtn.bounds.Right + 12, TierRowY),
-            Game1.textColor);
-    }
-
-    private void DrawCategoryPriority(SpriteBatch b)
-    {
-        Utility.drawTextWithShadow(
-            b,
-            I18nHelper.Get("ui.summary.priority_header"),
-            Game1.smallFont,
-            new Vector2(xPositionOnScreen + 48, PriorityHeaderY),
-            Game1.textColor);
-
-        foreach (var row in _categoryRows)
-        {
-            var label = I18nHelper.Get($"ui.summary.category.{CategoryKey(row.Category)}");
-            Utility.drawTextWithShadow(
-                b,
-                $"{row.Index + 1}. {label}",
-                Game1.smallFont,
-                new Vector2(row.Down.bounds.Right + 16, row.Up.bounds.Y + 6),
-                Game1.textColor);
-        }
     }
 
     private void BuildBodyLines()
@@ -363,6 +208,18 @@ internal sealed class SummaryMenu : IClickableMenu
                                 .Select(greenhouse => greenhouse.LocationName)
                                 .OrderBy(name => name, StringComparer.Ordinal)),
                     }));
+
+        // Energy tier (selected on the Energy page).
+        var tierName = I18nHelper.Get($"ui.summary.tier.{TierKey(_reviewModel.Tier)}");
+        AddWrappedLine($"{I18nHelper.Get("ui.summary.energy_tier_label")} {tierName}");
+
+        // Task priority order (set on the Task Priority page).
+        AddWrappedLine(I18nHelper.Get("ui.summary.priority_header"));
+        for (var i = 0; i < _reviewModel.CategoryPriority.Count; i++)
+        {
+            var label = I18nHelper.Get($"ui.summary.category.{CategoryKey(_reviewModel.CategoryPriority[i])}");
+            AddWrappedLine($"   {i + 1}. {label}");
+        }
 
         if (_reviewModel.CanConfirm && _reviewModel.Pricing is not null && _reviewModel.WorkerEnergy is not null)
         {
@@ -418,7 +275,7 @@ internal sealed class SummaryMenu : IClickableMenu
 
     private void AddWrappedLine(string value)
     {
-        var wrapped = Game1.parseText(value, Game1.smallFont, MenuWidth - 96 - MenuScrollBar.ReservedWidth)
+        var wrapped = Game1.parseText(value, Game1.smallFont, width - 96 - MenuScrollBar.ReservedWidth)
             .Replace("\r\n", "\n")
             .Replace('\r', '\n');
 
@@ -454,26 +311,4 @@ internal sealed class SummaryMenu : IClickableMenu
                 btn.bounds.Y + (int)(btn.bounds.Height - textSize.Y) / 2),
             textTint);
     }
-
-    private static void DrawArrow(SpriteBatch b, ClickableComponent btn, bool enabled)
-    {
-        var tint = enabled ? Color.White : Color.Gray * 0.5f;
-        var textTint = enabled ? Game1.textColor : Color.Gray;
-        drawTextureBox(b, btn.bounds.X, btn.bounds.Y, btn.bounds.Width, btn.bounds.Height, tint);
-        var textSize = Game1.smallFont.MeasureString(btn.label);
-        Utility.drawTextWithShadow(
-            b,
-            btn.label,
-            Game1.smallFont,
-            new Vector2(
-                btn.bounds.X + (btn.bounds.Width - textSize.X) / 2,
-                btn.bounds.Y + (btn.bounds.Height - textSize.Y) / 2),
-            textTint);
-    }
-
-    private sealed record CategoryRow(
-        TaskCategory Category,
-        int Index,
-        ClickableComponent Up,
-        ClickableComponent Down);
 }
