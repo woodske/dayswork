@@ -334,7 +334,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Entrance override ({preferred.X},{preferred.Y}) blocked — using nearby passable tile ({x},{y}).",
-                    LogLevel.Debug);
+                    LogLevel.Trace);
                 return new TileCoord(x, y);
             }
         }
@@ -433,18 +433,18 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
     {
         if (_ctx is null)
         {
-            ModEntry.ModMonitor.Log("[Dayswork] No active shift to cancel.", LogLevel.Info);
+            ModEntry.ModMonitor.Log("[Dayswork] No active shift to cancel.", LogLevel.Trace);
             return;
         }
 
         var phase = _ctx.StateMachine.Phase;
         if (phase is ShiftPhase.Depositing or ShiftPhase.Exiting or ShiftPhase.Done)
         {
-            ModEntry.ModMonitor.Log("[Dayswork] Shift is already finishing — nothing to cancel.", LogLevel.Info);
+            ModEntry.ModMonitor.Log("[Dayswork] Shift is already finishing — nothing to cancel.", LogLevel.Trace);
             return;
         }
 
-        ModEntry.ModMonitor.Log("[Dayswork] Player cancelled shift early — worker will deposit and leave.", LogLevel.Info);
+        ModEntry.ModMonitor.Log("[Dayswork] Player cancelled shift early — worker will deposit and leave.", LogLevel.Trace);
         _ctx.ShiftEndTime = Game1.timeOfDay;
 
         // Stuck is a transient working state; bridge it to Recovering so that
@@ -473,7 +473,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         {
             ModEntry.ModMonitor.Log(
                 $"[Dayswork] Resetting in-memory worker runtime for session boundary {boundary}.",
-                LogLevel.Info);
+                LogLevel.Trace);
         }
 
         ClearWorker();
@@ -514,7 +514,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                                  batch.AnimalWork.Count == 0 &&
                                  !batch.FeedBuilding))
         {
-            ModEntry.ModMonitor.Log("[Dayswork] No applicable work found for today's contract — no worker spawned.", LogLevel.Info);
+            ModEntry.ModMonitor.Log("[Dayswork] No applicable work found for today's contract — no worker spawned.", LogLevel.Trace);
             return;
         }
 
@@ -683,9 +683,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             }
         }
 
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork][shift-plan] runtime batches={string.Join(", ", batches.Select(batch => $"{batch.Kind}:{batch.LocationName}:{string.Join("/", batch.Tasks)}"))} greenhouse={greenhouseLocation} outdoorTiles={outdoorZones.Count}.",
-            LogLevel.Info);
+        DevLog.Log(
+            $"[Dayswork][shift-plan] runtime batches={string.Join(", ", batches.Select(batch => $"{batch.Kind}:{batch.LocationName}:{string.Join("/", batch.Tasks)}"))} greenhouse={greenhouseLocation} outdoorTiles={outdoorZones.Count}.");
         return batches;
     }
 
@@ -801,9 +800,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         var batchTasks = batch.Tasks.ToHashSet();
         var refreshedAnimalWork = BuildAnimalWork(farm, buildingHomes, batchTasks);
 
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork][building-grazing] home={batch.LocationName} animalWork={refreshedAnimalWork.Count}.",
-            refreshedAnimalWork.Count == 0 ? LogLevel.Trace : LogLevel.Info);
+        DevLog.Log($"[Dayswork][building-grazing] home={batch.LocationName} animalWork={refreshedAnimalWork.Count}.");
         return batch with { TileWork = Array.Empty<WorkItem>(), AnimalWork = refreshedAnimalWork };
     }
 
@@ -825,9 +822,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
                 OutputScopeProvenance.AnimalBuilding(string.Empty))
             : (IReadOnlyList<WorkItem>)Array.Empty<WorkItem>();
 
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork][farm-forage] tileWork={refreshedTileWork.Count}.",
-            refreshedTileWork.Count == 0 ? LogLevel.Trace : LogLevel.Info);
+        DevLog.Log($"[Dayswork][farm-forage] tileWork={refreshedTileWork.Count}.");
         return batch with { TileWork = refreshedTileWork, AnimalWork = Array.Empty<AnimalWorkItem>() };
     }
 
@@ -1195,9 +1190,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         // Reset the routing guard so it doesn't immediately fire on the items we just queued.
         _activeBatchSelectionAttempts = 0;
 
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork][farm-forage] pre-completion rescan picked up {added} new tile item(s); batch continues.",
-            LogLevel.Info);
+        DevLog.Log($"[Dayswork][farm-forage] pre-completion rescan picked up {added} new tile item(s); batch continues.");
         return true;
     }
 
@@ -1692,7 +1685,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
             _ctx.ShiftEndTime = Game1.timeOfDay;
             ModEntry.ModMonitor.Log(
                 $"[Dayswork] Player slept during active shift; stopping worker at {_ctx.ShiftEndTime}.",
-                LogLevel.Info);
+                LogLevel.Trace);
         }
 
         // Route every collected-but-undelivered item through automatic overflow; do not run
@@ -2446,7 +2439,7 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork] Shift complete. StopReason={_ctx!.StateMachine.StopReason}. Remaining stamina={_ctx.EnergyState.RemainingEnergy}/{_ctx.EnergyState.Capacity}.",
-            LogLevel.Info);
+            LogLevel.Trace);
 
         // One settlement letter next morning for overflow items only; U-21 removes refund settlement.
         DispatchShiftOverflow();
@@ -2880,9 +2873,8 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         string changedState,
         string restoredState)
     {
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork][player-action-guard] Worker task {task} at ({tile.X},{tile.Y}) in {location.NameOrUniqueName} changed Game1.player action state while playerTool={DescribePlayerTool(Game1.player)}; restored. saved={{ {savedState} }} changed={{ {changedState} }} restored={{ {restoredState} }}",
-            LogLevel.Debug);
+        DevLog.Log(
+            $"[Dayswork][player-action-guard] Worker task {task} at ({tile.X},{tile.Y}) in {location.NameOrUniqueName} changed Game1.player action state while playerTool={DescribePlayerTool(Game1.player)}; restored. saved={{ {savedState} }} changed={{ {changedState} }} restored={{ {restoredState} }}");
     }
 
     private static string DescribePlayerTool(Farmer player)

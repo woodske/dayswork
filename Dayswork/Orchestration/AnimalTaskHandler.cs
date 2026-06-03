@@ -133,9 +133,8 @@ internal sealed class AnimalTaskHandler
             .ToList();
 
         feedItems.AddRange(feederItems);
-        _monitor.Log(
-            $"[Dayswork][feed-plan] location={animalHouse.Name} hopper=({hopperTile.X},{hopperTile.Y}) hopperNav=({hopperNav.X},{hopperNav.Y}) hopperSource={hopperSource} troughSource=Back:Trough filled={filled} empty={emptySlots} hayToTake={feederItems.Count} feeders=[{string.Join("; ", feederItems.Select(item => $"task=({item.TaskTile.X},{item.TaskTile.Y}) nav=({item.NavTile.X},{item.NavTile.Y})"))}]",
-            LogLevel.Info);
+        DevLog.Log(
+            $"[Dayswork][feed-plan] location={animalHouse.Name} hopper=({hopperTile.X},{hopperTile.Y}) hopperNav=({hopperNav.X},{hopperNav.Y}) hopperSource={hopperSource} troughSource=Back:Trough filled={filled} empty={emptySlots} hayToTake={feederItems.Count} feeders=[{string.Join("; ", feederItems.Select(item => $"task=({item.TaskTile.X},{item.TaskTile.Y}) nav=({item.NavTile.X},{item.NavTile.Y})"))}]");
         return new FeedWorkPlan(feedItems, hopperTile, feederItems.Count, emptySlots);
     }
 

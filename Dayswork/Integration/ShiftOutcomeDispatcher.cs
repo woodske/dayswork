@@ -24,7 +24,7 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork] Deposited {deposited} overflow item stack(s) to {(usedChest ? "the farmhand cabin chest" : "the shipping bin")}.",
-            LogLevel.Info);
+            LogLevel.Trace);
 
         Game1.addHUDMessage(new HUDMessage(
             I18nHelper.Get(usedChest ? "notify.items_deposited_chest" : "notify.items_deposited_bin"),

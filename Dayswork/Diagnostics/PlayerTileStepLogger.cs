@@ -5,6 +5,7 @@ using StardewValley;
 
 namespace Dayswork.Diagnostics;
 
+// Dev-only player tile-step diagnostic — wired in ModEntry only when DevLog.Enabled (off for release).
 internal sealed class PlayerTileStepLogger
 {
     private readonly IMonitor _monitor;

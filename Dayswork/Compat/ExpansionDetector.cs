@@ -49,7 +49,7 @@ internal sealed class ExpansionDetector
             }
 
             var profile = _selector.Select(installed);
-            _monitor.Log($"[Dayswork] Active expansion compatibility profile: {profile.Id}.", LogLevel.Debug);
+            _monitor.Log($"[Dayswork] Active expansion compatibility profile: {profile.Id}.", LogLevel.Trace);
             return profile;
         }
         catch (Exception ex)

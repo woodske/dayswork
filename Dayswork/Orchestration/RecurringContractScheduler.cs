@@ -98,7 +98,7 @@ internal sealed class RecurringContractScheduler
             _shiftOutcomes.ShowFestivalNotice(contract, 0);
         }
 
-        ModEntry.ModMonitor.Log(I18nHelper.Get("log.festival.skipped"), LogLevel.Info);
+        ModEntry.ModMonitor.Log(I18nHelper.Get("log.festival.skipped"), LogLevel.Trace);
     }
 
     // Full per-recurring-day sequence: rebuild first, persist refreshed terms when valid, then select
@@ -115,19 +115,19 @@ internal sealed class RecurringContractScheduler
                 _shiftOutcomes.ShowNeedsAttentionNotice(contract);
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Recurring contract {contract.Id.Value} needs attention before it can be rebuilt for today — skipped with no charge.",
-                    LogLevel.Info);
+                    LogLevel.Trace);
                 return;
             case RecurringDayStartNoticeKind.FestivalSkip:
                 _shiftOutcomes.ShowFestivalNotice(contract, 0);
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Recurring contract {contract.Id.Value} refreshed for a festival day — no charge taken and no worker spawned.",
-                    LogLevel.Info);
+                    LogLevel.Trace);
                 return;
             case RecurringDayStartNoticeKind.CannotAfford:
                 _shiftOutcomes.ShowCannotAffordNotice(contract, outcome.DailyPrice, outcome.Shortfall);
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Recurring contract {contract.Id.Value} is unaffordable today (price {outcome.DailyPrice}g, short by {outcome.Shortfall}g) — skipped with refreshed terms preserved.",
-                    LogLevel.Info);
+                    LogLevel.Trace);
                 return;
         }
 

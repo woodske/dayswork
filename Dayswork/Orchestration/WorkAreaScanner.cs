@@ -491,12 +491,10 @@ internal sealed class WorkAreaScanner
         int noNavigationTiles,
         int duplicateTiles)
     {
-        var message =
+        DevLog.Log(
             $"[Dayswork][scan] location={location.Name} zones={zoneCount} scannedTiles={scannedTiles} " +
             $"enabled={string.Join(",", enabled.OrderBy(t => t))} detected=[{FormatCounts(detectedByKind)}] " +
             $"accepted=[{FormatCounts(acceptedByKind)}] acceptedItems={acceptedItems} " +
-            $"capabilitySkipped={capabilitySkippedTiles} noStandTile={noNavigationTiles} duplicateClumpTiles={duplicateTiles}";
-
-        ModEntry.ModMonitor.Log(message, acceptedItems == 0 ? LogLevel.Info : LogLevel.Trace);
+            $"capabilitySkipped={capabilitySkippedTiles} noStandTile={noNavigationTiles} duplicateClumpTiles={duplicateTiles}");
     }
 }

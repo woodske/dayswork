@@ -62,7 +62,6 @@ public sealed class ModEntry : Mod
         var animalHandler   = new AnimalTaskHandler(this.Monitor);
         var buildingNavigator = new BuildingWorkNavigator(this.Monitor, movementDriver);
         var depositPlanner  = new DepositPlanner();
-        var playerTileStepLogger = new PlayerTileStepLogger(this.Monitor);
         // U-25 WS2: missed/overflow items are deposited into the hiring building's static chest and
         // notices are shown as HUD messages — no Mail Framework Mod, no mailbox delivery.
         var shiftOutcomeDispatcher = new ShiftOutcomeDispatcher();
@@ -105,10 +104,8 @@ public sealed class ModEntry : Mod
             expansionCompat.SetActiveProfile(expansionDetector.ResolveActiveProfile());
         };
         helper.Events.GameLoop.ReturnedToTitle += sessionResetHandler.OnReturnedToTitle;
-        helper.Events.GameLoop.ReturnedToTitle += (_, _) => playerTileStepLogger.Reset();
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
-        helper.Events.GameLoop.SaveLoaded   += (_, _) => playerTileStepLogger.Reset();
         // Stop and settle any in-flight shift (sleep-stop + overflow delivery) BEFORE contracts
         // persist and before the day rolls over — handler order is authoritative (Pattern S /
         // REL-U15-02). U-21 BR-END-03 / BR-SLEEP-02 removed refund settlement from this path.
@@ -117,7 +114,6 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
         // Reset the "worker done for the day" animation flag each morning (office goes dark again).
         helper.Events.GameLoop.DayStarted   += (_, _) => HiringBuilding.WorkCompletedToday = false;
-        helper.Events.GameLoop.UpdateTicked += playerTileStepLogger.OnUpdateTicked;
         helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;
         helper.Events.GameLoop.TimeChanged  += orchestrator.OnTimeChanged;
         helper.Events.Content.AssetRequested += OnAssetRequested;
@@ -125,10 +121,18 @@ public sealed class ModEntry : Mod
         // Evening lit-windows + chimney smoke once the worker has finished for the day.
         helper.Events.Display.RenderedWorld += buildingOverlay.OnRenderedWorld;
 
-        // TODO: REMOVE before release — debug command for verifying save/load persistence (task #1 play-test)
-        RegisterDebugCommands(helper, store, playerTileStepLogger);
+        // Dev tooling (verbose diagnostics + debug console commands) — gated by DevLog.Enabled, which
+        // is off for release. One switch keeps the whole dev kit out of shipped builds.
+        if (DevLog.Enabled)
+        {
+            var playerTileStepLogger = new PlayerTileStepLogger(this.Monitor);
+            helper.Events.GameLoop.ReturnedToTitle += (_, _) => playerTileStepLogger.Reset();
+            helper.Events.GameLoop.SaveLoaded      += (_, _) => playerTileStepLogger.Reset();
+            helper.Events.GameLoop.UpdateTicked    += playerTileStepLogger.OnUpdateTicked;
+            RegisterDebugCommands(helper, store, playerTileStepLogger);
+        }
 
-        this.Monitor.Log($"Dayswork loaded ({this.ModManifest.Version})", LogLevel.Info);
+        this.Monitor.Log($"Dayswork loaded ({this.ModManifest.Version})", LogLevel.Trace);
     }
 
     private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
@@ -144,7 +148,7 @@ public sealed class ModEntry : Mod
         HiringBuilding.OnAssetRequested(e, this.Helper);
     }
 
-    // TODO: REMOVE before release — see RegisterDebugCommands call above
+    // Dev-only debug commands — registered from Entry only when DevLog.Enabled (off for release).
     private void RegisterDebugCommands(IModHelper helper, ContractStore store, PlayerTileStepLogger playerTileStepLogger)
     {
         helper.ConsoleCommands.Add(
