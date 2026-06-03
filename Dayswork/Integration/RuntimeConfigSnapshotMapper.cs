@@ -19,6 +19,7 @@ internal static class RuntimeConfigSnapshotMapper
                 : defaults.WorkerWalkPixelsPerTick,
             WorkerActionAnimationMs = Math.Max(1, config.WorkerActionAnimationMs),
             WorkerEntranceHoldTicks = Math.Max(0, config.WorkerEntranceHoldTicks),
+            WorkOnHolidays = config.WorkOnHolidays,
             EnergyTierEnergy = NormalizePositiveDictionary(
                 config.EnergyTierEnergy,
                 defaults.EnergyTierEnergy,
@@ -60,6 +61,7 @@ internal static class RuntimeConfigSnapshotMapper
             normalized.WorkerWalkPixelsPerTick,
             normalized.WorkerActionAnimationMs,
             normalized.WorkerEntranceHoldTicks,
+            normalized.WorkOnHolidays,
             energyTierEnergy,
             energyTierPrice,
             workActionCosts);

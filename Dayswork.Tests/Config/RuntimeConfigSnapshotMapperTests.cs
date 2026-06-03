@@ -40,6 +40,7 @@ public class RuntimeConfigSnapshotMapperTests
         Assert.Equal(defaults.WorkerWalkPixelsPerTick, normalized.WorkerWalkPixelsPerTick);
         Assert.Equal(1, normalized.WorkerActionAnimationMs);
         Assert.Equal(0, normalized.WorkerEntranceHoldTicks);
+        Assert.Equal(defaults.WorkOnHolidays, normalized.WorkOnHolidays);
         Assert.Equal(defaults.EnergyTierEnergy["FullDay"], normalized.EnergyTierEnergy["FullDay"]);
         Assert.Equal(defaults.EnergyTierPrice["FullDay"], normalized.EnergyTierPrice["FullDay"]);
         Assert.Equal(defaults.WorkActionCosts["AxeSwing"], normalized.WorkActionCosts["AxeSwing"]);
@@ -49,12 +50,14 @@ public class RuntimeConfigSnapshotMapperTests
     public void BuildSnapshot_applies_edited_values()
     {
         var config = ModConfig.CreateDefaults();
+        config.WorkOnHolidays = false;
         config.EnergyTierEnergy["FullDay"] = 222;
         config.EnergyTierPrice["FullDay"] = 999;
         config.WorkActionCosts["AxeSwing"] = 7;
 
         var snapshot = RuntimeConfigSnapshotMapper.BuildSnapshot(config);
 
+        Assert.False(snapshot.WorkOnHolidays);
         Assert.Equal(222, snapshot.EnergyTierEnergy[EnergyTier.FullDay]);
         Assert.Equal(999, snapshot.EnergyTierPrice[EnergyTier.FullDay]);
         Assert.Equal(7, snapshot.WorkActionCosts[WorkActionKind.AxeSwing]);

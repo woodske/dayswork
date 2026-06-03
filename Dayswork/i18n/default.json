@@ -161,6 +161,8 @@
     "gmcm.worker.action_animation_ms.tooltip": "How long each visible work action lasts before the worker can move on.",
     "gmcm.worker.entrance_hold_ticks.name": "Entrance hold ticks",
     "gmcm.worker.entrance_hold_ticks.tooltip": "How long the worker pauses at the farm entrance so their arrival reads clearly.",
+    "gmcm.worker.work_on_holidays.name": "Work on holidays",
+    "gmcm.worker.work_on_holidays.tooltip": "When enabled, the farmhand works on festival and holiday days. Turn this off to keep the current skip-holidays behavior.",
     "gmcm.worker.hard_cap_time.name": "Hard cap time",
     "gmcm.worker.hard_cap_time.tooltip": "The Stardew HHMM time when the worker stops starting new work and begins wrap-up.",
     "gmcm.worker.stuck_initial_wait.name": "Initial stuck wait (minutes)",

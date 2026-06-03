@@ -18,6 +18,7 @@ public class ConfigSnapshotGenSmokeTests
             && s.WorkerWalkPixelsPerTick > 0
             && s.WorkerActionAnimationMs >= 1
             && s.WorkerEntranceHoldTicks >= 0
+            && (s.WorkOnHolidays || !s.WorkOnHolidays)
             && s.EnergyTierEnergy.Count == Enum.GetValues<EnergyTier>().Length
             && s.EnergyTierEnergy.Values.All(v => v > 0)
             && s.EnergyTierPrice.Count == Enum.GetValues<EnergyTier>().Length

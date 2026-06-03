@@ -13,6 +13,7 @@ public sealed class ModConfig
     public float WorkerWalkPixelsPerTick { get; set; } = DefaultSnapshot.WorkerWalkPixelsPerTick;
     public int WorkerActionAnimationMs { get; set; } = DefaultSnapshot.WorkerActionAnimationMs;
     public int WorkerEntranceHoldTicks { get; set; } = DefaultSnapshot.WorkerEntranceHoldTicks;
+    public bool WorkOnHolidays { get; set; } = DefaultSnapshot.WorkOnHolidays;
     public Dictionary<string, int> EnergyTierEnergy { get; set; } = CreateEnergyTierEnergyDefaults();
     public Dictionary<string, int> EnergyTierPrice { get; set; } = CreateEnergyTierPriceDefaults();
     public Dictionary<string, int> WorkActionCosts { get; set; } = CreateWorkActionCostDefaults();

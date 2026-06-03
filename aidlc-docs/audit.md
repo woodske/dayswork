@@ -5465,3 +5465,19 @@ Fix deposit routing so `Collect Fruit -> Shipping Bin` always ends in the shippi
 **Context**: Focused recurring-contract review/edit fix for persisted energy tier and category-priority hydration.
 
 ---
+
+## Code Generation
+**Timestamp**: 2026-06-03T18:08:56Z
+**User Input**: "I give players the option to have the farmhand work on holidays. Default to true (the worker will work on holidays). If set to false, the worker will skip holidays (current implementation)."
+**AI Response**: "Added a `WorkOnHolidays` config flag defaulting to true, exposed it through GMCM worker-behavior settings, and updated recurring/one-time holiday gating so festival-day skips only happen when the setting is turned off. Added focused config regression coverage before verification."
+**Context**: Config and scheduler update for holiday work behavior.
+
+---
+
+## Build and Test
+**Timestamp**: 2026-06-03T18:24:19Z
+**User Input**: "N/A - verification executed from the approved implementation request."
+**AI Response**: "Verification passed for the holiday-work config toggle. `dotnet build Dayswork.sln /p:EnableModDeploy=false` completed with 0 warnings and 0 errors. `dotnet test Dayswork.sln /p:EnableModDeploy=false` completed with 345 passed, 0 failed, and 1 expected skip. Updated aidlc-state.md with the new holiday-work config summary."
+**Context**: Build and Test verification for configurable holiday work behavior.
+
+---

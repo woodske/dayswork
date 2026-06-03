@@ -61,6 +61,12 @@ public class ConfigDefaultsTests
     }
 
     [Fact]
+    public void Build_WorkOnHolidays_defaults_true()
+    {
+        Assert.True(ConfigDefaults.Build().WorkOnHolidays);
+    }
+
+    [Fact]
     public void Build_WorkActionCosts_cover_every_work_action()
     {
         var snapshot = ConfigDefaults.Build();

@@ -37,6 +37,7 @@ public static class ConfigSnapshotGen
             from walkPixels in Gen.Choose(1, 6).Select(x => (float)x)
             from actionAnimationMs in Gen.Choose(100, 1500)
             from entranceHoldTicks in Gen.Choose(0, 300)
+            from workOnHolidays in Arb.Generate<bool>()
             from tierEnergy in tierEnergyGen
             from tierPrice in tierPriceGen
             from actionCosts in actionCostGen
@@ -47,6 +48,7 @@ public static class ConfigSnapshotGen
                 walkPixels,
                 actionAnimationMs,
                 entranceHoldTicks,
+                workOnHolidays,
                 tierEnergy,
                 tierPrice,
                 actionCosts);

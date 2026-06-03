@@ -11,6 +11,7 @@ public interface IConfigSnapshot
     float WorkerWalkPixelsPerTick { get; }
     int WorkerActionAnimationMs { get; }
     int WorkerEntranceHoldTicks { get; }
+    bool WorkOnHolidays { get; }
 
     /// <summary>Worker energy (daily capacity) granted by each purchasable tier.</summary>
     IReadOnlyDictionary<EnergyTier, int> EnergyTierEnergy { get; }

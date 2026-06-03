@@ -48,8 +48,8 @@ internal sealed class RecurringContractScheduler
 
         var today = CurrentGameDate();
         var contractsForToday = _store.ListActiveForDate(today.Day, today.Season, today.Year);
-        var festival = _calendar.IsFestivalToday();
         var config = _configManager.CurrentSnapshot;
+        var holidaySkip = _calendar.IsFestivalToday() && !config.WorkOnHolidays;
 
         foreach (var contract in contractsForToday)
         {
@@ -57,7 +57,7 @@ internal sealed class RecurringContractScheduler
             {
                 // Festival gate for one-time contracts: the contract is consumed and the already-paid
                 // fixed price is returned by direct refund plus a same-day HUD notice.
-                if (festival && contract.Schedule == ContractSchedule.OneTime)
+                if (holidaySkip && contract.Schedule == ContractSchedule.OneTime)
                 {
                     HandleFestival(contract);
                     continue;
@@ -72,7 +72,7 @@ internal sealed class RecurringContractScheduler
                 }
                 else
                 {
-                    StartRecurring(contract, config, festival);
+                    StartRecurring(contract, config, holidaySkip);
                 }
             }
             catch (Exception ex)

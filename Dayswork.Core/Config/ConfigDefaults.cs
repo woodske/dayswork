@@ -45,6 +45,7 @@ public static class ConfigDefaults
             workerWalkPixelsPerTick: 2f,
             workerActionAnimationMs: 650,
             workerEntranceHoldTicks: 120,
+            workOnHolidays: true,
             energyTierEnergy: new ReadOnlyDictionary<EnergyTier, int>(energyTierEnergy),
             energyTierPrice: new ReadOnlyDictionary<EnergyTier, int>(energyTierPrice),
             workActionCosts: new ReadOnlyDictionary<WorkActionKind, int>(workActionCosts));

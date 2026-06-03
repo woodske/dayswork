@@ -10,6 +10,7 @@ public sealed record ConfigSnapshot(
     float WorkerWalkPixelsPerTick,
     int WorkerActionAnimationMs,
     int WorkerEntranceHoldTicks,
+    bool WorkOnHolidays,
     IReadOnlyDictionary<EnergyTier, int> EnergyTierEnergy,
     IReadOnlyDictionary<EnergyTier, int> EnergyTierPrice,
     IReadOnlyDictionary<WorkActionKind, int> WorkActionCosts
@@ -24,6 +25,7 @@ public sealed record ConfigSnapshot(
         && WorkerWalkPixelsPerTick.Equals(other.WorkerWalkPixelsPerTick)
         && WorkerActionAnimationMs == other.WorkerActionAnimationMs
         && WorkerEntranceHoldTicks == other.WorkerEntranceHoldTicks
+        && WorkOnHolidays == other.WorkOnHolidays
         && DictionaryEquals(EnergyTierEnergy, other.EnergyTierEnergy)
         && DictionaryEquals(EnergyTierPrice, other.EnergyTierPrice)
         && DictionaryEquals(WorkActionCosts, other.WorkActionCosts);
@@ -37,6 +39,7 @@ public sealed record ConfigSnapshot(
         hash.Add(WorkerWalkPixelsPerTick);
         hash.Add(WorkerActionAnimationMs);
         hash.Add(WorkerEntranceHoldTicks);
+        hash.Add(WorkOnHolidays);
         hash.Add(EnergyTierEnergy.Count);
         hash.Add(EnergyTierPrice.Count);
         hash.Add(WorkActionCosts.Count);

@@ -22,6 +22,7 @@ public class ConfigSnapshotFactoryTests
             workerWalkPixelsPerTick: workerWalkPixelsPerTick,
             workerActionAnimationMs: defaults.WorkerActionAnimationMs,
             workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
+            workOnHolidays: defaults.WorkOnHolidays,
             energyTierEnergy: tierEnergy ?? defaults.EnergyTierEnergy,
             energyTierPrice: tierPrice ?? defaults.EnergyTierPrice,
             workActionCosts: defaults.WorkActionCosts);
@@ -36,6 +37,7 @@ public class ConfigSnapshotFactoryTests
         Assert.Equal(2000, snapshot.HardCapTime);
         Assert.Equal(10, snapshot.StuckInitialWaitMinutes);
         Assert.Equal(10, snapshot.StuckPostTeleportWaitMinutes);
+        Assert.Equal(defaults.WorkOnHolidays, snapshot.WorkOnHolidays);
         Assert.Equal(defaults.EnergyTierEnergy[EnergyTier.FullDay], snapshot.EnergyTierEnergy[EnergyTier.FullDay]);
         Assert.Equal(defaults.EnergyTierPrice[EnergyTier.FullDay], snapshot.EnergyTierPrice[EnergyTier.FullDay]);
     }
