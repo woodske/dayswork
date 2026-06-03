@@ -23,7 +23,7 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         var deposited = DepositToBuildingChestOrBin(built, out var usedChest);
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork] Deposited {deposited} overflow item stack(s) to {(usedChest ? "the farmhand office chest" : "the shipping bin")}.",
+            $"[Dayswork] Deposited {deposited} overflow item stack(s) to {(usedChest ? "the farmhand cabin chest" : "the shipping bin")}.",
             LogLevel.Info);
 
         Game1.addHUDMessage(new HUDMessage(

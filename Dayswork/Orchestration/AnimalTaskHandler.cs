@@ -6,6 +6,7 @@ using Dayswork.Worker;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.GameData.FarmAnimals;
 using StardewValley.Tools;
 using SObject = StardewValley.Object;
 
@@ -185,7 +186,18 @@ internal sealed class AnimalTaskHandler
     }
 
     public bool HasToolHarvestReady(FarmAnimal animal) =>
-        !string.IsNullOrWhiteSpace(animal.currentProduce.Value);
+        !string.IsNullOrWhiteSpace(animal.currentProduce.Value) &&
+        !ProducesGroundForage(animal);
+
+    /// <summary>
+    /// True for animals (e.g. pigs) whose produce is dug up from the ground rather than harvested
+    /// off the animal. Their produce — truffles — is dropped on the ground and collected by the
+    /// farm-forage pass, never taken directly from the animal. Excluding them stops the worker from
+    /// "harvesting" a truffle off each pig (notably indoors in winter, where pigs never forage).
+    /// Falls back to allowing collection if the animal data is unavailable (unchanged behaviour).
+    /// </summary>
+    private static bool ProducesGroundForage(FarmAnimal animal) =>
+        animal.GetAnimalData()?.HarvestType == FarmAnimalHarvestType.DigUp;
 
     public bool TryCollect(FarmAnimal animal, ItemBuffer buffer, OutputScopeProvenance? provenance = null)
     {

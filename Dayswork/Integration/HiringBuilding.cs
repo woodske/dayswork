@@ -24,10 +24,47 @@ internal static class HiringBuilding
     /// <summary>Id of the building's built-in output chest where missed/overflow items are deposited.</summary>
     public const string OutputChestId = "Bindicle.Dayswork_Output";
 
-    // Footprint, in tiles. The placeholder texture is sized to match (3 tiles * 16px = 48px).
-    public const int TilesWide = 3;
+    /// <summary>
+    /// True once the worker has finished and left for the day (set in ShiftOrchestrator.HandleExit,
+    /// reset each morning on DayStarted). Drives the evening lit-windows/lantern glow and chimney
+    /// smoke, drawn by <see cref="HiringBuildingOverlayRenderer"/>. Single-player only; not persisted.
+    /// (Data/Buildings draw layers can't be conditioned in this game version, so the overlay is
+    /// rendered in C# instead.)
+    /// </summary>
+    public static bool WorkCompletedToday { get; set; }
+
+    // Footprint, in tiles, modeled after the Log Cabin. The base building sprite occupies the
+    // (0,0,80,106) region of the sheet (5 tiles wide; 106px tall so the roof + chimney overhang
+    // well above the 3-tile footprint).
+    public const int TilesWide = 5;
     public const int TilesHigh = 3;
-    public static readonly Point OutputChestDisplayTile = new(2, 1);
+    // Output chest on the porch, right of the door (the cabin's mailbox spot) when facing the house.
+    public static readonly Point OutputChestDisplayTile = new(3, 2);
+
+    /// <summary>
+    /// Footprint tiles that open the hire/manage flow when action-clicked: the drawn-in bulletin
+    /// board on the upper-right wall (4,0)/(4,1), plus the porch tile directly in front of it (4,2)
+    /// so the player can click at ground level too. Clicking elsewhere on the building does nothing
+    /// (the chest tile is handled separately).
+    /// </summary>
+    public static readonly Point[] BulletinBoardTiles = { new(4, 0), new(4, 1), new(4, 2) };
+
+    // ── Spritesheet geometry, shared with HiringBuildingOverlayRenderer ──────────
+    // Sheet is 160x122: base (0,0,80,106), window glow (80,0,80,106), smoke row at y=106.
+    /// <summary>Pixel size of the base building sprite (the SourceRect region of the sheet).</summary>
+    public const int SpriteWidthPx = 80;
+    public const int SpriteHeightPx = 106;
+    /// <summary>Sheet region of the warm-lit-windows overlay (composited over the base when lit).</summary>
+    public static readonly Rectangle GlowSourceRect = new(80, 0, 80, 106);
+    /// <summary>First smoke frame on the sheet; frames advance rightward by <see cref="SmokeFramePx"/>.</summary>
+    public static readonly Rectangle SmokeFirstFrame = new(0, 106, 16, 16);
+    public const int SmokeFramePx = 16;
+    public const int SmokeFrameCount = 4;
+    public const int SmokeFrameDurationMs = 140;
+    /// <summary>Smoke draw offset from the sprite's top-left, in sprite pixels (above the chimney).</summary>
+    public static readonly Vector2 SmokeDrawOffset = new(54, -3);
+    /// <summary>Earliest time of day (HHMM) at which the lit-window glow is drawn.</summary>
+    public const int GlowStartTime = 1800;
 
     /// <summary>Handles the AssetRequested events that define the building texture and Data/Buildings entry.</summary>
     public static void OnAssetRequested(AssetRequestedEventArgs e, IModHelper helper)
@@ -62,7 +99,11 @@ internal static class HiringBuilding
         },
         BuildDays = 1,
         Size = new Point(TilesWide, TilesHigh),
-        HumanDoor = new Point(1, TilesHigh - 1),
+        // Base building sprite region of the sheet. The glow overlay (x=80) and smoke frames
+        // (y=80) live outside this rect; they're drawn conditionally in HiringBuildingOverlayRenderer
+        // because BuildingDrawLayer has no GameStateQuery condition in this game version.
+        SourceRect = new Rectangle(0, 0, SpriteWidthPx, SpriteHeightPx),
+        HumanDoor = new Point(2, TilesHigh - 1), // front-center porch tile (2,2)
         IndoorMap = null,
         MaxOccupants = 0,
         DrawLayers = new List<BuildingDrawLayer>(),
@@ -86,5 +127,25 @@ internal static class HiringBuilding
     {
         var building = HiringBuildingInteraction.FindHiringBuilding(farm);
         return building?.GetBuildingChest(OutputChestId);
+    }
+
+    /// <summary>
+    /// Absolute farm tile of the building's built-in output chest (the game places the building
+    /// chest as a farm object at the display tile). Null when no building exists. Used to exclude it
+    /// from discoverable-chest lists — it's the implicit default output destination, not a
+    /// separately selectable chest.
+    /// </summary>
+    public static Point? TryGetOutputChestTile(Farm? farm)
+    {
+        if (farm is null)
+            return null;
+
+        var building = HiringBuildingInteraction.FindHiringBuilding(farm);
+        if (building is null)
+            return null;
+
+        return new Point(
+            building.tileX.Value + OutputChestDisplayTile.X,
+            building.tileY.Value + OutputChestDisplayTile.Y);
     }
 }

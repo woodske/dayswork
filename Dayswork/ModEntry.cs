@@ -51,6 +51,7 @@ public sealed class ModEntry : Mod
         var chestResolver = new ChestResolver(Helper);
         Coordinator = new HiringFlowCoordinator(contractTermsBuilder, configManager, store, chestResolver, Helper);
         var buildingInteraction = new HiringBuildingInteraction(helper);
+        var buildingOverlay = new HiringBuildingOverlayRenderer();
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
         var toolReader      = new ToolLevelReader();
@@ -114,11 +115,15 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;
         helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
+        // Reset the "worker done for the day" animation flag each morning (office goes dark again).
+        helper.Events.GameLoop.DayStarted   += (_, _) => HiringBuilding.WorkCompletedToday = false;
         helper.Events.GameLoop.UpdateTicked += playerTileStepLogger.OnUpdateTicked;
         helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;
         helper.Events.GameLoop.TimeChanged  += orchestrator.OnTimeChanged;
         helper.Events.Content.AssetRequested += OnAssetRequested;
         helper.Events.Input.ButtonPressed += buildingInteraction.OnButtonPressed;
+        // Evening lit-windows + chimney smoke once the worker has finished for the day.
+        helper.Events.Display.RenderedWorld += buildingOverlay.OnRenderedWorld;
 
         // TODO: REMOVE before release — debug command for verifying save/load persistence (task #1 play-test)
         RegisterDebugCommands(helper, store, playerTileStepLogger);

@@ -2451,6 +2451,11 @@ internal sealed class ShiftOrchestrator : ISessionBoundaryResettable
         // One settlement letter next morning for overflow items only; U-21 removes refund settlement.
         DispatchShiftOverflow();
 
+        // The worker has finished and left for the day — light the office windows/lantern and
+        // start the chimney smoke (gated by the Bindicle.Dayswork_WORKER_DONE GameStateQuery).
+        // Reset next morning on DayStarted (ModEntry).
+        HiringBuilding.WorkCompletedToday = true;
+
         ClearWorker();
         _ctx.StateMachine.Transition(ShiftPhase.Done);
         _ctx = null;

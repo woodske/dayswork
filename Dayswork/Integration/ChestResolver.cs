@@ -23,6 +23,11 @@ internal sealed class ChestResolver
         var result = new List<ChestEntry>();
         string farmGroup = I18nHelper.Get("ui.zone_chest.group_farm");
 
+        // The office's built-in output chest is placed as a farm object at its display tile, but it
+        // is the implicit default destination ("Farmhand Office chest") — exclude it so it isn't
+        // also offered as a separately selectable chest (FR-HIRE: avoid duplicate default).
+        var officeChestTile = HiringBuilding.TryGetOutputChestTile(farm as Farm);
+
         // Open-farm chests
         foreach (var (tile, obj) in farm.Objects.Pairs)
         {
@@ -30,6 +35,8 @@ internal sealed class ChestResolver
             {
                 var tileX = (int)tile.X;
                 var tileY = (int)tile.Y;
+                if (officeChestTile is { } oct && tileX == oct.X && tileY == oct.Y)
+                    continue;
                 var chestRef = new ChestRef(farm.Name, new TileCoord(tileX, tileY));
                 result.Add(new ChestEntry(chestRef, GetDisplayName(chest, farm, tileX, tileY), farmGroup));
             }
