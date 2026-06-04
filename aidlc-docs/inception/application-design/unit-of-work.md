@@ -432,3 +432,77 @@ The same conventions apply: **Owns** = introduces a new seam; **Extends** = chan
 | New content classification + Grandpa's Shed work location | `U-SVE-04` |
 
 **Validation**: every SVE component from [sve-compatibility-application-design.md](sve-compatibility-application-design.md) is owned or extended by a unit; every SVE story (S-21..S-26) is assigned in [unit-of-work-story-map.md](unit-of-work-story-map.md); no SVE unit depends on a later SVE unit.
+
+---
+
+# Unit of Work — Manage Crops Feature
+
+Continues the appended-unit convention (historical U-01..U-17, retrofit U-18..U-25, U-SVE-01..04, U-T09/U-T10). Manage Crops adds **U-MC-01..U-MC-07** (unit-plan answers Q1=A ~7 medium units, Q2=A foundation-first hybrid, Q3=A no separate cleanup unit — final regression in Build and Test, Q4=A sequential U-MC-01→07). Design refs: components C-24..C-31 / M-24..M-29 in [manage-crops-application-design.md](manage-crops-application-design.md). The feature is opt-in: an empty `CropPlan` leaves all existing behavior unchanged.
+
+## U-MC-01 — Crop-plan Domain + Persistence Foundation
+**Purpose**: the shared foundation — crop-plan domain types, pure decision-logic skeletons, V3 persistence.
+**Owns**: C-24 ManagedCropDomain (`CropPlan`, `CropZoneAssignment`, `SeasonCropChoice`, `StorePreference`, `ManagedCropWorkScope`), C-25 PlantingViabilityCalculator, C-26 CropSupplyPlanner, C-27 SeasonAssignmentResolver, C-28 StoreResolver, C-29 CropShiftPlanner (skeleton), C-30 CropPlanSerialization, C-31 CropDescriptor.
+**Extends**: `Contract`, `ContractScopeSelection`, `WorkScopeSet` (carry `CropPlan`/`ManagedCropWorkScope`); C-16 `SaveDataSerializer` (`DaysworkSaveDataV2`→`V3`, `ContractDtoV2`→`V3` empty-plan migration).
+**Stories**: S-34, S-35.
+**Definition of Done**: domain + pure planners compile in `Dayswork.Core` with no SMAPI deps; V2 saves migrate to empty/disabled crop plans; crop-plan DTO round-trips (PBT-02); FsCheck properties for viability, `min(seeds,fertilizer)`, multi-season locking, store/fallback (PBT-03); build 0/0, tests green.
+
+## U-MC-02 — Cabin Chests (Input + Backfill)
+**Purpose**: add the second built-in office chest and make both chests behave correctly.
+**Owns**: M-28 CabinChestService.
+**Extends**: `HiringBuilding.BuildData()` (second `BuildingChest` = input chest, `DisplayTile`), M-20 `ChestResolver` (exclude both built-in chests), programmatic i18n names on both chests, one-time idempotent input-chest backfill for pre-existing offices.
+**Depends on**: U-MC-01 (domain for chest refs not strictly required, but ordered after foundation).
+**Stories**: S-31 (chests), S-34 (backfill).
+**Definition of Done**: new save shows two named office chests; pre-existing offices gain the input chest on load (idempotent); neither built-in chest appears as a selectable per-zone destination; build 0/0, tests green.
+
+## U-MC-03 — Manage Crops Authoring UI
+**Purpose**: the crop-first authoring page.
+**Owns**: M-24 ManageCropsMenu, M-25 CropCatalogProvider.
+**Extends**: `HubMenu` (nav row + status chip), `ContractDraft` (in-progress crop plan); wires C-27 (multi-season locking), C-31 (descriptors).
+**Depends on**: U-MC-01.
+**Stories**: S-27.
+**Definition of Done**: Manage Crops page opens from the hub; crop-first authoring (season→crop→fertilizer→replant) with season filter on the farm, multi-season locked styling, output-chest assignment; gamepad + mouse/keyboard; build 0/0, tests green.
+
+## U-MC-04 — Zone Draw Overlay Extension
+**Purpose**: draw crop zones around existing assignments (DEV-MC-01 coloring).
+**Owns**: (none new).
+**Extends**: M-08 `ZoneDrawOverlay`, `ZoneDrawMenu`, `IZoneDrawSource` — existing zones rendered **red** & unselectable, active draw **green**, overlap prevention; delete-and-redraw only.
+**Depends on**: U-MC-01, U-MC-03.
+**Stories**: S-28.
+**Definition of Done**: drawing applies the configured seasonal plan to drawn zones; existing zones are red/unselectable, active draw is green; overlap prevented; build 0/0, tests green.
+
+## U-MC-05 — Shift Crop Behavior
+**Purpose**: prepare ground, plant viably, self-heal the field each shift.
+**Owns**: M-27 ManagedCropShiftRunner (core per-tile execution), C-29 CropShiftPlanner (full).
+**Extends**: `ShiftPlanBuilder`/`ShiftOrchestrator` (managed-crop batch), `WorkerTool`/`ForTask` (`Hoe`), C-09 `CapabilityEvaluator`/`CapabilityMatrix` (till/water/clear gating), `WorkActionKind`/`WorkerEnergyProfile` (`HoeSwing`/`PlantSeed`/`ApplyFertilizer`), M-29 CropHudNotifier (tool-skip/fertilizer-unavailable notices).
+**Depends on**: U-MC-01, U-MC-03 (plan authored), U-MC-02 (input chest read).
+**Stories**: S-29, S-33.
+**Definition of Done**: per-tile harvest→clear→till→fertilize→seed→water in dependency order; viability gate; seed/fertilizer atomicity; re-till, replant/gap-fill; debris/dead-plant toggles (default ON); per-tile `Diggable`; capability/energy gating; coexistence with general tasks; build 0/0, tests green (PBT for ordering/viability).
+
+## U-MC-06 — Town Shopping
+**Purpose**: autonomous seed/fertilizer purchasing.
+**Owns**: M-26 ShopPurchaseService.
+**Extends**: `CrossLocationRouteNavigator` (vanilla Farm↔SeedShop / Farm↔JojaMart routes), wires C-26 (purchase target) + C-28 (store/fallback), M-29 (purchase/fallback/festival/insufficient-funds notices).
+**Depends on**: U-MC-01, U-MC-05.
+**Stories**: S-30.
+**Definition of Done**: store-hours-aware deferral; walk-to-store; headless `ShopBuilder` paced transaction (per-transaction HUD notice); preferred/fallback + festival handling; wallet funding/max-affordable; leftovers to input chest; shopping costs time only; build 0/0, tests green.
+
+## U-MC-07 — Output Routing + Greenhouse/Shed
+**Purpose**: per-zone harvest routing and season-agnostic greenhouse/shed support.
+**Owns**: (none new).
+**Extends**: M-27 (per-zone harvest routing to assigned `ChestRef` / output-chest fallback), `SveExpansionProfile`/`ExpansionProfileSelector` (reuse `GreenhouseWork` shed routes; live-map `Diggable` variant awareness).
+**Depends on**: U-MC-01, U-MC-05.
+**Stories**: S-31 (routing), S-32.
+**Definition of Done**: each zone's harvest routes to its assigned chest (else output chest); greenhouse/shed season-agnostic (no season filter, viability bypass) using reused routes and per-tile `Diggable` from the live map variant; build 0/0, tests green; SVE shed validated via manual playtest.
+
+## Manage Crops unit component coverage summary
+| Manage Crops area | Covered by |
+|---|---|
+| Domain + pure planners + V3 persistence | `U-MC-01` |
+| Cabin chests (input + backfill + naming) | `U-MC-02` |
+| Authoring UI + crop catalog | `U-MC-03` |
+| Zone draw overlay (DEV-MC-01) | `U-MC-04` |
+| Shift crop behavior (prepare/plant/maintain, tools/energy) | `U-MC-05` |
+| Town shopping (navigation + headless shop) | `U-MC-06` |
+| Output routing + greenhouse/shed | `U-MC-07` |
+
+**Validation**: every Manage Crops component (C-24..C-31 / M-24..M-29) is owned or extended by a unit; every Manage Crops story (S-27..S-35) is assigned in [unit-of-work-story-map.md](unit-of-work-story-map.md); no unit depends on a later unit.

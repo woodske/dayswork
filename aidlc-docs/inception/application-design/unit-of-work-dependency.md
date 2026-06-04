@@ -174,3 +174,36 @@ Each SVE unit completes the normal Construction loop (Functional Design → NFR 
 - No SVE unit depends on a later SVE unit.
 - Every SVE unit has a clear predecessor chain back to the prior baseline via `U-SVE-01`.
 - Foundation-first is preserved; the Vanilla profile guarantees no vanilla regression while override units are built incrementally.
+
+---
+
+## Manage Crops — dependency summary
+
+| Unit | Depends on | Why |
+|---|---|---|
+| `U-MC-01` Domain + Persistence Foundation | Prior baseline | Shared crop-plan domain, pure planners, V3 schema — every later unit builds on it |
+| `U-MC-02` Cabin Chests | `U-MC-01` | Input chest is the availability-gate reservoir referenced by domain/runtime |
+| `U-MC-03` Authoring UI | `U-MC-01` | Menu reads/writes the crop-plan domain via `ContractDraft` |
+| `U-MC-04` Zone Draw Overlay | `U-MC-01`, `U-MC-03` | Draw applies the authored plan; overlay launched from the authoring page |
+| `U-MC-05` Shift Crop Behavior | `U-MC-01`, `U-MC-02`, `U-MC-03` | Executes the authored plan, reads the input chest, uses pure planners |
+| `U-MC-06` Town Shopping | `U-MC-01`, `U-MC-05` | Shopping is triggered by the shift runner's supply assessment |
+| `U-MC-07` Output Routing + Greenhouse/Shed | `U-MC-01`, `U-MC-05` | Routing/greenhouse logic layers onto the shift runner |
+
+## Recommended execution order (unit-plan Q4=A)
+1. `U-MC-01` Domain + Persistence Foundation
+2. `U-MC-02` Cabin Chests
+3. `U-MC-03` Authoring UI
+4. `U-MC-04` Zone Draw Overlay
+5. `U-MC-05` Shift Crop Behavior
+6. `U-MC-06` Town Shopping
+7. `U-MC-07` Output Routing + Greenhouse/Shed
+
+Sequential for a solo developer to keep playtesting focused; U-MC-02/03/04 are technically parallelizable after U-MC-01, but the runtime units (U-MC-05..07) build on the authored plan.
+
+## Construction loop handoff
+Each Manage Crops unit completes the normal Construction loop (Functional Design → NFR Requirements → NFR Design → Code Generation; Infrastructure Design skipped) before the next begins. Only after `U-MC-07` is approved does the change move to the global Build and Test stage (Q3=A: no separate cleanup unit — final regression consolidated there).
+
+## Validation
+- No Manage Crops unit depends on a later unit.
+- Every unit chains back to the foundation `U-MC-01`.
+- Foundation-first preserved; the feature is opt-in (empty `CropPlan`) so no existing-behavior regression while units are built incrementally.

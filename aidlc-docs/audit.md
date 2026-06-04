@@ -5481,3 +5481,115 @@ Fix deposit routing so `Collect Fruit -> Shipping Bin` always ends in the shippi
 **Context**: Build and Test verification for configurable holiday work behavior.
 
 ---
+
+## Workflow Start — Manage Crops Feature
+**Timestamp**: 2026-06-04T00:00:00Z
+**User Input**: "Using ai-dlc, implement new manage crops feature following aidlc-docs\inception\manage-crops-spec.md"
+**AI Response**: "Loaded mandatory common rules, extension opt-in prompts, and existing aidlc-state.md. Confirmed brownfield AI-DLC continuation. Read the full Manage Crops spec. Beginning Workspace Detection (brownfield, existing artifacts present) then Requirements Analysis."
+**Context**: New feature kickoff — Manage Crops. Brownfield resume of the Dayswork AI-DLC project.
+
+---
+
+## Workspace Detection — Manage Crops
+**Timestamp**: 2026-06-04T00:00:01Z
+**User Input**: "(none — informational stage, auto-proceeds)"
+**AI Response**: "Existing aidlc-state.md found; project resumed. Existing code present (Dayswork, Dayswork.Core, Dayswork.Tests C# projects). Reverse-engineering refresh not required — the spec is already grounded in current types and prior SVE/routing artifacts. Brownfield with current artifacts → proceeding directly to Requirements Analysis."
+**Context**: Workspace Detection complete for the Manage Crops change.
+
+---
+
+## Requirements Analysis — Manage Crops
+**Timestamp**: 2026-06-04T00:00:02Z
+**User Input**: "(pending — clarifying questions issued)"
+**AI Response**: "Created aidlc-docs/inception/requirements/manage-crops-requirement-verification-questions.md with clarifying questions plus the two mandatory extension opt-in prompts (Security Baseline, Property-Based Testing). Awaiting user answers at the requirements gate."
+**Context**: Requirements Analysis question gate for the Manage Crops feature.
+
+---
+
+## Requirements Analysis — Manage Crops (answers received)
+**Timestamp**: 2026-06-04T00:30:00Z
+**User Input**: "done" (answers in manage-crops-requirement-verification-questions.md: Q1=A, Q2=A, Q3=A, Q4=A, Q5=B, Q6=A)
+**AI Response**: "Validated all six answers — no contradictions; all align with standing project decisions. Recorded extension config (Security Baseline disabled, PBT full mode) in aidlc-state.md. Generated manage-crops-requirements.md (FR-MC-01..44, NFR-MC-01..09) and an Active Change section. Presenting the Requirements Analysis approval gate."
+**Context**: Requirements Analysis complete for the Manage Crops feature; awaiting approval to proceed to User Stories.
+
+---
+
+## Requirements Analysis Approval — Manage Crops
+**Timestamp**: 2026-06-04T00:45:00Z
+**User Input**: "continue"
+**AI Response**: "Requirements approved. Marked Requirements Analysis complete for the Manage Crops change. Proceeding to User Stories. Performed the mandatory User Stories assessment (Execute = Yes — high-priority new user feature) and created manage-crops-user-stories-assessment.md and manage-crops-story-generation-plan.md (Part 1 planning with 5 embedded questions). Awaiting answers at the story-plan gate."
+**Context**: Requirements → User Stories transition for Manage Crops.
+
+---
+
+## User Stories (Planning) — Manage Crops
+**Timestamp**: 2026-06-04T00:45:01Z
+**User Input**: "(pending — story-plan questions issued)"
+**AI Response**: "Created the story generation plan with 5 planning questions (breakdown approach, granularity, personas, maintainer story, PBT obligation depth) plus mandatory artifacts + execution checklist. Awaiting user answers before generating stories."
+**Context**: User Stories Part 1 planning gate for Manage Crops.
+
+---
+
+## User Stories (Planning) Answers — Manage Crops
+**Timestamp**: 2026-06-04T01:00:00Z
+**User Input**: "done" (story plan answers: Q1=A, Q2=A, Q3=A, Q4=A, Q5=A)
+**AI Response**: "Analyzed all five answers — no vague/ambiguous/contradictory responses. Plan: new 'Section 7 — Manage Crops' journey (8 player/farmhand stories S-27..S-34) + one maintainer story (S-35) in Section 5; reuse personas P-01/02/03; embed explicit PBT obligations in the maintainer story. Presenting the story-plan approval gate before generation."
+**Context**: User Stories Part 1 planning answers validated; awaiting plan approval before Part 2 generation.
+
+---
+
+## User Stories (Plan Approval + Generation) — Manage Crops
+**Timestamp**: 2026-06-04T01:20:00Z
+**User Input**: "continue"
+**AI Response**: "Story plan approved. Executed Part 2 generation: added 'Section 7 — Manage Crops' journey stories S-27..S-34 (author plan, draw zones, prepare/plant/maintain, town shopping, two cabin chests + output routing, greenhouse/shed, tools/energy/pricing/coexistence, persistence/migration) and maintainer story S-35 (navigation/headless-shop seam + pure planning logic + V3 persistence + full-mode PBT obligations) to stories.md. Extended the coverage summary with all FR-MC-*/NFR-MC-* rows. Updated personas.md (P-01/02/03 story interests + persona→story matrix; confirmed no new persona). Marked all plan checkboxes complete. Presenting the User Stories approval gate."
+**Context**: User Stories Part 2 generation complete for Manage Crops; awaiting approval to proceed to Workflow Planning.
+
+---
+
+## User Stories (Change Request) — Manage Crops
+**Timestamp**: 2026-06-04T01:30:00Z
+**User Input**: "update s-28, existing zones show up in red (do not do different colors for different crops) and new zone draws in green."
+**AI Response**: "Updated S-28 (and the underlying FR-MC-06) so the draw overlay renders all existing/assigned zones in a single RED (no per-crop colors) and the active draw session in GREEN. Recorded as DEV-MC-01 overriding spec §5.3 (which called for distinct color per crop + red active draw). Re-presenting the User Stories approval gate."
+**Context**: User-requested story/requirement amendment during the User Stories approval gate.
+
+---
+
+## User Stories Approval + Workflow Planning — Manage Crops
+**Timestamp**: 2026-06-04T01:45:00Z
+**User Input**: "continue"
+**AI Response**: "User Stories approved (with the S-28/DEV-MC-01 overlay-color amendment). Executed Workflow Planning: created manage-crops-execution-plan.md. EXECUTE Application Design, Units Generation, per-unit Functional Design/NFR Requirements/NFR Design/Code Generation, Build and Test; SKIP Reverse Engineering and Infrastructure Design. Proposed ~7 foundation-first units (U-MC-01..07); risk High; package sequence Core → Mod → Tests. Presenting the Workflow Planning approval gate."
+**Context**: User Stories → Workflow Planning transition for Manage Crops; awaiting approval to proceed to Application Design.
+
+---
+
+## Workflow Planning Approval + Application Design (Planning) — Manage Crops
+**Timestamp**: 2026-06-04T02:00:00Z
+**User Input**: "approved and continue"
+**AI Response**: "Workflow plan approved. Started Application Design: created manage-crops-application-design-plan.md with 6 design questions (crop-plan/pure-logic placement, town-store navigation, headless shop transaction structure, managed-crop work-scope integration, authoring UI structure, crop catalog seam). Confirmed existing component numbering (C-01..C-23 / M-01..M-23 → new C-24+/M-24+). Awaiting answers before generating design artifacts."
+**Context**: Workflow Planning → Application Design transition for Manage Crops; design-plan question gate.
+
+---
+
+## Application Design (Answers + Generation) — Manage Crops
+**Timestamp**: 2026-06-04T02:20:00Z
+**User Input**: "use recommended for all"
+**AI Response**: "Recorded all six design answers as A (no ambiguity/contradiction). Generated Application Design artifacts: manage-crops-components.md, -component-methods.md, -services.md, -component-dependency.md, -application-design.md. New components C-24..C-31 (pure Core decision/domain/serialization) and M-24..M-29 (Mod adapters: menu, catalog, headless shop, shift runner, cabin chests, HUD), plus extensions to HubMenu/ZoneDrawOverlay/ContractDraft/WorkScopeSet/ShiftPlanBuilder/ShiftOrchestrator/CrossLocationRouteNavigator/WorkerTool/CapabilityEvaluator/WorkActionKind/SaveDataSerializer/ChestResolver/GMCMRegistrar/SveExpansionProfile. Vanilla path preserved. Presenting the Application Design approval gate."
+**Context**: Application Design complete for Manage Crops; awaiting approval to proceed to Units Generation.
+
+---
+
+## Application Design Approval + Units Generation (Planning) — Manage Crops
+**Timestamp**: 2026-06-04T02:35:00Z
+**User Input**: "continue"
+**AI Response**: "Application Design approved. Started Units Generation: created manage-crops-unit-of-work-plan.md with the proposed U-MC-01..07 foundation-first decomposition and 4 planning questions (unit count/granularity, slicing strategy, final cleanup unit vs fold into Build&Test, sequencing). Awaiting answers before generating unit artifacts."
+**Context**: Application Design → Units Generation transition for Manage Crops; unit-of-work planning gate.
+
+---
+
+## Units Generation (Answers + Generation) — Manage Crops
+**Timestamp**: 2026-06-04T02:50:00Z
+**User Input**: "done" (unit-plan answers Q1=A, Q2=A, Q3=A, Q4=A)
+**AI Response**: "Validated answers (no ambiguity). Generated unit artifacts: appended U-MC-01..U-MC-07 to unit-of-work.md (definitions/owns/extends/DoD), unit-of-work-dependency.md (dependency summary + sequential execution order), and unit-of-work-story-map.md (S-27..S-35 → units, coverage verified). Foundation-first sequential; no separate cleanup unit (final regression in Build and Test). Marked plan checkboxes complete. Presenting the Units Generation approval gate before CONSTRUCTION."
+**Context**: Units Generation complete for Manage Crops; awaiting approval to begin the per-unit Construction loop (U-MC-01).
+
+---

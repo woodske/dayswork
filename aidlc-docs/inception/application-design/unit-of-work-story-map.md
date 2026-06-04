@@ -148,3 +148,45 @@ Maps the SVE story set (S-21..S-26 from [stories.md](../user-stories/stories.md)
 | `U-SVE-02` Farm Maps + Worker Entrance | `S-22` |
 | `U-SVE-03` Animal Buildings | `S-23` |
 | `U-SVE-04` New Content + Grandpa's Shed | `S-24`, `S-25` |
+
+---
+
+## Manage Crops — story → unit map
+
+| Story | Primary unit | Supporting units | Role |
+|---|---|---|---|
+| `S-27` Author a seasonal crop plan | `U-MC-03` | `U-MC-01` | Crop-first authoring page + catalog; domain from the foundation |
+| `S-28` Draw crop zones around existing assignments | `U-MC-04` | `U-MC-03`, `U-MC-01` | Overlay extension (DEV-MC-01); launched from authoring |
+| `S-29` Prepare/plant/maintain each shift | `U-MC-05` | `U-MC-01`, `U-MC-02` | Shift runner + pure shift planner; reads input chest |
+| `S-30` Town shopping for seeds & fertilizer | `U-MC-06` | `U-MC-01`, `U-MC-05` | Navigation + headless shop; triggered by shift assessment |
+| `S-31` Two cabin chests + per-zone output routing | `U-MC-02` | `U-MC-07`, `U-MC-01` | Input chest in U-MC-02; per-zone harvest routing in U-MC-07 |
+| `S-32` Greenhouse & Grandpa's Shed crops | `U-MC-07` | `U-MC-01`, `U-MC-05` | Season-agnostic support + reused shed routes |
+| `S-33` Tools/energy/pricing/coexistence | `U-MC-05` | `U-MC-01` | Hoe/capability/energy + general-task coexistence |
+| `S-34` Plan persists / input-chest backfill | `U-MC-01` | `U-MC-02` | V3 persistence in U-MC-01; backfill in U-MC-02 |
+| `S-35` Manage Crops technical seams + PBT | `U-MC-01` | `U-MC-05`, `U-MC-06` | Pure planners + persistence in U-MC-01; nav/shop seams in U-MC-05/06 |
+
+## Coverage verification
+| Story | Assigned to at least one unit? |
+|---|---|
+| `S-27` | ✅ `U-MC-03` |
+| `S-28` | ✅ `U-MC-04` |
+| `S-29` | ✅ `U-MC-05` |
+| `S-30` | ✅ `U-MC-06` |
+| `S-31` | ✅ `U-MC-02` (+ `U-MC-07`) |
+| `S-32` | ✅ `U-MC-07` |
+| `S-33` | ✅ `U-MC-05` |
+| `S-34` | ✅ `U-MC-01` (+ `U-MC-02`) |
+| `S-35` | ✅ `U-MC-01` (+ `U-MC-05`/`U-MC-06`) |
+
+**All Manage Crops stories (S-27..S-35) are assigned to at least one unit.**
+
+## Stories by Manage Crops unit
+| Unit | Stories touched |
+|---|---|
+| `U-MC-01` Domain + Persistence Foundation | `S-34`, `S-35` |
+| `U-MC-02` Cabin Chests | `S-31`, `S-34` |
+| `U-MC-03` Authoring UI | `S-27` |
+| `U-MC-04` Zone Draw Overlay | `S-28` |
+| `U-MC-05` Shift Crop Behavior | `S-29`, `S-33` |
+| `U-MC-06` Town Shopping | `S-30` |
+| `U-MC-07` Output Routing + Greenhouse/Shed | `S-31`, `S-32` |

@@ -575,6 +575,59 @@ These stories anchor the architectural choices that keep the mod testable and tr
 
 ---
 
+### S-35 — Build the Manage Crops technical seams on testable, isolated logic
+
+**As** P-03 the Mod Maintainer,
+**I want** the new town-store navigation, the headless 1.6 shop transaction, the pure crop-plan planning logic, and the V3 persistence/migration to live behind isolated, deterministic seams,
+**so that** I can unit/property-test the hard parts without launching Stardew, keep the shop interaction respectful of live game data, and migrate existing saves safely.
+
+**Implements**: FR-MC-17, FR-MC-18, FR-MC-37, FR-MC-38, FR-MC-39; NFR-MC-01, NFR-MC-02, NFR-MC-03, NFR-MC-06, NFR-MC-08, NFR-MC-09
+
+**Acceptance criteria (UI/visual — bullets):**
+- Town-store routing is built on the existing cross-location layer (`CrossLocationRouteNavigator`, `BuildingWorkNavigator`); routing to SeedShop / JojaMart is added as new route definitions/legs, not a parallel navigation system (FR-MC-17).
+- The shop transaction is **headless** — it reads live `Data/Shops` stock/prices via the game's shop APIs (e.g. `ShopBuilder`) and never opens the visual `ShopMenu` (FR-MC-18).
+- Pure crop-plan planning logic (viability, supply targeting, `min(seeds,fertilizer)` completion, multi-season locking, store/fallback resolution, per-tile action ordering) lives in `Dayswork.Core` with no SMAPI/Stardew dependency and is exercised by xUnit + FsCheck (consistent with S-19) (NFR-MC-01, NFR-MC-09).
+- New persistence DTOs live under `Dayswork.Core/Persistence/Dto/`; the schema bump is `DaysworkSaveDataV2`→`V3` and `ContractDtoV2`→`V3` (FR-MC-37, FR-MC-38).
+- No new runtime dependency is introduced; the existing C#/.NET 6 + SMAPI + xUnit + FsCheck stack is reused (NFR-MC-09).
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** a V2 save with existing contracts
+  **When** Dayswork loads it under the V3 schema
+  **Then** every contract deserializes with an empty/disabled crop plan and no data loss (absence = no managed crops) (FR-MC-38, NFR-MC-06).
+- **Given** an office (`Bindicle.Dayswork_Office`) placed before this update with only the output chest
+  **When** the save loads
+  **Then** the input chest is guaranteed to exist — created by a one-time, idempotent backfill if the game does not auto-create the newly-declared `BuildingChest` (FR-MC-39, NFR-MC-06).
+- **Given** a headless purchase resolves
+  **When** gold is deducted from the wallet
+  **Then** the corresponding seeds/fertilizer are placed into the worker's carried inventory in the same transaction — gold is never deducted without delivering goods (NFR-MC-03).
+
+**Acceptance criteria (state — Gherkin) — PBT obligations (full mode):**
+- **Given** the planting-viability function
+  **When** FsCheck generates crops with varied (fertilized) growth times, current day-of-season, and season lengths
+  **Then** a crop is reported viable iff it can mature and be harvested at least once before the season ends, deterministically; and the greenhouse/shed bypass always reports viable for season-agnostic locations (PBT-03 invariant).
+- **Given** the per-tile supply-completion planner
+  **When** FsCheck generates seed and fertilizer stock levels for a fertilized zone
+  **Then** the number of completed tiles is exactly `min(seeds, fertilizer)`, no tile is ever left with fertilizer-but-no-seed or seed-but-no-fertilizer, and leftover single components remain in the input chest (PBT-03 invariant).
+- **Given** the multi-season assignment function
+  **When** FsCheck generates crop selections including multi-season crops
+  **Then** consecutive viable seasons are auto-populated and locked, locked seasons are never reassignable to another crop, and no mid-life teardown is ever produced (PBT-03 invariant).
+- **Given** the store/fallback resolver
+  **When** FsCheck generates preferred-store settings, day-of-week, and festival flags
+  **Then** the resolved store is deterministic (preferred when open, fallback when preferred is closed, none on festival), and a store is only chosen when it stocks the requested item (PBT-03 invariant).
+- **Given** the crop-plan save-data DTOs
+  **When** FsCheck generates valid crop plans (zones, season choices, replant flags, chest refs, store config)
+  **Then** `deserialize(serialize(plan)) == plan` for all generated inputs (PBT-02 round-trip).
+- **Given** a property-test failure
+  **When** it is reported
+  **Then** the seed and the shrunk minimal failing input are logged for deterministic replay (PBT-08).
+
+**Acceptance criteria (performance):**
+- **Given** per-shift crop planning and per-tile checks run during a shift
+  **When** the worker executes a managed-crop contract
+  **Then** planning is bounded and introduces no per-tile graph discovery on the hot path; town-store routing reuses bounded navigation consistent with the existing synchronous runtime shell (NFR-MC-02). *(Validated via the existing performance scenario plus manual playtest.)*
+
+---
+
 ## Section 6 — Expansion Compatibility (Stardew Valley Expanded)
 
 These stories describe how Dayswork behaves when **Stardew Valley Expanded** is installed, while leaving vanilla behavior unchanged. The maintainer-facing companion (the provider seam itself) is **S-26**, kept in Section 5 alongside the other architecture stories.
@@ -723,6 +776,251 @@ These stories describe how Dayswork behaves when **Stardew Valley Expanded** is 
 
 ---
 
+## Section 7 — Manage Crops
+
+These stories describe the **Manage Crops** feature: a dedicated, crop-first authoring
+page and an autonomous, viability-gated, self-healing crop-management routine the
+farmhand performs each shift — including buying seeds/fertilizer in town. They build on
+the existing contract hub, zone-draw overlay, capability/energy model, cross-location
+navigation, and the office output chest. The maintainer-facing companion (new
+navigation/shop seams, pure planning logic, V3 persistence, PBT) is **S-35** in
+Section 5. Crop management is **opt-in**: a contract with no crop plan behaves exactly
+as today.
+
+### S-27 — Author a seasonal crop plan, crop-first then draw
+
+**As** P-01 the Player,
+**I want** a top-level **Manage Crops** page where I choose a season, crop, and fertilizer (and optional auto-replant) for as many seasons as I like, then draw the zone(s) once to apply the whole plan,
+**so that** I can declare exactly what grows where and when, and a full year-round rotation only takes one draw.
+
+**Implements**: FR-MC-01, FR-MC-02, FR-MC-03, FR-MC-04, FR-MC-05, FR-MC-08
+
+**Acceptance criteria (UI/visual — bullets):**
+- A new **Manage Crops** button is added to `HubMenu`, rendered like the existing nav rows (Task Selection, Work Scope, Output, Energy, …) and opening a dedicated page (e.g. `ManageCropsMenu`).
+- The page's status chip shows **"Done"** when at least one zone is configured and **"Optional"** otherwise (crop management is opt-in).
+- Authoring order is **configure the full seasonal plan, then draw once**: for each season the player selects season → crop → fertilizer (or none) → optional "auto-replant this season's crop"; the player may configure anywhere from one to four seasons before drawing.
+- The crop list is built from game crop data (vanilla **and** modded). On the open farm it is **filtered to the selected season**; each crop is tagged **auto-buyable** (stocked at Pierre/Joja) or **chest-supply-only** (ancient fruit, coffee, foraged, seed-maker output).
+- Selecting a multi-season crop (e.g. corn) **auto-populates and locks** its consecutive seasons; locked seasons render in a distinct "multi-season" style, are **not assignable** to another crop, and the UI makes it obvious why they are blocked.
+- The player may assign an **output chest** for the zone(s), shared across all seasons of the zone.
+- The screen is fully navigable with mouse/keyboard **and** gamepad (consistent with NFR-UX-01).
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** the player has configured crops for one or more seasons
+  **When** they draw one or more zones in a single draw operation
+  **Then** the complete seasonal plan is applied to each drawn zone, and seasons left unconfigured remain unassigned for those zones (the farmhand ignores them).
+- **Given** the player draws two non-contiguous zones in the same operation
+  **When** the plan is applied
+  **Then** each drawn zone is its own independently-configured unit (its own per-season crops/fertilizers, replant flags, and chest), and two such zones may legitimately carry the same plan.
+
+---
+
+### S-28 — Draw crop zones around existing assignments
+
+**As** P-01 the Player,
+**I want** the draw overlay to show me where crops are already assigned (in red, unselectable) while my new zone draws in green,
+**so that** I can shape new zones into the gaps without overlapping, and reshape by deleting and redrawing.
+
+**Implements**: FR-MC-06, FR-MC-07
+
+**Acceptance criteria (UI/visual — bullets):**
+- Drawing reuses the existing zone-draw machinery (`ZoneDrawOverlay`, `ZoneDrawMenu`, `IZoneDrawSource`).
+- Tiles already assigned to an existing crop zone are **unselectable** and rendered in **red** (a single color for all existing assignments — not a distinct color per crop).
+- The current drawing session's tentative zone renders in **green** until confirmed.
+- The player can see existing zones and the new draw together as one combined visual unit.
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** the player drags a new rectangle that would overlap already-assigned tiles
+  **When** the rectangle is evaluated
+  **Then** the already-assigned tiles cannot be included in the new zone (overlap is prevented).
+- **Given** the player wants to change a zone's crop, fertilizer, shape, or chest
+  **When** they use the Manage Crops page
+  **Then** the only supported edit is **delete the zone and redraw it** — there is no in-place reassignment in this iteration (FR-MC-07).
+
+---
+
+### S-29 — Farmhand prepares the ground, plants viably, and self-heals the field each shift
+
+**As** P-02 the Farmhand,
+**I want** to take each managed-zone tile through harvest → clear debris → till → fertilize → seed → water in dependency order, only planting where it's viable and where I have both seed and fertilizer on hand,
+**so that** the player's declared plan is executed faithfully, nothing is wasted, and the field heals itself over time.
+
+**Implements**: FR-MC-09, FR-MC-10, FR-MC-11, FR-MC-21, FR-MC-22, FR-MC-24, FR-MC-25, FR-MC-26, FR-MC-27
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** a managed zone with mixed tile states
+  **When** the farmhand works a single tile
+  **Then** it follows the per-tile order **harvest (if a mature crop is present) → clear debris → till → fertilize → seed → water**, each action its own animation/beat paced at `WorkerActionAnimationMs`, with fertilizer laid on bare tilled soil **before** the seed.
+- **Given** a mature non-regrow crop on a managed tile
+  **When** the shift runs
+  **Then** the crop is **harvested first**, freeing the tile so it can be replanted the **same shift** (soil stays tilled, so only fertilize → seed → water remain) — subject to viability and supply.
+- **Given** the open farm and a candidate planting
+  **When** viability is checked
+  **Then** the crop is planted only if it can **mature and be harvested at least once before the season ends**, computed with the **fertilized** growth time.
+- **Given** a zone configured with a fertilizer
+  **When** the farmhand evaluates a tile
+  **Then** it **never** lays fertilizer **or** seed unless **both** are on hand for that tile; under partial stock only `min(seeds, fertilizer)` tiles are completed and leftovers remain in the input chest.
+- **Given** a zone whose configured fertilizer is **entirely unavailable** (not in the input chest and not purchasable at the preferred/fallback store)
+  **When** the shift runs
+  **Then** **no** tiles in that zone are planted and a HUD notice fires — seed is never planted un-fertilized.
+- **Given** "auto-replant this season's crop" is enabled and empty prepared tiles remain (e.g. left empty earlier under partial stock)
+  **When** the farmhand re-checks the zone that shift
+  **Then** it fills any empty prepared tiles that still have enough days to produce; when disabled, it does not refill emptied tiles within the season.
+- **Given** managed-zone tiles that reverted to untilled, or tiles the game does not mark tillable (no `Diggable` Back-layer property) or blocked by an unclearable object
+  **When** preparation runs
+  **Then** reverted tiles are re-tilled, and non-diggable/blocked tiles are simply skipped (per-tile check bounds the plantable area; no hardcoded region).
+
+**Acceptance criteria (UI/visual — bullets):**
+- The "clear debris before tilling" global toggle controls debris clearing before tilling, runs independently of the contract's general clearing tasks, and spends no energy on a tile with no debris.
+- The "clear dead plants" global toggle, when enabled, clears dead/wilted plants **opportunistically as encountered**, scoped to the contract's **assigned work areas only — not farm-wide** (no dedicated sweep); when disabled, dead-crop tiles are skipped and cannot be re-tilled/replanted.
+- Both global toggles default **ON**.
+
+---
+
+### S-30 — Farmhand shops in town for seeds and fertilizer
+
+**As** P-02 the Farmhand,
+**I want** to walk to Pierre's or JojaMart when stores open, buy what the plan needs that I don't already have, and bring it back — without idling at a closed store,
+**so that** the player's plan can be planted even when they didn't pre-stock supplies.
+
+**Implements**: FR-MC-12, FR-MC-13, FR-MC-14, FR-MC-15, FR-MC-16, FR-MC-17, FR-MC-18, FR-MC-19, FR-MC-20, FR-MC-41
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** the shift starts at 6 AM but stores open at 9 AM
+  **When** the farmhand assesses needed supplies vs input-chest stock
+  **Then** it does all supply-independent work during the 6–9 window (harvest, clear debris, till, clear dead, water existing, and plant/fertilize from existing input-chest stock) and **defers** the shop trip until stores open — ideally arriving near 9 AM — rather than idling at a closed store.
+- **Given** the plan needs supplies not in the input chest
+  **When** the farmhand shops
+  **Then** it buys enough to fill the empty assigned **viable** tiles planned this shift (target computed up front from the zone definitions), funded from the **player's wallet**; on insufficient funds it buys the **maximum affordable** quantity and continues.
+- **Given** a configured **preferred store** that is closed (e.g. Pierre on Wednesdays)
+  **When** the farmhand needs to shop
+  **Then** it uses the **fallback** store and emits a HUD notice that it is using the fallback (FR-MC-20); Pierre is treated as unlimited stock and JojaMart is shoppable **without** a membership.
+- **Given** the farmhand reaches the shop counter
+  **When** the purchase resolves
+  **Then** it resolves **headlessly** against live 1.6 shop stock/prices (no visual `ShopMenu`), only buying items the store actually stocks; gold is deducted from the wallet and items go to the worker's carried inventory; **leftovers settle to the input chest at end of shift**.
+- **Given** purchases to make
+  **When** transactions execute
+  **Then** they run as a **paced sequence**, one line-item per beat at `WorkerActionAnimationMs`, each beat emitting its own HUD notification (e.g. "Bought 12× Parsnip Seeds").
+- **Given** today is a **festival**
+  **When** the shift runs
+  **Then** purchasing is **skipped** with a HUD notice, and all other (supply-independent) tasks still run.
+- **Given** a **chest-supply-only** crop (ancient fruit, coffee, foraged, seed-maker output)
+  **When** input-chest stock for it runs out
+  **Then** the farmhand never makes a store trip for it — it plants as many tiles as it can and leaves the rest (no "unavailable" purchase notice; only the partial-plant outcome).
+
+**Acceptance criteria (UI/visual — bullets):**
+- The farmhand **physically walks to and enters** the store (a deliberate time cost), using the existing cross-location routing layer extended with new town-store legs (S-35).
+- Shopping trips cost **shift time only, not energy** (FR-MC-41).
+
+---
+
+### S-31 — Two cabin chests, plus per-zone output routing
+
+**As** P-01 the Player,
+**I want** a dedicated **input chest** I stock with seeds/fertilizer alongside the existing **output chest**, and each zone's harvest routed to the chest I assigned it,
+**so that** I control exactly what the farmhand consumes and where its output lands.
+
+**Implements**: FR-MC-29, FR-MC-33, FR-MC-34, FR-MC-35, FR-MC-36, FR-MC-28
+
+**Acceptance criteria (UI/visual — bullets):**
+- The office building declares **two** built-in chests via the 1.6 `BuildingData.Chests` list: the existing **output chest** (`Bindicle.Dayswork_Output`) and a **new input chest** (`Bindicle.Dayswork_Input`), each an ordinary player-accessible chest at its own `DisplayTile` (e.g. symmetric porch tiles).
+- Both built-in chests are named **programmatically** with fixed i18n-backed labels (e.g. "Farmhand Office — Input" / "Farmhand Office — Output"), surfaced via the vanilla hover tooltip and Lookup Anything; all other chests keep their existing `ChestResolver.GetDisplayName` behavior.
+- The per-zone output-chest picker **excludes both** built-in office chests so neither is offered as a duplicate destination.
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** the input chest holds seeds/fertilizer
+  **When** the farmhand checks supply availability
+  **Then** it reads the **input chest first** (the availability gate), uses only physically-present items, and returns leftover purchased supplies to the input chest at end of shift.
+- **Given** a zone with an assigned output chest
+  **When** its crops are harvested
+  **Then** the harvest is routed to that zone's assigned chest (`ChestRef`).
+- **Given** a zone with **no** chest assigned
+  **When** its crops are harvested
+  **Then** behavior falls back to current behavior: the worker holds the items and deposits them into the office **output chest** at end of shift.
+- **Given** general `WaterCrops`/`HarvestCrops` tasks and managed zones coexist
+  **When** a shift runs
+  **Then** watering/harvesting inside managed zones is automatic, the general tasks remain available for manually-planted crops outside zones, and the two paths never double-act on the same tile in the same shift (FR-MC-28).
+
+---
+
+### S-32 — Manage greenhouse and Grandpa's Shed crops year-round
+
+**As** P-01 the Player (and **P-02** the Farmhand),
+**I want** to assign a single continuous crop to the greenhouse or SVE Grandpa's Shed greenhouse with no season choice,
+**so that** year-round crops (ancient fruit, coffee, etc.) are managed continuously without seasonal teardown.
+
+**Implements**: FR-MC-05, FR-MC-23, FR-MC-43, FR-MC-44
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** the selected location is the vanilla `Greenhouse` or `Custom_GrandpasShedGreenhouse` (both `IsGreenhouse`)
+  **When** the player authors a plan there
+  **Then** **no season option** is presented; the zone has a single crop assignment that applies continuously, and the crop list is **not** season-filtered.
+- **Given** a season-agnostic location
+  **When** the farmhand evaluates a planting
+  **Then** the end-of-season viability gate is **not** applied — any selected crop is plantable at any time.
+- **Given** SVE is installed and `Custom_GrandpasShedGreenhouse` is available
+  **When** the farmhand works the shed greenhouse
+  **Then** it reuses the existing `GreenhouseWork` role and pre-built multi-hop routes — no new navigation work — while `Custom_GrandpasShed` proper stays `DepositOnly`.
+- **Given** a greenhouse/shed map with default vs `...Cleared` variants
+  **When** the farmhand resolves plantable tiles
+  **Then** it reads the `Diggable` Back-layer property from whichever map variant is **live** at shift time (no assumed/default map, no hardcoded region) (FR-MC-44).
+
+**Acceptance criteria (UI/visual — bullets):**
+- Year-round crops simply persist without seasonal teardown; the UI makes clear the greenhouse/shed zone is season-agnostic. *(SVE shed greenhouse end-to-end validated via manual SVE playtest.)*
+
+---
+
+### S-33 — Tools, energy, pricing, and coexistence for crop work
+
+**As** P-02 the Farmhand,
+**I want** to use whatever tools the contract equips me with, gating crop actions on capability and item availability, and spending the right energy,
+**so that** crop management slots into the existing economy and capability model without surprises.
+
+**Implements**: FR-MC-30, FR-MC-31, FR-MC-32, FR-MC-40, FR-MC-42
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** crop actions reuse the existing capability model
+  **When** the farmhand acts
+  **Then** tilling maps to a new `WorkerTool.Hoe`, watering to `WateringCan`, and debris/dead-plant clearing to `Axe`/`Pickaxe`/`Scythe` respecting `CapabilityMatrix` **level** gating (e.g. a Steel-gated boulder).
+- **Given** planting and fertilizing
+  **When** the farmhand acts
+  **Then** they are **not** tool-gated — they gate only on item availability (seed/fertilizer in chest or purchasable).
+- **Given** a required tool is missing or too weak for a specific target
+  **When** the farmhand reaches that action/tile
+  **Then** it **skips just that action/tile** and emits a HUD notice; the rest of the contract proceeds. There is **no** contract-creation tool validation.
+- **Given** the new crop actions
+  **When** they execute
+  **Then** `HoeSwing` (till), `PlantSeed`, and `ApplyFertilizer` each draw a **configurable non-zero** energy cost (surfaced via config/GMCM), while debris/dead-plant clearing reuse existing `AxeSwing`/`PickaxeSwing`/`ScytheSwing` and watering/harvesting reuse `WaterTile`/`HarvestCrop`/`HarvestFruit`.
+
+**Acceptance criteria (UI/visual — bullets):**
+- Crop management adds **no separate charge** — it draws the existing flat energy-tier budget like any other task; the only added gold cost is the actual seed/fertilizer purchase (FR-MC-42).
+- A tile blocked by debris the farmhand cannot clear (too-weak tool) cannot be tilled/planted that shift and is retried on later shifts once the obstacle is removable.
+
+---
+
+### S-34 — A crop plan survives save/reload and existing offices get the input chest
+
+**As** P-01 the Player,
+**I want** my Manage Crops configuration to persist across save/reload, and my existing farmhand office to gain the new input chest automatically,
+**so that** the feature works on my established save without rebuilding anything, and contracts without a crop plan keep working exactly as before.
+
+**Implements**: FR-MC-37, FR-MC-38, FR-MC-39
+
+**Acceptance criteria (state — Gherkin):**
+- **Given** a contract with a Manage Crops plan
+  **When** the player saves and reloads
+  **Then** the full plan (zones, per-season crop/fertilizer choices, replant flags, output chest, store config, global toggles) is restored intact under the V3 schema.
+- **Given** a save created before this update (V2), with existing contracts
+  **When** it loads under V3
+  **Then** each contract deserializes with an empty/disabled crop plan and behaves exactly as today (feature is opt-in; absence = no managed crops).
+- **Given** an existing `Bindicle.Dayswork_Office` placed before this update (output chest only)
+  **When** the save loads
+  **Then** the new input chest exists for that office — created by a one-time, idempotent backfill if the game does not auto-create the newly-declared `BuildingChest`.
+
+**Acceptance criteria (UI/visual — bullets):**
+- The maintainer-facing seam details (DTO shapes, schema migration, backfill, round-trip PBT) are covered by **S-35**.
+
+---
+
 ## Coverage Summary
 
 | Requirement group | Stories covering it |
@@ -749,5 +1047,13 @@ These stories describe how Dayswork behaves when **Stardew Valley Expanded** is 
 | Maintainability NFRs (NFR-MAINT-01..05) | S-19 |
 | Onboarding NFRs (NFR-ONBOARD-01..02) | (covered by docs; no story) |
 | Safety / data-integrity NFRs (NFR-SAFE-01..04) | S-10, S-11, S-16, S-19 |
+| Manage Crops — authoring & UI (FR-MC-01..08) | S-27, S-28 |
+| Manage Crops — shift behavior: prepare/plant/maintain (FR-MC-09, 10, 11, 21, 22, 24, 25, 26, 27) | S-29 |
+| Manage Crops — viability & greenhouse/shed bypass (FR-MC-21, 23, 43, 44, FR-MC-05) | S-29, S-32 |
+| Manage Crops — purchasing (FR-MC-12..20, FR-MC-41) | S-30 |
+| Manage Crops — cabin chests & output routing (FR-MC-28, 29, 33, 34, 35, 36) | S-31 |
+| Manage Crops — tools/energy/pricing/coexistence (FR-MC-28, 30, 31, 32, 40, 42) | S-31, S-33 |
+| Manage Crops — persistence & migration (FR-MC-37, 38, 39) | S-34, S-35 |
+| Manage Crops — technical seams (navigation/headless shop), pure logic, PBT (FR-MC-17, 18; NFR-MC-01..09) | S-35 |
 
-No FR group is left uncovered. SVE compatibility (FR-SVE-* / NFR-SVE-*) is now covered by S-21..S-26, expanding the formerly docs-only mod-compatibility row. TODO-10's shed-greenhouse requirements are covered by the refined S-25 plus S-26 route-provider/testability criteria. The remaining "covered by docs, no story" line (onboarding) is intentional — it's a documentation deliverable rather than user-observable behavior.
+No FR group is left uncovered. Manage Crops requirements (FR-MC-* / NFR-MC-*) are covered by S-27..S-34 (player/farmhand journey, Section 7) plus the maintainer story S-35 (Section 5). SVE compatibility (FR-SVE-* / NFR-SVE-*) is now covered by S-21..S-26, expanding the formerly docs-only mod-compatibility row. TODO-10's shed-greenhouse requirements are covered by the refined S-25 plus S-26 route-provider/testability criteria. The remaining "covered by docs, no story" line (onboarding) is intentional — it's a documentation deliverable rather than user-observable behavior.

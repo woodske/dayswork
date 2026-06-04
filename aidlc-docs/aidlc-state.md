@@ -114,8 +114,35 @@
 | Property-Based Testing | Yes | Full — all PBT rules blocking where applicable | Worker Routing Requirements Analysis (Q7: A) |
 | Security Baseline (TODO-10) | No | — | TODO-10 Requirements Analysis (Q10: B) |
 | Property-Based Testing (TODO-10) | Yes | Partial - PBT-02, PBT-03, PBT-07, PBT-08, PBT-09 blocking where applicable | TODO-10 Requirements Analysis (Q11: B) |
+| Security Baseline (Manage Crops) | No | — | Manage Crops Requirements Analysis (Q5: B — no network/PII/auth surface) |
+| Property-Based Testing (Manage Crops) | Yes | Full — all PBT rules blocking where applicable | Manage Crops Requirements Analysis (Q6: A) |
 
 **PBT framework**: FsCheck (per PBT-09 recommendation for C#/.NET; integrates with xUnit chosen in Q4).
+
+## Active Change — Manage Crops Feature — Requirements Approval Gate
+- **Requested At**: 2026-06-04 (`Using ai-dlc, implement new manage crops feature following aidlc-docs\inception\manage-crops-spec.md`)
+- **Current Phase**: INCEPTION
+- **Current Stage**: Units Generation complete — **awaiting approval** to proceed to CONSTRUCTION (per-unit loop, starting U-MC-01). See [unit-of-work.md](inception/application-design/unit-of-work.md) (Manage Crops section).
+- **Application Design Approval**: Approved 2026-06-04 (user response: `continue`).
+- **Units Generation Plan**: Approved 2026-06-04 (answers Q1=A, Q2=A, Q3=A, Q4=A). Plan: [manage-crops-unit-of-work-plan.md](inception/plans/manage-crops-unit-of-work-plan.md).
+- **Units Generation**: Complete 2026-06-04. Appended **U-MC-01..U-MC-07** (foundation-first, sequential) to [unit-of-work.md](inception/application-design/unit-of-work.md), [unit-of-work-dependency.md](inception/application-design/unit-of-work-dependency.md), and [unit-of-work-story-map.md](inception/application-design/unit-of-work-story-map.md). U-MC-01 domain+persistence → 02 cabin chests → 03 authoring UI → 04 draw overlay → 05 shift behavior → 06 town shopping → 07 output/greenhouse-shed. All S-27..S-35 assigned; no separate cleanup unit (final regression in Build and Test).
+- **Workflow Planning Approval**: Approved 2026-06-04 (user response: `approved and continue`).
+- **Application Design Plan**: Approved 2026-06-04 (user response: `use recommended for all`). Answers Q1=A, Q2=A, Q3=A, Q4=A, Q5=A, Q6=A. Plan: [manage-crops-application-design-plan.md](inception/plans/manage-crops-application-design-plan.md).
+- **Application Design Generation**: Complete 2026-06-04. New components **C-24..C-31** (pure Core: ManagedCropDomain, PlantingViabilityCalculator, CropSupplyPlanner, SeasonAssignmentResolver, StoreResolver, CropShiftPlanner, CropPlanSerialization, CropDescriptor) and **M-24..M-29** (Mod: ManageCropsMenu, CropCatalogProvider, ShopPurchaseService, ManagedCropShiftRunner, CabinChestService, CropHudNotifier), plus extensions to existing components. Artifacts: [manage-crops-components.md](inception/application-design/manage-crops-components.md), [manage-crops-component-methods.md](inception/application-design/manage-crops-component-methods.md), [manage-crops-services.md](inception/application-design/manage-crops-services.md), [manage-crops-component-dependency.md](inception/application-design/manage-crops-component-dependency.md), [manage-crops-application-design.md](inception/application-design/manage-crops-application-design.md). Design keeps planning logic pure-Core, town-store routing on the existing navigator, headless shop as a thin adapter, a new managed-crop scope→batch, a new hub page, and a dedicated crop-catalog seam; vanilla path preserved.
+- **Requirements Approval**: Approved 2026-06-04 (user response: `continue`).
+- **User Stories Assessment**: Execute = Yes (high-priority new user feature). See [manage-crops-user-stories-assessment.md](inception/plans/manage-crops-user-stories-assessment.md).
+- **User Stories Plan**: Approved 2026-06-04 (user response: `continue`). Answers Q1=A, Q2=A, Q3=A, Q4=A, Q5=A. Plan: [manage-crops-story-generation-plan.md](inception/plans/manage-crops-story-generation-plan.md).
+- **User Stories Generation**: Complete 2026-06-04. Added "Section 7 — Manage Crops" journey stories **S-27..S-34** plus maintainer story **S-35** (Section 5) to [stories.md](inception/user-stories/stories.md); extended the coverage summary with all FR-MC-*/NFR-MC-* rows; updated [personas.md](inception/user-stories/personas.md) (story interests + matrix; no new persona — P-01/02/03 suffice). **DEV-MC-01** (user override): draw overlay shows existing zones in red (single color) and the active draw in green (S-28/FR-MC-06; reverses spec §5.3).
+- **User Stories Approval**: Approved 2026-06-04 (user response: `continue`, with the S-28/DEV-MC-01 amendment).
+- **Workflow Planning**: Complete 2026-06-04 — [manage-crops-execution-plan.md](inception/plans/manage-crops-execution-plan.md). **EXECUTE**: Application Design, Units Generation, per-unit Functional Design / NFR Requirements / NFR Design / Code Generation, Build and Test. **SKIP**: Reverse Engineering, Infrastructure Design. Proposed ~7 units (U-MC-01..07, foundation-first); risk High. Package sequence: `Dayswork.Core` → `Dayswork` → `Dayswork.Tests`.
+- **Request Type**: New Feature (large, multi-component).
+- **Scope Estimate**: System-wide — new hub page + authoring UI, new managed-crop work-scope layer, runtime shift behavior, autonomous town shopping with new cross-location store navigation + headless 1.6 shop transactions, two cabin chests, persistence V2→V3 + migration/backfill, greenhouse/SVE-shed support, new energy action kinds.
+- **Complexity Estimate**: Complex.
+- **Source spec**: [manage-crops-spec.md](inception/manage-crops-spec.md) — all OQ-1..OQ-8 resolved; decisions log §10–§11.
+- **Workspace Detection**: Complete 2026-06-04 — brownfield AI-DLC continuation; existing `Dayswork`/`Dayswork.Core`/`Dayswork.Tests` C# projects; no reverse-engineering refresh (spec already grounded in current types).
+- **Requirements Answers**: Q1=A (full spec via unit loop), Q2=A (preferred-store-closed notice in scope), Q3=A (input-chest backfill required), Q4=A (both global toggles default ON), Q5=B (Security disabled), Q6=A (PBT full mode). No contradictions.
+- **Extension Config (this change)**: Security Baseline disabled; Property-Based Testing enabled, full mode.
+- **Requirements Analysis**: Complete 2026-06-04 — generated [manage-crops-requirements.md](inception/requirements/manage-crops-requirements.md) (FR-MC-01..44, NFR-MC-01..09).
 
 ## Active Change — TODO-10 SVE Grandpa's Shed Greenhouse — Code Generation Review Gate
 - **Requested At**: 2026-05-31T13:35:14Z (`using ai-dlc, do task TODO-10`)
