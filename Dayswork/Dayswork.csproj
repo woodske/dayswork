@@ -10,8 +10,14 @@
     <RootNamespace>Dayswork</RootNamespace>
     <!-- Auto-deploy built mod to <StardewModsPath>/Dayswork/ after each build -->
     <EnableModDeploy>true</EnableModDeploy>
-    <!-- Release zip deferred until U-16 (v1 release candidate) -->
+    <!-- Set true for release -->
     <EnableModZip>false</EnableModZip>
+  </PropertyGroup>
+
+  <!-- Release build: disable PDB generation -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>

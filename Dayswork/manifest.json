@@ -1,8 +1,8 @@
 {
   "Name": "Dayswork",
   "Author": "Bindicle",
-  "Version": "0.1.0",
-  "Description": "Hire NPC farmhands from the Pelican Town bulletin board to work your farm while you adventure.",
+  "Version": "1.0.0",
+  "Description": "Hire an NPC farmhand to work your farm while you adventure.",
   "UniqueID": "Bindicle.Dayswork",
   "MinimumApiVersion": "4.0.0",
   "EntryDll": "Dayswork.dll",
@@ -13,5 +13,5 @@
       "IsRequired": false
     }
   ],
-  "UpdateKeys": [ "Nexus:12345" ]
+  "UpdateKeys": [ "Nexus:47134" ]
 }

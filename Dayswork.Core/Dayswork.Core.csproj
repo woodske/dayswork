@@ -10,6 +10,12 @@
     <RootNamespace>Dayswork.Core</RootNamespace>
   </PropertyGroup>
 
+  <!-- Release build: disable PDB generation -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
   <!--
     ZERO SMAPI / StardewValley references here — enforced at the project level.
     Only Newtonsoft.Json is permitted as an outside dependency (used for JSON
