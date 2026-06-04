@@ -68,6 +68,7 @@
     "building.action.manage": "Manage farmhand contract",
     "notify.items_deposited_chest": "Your farmhand left some items in the cabin chest.",
     "notify.items_deposited_bin": "Your farmhand left some items in the shipping bin.",
+    "notify.shift_started": "Shift started. Fee charged: {{price}}g",
     "notify.cannot_afford": "Your farmhand didn't work today: you couldn't afford the {{price}}g fee (short {{shortfall}}g).",
     "notify.needs_attention": "Your farmhand contract needs attention before it can run again.",
     "notify.festival": "Your farmhand took the festival day off.",

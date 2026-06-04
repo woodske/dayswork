@@ -13,6 +13,7 @@ using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Buildings;
+using StardewValley.Menus;
 using StardewValley.Objects;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
@@ -391,6 +392,11 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             batches:          batches);
 
         _morningEntranceHoldTicks = pacingProfile.EntranceHoldTicks;
+
+        Game1.addHUDMessage(new HUDMessage(
+            I18nHelper.Get("notify.shift_started", new { price = contract.TermsSnapshot.Pricing.TotalPrice }),
+            HUDMessage.newQuest_type));
+
         BeginCurrentBatch();
     }
 
