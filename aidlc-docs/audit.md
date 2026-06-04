@@ -5593,3 +5593,81 @@ Fix deposit routing so `Collect Fruit -> Shipping Bin` always ends in the shippi
 **Context**: Units Generation complete for Manage Crops; awaiting approval to begin the per-unit Construction loop (U-MC-01).
 
 ---
+
+## Units Generation Approval + U-MC-01 Functional Design (Planning) — Manage Crops
+**Timestamp**: 2026-06-04T03:05:00Z
+**User Input**: "approved and continue"
+**AI Response**: "Units Generation approved; entered CONSTRUCTION per-unit loop at U-MC-01. Grounded in source: SaveDataSerializer is already at envelope SchemaVersion=3 and discards non-matching versions (DTO classes still named ...V2). Created u-mc-01-domain-persistence-functional-design-plan.md with 6 FD questions (persistence versioning/migration given schema-already-3, season-choice domain modeling, CropPlan vs ManagedCropWorkScope, depth of pure planners in the foundation, item-id representation, PBT obligations). Awaiting answers."
+**Context**: U-MC-01 Functional Design planning gate.
+
+---
+## U-MC-01 Functional Design — Answers Received
+**Timestamp**: 2026-06-04T22:10:57Z
+**User Input**: "continue ai-dlc workflow, functional design place U-MC-01 questions have been answered"
+**AI Response**: "Resumed the AI-DLC workflow from U-MC-01 Functional Design planning. Loaded mandatory common rules, Functional Design rules, extension opt-in files, active extension configuration, and full Property-Based Testing rules because Manage Crops selected full mode. Read the answered U-MC-01 functional design plan; validated all six [Answer]: tags as present and unambiguous (Q1=B, Q2=A, Q3=A, Q4=A, Q5=A, Q6=A), with no contradictions. Proceeding to generate U-MC-01 functional design artifacts and mark plan checkboxes in the same interaction."
+**Context**: CONSTRUCTION — U-MC-01 Crop-plan Domain + Persistence Foundation, Functional Design Step 5
+
+---
+## U-MC-01 Functional Design — Complete (Awaiting Approval)
+**Timestamp**: 2026-06-04T22:14:42Z
+**User Input**: "continue ai-dlc workflow, functional design place U-MC-01 questions have been answered"
+**AI Response**: "Generated U-MC-01 functional design artifacts at aidlc-docs/construction/u-mc-01-domain-persistence/functional-design/: business-logic-model.md, business-rules.md, and domain-entities.md. Marked all plan checklist items complete in u-mc-01-domain-persistence-functional-design-plan.md and updated aidlc-state.md to the U-MC-01 Functional Design review gate. Extension compliance: Security Baseline N/A because disabled for Manage Crops; Property-Based Testing full mode compliant for Functional Design because PBT-01 properties are explicitly identified and carried forward. Presenting standardized Functional Design completion gate and awaiting explicit approval before proceeding to NFR Requirements."
+**Context**: CONSTRUCTION — U-MC-01 Crop-plan Domain + Persistence Foundation, Functional Design Steps 6-8
+
+---
+## U-MC-01 Functional Design Approval and NFR Requirements Start
+**Timestamp**: 2026-06-04T22:16:31Z
+**User Input**: "continue"
+**AI Response**: "Recorded explicit Functional Design approval for U-MC-01 and advanced to NFR Requirements. Loaded NFR Requirements rule details, content-validation rules, U-MC-01 Functional Design artifacts, full Property-Based Testing rules, and current project files confirming FsCheck.Xunit 2.16.5, xUnit, .NET 6, nullable enabled, warnings-as-errors, and Core's Newtonsoft.Json-only dependency boundary. NFR question assessment found no additional user questions needed because performance, reliability, security, test rigor, persistence compatibility, and tech-stack choices are fixed by approved Manage Crops requirements and Functional Design. Proceeding to generate NFR Requirements artifacts and mark plan checkboxes in the same interaction."
+**Context**: CONSTRUCTION — U-MC-01 Crop-plan Domain + Persistence Foundation, Functional Design approval -> NFR Requirements
+
+---
+## U-MC-01 NFR Requirements — Complete (Awaiting Approval)
+**Timestamp**: 2026-06-04T22:18:32Z
+**User Input**: "continue"
+**AI Response**: "Generated NFR Requirements artifacts for U-MC-01 at aidlc-docs/construction/u-mc-01-domain-persistence/nfr-requirements/: nfr-requirements.md and tech-stack-decisions.md. Created and completed the NFR Requirements plan at aidlc-docs/construction/plans/u-mc-01-domain-persistence-nfr-requirements-plan.md with all checkboxes marked. Updated aidlc-state.md to the U-MC-01 NFR Requirements review gate. Verification found no open plan checkboxes, no non-ASCII in the new NFR files, and PBT-09 documented as compliant via FsCheck.Xunit 2.16.5 in Dayswork.Tests.csproj. Presenting standardized NFR Requirements completion gate and awaiting explicit approval before proceeding to NFR Design."
+**Context**: CONSTRUCTION — U-MC-01 Crop-plan Domain + Persistence Foundation, NFR Requirements Steps 6-8
+
+---
+## U-MC-01 NFR Requirements Approval and NFR Design Start
+**Timestamp**: 2026-06-04T22:19:43Z
+**User Input**: "continue"
+**AI Response**: "Recorded explicit NFR Requirements approval for U-MC-01 and advanced to NFR Design. Loaded NFR Design rule details, content-validation rules, approved NFR Requirements artifacts, tech-stack decisions, and U-MC-01 Functional Design context. Proceeding to create the NFR Design plan with explicit category evaluation and generate NFR Design artifacts."
+**Context**: CONSTRUCTION — U-MC-01 Crop-plan Domain + Persistence Foundation, NFR Requirements approval -> NFR Design
+
+---
+## U-MC-01 NFR Design — Complete (Awaiting Approval)
+**Timestamp**: 2026-06-04T22:22:11Z
+**User Input**: "continue"
+**AI Response**: "Generated NFR Design artifacts for U-MC-01 at aidlc-docs/construction/u-mc-01-domain-persistence/nfr-design/: nfr-design-patterns.md and logical-components.md. Created and completed the NFR Design plan at aidlc-docs/construction/plans/u-mc-01-domain-persistence-nfr-design-plan.md with all checkboxes marked and all mandatory NFR Design question categories evaluated. Updated aidlc-state.md to the U-MC-01 NFR Design review gate. Verification found no open plan checkboxes, no non-ASCII in the new NFR Design files, and extension compliance sections present. Presenting standardized NFR Design completion gate and awaiting explicit approval before proceeding to Code Generation planning."
+**Context**: CONSTRUCTION — U-MC-01 Crop-plan Domain + Persistence Foundation, NFR Design Steps 6-8
+
+---
+## U-MC-01 NFR Design Approval and Code Generation Planning Start
+**Timestamp**: 2026-06-04T22:24:17Z
+**User Input**: "continue"
+**AI Response**: "Recorded explicit NFR Design approval for U-MC-01 and advanced to Code Generation Part 1 (Planning). Loaded Code Generation rule details, content-validation rules, U-MC-01 Functional Design, NFR Requirements, NFR Design, unit-of-work, story map, aidlc-state, and relevant source/test layout. Reviewed existing Core domain, WorkScopeSet, WorkScopeClassifier, SaveDataSerializer, DTOs, persistence tests, U19 persistence generators, and existing FsCheck generator patterns. Proceeding to create the U-MC-01 code generation plan and approval prompt."
+**Context**: CONSTRUCTION — U-MC-01 Crop-plan Domain + Persistence Foundation, NFR Design approval -> Code Generation Part 1
+
+---
+## U-MC-01 Code Generation Plan — Approval Prompt
+**Timestamp**: 2026-06-04T22:24:17Z
+**User Input**: "continue"
+**AI Response**: "Created the Code Generation Part 1 plan at aidlc-docs/construction/plans/u-mc-01-domain-persistence-code-generation-plan.md. The plan contains 18 generation steps covering Core crop domain records/enums, planner input/output records, pure planners, DTOs, serializer mapping, WorkScopeSet/WorkScopeClassifier integration, contract constructor/defaulting, FsCheck generators, example tests, property tests, verification, code summary, state/audit updates, and duplicate-file checks. Awaiting explicit approval before executing any application-code changes."
+**Context**: CONSTRUCTION — U-MC-01 Code Generation Part 1 planning gate
+
+---
+## Code Generation Plan Approval Response
+**Timestamp**: 2026-06-04T22:40:55Z
+**User Input**: "continue"
+**AI Response**: "User approved U-MC-01 Code Generation Part 1 plan. Proceeding to Code Generation Part 2 and marking the approval checkbox before application code changes."
+**Context**: CONSTRUCTION - U-MC-01 Code Generation Part 2 approval recorded
+
+---
+## Code Generation Completion Prompt
+**Timestamp**: 2026-06-04T22:56:00Z
+**User Input**: ""
+**AI Response**: "U-MC-01 Code Generation Part 2 completed. Build and test verification passed. Presenting standardized Code Generation review prompt and awaiting explicit user approval before continuing."
+**Context**: CONSTRUCTION - U-MC-01 Code Generation completion and approval gate
+
+---

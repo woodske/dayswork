@@ -1,4 +1,5 @@
 using Dayswork.Core.Config;
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 using Dayswork.Core.Persistence.Dto;
@@ -157,6 +158,7 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             TermsSnapshot = MapTermsSnapshot(contract.TermsSnapshot),
             Tier = contract.Tier.ToString(),
             CategoryPriority = contract.CategoryPriority.Select(category => category.ToString()).ToList(),
+            CropPlan = CropPlanSerialization.MapDomainToDto(contract.CropPlan),
         };
 
     private static Contract MapDtoV2ToDomain(ContractDtoV2 dto)
@@ -179,6 +181,7 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             : Enum.Parse<EnergyTier>(dto.Tier);
 
         var categoryPriority = MapCategoryPriority(dto.CategoryPriority);
+        var cropPlan = CropPlanSerialization.MapDtoToDomain(dto.CropPlan);
 
         return new Contract(
             Id: id,
@@ -190,7 +193,8 @@ public sealed class SaveDataSerializer : ISaveDataSerializer
             ScopeSelection: scopeSelection,
             TermsSnapshot: termsSnapshot,
             Tier: tier,
-            CategoryPriority: categoryPriority);
+            CategoryPriority: categoryPriority,
+            CropPlan: cropPlan);
     }
 
     // Player category priority. Parse the saved order, dropping unknown/duplicate entries, then

@@ -162,4 +162,57 @@ public sealed class SaveDataSerializerTests
         Assert.NotNull(dto["ScopeSelection"]);
         Assert.NotNull(dto["TermsSnapshot"]);
     }
+
+    [Fact]
+    public void Serialize_EmptyCropPlan_OmitsCropPlan()
+    {
+        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+
+        var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
+        var dto = payload["Contracts"]!.Single()!;
+
+        Assert.Null(dto["CropPlan"]);
+    }
+
+    [Fact]
+    public void Deserialize_MissingCropPlan_DefaultsToEmpty()
+    {
+        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
+        ((JObject)payload["Contracts"]!.Single()!).Remove("CropPlan");
+
+        var result = _serializer.Deserialize(payload.ToString(Formatting.None));
+
+        var hydrated = Assert.Single(result);
+        Assert.False(hydrated.CropPlan.IsEnabled);
+    }
+
+    [Fact]
+    public void Deserialize_MalformedCropPlan_SkipsOnlyAffectedContract()
+    {
+        var validContract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var payload = JObject.Parse(_serializer.Serialize(new[] { validContract }, "0.2.0"));
+        var malformed = (JObject)((JObject)payload["Contracts"]!.Single()!).DeepClone();
+        malformed["Id"] = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+        malformed["CropPlan"] = new JObject
+        {
+            ["Assignments"] = new JArray
+            {
+                new JObject
+                {
+                    ["LocationName"] = "Farm",
+                    ["Mode"] = "NotARealMode",
+                    ["Choices"] = new JArray(),
+                },
+            },
+        };
+        ((JArray)payload["Contracts"]!).Add(malformed);
+
+        var result = _serializer.Deserialize(payload.ToString(Formatting.None));
+
+        var hydrated = Assert.Single(result);
+        Assert.True(ContractStructuralComparer.ContractsEqual(validContract, hydrated));
+        Assert.Single(_warnings);
+        Assert.Contains("Skipping schema v3 contract", _warnings[0]);
+    }
 }

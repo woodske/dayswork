@@ -1,4 +1,5 @@
 using Dayswork.Core.Config;
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 using Dayswork.Tests.Generators;
@@ -43,7 +44,8 @@ public static class U19PersistenceGen
              ScopeSelection: canonicalScope,
              TermsSnapshot: preview.ProposedTerms!,
              Tier: tier,
-             CategoryPriority: categoryPriority))
+             CategoryPriority: categoryPriority,
+             CropPlan: CropPlan.Empty))
         .ToArbitrary();
 
     public static Arbitrary<ContractTermsSnapshot> TermsSnapshot() =>
@@ -96,7 +98,8 @@ public static class U19PersistenceGen
             ScopeSelection: scope,
             TermsSnapshot: BuildTerms(scope, enabledTasks, EnergyTier.FullDay),
             Tier: EnergyTier.FullDay,
-            CategoryPriority: TaskKindSets.DefaultCategoryPriority);
+            CategoryPriority: TaskKindSets.DefaultCategoryPriority,
+            CropPlan: CropPlan.Empty);
     }
 
     public static ContractTermsSnapshot CreateAlternateTermsSnapshot()

@@ -12,4 +12,5 @@ public sealed class ContractDtoV2
     public ContractTermsSnapshotDto TermsSnapshot { get; set; } = new();
     public string Tier { get; set; } = "";
     public List<string> CategoryPriority { get; set; } = new();
+    public CropPlanDtoV1? CropPlan { get; set; }
 }

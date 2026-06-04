@@ -1,3 +1,4 @@
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 
@@ -15,7 +16,8 @@ internal static class ContractStructuralComparer
         && left.Tier == right.Tier
         && left.CategoryPriority.SequenceEqual(right.CategoryPriority)
         && ScopeSelectionsEqual(left.ScopeSelection, right.ScopeSelection)
-        && TermsSnapshotsEqual(left.TermsSnapshot, right.TermsSnapshot);
+        && TermsSnapshotsEqual(left.TermsSnapshot, right.TermsSnapshot)
+        && CropPlansEqual(left.CropPlan, right.CropPlan);
 
     public static bool ScopeSelectionsEqual(ContractScopeSelection left, ContractScopeSelection right) =>
         ZonesEqual(left.OutdoorZones, right.OutdoorZones)
@@ -59,6 +61,33 @@ internal static class ContractStructuralComparer
 
         return $"{contract.Id}|{enabledTasks}|{destinations}|{contract.Schedule}|{contract.Status}|{contract.HireDate.Day}:{contract.HireDate.Season}:{contract.HireDate.Year}|{scope}|{terms}|{priority}";
     }
+
+    public static bool CropPlansEqual(CropPlan left, CropPlan right) =>
+        left.Assignments.Count == right.Assignments.Count
+        && left.Assignments.Zip(right.Assignments, CropAssignmentsEqual).All(equal => equal);
+
+    private static bool CropAssignmentsEqual(CropZoneAssignment left, CropZoneAssignment right) =>
+        left.Zone == right.Zone
+        && left.Mode == right.Mode
+        && Equals(left.OutputChest, right.OutputChest)
+        && left.Choices.Count == right.Choices.Count
+        && left.Choices.Zip(right.Choices, CropChoicesEqual).All(equal => equal);
+
+    private static bool CropChoicesEqual(SeasonCropChoice left, SeasonCropChoice right) =>
+        left.Season == right.Season
+        && left.StorePreference == right.StorePreference
+        && left.IsLocked == right.IsLocked
+        && left.OriginSeason == right.OriginSeason
+        && CropDescriptorsEqual(left.Crop, right.Crop);
+
+    private static bool CropDescriptorsEqual(CropDescriptor left, CropDescriptor right) =>
+        left.CropItemId == right.CropItemId
+        && left.SeedItemId == right.SeedItemId
+        && left.FertilizerItemId == right.FertilizerItemId
+        && left.DaysToFirstHarvest == right.DaysToFirstHarvest
+        && left.FertilizedDaysToFirstHarvest == right.FertilizedDaysToFirstHarvest
+        && left.RegrowDays == right.RegrowDays
+        && left.Seasons.SequenceEqual(right.Seasons);
 
     private static bool ZonesEqual(IReadOnlyList<Zone> left, IReadOnlyList<Zone> right) =>
         left.Count == right.Count && left.SequenceEqual(right);

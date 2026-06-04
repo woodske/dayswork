@@ -1,10 +1,11 @@
 namespace Dayswork.Core.Pricing;
 
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
 public sealed class WorkScopeClassifier : IWorkScopeClassifier
 {
-    public WorkScopeSet Classify(ContractScopeSelection selection, IReadOnlySet<TaskKind> enabledTasks)
+    public WorkScopeSet Classify(ContractScopeSelection selection, IReadOnlySet<TaskKind> enabledTasks, CropPlan? cropPlan = null)
     {
         OutdoorWorkScope? outdoorWork = null;
         if (selection.OutdoorZones.Count > 0 && enabledTasks.Any(TaskKindSets.IsOutdoorService))
@@ -34,7 +35,11 @@ public sealed class WorkScopeClassifier : IWorkScopeClassifier
                     .Select(locationName => new GreenhouseWorkScope(locationName)));
         }
 
-        return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks);
+        var managedCrops = cropPlan is { IsEnabled: true }
+            ? new ManagedCropWorkScope(cropPlan.Assignments)
+            : null;
+
+        return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks, managedCrops);
     }
 
     private static OutdoorWorkScope BuildOutdoorWorkScope(IReadOnlyList<Zone> zones)
