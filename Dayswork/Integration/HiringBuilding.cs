@@ -24,6 +24,8 @@ internal static class HiringBuilding
 
     /// <summary>Id of the building's built-in output chest where missed/overflow items are deposited.</summary>
     public const string OutputChestId = "Bindicle.Dayswork_Output";
+    /// <summary>Id of the building's built-in input chest where crop-management supplies are stored.</summary>
+    public const string InputChestId = "Bindicle.Dayswork_Input";
 
     /// <summary>
     /// True once the worker has finished and left for the day (set in ShiftOrchestrator.HandleExit,
@@ -41,6 +43,8 @@ internal static class HiringBuilding
     public const int TilesHigh = 3;
     // Output chest on the porch, right of the door (the cabin's mailbox spot) when facing the house.
     public static readonly Point OutputChestDisplayTile = new(3, 2);
+    // Input chest on the porch, left of the door when facing the house.
+    public static readonly Point InputChestDisplayTile = new(1, 2);
 
     /// <summary>
     /// Footprint tiles that open the hire/manage flow when action-clicked: the drawn-in bulletin
@@ -109,8 +113,19 @@ internal static class HiringBuilding
         IndoorMap = null,
         MaxOccupants = 0,
         DrawLayers = new List<BuildingDrawLayer>(),
-        Chests = new List<BuildingChest>
+        Chests = BuildChests(),
+    };
+
+    internal static List<BuildingChest> BuildChests() =>
+        new()
         {
+            new()
+            {
+                Id = InputChestId,
+                Type = BuildingChestType.Chest,
+                DisplayTile = InputChestDisplayTile.ToVector2(),
+                DisplayHeight = 1f,
+            },
             new()
             {
                 Id = OutputChestId,
@@ -118,8 +133,7 @@ internal static class HiringBuilding
                 DisplayTile = OutputChestDisplayTile.ToVector2(),
                 DisplayHeight = 1f,
             },
-        },
-    };
+        };
 
     /// <summary>
     /// Resolves the building's built-in output chest, if the building is present on the farm.
@@ -132,12 +146,36 @@ internal static class HiringBuilding
     }
 
     /// <summary>
+    /// Resolves the building's built-in input chest, if the building is present on the farm.
+    /// Returns null when no building exists or the chest has not been backfilled yet.
+    /// </summary>
+    public static StardewValley.Objects.Chest? TryGetInputChest(Farm farm)
+    {
+        var building = HiringBuildingInteraction.FindHiringBuilding(farm);
+        return building?.GetBuildingChest(InputChestId);
+    }
+
+    /// <summary>
     /// Absolute farm tile of the building's built-in output chest (the game places the building
-    /// chest as a farm object at the display tile). Null when no building exists. Used to exclude it
-    /// from discoverable-chest lists — it's the implicit default output destination, not a
-    /// separately selectable chest.
+    /// chest as a farm object at the display tile). Null when no building exists.
     /// </summary>
     public static Point? TryGetOutputChestTile(Farm? farm)
+        => TryGetBuiltInChestTile(farm, OutputChestDisplayTile);
+
+    /// <summary>
+    /// Absolute farm tile of the building's built-in input chest. Null when no building exists.
+    /// Used to exclude the supply chest from selectable output destinations.
+    /// </summary>
+    public static Point? TryGetInputChestTile(Farm? farm)
+        => TryGetBuiltInChestTile(farm, InputChestDisplayTile);
+
+    internal static bool IsInputChestDisplayTile(int localX, int localY) =>
+        InputChestDisplayTile.X == localX && InputChestDisplayTile.Y == localY;
+
+    internal static bool IsOutputChestDisplayTile(int localX, int localY) =>
+        OutputChestDisplayTile.X == localX && OutputChestDisplayTile.Y == localY;
+
+    private static Point? TryGetBuiltInChestTile(Farm? farm, Point displayTile)
     {
         if (farm is null)
             return null;
@@ -147,7 +185,7 @@ internal static class HiringBuilding
             return null;
 
         return new Point(
-            building.tileX.Value + OutputChestDisplayTile.X,
-            building.tileY.Value + OutputChestDisplayTile.Y);
+            building.tileX.Value + displayTile.X,
+            building.tileY.Value + displayTile.Y);
     }
 }

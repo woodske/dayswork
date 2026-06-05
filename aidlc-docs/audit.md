@@ -5671,3 +5671,66 @@ Fix deposit routing so `Collect Fruit -> Shipping Bin` always ends in the shippi
 **Context**: CONSTRUCTION - U-MC-01 Code Generation completion and approval gate
 
 ---
+## Code Generation Approval Response
+**Timestamp**: 2026-06-04T22:58:26Z
+**User Input**: "continue"
+**AI Response**: "User approved U-MC-01 Code Generation. Recorded approval and advanced to U-MC-02 Functional Design. Created U-MC-02 Functional Design question plan and awaiting answers before generating functional design artifacts."
+**Context**: CONSTRUCTION - U-MC-01 Code Generation approval; U-MC-02 Functional Design planning
+
+---
+## Functional Design Question Response
+**Timestamp**: 2026-06-04T23:06:24Z
+**User Input**: "I answered the questions, let's make it clear that the farmhand cabin input chest is where the crop management will draw from and the output chest is where the task output can be deposited."
+**AI Response**: "Read U-MC-02 Functional Design answers. Answers complete, but Q4 conflicts with approved FR-MC-35 and U-MC-02 scope. Created a clarification question file before generating Functional Design artifacts."
+**Context**: CONSTRUCTION - U-MC-02 Functional Design answer validation and clarification
+
+---
+## Functional Design Clarification Response
+**Timestamp**: 2026-06-04T23:21:22Z
+**User Input**: "continue"
+**AI Response**: "Read U-MC-02 clarification answer from the clarification file. Resolved the conflict by treating the output chest as both default/fallback and explicitly selectable, while the input chest remains excluded. Proceeding to generate Functional Design artifacts."
+**Context**: CONSTRUCTION - U-MC-02 Functional Design clarification resolved
+
+---
+## Functional Design Completion Prompt
+**Timestamp**: 2026-06-04T23:21:22Z
+**User Input**: ""
+**AI Response**: "Generated U-MC-02 Functional Design artifacts and presenting the standardized Functional Design review gate. Awaiting explicit approval before continuing."
+**Context**: CONSTRUCTION - U-MC-02 Functional Design completion
+
+---
+## Functional Design Approval And NFR Requirements Completion
+**Timestamp**: 2026-06-05T00:30:40Z
+**User Input**: "continue through to code plan, use recommended nfr questions"
+**AI Response**: "Recorded U-MC-02 Functional Design approval. Used recommended NFR choices as instructed, generated U-MC-02 NFR Requirements artifacts, and continued toward NFR Design and Code Generation planning."
+**Context**: CONSTRUCTION - U-MC-02 Functional Design approval and NFR Requirements generation
+
+---
+## NFR Design Completion
+**Timestamp**: 2026-06-05T00:30:40Z
+**User Input**: "continue through to code plan, use recommended nfr questions"
+**AI Response**: "Generated U-MC-02 NFR Design artifacts using the recommended NFR posture and continued toward Code Generation Part 1 planning as instructed."
+**Context**: CONSTRUCTION - U-MC-02 NFR Design generation
+
+---
+## Code Generation Plan Approval Prompt
+**Timestamp**: 2026-06-05T00:30:40Z
+**User Input**: ""
+**AI Response**: "Created U-MC-02 Code Generation Part 1 plan and requesting approval before application-code changes. No application code for U-MC-02 has been changed yet."
+**Context**: CONSTRUCTION - U-MC-02 Code Generation Part 1 approval gate
+
+---
+## Code Generation Plan Approval Response
+**Timestamp**: 2026-06-05T00:41:04Z
+**User Input**: "continue"
+**AI Response**: "User approved U-MC-02 Code Generation Part 1 plan. Proceeding to Code Generation Part 2 and marking the approval checkbox before application code changes."
+**Context**: CONSTRUCTION - U-MC-02 Code Generation Part 2 approval recorded
+
+---
+## Code Generation Completion Prompt
+**Timestamp**: 2026-06-05T00:55:19Z
+**User Input**: ""
+**AI Response**: "U-MC-02 Code Generation Part 2 completed. Build and test verification passed. Presenting standardized Code Generation review prompt and awaiting explicit user approval before continuing to U-MC-03."
+**Context**: CONSTRUCTION - U-MC-02 Code Generation completion and approval gate
+
+---

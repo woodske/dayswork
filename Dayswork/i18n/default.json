@@ -64,6 +64,8 @@
     "ui.summary.category.fieldwork": "Fieldwork (trees, rocks, clearing)",
     "building.office.name": "Farmhand Cabin",
     "building.office.description": "Hire and manage a farmhand here. Missed items are left in its chest.",
+    "building.office.input_chest.name": "Farmhand Cabin - Input",
+    "building.office.output_chest.name": "Farmhand Cabin - Output",
     "building.action.hire": "Hire a farmhand",
     "building.action.manage": "Manage farmhand contract",
     "notify.items_deposited_chest": "Your farmhand left some items in the cabin chest.",

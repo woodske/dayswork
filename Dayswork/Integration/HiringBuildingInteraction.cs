@@ -43,6 +43,15 @@ internal sealed class HiringBuildingInteraction
         if (!PlayerNextToFootprint(building, Game1.player.TilePoint))
             return;
 
+        // Input chest on the porch.
+        if (IsInputChestDisplayTile(building, gx, gy) &&
+            building.GetBuildingChest(HiringBuilding.InputChestId) is { } inputChest)
+        {
+            _helper.Input.Suppress(e.Button);
+            inputChest.ShowMenu();
+            return;
+        }
+
         // Output chest on the porch.
         if (IsOutputChestDisplayTile(building, gx, gy) &&
             building.GetBuildingChest(HiringBuilding.OutputChestId) is { } chest)
@@ -83,6 +92,10 @@ internal sealed class HiringBuildingInteraction
     private static bool IsOutputChestDisplayTile(Building building, int x, int y) =>
         x == building.tileX.Value + HiringBuilding.OutputChestDisplayTile.X
         && y == building.tileY.Value + HiringBuilding.OutputChestDisplayTile.Y;
+
+    private static bool IsInputChestDisplayTile(Building building, int x, int y) =>
+        x == building.tileX.Value + HiringBuilding.InputChestDisplayTile.X
+        && y == building.tileY.Value + HiringBuilding.InputChestDisplayTile.Y;
 
     private static bool IsBulletinBoardTile(Building building, int x, int y)
     {
