@@ -28,14 +28,21 @@ public static class ManageCropsGen
         (from zone in ZoneGen()
          from mode in Gen.Elements(CropAssignmentMode.Seasonal, CropAssignmentMode.SeasonAgnostic)
          from choice in SeasonCropChoice().Generator
-         select new CropZoneAssignment(zone, mode, new[] { choice }))
+         from hasGroupId in Arb.Generate<bool>()
+         from groupIndex in Gen.Choose(1, 4)
+         select new CropZoneAssignment(
+             zone,
+             mode,
+             new[] { choice },
+             groupId: hasGroupId ? $"group-{groupIndex}" : null))
         .ToArbitrary();
 
     public static Arbitrary<SeasonCropChoice> SeasonCropChoice() =>
         (from season in SeasonGen()
          from crop in CropDescriptor().Generator
          from preference in StorePreferenceGen()
-         select new SeasonCropChoice(season, crop, preference))
+         from autoReplant in Arb.Generate<bool>()
+         select new SeasonCropChoice(season, crop, preference, autoReplant: autoReplant))
         .ToArbitrary();
 
     public static Arbitrary<CropDescriptor> CropDescriptor() =>

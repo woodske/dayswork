@@ -11,6 +11,8 @@ namespace Dayswork.UI;
 // Reads IZoneDrawSource; holds no mutable state.
 internal sealed class ZoneDrawOverlay : IDisposable
 {
+    private static readonly Color DragPreviewFillColor = new(144, 238, 144, 255);
+
     private readonly IZoneDrawSource _source;
     private Texture2D? _pixelTexture;
     private bool _disposed;
@@ -32,9 +34,13 @@ internal sealed class ZoneDrawOverlay : IDisposable
         if (_source.IsInZoneDrawMode)
             DrawTileGrid(e.SpriteBatch);
 
-        // Completed zones — blue semi-transparent fill (O(zone count), not O(tile count) — NFR-PERF-03)
+        // Completed zones — semi-transparent fill in the layer's color (O(zone count), not O(tile count) — NFR-PERF-03)
         foreach (var zone in _source.CompletedZones)
-            DrawZoneFill(e.SpriteBatch, zone.TopLeft, zone.BottomRight, Color.LightBlue * 0.4f);
+            DrawZoneFill(e.SpriteBatch, zone.TopLeft, zone.BottomRight, _source.ZoneFillColor);
+
+        // Protected zones belong to other managed-crop groups and cannot be selected in this session.
+        foreach (var zone in _source.ProtectedZones)
+            DrawZoneFill(e.SpriteBatch, zone.TopLeft, zone.BottomRight, _source.ProtectedZoneFillColor);
 
         // Selected building footprints — yellow fill
         foreach (var outline in _source.SelectedBuildings)
@@ -50,7 +56,7 @@ internal sealed class ZoneDrawOverlay : IDisposable
             var current = _source.DragCurrent;
             var topLeft     = new TileCoord(Math.Min(start.X, current.X), Math.Min(start.Y, current.Y));
             var bottomRight = new TileCoord(Math.Max(start.X, current.X), Math.Max(start.Y, current.Y));
-            DrawZoneFill(e.SpriteBatch, topLeft, bottomRight, Color.White * 0.25f);
+            DrawZoneFill(e.SpriteBatch, topLeft, bottomRight, DragPreviewFillColor * 0.35f);
         }
     }
 

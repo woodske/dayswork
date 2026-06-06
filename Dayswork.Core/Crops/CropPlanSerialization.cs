@@ -43,6 +43,7 @@ public static class CropPlanSerialization
                 .Select(MapChoiceToDto)
                 .ToList(),
             OutputChest = assignment.OutputChest is null ? null : MapChestRefToDto(assignment.OutputChest),
+            GroupId = assignment.GroupId,
         };
 
     private static CropZoneAssignment MapAssignmentToDomain(CropZoneAssignmentDtoV1 dto)
@@ -59,7 +60,8 @@ public static class CropPlanSerialization
             (dto.Choices ?? throw new JsonException("CropPlan assignment Choices was null."))
                 .Select(MapChoiceToDomain)
                 .ToList(),
-            dto.OutputChest is null ? null : MapChestRefToDomain(dto.OutputChest));
+            dto.OutputChest is null ? null : MapChestRefToDomain(dto.OutputChest),
+            dto.GroupId);
     }
 
     private static SeasonCropChoiceDtoV1 MapChoiceToDto(SeasonCropChoice choice) =>
@@ -76,6 +78,7 @@ public static class CropPlanSerialization
             StorePreference = choice.StorePreference.ToString(),
             IsLocked = choice.IsLocked,
             OriginSeason = choice.OriginSeason?.ToString(),
+            AutoReplant = choice.AutoReplant,
         };
 
     private static SeasonCropChoice MapChoiceToDomain(SeasonCropChoiceDtoV1 dto)
@@ -96,7 +99,8 @@ public static class CropPlanSerialization
             crop,
             Enum.Parse<StorePreference>(Require(dto.StorePreference, "CropPlan choice StorePreference")),
             dto.IsLocked,
-            string.IsNullOrWhiteSpace(dto.OriginSeason) ? null : Enum.Parse<Season>(dto.OriginSeason));
+            string.IsNullOrWhiteSpace(dto.OriginSeason) ? null : Enum.Parse<Season>(dto.OriginSeason),
+            dto.AutoReplant);
     }
 
     private static ChestRefDtoV1 MapChestRefToDto(ChestRef chestRef) =>

@@ -33,6 +33,7 @@ public sealed class CropPlanSerializationTests
         Assert.True(hydrated.IsEnabled);
         Assert.Equal(plan.Assignments[0].Zone, hydrated.Assignments[0].Zone);
         Assert.Equal(plan.Assignments[0].Choices[0].Crop.SeedItemId, hydrated.Assignments[0].Choices[0].Crop.SeedItemId);
+        Assert.Equal("group-1", hydrated.Assignments[0].GroupId);
     }
 
     private static CropPlan CreatePlan()
@@ -41,7 +42,8 @@ public sealed class CropPlanSerializationTests
         var assignment = new CropZoneAssignment(
             new Zone("Farm", new TileCoord(0, 0), new TileCoord(1, 1)),
             CropAssignmentMode.Seasonal,
-            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.Pierre) });
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.Pierre) },
+            groupId: "group-1");
         return new CropPlan(new[] { assignment });
     }
 }

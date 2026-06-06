@@ -5734,3 +5734,149 @@ Fix deposit routing so `Collect Fruit -> Shipping Bin` always ends in the shippi
 **Context**: CONSTRUCTION - U-MC-02 Code Generation completion and approval gate
 
 ---
+## U-MC-02 Code Generation Approval Response
+**Timestamp**: 2026-06-05T01:10:00Z
+**User Input**: "continue ai-dlc workflow. U-MC-02 is approved."
+**AI Response**: "Recorded U-MC-02 Code Generation approval. Advanced the per-unit construction loop to U-MC-03 (Manage Crops Authoring UI) and began the Functional Design stage by creating the functional design plan with clarification questions."
+**Context**: CONSTRUCTION - U-MC-02 Code Generation approved; U-MC-03 Functional Design started
+
+---
+## U-MC-03 Functional Design Plan Created
+**Timestamp**: 2026-06-05T01:10:30Z
+**User Input**: ""
+**AI Response**: "Created aidlc-docs/construction/plans/u-mc-03-authoring-ui-functional-design-plan.md with 8 clarification questions covering menu page structure, crop catalog seam + testing emphasis, the U-MC-03/U-MC-04 draw-handoff boundary, multi-season locking ownership, season-agnostic (greenhouse) authoring scope, plan-level toggles/store-preference scope boundary, output-chest assignment UX, and status-chip behavior. Awaiting answers before generating Functional Design artifacts."
+**Context**: CONSTRUCTION - U-MC-03 Functional Design questions awaiting user answers
+
+---
+## U-MC-03 Functional Design Answers Received
+**Timestamp**: 2026-06-05T01:30:00Z
+**User Input**: "done" (answers filled into the plan file: Q1=A, Q2=B, Q3=A, Q4=A, Q5=A, Q6=A, Q7=A, Q8=A)
+**AI Response**: "Validated all eight answers as unambiguous and mutually consistent; no clarification round needed. Generated the four U-MC-03 Functional Design artifacts (domain-entities.md, business-logic-model.md, business-rules.md, frontend-components.md) under construction/u-mc-03-authoring-ui/functional-design/."
+**Context**: CONSTRUCTION - U-MC-03 Functional Design generation
+
+---
+## U-MC-03 Functional Design Completion Gate
+**Timestamp**: 2026-06-05T01:30:30Z
+**User Input**: ""
+**AI Response**: "Presented the standardized Functional Design completion gate for U-MC-03 and requested explicit approval (Request Changes vs Continue to NFR Requirements) before proceeding."
+**Context**: CONSTRUCTION - U-MC-03 Functional Design review/approval gate
+
+---
+## U-MC-03 Functional Design Approval Response
+**Timestamp**: 2026-06-05T01:45:00Z
+**User Input**: "continue"
+**AI Response**: "Recorded U-MC-03 Functional Design approval and advanced to NFR Requirements. No separate NFR question round needed: the approved Functional Design (Q3=A testing/determinism, Q1/Q2/Q7 UX, i18n rules, scope boundaries) and the existing NFR-MC-01..09 requirements fix the NFR posture, consistent with U-MC-01/U-MC-02. Generating nfr-requirements.md and tech-stack-decisions.md."
+**Context**: CONSTRUCTION - U-MC-03 Functional Design approved; NFR Requirements started
+
+---
+## U-MC-03 NFR Requirements Completion Gate
+**Timestamp**: 2026-06-05T01:50:00Z
+**User Input**: ""
+**AI Response**: "Generated U-MC-03 NFR Requirements (nfr-requirements.md with NFR-MC3-* across scalability/performance/reliability/security/maintainability/usability, and tech-stack-decisions.md reusing the existing stack with no new dependency). No question round was needed. Presented the standardized NFR Requirements completion gate and awaiting explicit approval before NFR Design."
+**Context**: CONSTRUCTION - U-MC-03 NFR Requirements review/approval gate
+
+---
+## U-MC-03 NFR Requirements Approval Response
+**Timestamp**: 2026-06-05T02:00:00Z
+**User Input**: "continue"
+**AI Response**: "Recorded U-MC-03 NFR Requirements approval and advanced to NFR Design. No NFR Design question round needed: NFR-MC3-* and the approved Functional Design fix the pattern set cleanly (consistent with U-MC-01/U-MC-02). Generating nfr-design-patterns.md and logical-components.md."
+**Context**: CONSTRUCTION - U-MC-03 NFR Requirements approved; NFR Design started
+
+---
+## U-MC-03 NFR Design Completion Gate
+**Timestamp**: 2026-06-05T02:05:00Z
+**User Input**: ""
+**AI Response**: "Generated U-MC-03 NFR Design (nfr-design-patterns.md and logical-components.md). No question round was needed; all mandatory categories resolved by NFR-MC3-* and the Functional Design. Presented the standardized NFR Design completion gate and awaiting explicit approval before Code Generation."
+**Context**: CONSTRUCTION - U-MC-03 NFR Design review/approval gate
+
+---
+## U-MC-03 NFR Design Approval Response
+**Timestamp**: 2026-06-05T02:10:00Z
+**User Input**: "continue"
+**AI Response**: "Recorded U-MC-03 NFR Design approval. Infrastructure Design SKIP (SMAPI mod). Advanced to Code Generation."
+**Context**: CONSTRUCTION - U-MC-03 NFR Design approved; Code Generation started
+
+---
+## U-MC-03 Code Generation
+**Timestamp**: 2026-06-05T02:55:00Z
+**User Input**: "continue until either I need to answer questions or playtest"
+**AI Response**: "Per user pre-authorization to continue through routine gates, created the U-MC-03 Code Generation Part 1 plan and executed Part 2: pure Core catalog seam (CropSupplyTag/CropCatalogEntry/FertilizerOption/CropCatalogSource/CropCatalog + CropDescriptor.WithFertilizer), additive SeasonCropChoice.AutoReplant (DEV-MC-03-01), mod CropPlanDraft authoring state, live CropCatalogProvider adapter, reusable CropListPickerMenu, ManageCropsMenu page, HubMenu nav row + status, HiringFlowCoordinator wiring (page/pickers/draw/materialize/BuildContract/edit hydration), i18n keys, and tests. Verification: build 0/0; tests 401 passed / 1 expected skip / 0 failed; deploy build succeeded to the Mods folder. Stopping at the Code Generation review gate because in-game playtest is the natural next checkpoint."
+**Context**: CONSTRUCTION - U-MC-03 Code Generation complete; playtest review gate
+
+---
+## U-MC-03 Code Generation Review Fix - Crop Groups
+**Timestamp**: 2026-06-05T19:48:29Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Manage Crops Crop Groups
+
+## Summary
+Add explicit crop groups to the Manage Crops flow. The first Manage Crops page becomes a summary page with an **Add Crop Group** button, editable/deletable group rows, and per-season crop/fertilizer/replant details. Adding or editing a group opens a separate group editor view for season choices, per-group output chest, and tile drawing.
+
+## Key Changes
+- UI:
+  - Keep using the existing layout framework (`LayoutMenu`, `PageShell`, `VStack`, `HStack`, `ScrollPanel`, `MenuButton`, `Checkbox`).
+  - Convert `ManageCropsMenu` into the group summary page.
+  - Add `CropGroupEditorMenu` for season table editing, with columns: **Season**, **Crop**, **Fertilizer**, **Replant**.
+  - Rename player-facing “auto-replant” text to “replant” in labels/help/i18n.
+  - Widen only the Manage Crops pages via a new wide layout width, targeting about `960px` while clamping to the viewport.
+- Draft/domain shape:
+  - Add a `CropGroupDraft` concept containing group id, season slots, per-group output chest, and drawn zones.
+  - Update `CropPlanDraft` to own multiple groups, support add/edit/delete, and build a `CropPlan` by flattening group zones into crop assignments.
+  - Preserve per-group output chest when materializing assignments.
+  - Add an optional persisted group id to crop assignments so edit flow can reconstruct groups after save; older saves without ids hydrate one assignment as one group.
+- Zone drawing:
+  - Extend `ZoneDrawMenu`/overlay with protected zones.
+  - When editing or adding a group, other groups’ tiles are visible but unselectable; attempted overlap is rejected with a HUD message/sound.
+  - The active group’s zones remain editable/toggleable.
+- Summary list:
+  - Each group row shows group number/tile or zone count plus Spring/Summer/Fall/Winter crop, fertilizer, and replant state.
+  - Rows offer Edit and Delete actions.
+
+## Tests
+- Add/extend `CropPlanDraftTests` for multiple groups, edit isolation, delete behavior, per-group output chest, and build/hydrate behavior.
+- Extend crop plan serialization example and FsCheck round-trip coverage for persisted group ids.
+- Add pure overlap-policy tests for active zones vs protected zones, including “previous group tiles cannot be selected.”
+- Update i18n/lint expectations for “Replant” and the new summary/editor labels.
+- Verify with:
+  - `dotnet build Dayswork.sln /p:EnableModDeploy=false`
+  - `dotnet test Dayswork.sln /p:EnableModDeploy=false`
+
+## Assumptions
+- “Replant” is a player-facing rename; existing internal `AutoReplant`/JSON fields can remain for compatibility unless a broader code rename is requested.
+- Security Baseline remains disabled for Manage Crops.
+- Property-Based Testing remains enabled in full mode where applicable."
+**AI Response**: "Implemented the crop-groups review fix. Added persisted CropZoneAssignment.GroupId, group-aware CropPlanDraft/CropGroupDraft, Manage Crops summary page, CropGroupEditorMenu, per-group output chest wiring, protected-zone draw behavior, player-facing Replant labels, group/serialization/overlap tests, and FsCheck generator coverage for group ids. Verification passed: dotnet test Dayswork.sln /p:EnableModDeploy=false (429 passed / 1 expected skip / 0 failed) and dotnet build Dayswork.sln /p:EnableModDeploy=false (0 warnings / 0 errors). Security Baseline remains disabled; Property-Based Testing full mode satisfied by updated example and property coverage."
+**Context**: CONSTRUCTION - U-MC-03 Code Generation review fix implemented
+
+---
+## U-MC-03 Code Generation Review Fix - Crop Group UI Polish
+**Timestamp**: 2026-06-05T20:47:48Z
+**User Input**: "This looks a lot better. Some UI tweaks:
+In manage crops, the scroll bar overlaps the group details (over the delete button). You can make the UI wider if needed
+In manage crops, the crop details don't populate for the seasons (it should show just the crop)
+In add crop group, the seasons don't populate"
+**AI Response**: "Applied focused UI polish: widened Manage Crops pages to a 1080px preferred width with viewport clamping, narrowed/shortened the summary rows so Edit/Delete no longer run under the scrollbar, changed summary season cells to display only the crop name, and switched editor row season labels to direct season label mapping. Verification passed: dotnet build Dayswork.sln /p:EnableModDeploy=false (0 warnings / 0 errors) and dotnet test Dayswork.sln /p:EnableModDeploy=false (429 passed / 1 expected skip / 0 failed)."
+**Context**: CONSTRUCTION - U-MC-03 crop group UI polish
+
+---
+## U-MC-03 Code Generation Review Fix - Crop Group Season Labels
+**Timestamp**: 2026-06-05T20:54:56Z
+**User Input**: "The crop group UI still does not populate the seasons in the season column"
+**AI Response**: "Fixed the layout measurement bug that prevented labels inside FixedHeight rows and ScrollPanel items from preparing rendered text before draw. FixedHeight.Arrange now measures its child before arranging; ScrollPanel.Arrange now measures visible items before arranging. Added focused FixedHeight and ScrollPanel layout regression tests. Verification passed: dotnet build Dayswork.sln /p:EnableModDeploy=false (0 warnings / 0 errors) and dotnet test Dayswork.sln /p:EnableModDeploy=false (431 passed / 1 expected skip / 0 failed)."
+**Context**: CONSTRUCTION - U-MC-03 crop group layout label fix
+
+---
+## U-MC-03 Code Generation Review Fix - Crop Group Summary Alignment
+**Timestamp**: 2026-06-05T21:01:17Z
+**User Input**: "The crop for spring is overlapping the zone details. I'm not sure what the best fix is. If we move the text up, the Cauliflower text will be too close to Group 1."
+**AI Response**: "Adjusted Manage Crops summary rows into a two-line structure: the top line contains the group label, seasonal crop names, and Edit/Delete controls; the second line contains the zone/tile detail, indented under the group column. This keeps crop names aligned with the group label without overlapping zone details. Verification passed: dotnet build Dayswork.sln /p:EnableModDeploy=false (0 warnings / 0 errors) and dotnet test Dayswork.sln /p:EnableModDeploy=false (431 passed / 1 expected skip / 0 failed)."
+**Context**: CONSTRUCTION - U-MC-03 crop group summary alignment
+
+---
+## U-MC-03 Code Generation Review Fix - Crop Name Ellipsis
+**Timestamp**: 2026-06-05T21:06:21Z
+**User Input**: "now we have a situation where the butternut squash text is overlapping the broccoli text in fall. Let's use an ellipsis to handle overflow text"
+**AI Response**: "Added optional ellipsis truncation to the shared Label layout element and enabled it for Manage Crops summary season crop cells. Long crop names now truncate within their season column instead of drawing into adjacent columns. Verification passed: dotnet build Dayswork.sln /p:EnableModDeploy=false (0 warnings / 0 errors) and dotnet test Dayswork.sln /p:EnableModDeploy=false (431 passed / 1 expected skip / 0 failed)."
+**Context**: CONSTRUCTION - U-MC-03 crop group crop-name overflow handling
+
+---

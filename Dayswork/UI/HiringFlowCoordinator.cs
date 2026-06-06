@@ -1,11 +1,14 @@
 using Dayswork.Core.Config;
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
 using Dayswork.Integration;
+using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
+using Season = Dayswork.Core.Domain.Season;
 
 namespace Dayswork.UI;
 
@@ -16,6 +19,10 @@ internal sealed class HiringFlowCoordinator
     private readonly IContractStore _contractStore;
     private readonly ChestResolver _chestResolver;
     private readonly IModHelper _helper;
+
+    // Live crop/fertilizer/shop catalog adapter, rebuilt per hiring-flow session so its per-season
+    // memo is fresh (NFR-MC3-PERF-02). Created lazily when the Manage Crops page first opens.
+    private CropCatalogProvider? _cropCatalog;
 
     public HiringFlowCoordinator(
         IContractTermsBuilder termsBuilder,
@@ -41,12 +48,14 @@ internal sealed class HiringFlowCoordinator
             return;
         }
 
+        _cropCatalog = null;
         var draft = new ContractDraft();
         ShowHub(draft);
     }
 
     public void OpenEditFlow(ContractId existing)
     {
+        _cropCatalog = null;
         var contract = _contractStore.Get(existing);
         var draft = CreateEditDraft(existing, contract);
         ShowHub(draft);
@@ -75,6 +84,7 @@ internal sealed class HiringFlowCoordinator
             draft,
             onTaskSelection: ShowTaskSelection,
             onWorkScope: ShowZoneAndChest,
+            onManageCrops: ShowManageCrops,
             onOutput: ShowOutputDestinations,
             onPriority: ShowTaskPriority,
             onEnergy: ShowEnergy,
@@ -109,6 +119,180 @@ internal sealed class HiringFlowCoordinator
             _chestResolver,
             onBack: ShowHub);
     }
+
+    // ── Manage Crops authoring (U-MC-03) ─────────────────────────────────────
+    private void ShowManageCrops(ContractDraft draft)
+    {
+        var catalog = EnsureCropCatalog();
+
+        // Names are not persisted; refresh hydrated/edit-flow slot labels from the full catalog.
+        draft.CropPlan.EnrichDisplayNames(catalog.GetCatalog(null, greenhouse: true), catalog.GetFertilizers());
+
+        Game1.activeClickableMenu = new ManageCropsMenu(
+            draft,
+            onBack: ShowHub,
+            onAddGroup: AddCropGroup,
+            onEditGroup: ShowCropGroupEditor,
+            onDeleteGroup: DeleteCropGroup);
+    }
+
+    private void AddCropGroup(ContractDraft draft)
+    {
+        var group = draft.CropPlan.AddGroup();
+        ShowCropGroupEditor(draft, group.Id);
+    }
+
+    private void ShowCropGroupEditor(ContractDraft draft, string groupId)
+    {
+        if (!draft.CropPlan.TryGetGroup(groupId, out var group))
+        {
+            ShowManageCrops(draft);
+            return;
+        }
+
+        var catalog = EnsureCropCatalog();
+        group.EnrichDisplayNames(catalog.GetCatalog(null, greenhouse: true), catalog.GetFertilizers());
+
+        Game1.activeClickableMenu = new CropGroupEditorMenu(
+            draft,
+            group,
+            onBack: ShowManageCrops,
+            onPickCrop: (id, season) => ShowCropPicker(draft, id, season),
+            onPickFertilizer: (id, season) => ShowFertilizerPicker(draft, id, season),
+            onPickChest: id => ShowCropOutputChestPicker(draft, id),
+            onBeginDraw: id => BeginCropZoneDraw(draft, id));
+    }
+
+    private void DeleteCropGroup(ContractDraft draft, string groupId)
+    {
+        draft.CropPlan.DeleteGroup(groupId);
+        RefreshPreview(draft);
+    }
+
+    private void ShowCropPicker(ContractDraft draft, string groupId, Season season)
+    {
+        var entries = EnsureCropCatalog().GetCatalog(season, greenhouse: false);
+
+        var rows = new List<PickerRow> { new(I18nHelper.Get("ui.manage_crops.picker_none"), null) };
+        rows.AddRange(entries.Select(entry => new PickerRow(entry.DisplayName, SupplyTagLabel(entry.Supply))));
+
+        Game1.activeClickableMenu = new CropListPickerMenu(
+            I18nHelper.Get("ui.manage_crops.picker_crop_title"),
+            rows,
+            selectedIndex: 0,
+            onSelect: index =>
+            {
+                if (!draft.CropPlan.TryGetGroup(groupId, out var group))
+                {
+                    ShowManageCrops(draft);
+                    return;
+                }
+
+                if (index == 0)
+                {
+                    group.ClearSeason(season);
+                }
+                else
+                {
+                    var entry = entries[index - 1];
+                    if (!group.TrySetCrop(season, entry.Crop, entry.DisplayName, out _))
+                        Game1.addHUDMessage(new HUDMessage(I18nHelper.Get("ui.manage_crops.lock_conflict"), HUDMessage.error_type));
+                }
+
+                ShowCropGroupEditor(draft, groupId);
+            },
+            onCancel: () => ShowCropGroupEditor(draft, groupId));
+    }
+
+    private void ShowFertilizerPicker(ContractDraft draft, string groupId, Season season)
+    {
+        var fertilizers = EnsureCropCatalog().GetFertilizers();
+
+        var rows = new List<PickerRow> { new(I18nHelper.Get("ui.manage_crops.fertilizer_none"), null) };
+        rows.AddRange(fertilizers.Select(option => new PickerRow(option.DisplayName, SupplyTagLabel(option.Supply))));
+
+        Game1.activeClickableMenu = new CropListPickerMenu(
+            I18nHelper.Get("ui.manage_crops.picker_fertilizer_title"),
+            rows,
+            selectedIndex: 0,
+            onSelect: index =>
+            {
+                if (!draft.CropPlan.TryGetGroup(groupId, out var group))
+                {
+                    ShowManageCrops(draft);
+                    return;
+                }
+
+                if (index == 0)
+                    group.SetFertilizer(season, null, string.Empty);
+                else
+                {
+                    var option = fertilizers[index - 1];
+                    group.SetFertilizer(season, option.ItemId, option.DisplayName);
+                }
+
+                ShowCropGroupEditor(draft, groupId);
+            },
+            onCancel: () => ShowCropGroupEditor(draft, groupId));
+    }
+
+    private void ShowCropOutputChestPicker(ContractDraft draft, string groupId)
+    {
+        var chests = _chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
+
+        var rows = new List<PickerRow> { new(I18nHelper.Get("ui.manage_crops.output_automatic"), null) };
+        rows.AddRange(chests.Select(chest => new PickerRow(chest.DisplayName, chest.GroupLabel)));
+
+        Game1.activeClickableMenu = new CropListPickerMenu(
+            I18nHelper.Get("ui.manage_crops.picker_chest_title"),
+            rows,
+            selectedIndex: 0,
+            onSelect: index =>
+            {
+                if (draft.CropPlan.TryGetGroup(groupId, out var group))
+                    group.OutputChest = index == 0 ? null : chests[index - 1].Ref;
+
+                ShowCropGroupEditor(draft, groupId);
+            },
+            onCancel: () => ShowCropGroupEditor(draft, groupId));
+    }
+
+    private void BeginCropZoneDraw(ContractDraft draft, string groupId)
+    {
+        if (!draft.CropPlan.TryGetGroup(groupId, out var group))
+        {
+            ShowManageCrops(draft);
+            return;
+        }
+
+        // Managed crops are their own draw layer: seed only from existing crop zones (not the general
+        // work scope), render green, ignore buildings, and let overlapping draws toggle active tiles off.
+        // Other crop groups are protected so one tile can only belong to one group.
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            draft,
+            new List<BuildingOutline>(),
+            _helper,
+            onComplete: (zones, _) =>
+            {
+                draft.CropPlan.SetGroupZones(groupId, zones);
+                RefreshPreview(draft);
+                ShowCropGroupEditor(draft, groupId);
+            },
+            onCancel: () => ShowCropGroupEditor(draft, groupId),
+            initialZones: group.Zones,
+            allowBuildingSelection: false,
+            overlapTogglesSelection: true,
+            protectedZones: draft.CropPlan.ProtectedZones(groupId),
+            zoneFillColor: Color.LimeGreen * 0.5f);
+    }
+
+    private CropCatalogProvider EnsureCropCatalog() =>
+        _cropCatalog ??= new CropCatalogProvider(ModEntry.ModMonitor);
+
+    private static string SupplyTagLabel(CropSupplyTag tag) =>
+        I18nHelper.Get(tag == CropSupplyTag.AutoBuyable
+            ? "ui.manage_crops.tag_auto_buyable"
+            : "ui.manage_crops.tag_chest_only");
 
     private void ShowSchedule(ContractDraft draft)
     {
@@ -286,7 +470,8 @@ internal sealed class HiringFlowCoordinator
             ScopeSelection: draft.ScopeSelection,
             TermsSnapshot: proposedTerms,
             Tier: draft.Tier,
-            CategoryPriority: draft.CategoryPriority.ToList().AsReadOnly());
+            CategoryPriority: draft.CategoryPriority.ToList().AsReadOnly(),
+            CropPlan: draft.CropPlan.BuildCropPlan());
     }
 
     internal static ContractDraft CreateEditDraft(ContractId existing, Contract contract)
@@ -306,6 +491,7 @@ internal sealed class HiringFlowCoordinator
         draft.CategoryPriority.AddRange(contract.CategoryPriority);
 
         LegacyScopeBootstrapper.HydrateDraft(draft, contract);
+        draft.CropPlan.HydrateFrom(contract.CropPlan);
         return draft;
     }
 

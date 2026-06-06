@@ -14,6 +14,9 @@ internal sealed class ContractDraft
     public List<GreenhouseSelection> Greenhouses { get; } = new();
     public DraftPreviewState PreviewState { get; set; } = DraftPreviewState.Empty;
 
+    /// <summary>In-progress managed-crop plan authored on the Manage Crops page (U-MC-03). Transient.</summary>
+    public CropPlanDraft CropPlan { get; } = new();
+
     /// <summary>Purchased energy tier (sets the worker's daily capacity and the contract price).</summary>
     public EnergyTier Tier { get; set; } = EnergyTier.FullDay;
 

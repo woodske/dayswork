@@ -11,8 +11,9 @@ public sealed class SeasonAssignmentResolver
             return new CropZoneAssignment(
                 assignment.Zone,
                 assignment.Mode,
-                new[] { new SeasonCropChoice(choice.Season, choice.Crop, choice.StorePreference) },
-                assignment.OutputChest);
+                new[] { new SeasonCropChoice(choice.Season, choice.Crop, choice.StorePreference, autoReplant: choice.AutoReplant) },
+                assignment.OutputChest,
+                assignment.GroupId);
         }
 
         var replacements = BuildSeasonalChoices(choice).ToDictionary(item => item.Season);
@@ -24,7 +25,7 @@ public sealed class SeasonAssignmentResolver
             .ToList()
             .AsReadOnly();
 
-        return new CropZoneAssignment(assignment.Zone, assignment.Mode, result, assignment.OutputChest);
+        return new CropZoneAssignment(assignment.Zone, assignment.Mode, result, assignment.OutputChest, assignment.GroupId);
     }
 
     public IReadOnlyList<SeasonCropChoice> BuildSeasonalChoices(SeasonCropChoice originChoice)
@@ -43,7 +44,8 @@ public sealed class SeasonAssignmentResolver
                 originChoice.Crop,
                 originChoice.StorePreference,
                 isLocked: season != originChoice.Season,
-                originSeason: season == originChoice.Season ? null : originChoice.Season))
+                originSeason: season == originChoice.Season ? null : originChoice.Season,
+                autoReplant: originChoice.AutoReplant))
             .ToList()
             .AsReadOnly();
     }

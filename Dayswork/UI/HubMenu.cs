@@ -32,6 +32,7 @@ internal sealed class HubMenu : IClickableMenu
         ContractDraft draft,
         Action<ContractDraft> onTaskSelection,
         Action<ContractDraft> onWorkScope,
+        Action<ContractDraft> onManageCrops,
         Action<ContractDraft> onOutput,
         Action<ContractDraft> onPriority,
         Action<ContractDraft> onEnergy,
@@ -51,6 +52,7 @@ internal sealed class HubMenu : IClickableMenu
 
         _items.Add(new NavItem("ui.hub.task_selection", onTaskSelection, TaskSelectionStatus));
         _items.Add(new NavItem("ui.hub.work_scope", onWorkScope, WorkScopeStatus));
+        _items.Add(new NavItem("ui.hub.manage_crops", onManageCrops, ManageCropsStatus));
         _items.Add(new NavItem("ui.hub.output_destination", onOutput, OutputStatus));
         _items.Add(new NavItem("ui.hub.task_priority", onPriority, () => HubStatus.None));
         _items.Add(new NavItem("ui.hub.energy", onEnergy, EnergyStatus));
@@ -220,6 +222,10 @@ internal sealed class HubMenu : IClickableMenu
 
     private HubStatus OutputStatus() =>
         _draft.Destinations.Count > 0 ? Done() : Optional();
+
+    // Crop management is opt-in: "Ready" once at least one zone has been drawn/configured (Q8=A).
+    private HubStatus ManageCropsStatus() =>
+        _draft.CropPlan.HasAnyAssignment ? Done() : Optional();
 
     // Energy/Recurrence always have a value; show the current selection as the status text.
     private HubStatus EnergyStatus() =>

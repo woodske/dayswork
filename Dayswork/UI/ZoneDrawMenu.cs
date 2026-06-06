@@ -28,11 +28,21 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private TileCoord? _dragStart;
     private TileCoord  _dragCurrent;
 
+    // Layer configuration (general task scope vs managed-crop zones).
+    private readonly bool _allowBuildingSelection;
+    private readonly bool _overlapToggles;
+    private readonly Color _zoneFillColor;
+    private readonly Color _protectedZoneFillColor;
+    private readonly List<Zone> _protectedZones = new();
+
     IReadOnlyList<Zone>            IZoneDrawSource.CompletedZones    => _completedZones;
+    IReadOnlyList<Zone>            IZoneDrawSource.ProtectedZones    => _protectedZones;
     IReadOnlyList<BuildingOutline> IZoneDrawSource.SelectedBuildings => _selectedBuildings;
     bool       IZoneDrawSource.IsInZoneDrawMode => true;          // grid always visible during the session
     TileCoord? IZoneDrawSource.DragStart        => _dragStart;
     TileCoord  IZoneDrawSource.DragCurrent      => _dragCurrent;
+    Color      IZoneDrawSource.ZoneFillColor    => _zoneFillColor;
+    Color      IZoneDrawSource.ProtectedZoneFillColor => _protectedZoneFillColor;
 
     private readonly ZoneDrawOverlay _overlay;
 
@@ -51,35 +61,48 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         List<BuildingOutline> buildingOutlines,
         IModHelper helper,
         Action<List<Zone>, List<BuildingOutline>> onComplete,
-        Action onCancel)
+        Action onCancel,
+        IReadOnlyList<Zone>? initialZones = null,
+        bool allowBuildingSelection = true,
+        bool overlapTogglesSelection = false,
+        IReadOnlyList<Zone>? protectedZones = null,
+        Color? zoneFillColor = null)
         : base(0, 0, 0, 0)
     {
         _buildingOutlines = buildingOutlines;
         _helper           = helper;
         _onComplete       = onComplete;
         _onCancel         = onCancel;
+        _allowBuildingSelection = allowBuildingSelection;
+        _overlapToggles   = overlapTogglesSelection;
+        _zoneFillColor    = zoneFillColor ?? Color.LightBlue * 0.4f;
+        _protectedZoneFillColor = Color.Red * 0.35f;
+        _protectedZones.AddRange(protectedZones ?? Array.Empty<Zone>());
 
-        // Restore prior selections so navigating back preserves work.
-        _completedZones.AddRange(draft.OutdoorZones);
+        // Restore prior selections (for the active layer only) so navigating back preserves work.
+        _completedZones.AddRange(initialZones ?? draft.OutdoorZones);
 
-        foreach (var animalBuilding in draft.AnimalBuildings)
+        if (_allowBuildingSelection)
         {
-            var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), animalBuilding.LocationName);
-            var match = buildingOutlines.FirstOrDefault(outline =>
-                outline.LocationName == animalBuilding.LocationName
-                || outline.LocationName == normalizedName);
-            if (match is not null && !_selectedBuildings.Contains(match))
-                _selectedBuildings.Add(match);
-        }
+            foreach (var animalBuilding in draft.AnimalBuildings)
+            {
+                var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), animalBuilding.LocationName);
+                var match = buildingOutlines.FirstOrDefault(outline =>
+                    outline.LocationName == animalBuilding.LocationName
+                    || outline.LocationName == normalizedName);
+                if (match is not null && !_selectedBuildings.Contains(match))
+                    _selectedBuildings.Add(match);
+            }
 
-        foreach (var greenhouse in draft.Greenhouses)
-        {
-            var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), greenhouse.LocationName);
-            var greenhouseMatch = buildingOutlines.FirstOrDefault(outline =>
-                outline.LocationName == greenhouse.LocationName
-                || outline.LocationName == normalizedName);
-            if (greenhouseMatch is not null && !_selectedBuildings.Contains(greenhouseMatch))
-                _selectedBuildings.Add(greenhouseMatch);
+            foreach (var greenhouse in draft.Greenhouses)
+            {
+                var normalizedName = BuildingLocationResolver.NormalizeLocationName(Game1.getFarm(), greenhouse.LocationName);
+                var greenhouseMatch = buildingOutlines.FirstOrDefault(outline =>
+                    outline.LocationName == greenhouse.LocationName
+                    || outline.LocationName == normalizedName);
+                if (greenhouseMatch is not null && !_selectedBuildings.Contains(greenhouseMatch))
+                    _selectedBuildings.Add(greenhouseMatch);
+            }
         }
 
         // Swap displayed location to the farm (no warp) and freeze the camera so we control it
@@ -241,8 +264,19 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         var topLeft     = new TileCoord(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y));
         var bottomRight = new TileCoord(Math.Max(start.X, end.X), Math.Max(start.Y, end.Y));
 
-        // Single-tile click: toggle a building if one is under the cursor; otherwise ignore
-        if (topLeft.X == bottomRight.X && topLeft.Y == bottomRight.Y)
+        var singleTile = topLeft.X == bottomRight.X && topLeft.Y == bottomRight.Y;
+
+        if (ZoneOverlapPolicy.OverlapsAny(_protectedZones, topLeft, bottomRight))
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("ui.manage_crops.zone_overlap_protected"),
+                HUDMessage.error_type));
+            Game1.playSound("cancel");
+            return;
+        }
+
+        // Single-tile click on a building toggles it (general scope only).
+        if (singleTile && _allowBuildingSelection)
         {
             foreach (var outline in _buildingOutlines)
             {
@@ -251,8 +285,31 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
                 Game1.playSound("smallSelect");
                 return;
             }
+        }
+
+        // Overlap-toggle layers (managed crops): a tile can be selected once. Drawing over any
+        // already-selected tile removes the overlapping zone(s) instead of stacking another on top.
+        if (_overlapToggles)
+        {
+            var overlapping = _completedZones.Where(zone => ZoneOverlapPolicy.ZonesOverlap(zone, topLeft, bottomRight)).ToList();
+            if (overlapping.Count > 0)
+            {
+                foreach (var zone in overlapping)
+                    _completedZones.Remove(zone);
+                Game1.playSound("bigDeSelect");
+            }
+            else
+            {
+                _completedZones.Add(new Zone("Farm", topLeft, bottomRight));
+                Game1.playSound("coin");
+            }
+
             return;
         }
+
+        // General scope: a bare single-tile click selects nothing; drags add a zone (overlap allowed).
+        if (singleTile)
+            return;
 
         _completedZones.Add(new Zone("Farm", topLeft, bottomRight));
         Game1.playSound("coin");

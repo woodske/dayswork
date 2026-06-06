@@ -8,12 +8,14 @@ public sealed record CropZoneAssignment
     public CropAssignmentMode Mode { get; }
     public IReadOnlyList<SeasonCropChoice> Choices { get; }
     public ChestRef? OutputChest { get; }
+    public string? GroupId { get; }
 
     public CropZoneAssignment(
         Zone zone,
         CropAssignmentMode mode,
         IReadOnlyList<SeasonCropChoice>? choices,
-        ChestRef? outputChest = null)
+        ChestRef? outputChest = null,
+        string? groupId = null)
     {
         Zone = zone;
         Mode = mode;
@@ -25,6 +27,7 @@ public sealed record CropZoneAssignment
             .ToList()
             .AsReadOnly();
         OutputChest = outputChest;
+        GroupId = string.IsNullOrWhiteSpace(groupId) ? null : groupId;
     }
 
     public bool IsEnabled => Choices.Count > 0;

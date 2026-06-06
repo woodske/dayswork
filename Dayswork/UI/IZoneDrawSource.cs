@@ -1,4 +1,5 @@
 using Dayswork.Core.Domain;
+using Microsoft.Xna.Framework;
 
 namespace Dayswork.UI;
 
@@ -7,8 +8,14 @@ namespace Dayswork.UI;
 internal interface IZoneDrawSource
 {
     IReadOnlyList<Zone>           CompletedZones    { get; }
+    IReadOnlyList<Zone>           ProtectedZones    { get; }
     IReadOnlyList<BuildingOutline> SelectedBuildings { get; }
     bool       IsInZoneDrawMode { get; }
     TileCoord? DragStart        { get; }
     TileCoord  DragCurrent      { get; }
+
+    // Fill color for completed-zone highlights — lets each draw layer (general tasks vs managed
+    // crops) render in its own color so they are visually distinct.
+    Color ZoneFillColor { get; }
+    Color ProtectedZoneFillColor { get; }
 }

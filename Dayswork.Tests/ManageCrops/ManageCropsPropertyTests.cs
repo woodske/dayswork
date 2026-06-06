@@ -99,4 +99,51 @@ public sealed class ManageCropsPropertyTests
         return ordered.ToProperty()
             .Label(string.Join("|", plan.AllActions.Select(action => $"{action.Tile.X},{action.Tile.Y}:{action.Kind}")));
     }
+
+    [Property(Arbitrary = new[] { typeof(ManageCropsGen) }, MaxTest = 200)]
+    public bool CropCatalog_OpenFarm_OnlyReturnsCropsGrowableInSeason(CropDescriptor[] crops)
+    {
+        var sources = crops
+            .Select((crop, index) => new CropCatalogSource(crop, $"name{index}", true, false))
+            .ToList();
+
+        foreach (var season in new[] { Dayswork.Core.Domain.Season.Spring, Dayswork.Core.Domain.Season.Summer, Dayswork.Core.Domain.Season.Fall, Dayswork.Core.Domain.Season.Winter })
+        {
+            var built = CropCatalog.Build(sources, season, greenhouse: false);
+            if (built.Any(entry => !entry.Crop.Seasons.Contains(season)))
+                return false;
+        }
+
+        return true;
+    }
+
+    [Property(Arbitrary = new[] { typeof(ManageCropsGen) }, MaxTest = 200)]
+    public bool CropCatalog_OutputIsOrderedByDisplayNameThenSeedId(CropDescriptor[] crops)
+    {
+        var sources = crops
+            .Select((crop, index) => new CropCatalogSource(crop, $"name{index % 3}", true, false))
+            .ToList();
+
+        var built = CropCatalog.Build(sources, seasonFilter: null, greenhouse: true);
+        var resorted = built
+            .OrderBy(entry => entry.DisplayName, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Crop.SeedItemId, StringComparer.Ordinal)
+            .ToList();
+
+        return built.SequenceEqual(resorted);
+    }
+
+    [Property(Arbitrary = new[] { typeof(ManageCropsGen) }, MaxTest = 200)]
+    public bool CropDescriptor_WithFertilizer_PreservesGrowthFields(CropDescriptor crop)
+    {
+        var result = crop.WithFertilizer("fert.applied");
+
+        return result.FertilizerItemId == "fert.applied"
+            && result.CropItemId == crop.CropItemId
+            && result.SeedItemId == crop.SeedItemId
+            && result.DaysToFirstHarvest == crop.DaysToFirstHarvest
+            && result.FertilizedDaysToFirstHarvest == crop.FertilizedDaysToFirstHarvest
+            && result.RegrowDays == crop.RegrowDays
+            && result.Seasons.SequenceEqual(crop.Seasons);
+    }
 }
