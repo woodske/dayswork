@@ -5880,3 +5880,31 @@ In add crop group, the seasons don't populate"
 **Context**: CONSTRUCTION - U-MC-03 crop group crop-name overflow handling
 
 ---
+## U-MC-03 Code Generation Approval
+**Timestamp**: 2026-06-05T22:00:00Z
+**User Input**: "Continue ai-dlc workflow. U-MC-03 is approved. Continue on. Use recommended options (unless there is an unclear path) and continue until playtesting is required."
+**AI Response**: "Recorded U-MC-03 (Manage Crops Authoring UI) Code Generation approval. Advanced the per-unit construction loop to U-MC-04 (Zone Draw Overlay Extension). Per user pre-authorization, proceeding through the U-MC-04 routine construction gates using recommended options and stopping at the next in-game playtest gate."
+**Context**: CONSTRUCTION - U-MC-03 Code Generation approved; advance to U-MC-04
+
+---
+## U-MC-04 Functional Design — Finding: scope already delivered in U-MC-03 review fix
+**Timestamp**: 2026-06-05T22:02:00Z
+**User Input**: "(continuation under the 2026-06-05T22:00:00Z pre-authorization — use recommended options, continue until playtesting)"
+**AI Response**: "Analyzed U-MC-04 (Zone Draw Overlay Extension, DEV-MC-01, S-28, FR-MC-06/07). Found its full Definition of Done already implemented during the U-MC-03 code-generation review fix: ZoneDrawMenu/ZoneDrawOverlay/IZoneDrawSource render other crop groups' zones in red and make them unselectable (Color.Red * 0.35f), the active draw session renders green (Color.LimeGreen * 0.5f + light-green drag preview), overlap is prevented via ZoneOverlapPolicy.OverlapsAny against CropPlanDraft.ProtectedZones, drawing is delete-and-redraw only (overlapTogglesSelection), and drawing applies the configured seasonal plan to each drawn zone. Existing tests already cover the pure logic (ZoneOverlapPolicyTests, CropPlanDraftTests.ProtectedZones_ExcludesActiveGroup). Generated U-MC-04 functional-design artifacts documenting the as-built design and DoD mapping. No clarification questions (DEV-MC-01 fully fixes the behavior). No new questions for the user."
+**Context**: CONSTRUCTION - U-MC-04 Functional Design (documentation of already-delivered behavior)
+
+---
+## U-MC-04 NFR Requirements / NFR Design / Infrastructure Design — Skipped
+**Timestamp**: 2026-06-05T22:10:00Z
+**User Input**: "(continuation under the 2026-06-05T22:00:00Z pre-authorization — use recommended options, continue until playtesting)"
+**AI Response**: "Skipped U-MC-04 NFR Requirements and NFR Design (recommended): the unit introduces no new technology, dependency, or quality concern and reuses the already-designed ZoneDrawMenu/ZoneDrawOverlay seam (overlay is already O(zone count) per NFR-PERF-03). Skipped Infrastructure Design (SMAPI mod, no cloud/IaC). Rationale recorded in the U-MC-04 code-summary."
+**Context**: CONSTRUCTION - U-MC-04 conditional design stages skipped
+
+---
+## U-MC-04 Code Generation
+**Timestamp**: 2026-06-05T22:15:00Z
+**User Input**: "(continuation under the 2026-06-05T22:00:00Z pre-authorization — use recommended options, continue until playtesting)"
+**AI Response**: "Completed U-MC-04 Code Generation as a verification + coverage-closing pass. The unit's full DoD (red/unselectable existing zones, green active draw, overlap prevention, delete-and-redraw, plan applied to each drawn zone) was already implemented during the U-MC-03 review fix across IZoneDrawSource/ZoneDrawOverlay/ZoneDrawMenu/ZoneOverlapPolicy/CropPlanDraft/HiringFlowCoordinator. Added 2 dedicated U-MC-04 example tests in ZoneOverlapPolicyTests (empty-protected free draw; multi-group 'any' rejection). Verification: dotnet build Dayswork.sln /p:EnableModDeploy=false (0 warnings / 0 errors); dotnet test Dayswork.sln /p:EnableModDeploy=false (435 passed / 1 expected skip / 0 failed, +2); dotnet build Dayswork.sln deployed to Mods/Dayswork. Code summary at construction/u-mc-04-zone-draw-overlay/code/code-summary.md. Stopping at the U-MC-04 in-game playtest review gate per user instruction."
+**Context**: CONSTRUCTION - U-MC-04 Code Generation complete; playtest review gate
+
+---
