@@ -235,6 +235,9 @@ internal sealed class GMCMRegistrar
         WorkActionKind.AxeSwing => "axe_swing",
         WorkActionKind.PickaxeSwing => "pickaxe_swing",
         WorkActionKind.ScytheSwing => "scythe_swing",
+        WorkActionKind.HoeSwing => "hoe_swing",
+        WorkActionKind.PlantSeed => "plant_seed",
+        WorkActionKind.ApplyFertilizer => "apply_fertilizer",
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
     };
 

@@ -10,16 +10,23 @@ namespace Dayswork.UI;
 
 internal sealed class ZoneAndChestMenu : IClickableMenu
 {
+    private const int SummaryLineSpacing = 28;
     private static readonly Color SecondaryTextColor = new(96, 72, 48);
 
     private readonly ContractDraft _draft;
     private readonly Action<ContractDraft> _onBack;
     private readonly Action<ContractDraft> _onBeginZoneDraw;
     private readonly Action<ContractDraft> _onClearScope;
+    private readonly List<ScopeLine> _summaryLines = new();
 
     private ClickableComponent _workAreaBtn = null!;
     private ClickableComponent _clearScopeBtn = null!;
     private ClickableComponent _backBtn = null!;
+    private Rectangle _summaryRect;
+    private int _summaryScrollIndex;
+    private int _maxSummaryScrollIndex;
+    private bool _draggingSummaryScrollBar;
+    private int _summaryScrollDragOffset;
 
     public ZoneAndChestMenu(
         ContractDraft draft,
@@ -76,6 +83,15 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         };
 
         var btnY = yPositionOnScreen + height - 70;
+        var summaryTop = yPositionOnScreen + 190;
+        _summaryRect = new Rectangle(
+            xPositionOnScreen + 48,
+            summaryTop,
+            width - 96 - MenuScrollBar.ReservedWidth,
+            btnY - summaryTop - 18);
+        BuildSummaryLines();
+        _maxSummaryScrollIndex = Math.Max(0, _summaryLines.Count - GetVisibleSummaryLineCount());
+        _summaryScrollIndex = Math.Clamp(_summaryScrollIndex, 0, _maxSummaryScrollIndex);
 
         _backBtn = new ClickableComponent(
             new Rectangle(xPositionOnScreen + 40, btnY, 170, 56),
@@ -89,6 +105,42 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
+        if (MenuScrollBar.TryBeginDrag(
+                _summaryRect,
+                GetVisibleSummaryLineCount(),
+                _summaryLines.Count,
+                _summaryScrollIndex,
+                x,
+                y,
+                out _summaryScrollDragOffset))
+        {
+            _draggingSummaryScrollBar = true;
+            return;
+        }
+
+        if (MenuScrollBar.UpArrowContains(_summaryRect, _summaryLines.Count, GetVisibleSummaryLineCount(), x, y))
+        {
+            ScrollSummary(-1);
+            return;
+        }
+
+        if (MenuScrollBar.DownArrowContains(_summaryRect, _summaryLines.Count, GetVisibleSummaryLineCount(), x, y))
+        {
+            ScrollSummary(1);
+            return;
+        }
+
+        if (MenuScrollBar.TrackContains(_summaryRect, GetVisibleSummaryLineCount(), _summaryLines.Count, x, y))
+        {
+            _summaryScrollIndex = MenuScrollBar.GetTrackClickScrollIndex(
+                _summaryRect,
+                GetVisibleSummaryLineCount(),
+                _summaryLines.Count,
+                _summaryScrollIndex,
+                y);
+            return;
+        }
+
         if (_workAreaBtn.bounds.Contains(x, y))
         {
             Game1.playSound("smallSelect");
@@ -107,6 +159,25 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
             _onBack(_draft);
     }
 
+    public override void leftClickHeld(int x, int y)
+    {
+        if (!_draggingSummaryScrollBar)
+            return;
+
+        _summaryScrollIndex = MenuScrollBar.GetDragScrollIndex(
+            _summaryRect,
+            GetVisibleSummaryLineCount(),
+            _summaryLines.Count,
+            _summaryScrollDragOffset,
+            y);
+    }
+
+    public override void releaseLeftClick(int x, int y)
+    {
+        _draggingSummaryScrollBar = false;
+        base.releaseLeftClick(x, y);
+    }
+
     public override void receiveGamePadButton(Buttons b)
     {
         if (b == Buttons.B)
@@ -116,6 +187,12 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
         }
 
         base.receiveGamePadButton(b);
+    }
+
+    public override void receiveScrollWheelAction(int direction)
+    {
+        if (direction != 0)
+            ScrollSummary(direction > 0 ? -1 : 1);
     }
 
     public override void populateClickableComponentList()
@@ -152,63 +229,79 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
 
         DrawButton(b, _workAreaBtn, enabled: true);
         DrawButton(b, _clearScopeBtn, enabled: HasSelectedScope());
+        DrawSummary(b);
+        MenuScrollBar.Draw(b, _summaryRect, GetVisibleSummaryLineCount(), _summaryLines.Count, _summaryScrollIndex);
 
-        const int leftMargin = 48;
-        const float sectionGap = 24f;
-        var sectionY = yPositionOnScreen + 190f;
+        DrawButton(b, _backBtn, enabled: true);
+        drawMouse(b);
+    }
 
-        sectionY += DrawScopeSection(
-            b,
+    private void DrawSummary(SpriteBatch b)
+    {
+        var lineY = _summaryRect.Y;
+        var visibleLineCount = GetVisibleSummaryLineCount();
+        for (var i = _summaryScrollIndex; i < _summaryLines.Count && i < _summaryScrollIndex + visibleLineCount; i++)
+        {
+            Utility.drawTextWithShadow(
+                b,
+                _summaryLines[i].Text,
+                Game1.smallFont,
+                new Vector2(_summaryRect.X, lineY),
+                _summaryLines[i].Color);
+            lineY += SummaryLineSpacing;
+        }
+    }
+
+    private void BuildSummaryLines()
+    {
+        _summaryLines.Clear();
+
+        AddSummarySection(
             I18nHelper.Get("ui.zone_chest.outdoor_section_label"),
-            I18nHelper.Get("ui.zone_chest.outdoor_count_label", new { count = _draft.PreviewState.ScopeSummary.OutdoorZones.Count }),
-            new Vector2(xPositionOnScreen + leftMargin, sectionY));
-        sectionY += sectionGap;
-
-        sectionY += DrawScopeSection(
-            b,
+            I18nHelper.Get("ui.zone_chest.outdoor_count_label", new { count = _draft.PreviewState.ScopeSummary.OutdoorZones.Count }));
+        AddSummarySection(
             I18nHelper.Get("ui.zone_chest.animal_section_label"),
             FormatAnimalScopeSummary(),
-            new Vector2(xPositionOnScreen + leftMargin, sectionY),
             I18nHelper.Get("ui.zone_chest.animal_scope_detail"));
-        sectionY += sectionGap;
-
-        DrawScopeSection(
-            b,
+        AddSummarySection(
             I18nHelper.Get("ui.zone_chest.greenhouse_section_label"),
             _draft.PreviewState.ScopeSummary.Greenhouses.Count == 0
                 ? I18nHelper.Get("ui.zone_chest.greenhouse_not_selected")
                 : I18nHelper.Get(
                     "ui.zone_chest.greenhouse_selected",
                     new { location = FormatGreenhouseSummary(_draft.PreviewState.ScopeSummary.Greenhouses) }),
-            new Vector2(xPositionOnScreen + leftMargin, sectionY),
             I18nHelper.Get("ui.zone_chest.greenhouse_scope_detail"));
-
-        DrawButton(b, _backBtn, enabled: true);
-        drawMouse(b);
     }
 
-    // Draws a scope section (label + wrapped value + optional wrapped detail) and returns the total
-    // height consumed, so the caller can lay the next section out below it. Wrapping keeps long
-    // animal-building lists inside the panel instead of running off the right edge.
-    private float DrawScopeSection(SpriteBatch b, string label, string value, Vector2 position, string? detail = null)
+    private void AddSummarySection(string label, string value, string? detail = null)
     {
-        var maxWidth = Math.Max(120, width - 96);
-
-        Utility.drawTextWithShadow(b, label, Game1.smallFont, position, Game1.textColor);
-        var y = position.Y + 30f;
-
-        var wrappedValue = Game1.parseText(value, Game1.smallFont, maxWidth);
-        Utility.drawTextWithShadow(b, wrappedValue, Game1.smallFont, new Vector2(position.X, y), SecondaryTextColor);
-        y += Game1.smallFont.MeasureString(wrappedValue).Y + 6f;
+        AddWrappedSummaryLine(label, Game1.textColor);
+        AddWrappedSummaryLine(value, SecondaryTextColor);
 
         if (!string.IsNullOrWhiteSpace(detail))
-        {
-            var wrappedDetail = Game1.parseText(detail, Game1.smallFont, maxWidth);
-            Utility.drawTextWithShadow(b, wrappedDetail, Game1.smallFont, new Vector2(position.X, y), SecondaryTextColor * 0.9f);
-            y += Game1.smallFont.MeasureString(wrappedDetail).Y;
-        }
+            AddWrappedSummaryLine(detail, SecondaryTextColor * 0.9f);
 
-        return y - position.Y;
+        _summaryLines.Add(new ScopeLine(string.Empty, SecondaryTextColor));
+    }
+
+    private void AddWrappedSummaryLine(string text, Color color)
+    {
+        var wrapped = Game1.parseText(text, Game1.smallFont, _summaryRect.Width)
+            .Replace("\r\n", "\n")
+            .Replace('\r', '\n');
+
+        foreach (var line in wrapped.Split('\n'))
+            _summaryLines.Add(new ScopeLine(line, color));
+    }
+
+    private int GetVisibleSummaryLineCount() =>
+        ContractMenuViewport.GetVisibleCount(_summaryRect.Height, SummaryLineSpacing);
+
+    private void ScrollSummary(int delta)
+    {
+        var next = Math.Clamp(_summaryScrollIndex + delta, 0, _maxSummaryScrollIndex);
+        if (next != _summaryScrollIndex)
+            _summaryScrollIndex = next;
     }
 
     private bool HasSelectedScope() =>
@@ -260,4 +353,6 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
                 btn.bounds.Y + (btn.bounds.Height - (int)textSize.Y) / 2),
             textTint);
     }
+
+    private readonly record struct ScopeLine(string Text, Color Color);
 }

@@ -9,6 +9,7 @@ public enum WorkerTool
     Axe,
     MilkPail,
     Shears,
+    Hoe,
 }
 
 public static class WorkerToolExtensions

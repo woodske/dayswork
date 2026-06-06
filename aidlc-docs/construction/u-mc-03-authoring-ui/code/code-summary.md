@@ -43,6 +43,35 @@ reads are isolated in a thin adapter (Q3=A). No persistence schema version chang
 - `Dayswork/i18n/default.json` — new `ui.hub.manage_crops` + `ui.manage_crops.*` keys.
 - `Dayswork.Tests/Generators/ManageCropsGen.cs` — randomize `AutoReplant` so the round-trip property exercises it.
 
+## Review Fix - 2026-06-06 Contract Menu Overflow and Scroll Containment
+
+Playtest feedback found that the Configure Contract hub could overlap the lower nav rows with the
+`Cancel` / `Hire` footer buttons in small windowed mode, allowing clicks on the footer to trigger
+the overlapped row instead. The review fix keeps contract-flow footers pinned and moves long body
+content into bounded scroll regions.
+
+### Modified Files
+
+- `Dayswork/UI/ContractMenuViewport.cs` — small internal helper for fixed-row and variable-row viewport math used by the overflow fix and covered by focused tests.
+- `Dayswork/UI/Layout/PageShell.cs` — additive support for a custom leading footer label/sound/width so the hub can use a cancel-style footer button while keeping the shared shell layout.
+- `Dayswork/UI/HubMenu.cs` — refactored from manual `IClickableMenu` geometry to `LayoutMenu` + `PageShell` + `ScrollPanel`; hub rows now scroll inside a bounded body while `Cancel` and `Hire` stay pinned in the footer.
+- `Dayswork/UI/ZoneAndChestMenu.cs` — replaced free-flowing scope summary drawing with a bounded text viewport using `MenuScrollBar`, preventing long animal/greenhouse summaries from colliding with the footer.
+- `Dayswork/UI/ContractListMenu.cs` — replaced content-sized menu growth with a fixed-height scrolling viewport that windows visible contracts and keeps action buttons inside the viewport.
+- `Dayswork.Tests/UI/ContractMenuViewportTests.cs` — focused example tests for compressed fixed-row and variable-row viewport behavior.
+
+### Verification
+
+- `dotnet build Dayswork.sln /p:EnableModDeploy=false` — **0 warnings / 0 errors**.
+- `dotnet test Dayswork.sln /p:EnableModDeploy=false` — **458 passed / 1 expected skip / 0 failed** (+4 new).
+
+### Notes
+
+- The safe-screen audit left `TaskSelectionMenu`, `OutputDestinationsMenu`, `CropListPickerMenu`,
+  `SummaryMenu`, `ManageCropsMenu`, `TaskPriorityMenu`, `EnergyMenu`, and `ScheduleMenu`
+  unchanged: inspection found their existing bounded layouts sufficient for this fix scope.
+- Manual in-game verification is still recommended for the original small-window click path because
+  the automated suite only covers the extracted viewport math, not rendered SMAPI menu interaction.
+
 ## Verification
 
 - `dotnet build Dayswork.sln /p:EnableModDeploy=false` — **0 warnings / 0 errors**.

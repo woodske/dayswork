@@ -18,6 +18,62 @@ Fix applied to `Dayswork/Orchestration/ShiftOrchestrator.cs`:
 
 ---
 
+## U-MC-03 Contract Menu Overflow Review Fix - Complete
+**Timestamp**: 2026-06-06T16:03:57.6348145Z
+**User Input**: "(continuation of the approved implementation request from 2026-06-06T15:58:07.5663197Z)"
+**AI Response**: "Completed the contract-menu overflow review fix. `HubMenu` now uses the shared layout shell with a bounded `ScrollPanel` body and pinned `Cancel` / `Hire` footer buttons, eliminating row/footer overlap in compressed windows. `ZoneAndChestMenu` now scrolls long scope summaries inside a bounded viewport above the footer, and `ContractListMenu` now uses a fixed-height scrolling body instead of growing the whole menu to content height. Added `ContractMenuViewport` plus 4 focused viewport tests. Verification: dotnet build Dayswork.sln /p:EnableModDeploy=false (0 warnings / 0 errors); dotnet test Dayswork.sln /p:EnableModDeploy=false (458 passed / 1 expected skip / 0 failed). Manual in-game verification still pending for the original small-window click path."
+**Context**: CONSTRUCTION - U-MC-03 contract menu overflow review fix complete; awaiting manual playtest confirmation if desired
+
+---
+
+## U-MC-03 Contract Menu Overflow Review Fix
+**Timestamp**: 2026-06-06T15:58:07.5663197Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Contract Menu Overflow and Scroll Containment
+
+## Summary
+- Treat this as a brownfield UI bug fix centered on the contract-flow menus.
+- Refactor [HubMenu.cs](/C:/Users/kwood/Repos/dayswork/Dayswork/UI/HubMenu.cs) onto the existing layout system so the Configure Contract menu body scrolls inside a bounded viewport while the footer stays pinned.
+- Broaden the pass across contract-related menus, but only change screens with confirmed footer-overlap risk after inspection.
+
+## Implementation Changes
+- [HubMenu.cs](/C:/Users/kwood/Repos/dayswork/Dayswork/UI/HubMenu.cs)
+  - Convert the menu from manual `IClickableMenu` geometry to `LayoutMenu` + `PageShell`.
+  - Render the hub sections as fixed-height `MenuButton` rows with trailing status text.
+  - Put those rows inside `FixedHeight(ScrollPanel(...))`, with the visible height derived from the space between the title block and footer so small windows reduce visible rows instead of pushing them under `Hire` / `Cancel`.
+  - Keep `Cancel` and `Hire` in the shell footer, preserving the existing confirm-enabled gate and preventing body/button hitbox overlap entirely.
+- [ZoneAndChestMenu.cs](/C:/Users/kwood/Repos/dayswork/Dayswork/UI/ZoneAndChestMenu.cs)
+  - Keep the top action buttons and footer pinned.
+  - Move the variable-length scope summary into a dedicated scrollable viewport above the footer using the existing `MenuScrollBar` pattern so long building/greenhouse lists cannot draw into the footer band.
+- [ContractListMenu.cs](/C:/Users/kwood/Repos/dayswork/Dayswork/UI/ContractListMenu.cs)
+  - Stop growing the whole menu to content height.
+  - Use a fixed-height body viewport based on `ContractMenuLayout` with scrollable rows and a fixed header/footer, rendering only visible contracts and action buttons.
+- Safe-screen audit
+  - Leave `TaskSelectionMenu`, `OutputDestinationsMenu`, `CropListPickerMenu`, `SummaryMenu`, and `ManageCropsMenu` unchanged unless implementation uncovers a concrete overlap bug, since they already bound content with scroll regions.
+  - Leave `TaskPriorityMenu`, `EnergyMenu`, and `ScheduleMenu` unchanged unless a reproducible minimum-height overlap is found during the audit.
+- Public/internal surface
+  - No public API, save-data, or i18n contract changes.
+  - Any new helpers stay internal and exist only to make viewport math and visible-row behavior testable.
+
+## Test Plan
+- Add focused unit tests for any extracted viewport or visible-row math so compressed menu heights reduce visible rows instead of overlapping the footer.
+- Extend layout tests where useful to cover compressed-height `ScrollPanel` behavior and scroll-index clamping.
+- Add focused regression coverage for contract-list viewport scrolling if row-windowing logic is extracted into testable helpers.
+- Manually verify in Stardew windowed mode at a small size:
+  - Configure Contract shows a scrollbar when the hub rows no longer fit.
+  - `Hire` and `Cancel` never overlap body rows and never trigger row actions when clicked.
+  - Long Work Scope summaries scroll instead of colliding with the footer.
+  - A long manage-contract list remains reachable through scrolling.
+
+## Assumptions
+- Chosen scope: audit all contract-related menus, but implement fixes only on screens with confirmed footer-overlap risk.
+- Chosen approach: refactor the hub onto the reusable layout system rather than patching the old manual geometry in place.
+- Extension defaults from `aidlc-state.md`: Security Baseline remains disabled; Property-Based Testing full mode applies only where new pure helper logic is introduced, otherwise visual UI verification is manual/N/A."
+**AI Response**: "Loaded the approved implementation plan, construction-stage code generation rules, and the enabled Property-Based Testing extension. Anchored the work under the U-MC-03 authoring UI review-fix area, created a focused code-generation checklist for the overflow fix, and prepared to patch the affected contract-flow menus plus focused regression tests."
+**Context**: CONSTRUCTION - U-MC-03 contract menu overflow review fix implementation started
+
+---
+
 ## Session Continuity — U-17 Resume
 **Timestamp**: 2026-05-23T03:21:19Z
 **User Input**: "continue ai-dlc workflow"
@@ -5908,3 +5964,47 @@ In add crop group, the seasons don't populate"
 **Context**: CONSTRUCTION - U-MC-04 Code Generation complete; playtest review gate
 
 ---
+
+---
+
+## U-MC-05 Functional Design
+**Timestamp**: 2026-06-05T00:00:00Z
+**User Input**: "Continue ai-dlc workflow. U-MC-04 is approved. Continue on. Use recommended options (unless there is an unclear path) and continue until playtesting is required."
+**AI Response**: "Recorded U-MC-04 Code Generation approval and advanced the per-unit loop to U-MC-05 (Shift Crop Behavior). Created the Functional Design plan (aidlc-docs/construction/plans/u-mc-05-shift-crop-behavior-functional-design-plan.md) resolving design decisions Q1-Q11 with recommended options (no blocking question round — the spec/requirements and U-MC-01 pure planners fix the behavior). Generated FD artifacts under aidlc-docs/construction/u-mc-05-shift-crop-behavior/functional-design/ (business-logic-model, domain-entities, business-rules, frontend-components). Unit boundary: open farm only; supply from the input chest only (shopping deferred to U-MC-06); harvest via output-chest fallback (per-zone routing + greenhouse/shed deferred to U-MC-07). Security Baseline N/A (disabled); PBT full-mode compliant (pure ManagedCropActionMap + ManagedZoneTileSet seams identified, runtime adapter example-covered). Auto-continuing past the FD approval gate under the user's standing pre-authorization to use recommended options and continue until the playtest gate."
+**Context**: CONSTRUCTION - U-MC-05 Functional Design complete; auto-continue to NFR Requirements
+
+---
+
+## U-MC-05 NFR Requirements + NFR Design
+**Timestamp**: 2026-06-05T00:10:00Z
+**User Input**: "(none — auto-continue under standing pre-authorization to use recommended options and continue until playtest)"
+**AI Response**: "Completed U-MC-05 NFR Requirements (nfr-requirements.md + tech-stack-decisions.md) and NFR Design (nfr-design-patterns.md + logical-components.md) using recommended options; no question round needed (approved Functional Design + feature NFR-MC-01..09 + existing architecture fix the bar). Posture: pure-Core planner reuse + thin runtime runner, live->pure field-state boundary, total pure action map, capability-skip barrier, atomic supply ledger (leftovers settle to input chest), coexistence via pure tile-exclusion, config-surfaced energy costs, no new dependency, no schema change. Skipped Infrastructure Design (SMAPI mod, no cloud/IaC). Security Baseline N/A (disabled); PBT full-mode compliant. Auto-continuing to Code Generation."
+**Context**: CONSTRUCTION - U-MC-05 NFR Requirements + NFR Design complete; Infrastructure Design skipped; advance to Code Generation
+
+---
+
+## U-MC-05 Code Generation
+**Timestamp**: 2026-06-05T00:30:00Z
+**User Input**: "(none — auto-continue under standing pre-authorization to use recommended options and continue until playtest)"
+**AI Response**: "Created the U-MC-05 Code Generation plan (u-mc-05-shift-crop-behavior-code-generation-plan.md, 23 steps) and executed it. Core: WorkActionKind +HoeSwing/PlantSeed/ApplyFertilizer (+default costs), WorkerTool +Hoe, BatchKind +ManagedCrops, pure ManagedCropActionMap + ManagedZoneTileSet, ShiftPlanBuilder emits the managed batch before general outdoor batches, +IntentPerformManagedCropAction. Mod: ManagedCropFieldReader (live->pure FieldState), ShiftOrchestrator.ManagedCrops.cs per-tile beat executor (harvest->clear->till->fertilize->seed->water with capability/energy gating, input-chest supply read/consume, harvest via output-chest pipeline, fertilizer-unavailable/tool-skip HUD notices), orchestrator dispatch/begin-batch/movement wiring, WorkAreaScanner coexistence exclusion, CropHudNotifier, GMCM cost keys + i18n. Tests: +19 (ManagedCropActionMap totality/determinism, ManagedZoneTileSet partition property, ShiftPlanBuilder managed-batch ordering). DEV-MC-05-01: clear-debris/clear-dead-plants toggles honored at default-ON; configurable OFF switch deferred (CropPlan has no toggle fields; global-toggle framing). Verification: build /p:EnableModDeploy=false 0/0; dotnet test 454 passed / 1 skip / 0 failed; deploy build 0/0 to Mods/Dayswork. Stopping at the in-game playtest review gate per the user's directive."
+**Context**: CONSTRUCTION - U-MC-05 Code Generation complete; deployed; awaiting in-game playtest approval before U-MC-06
+
+---
+
+## U-MC-05 Playtest Fix — farmhand never starts (managed-crop scope not classified)
+**Timestamp**: 2026-06-06T00:00:00Z
+**User Input**: "the farmhand does not start tasks. Add any devlogs as needed using our dev logging pattern. I've created a single crop group to plant cucumbers in the spring with a tillable area and no debris. The cucumber seeds are in the input chest. The farmhand never starts the day."
+**AI Response**: "Root cause: ShiftOrchestrator.StartShift called _scopeClassifier.Classify(selection, enabledTasks) WITHOUT the contract.CropPlan argument, so WorkScopeSet.ManagedCrops was always null -> no ManagedCrops batch -> a crop-only contract produced zero batches and the no-worker guard fired. Fix: pass contract.CropPlan to Classify. Added DevLog devlogs: StartShift managed-crop classification (plan enabled/assignments/managedScope/zoneLocations), the no-worker guard (batch count + kinds + managedScope), and BeginManagedCropBatch field/supply/per-zone plan detail. Verified crop zones are authored as Zone(\"Farm\",...), so the open-farm filter is correct. Verification: dotnet test 454 passed / 1 skip / 0 failed; deploy build 0/0 to Mods/Dayswork. Note: cucumbers are a summer crop in vanilla; if the worker now spawns but does not plant in spring, that is a season-validity matter (HoeDirt.plant rejects out-of-season seeds) separate from this spawn fix."
+**Context**: CONSTRUCTION - U-MC-05 playtest fix; redeployed; still at playtest review gate
+
+## U-MC-05 Playtest Fix — debris tiles cleared but never tilled/planted
+**Timestamp**: 2026-06-06T01:00:00Z
+**User Input**: "When the worker is assigned a crop group that has debris, the worker will till the open areas, clear the debris, and plant/fertilize the tilled areas. but they will not till the areas that were covered by debris. It should ideally go tile by tile and go through clear debris -> till -> plant/fert."
+**AI Response**: "Root cause: the managed plan was snapshotted once at batch start, so a tile that was debris at snapshot only received a ClearDebris action — no Till/Seed was generated for it (Till requires a non-debris, untilled, diggable tile at plan time). After the worker cleared the debris there was no re-plan, so those tiles were never tilled/planted. Fix: added a bounded re-plan loop to ShiftOrchestrator.ManagedCrops — extracted BuildManagedActions(logDetail) (re-reads live field + input-chest supply, toggle-filtered ordered actions) used for the initial plan and each re-plan; when the action queue drains, TryReplanManagedBatch re-reads the field and re-enqueues so newly-cleared tiles get tilled/planted on a following pass. Guards: pass cap (MaxManagedReplans=8) + a whole-plan signature no-progress check so un-clearable debris (capability skip) cannot loop. Also fixed earlier: seeds/fertilizer are now consumed only on a successful HoeDirt.plant, with per-tile planted= devlogs at Info level. Verification: dotnet test 454 passed / 1 skip / 0 failed; deploy build 0/0 to Mods/Dayswork."
+**Context**: CONSTRUCTION - U-MC-05 playtest fix (debris re-plan); redeployed; still at playtest review gate
+
+## U-MC-05 Playtest Adjustment — viability HUD notice + skip tilling non-viable zones
+**Timestamp**: 2026-06-06T02:00:00Z
+**User Input**: "When managing crops, if a crop won't be planted because it won't grow in time, there should be a HUD message notifying the player. The farmhand should also avoid tilling those areas if no crop will be planted."
+**AI Response**: "Core CropShiftPlanner now gates ground preparation on viability: BuildSupplyIndependentActions takes allowTill = isViable, so a zone whose crop can't mature before season end emits no Till (and already no seed) for its bare tiles; harvest/water-existing/debris-clear still run. Runtime: added CropHudNotifier.CropWontGrowInTime() (i18n notify.crop_wont_grow, deduped per shift) fired from BuildManagedActions via NotifyCropNotViable when a non-season-agnostic zone has open (non-crop) tiles but the choice is not viable; an Info devlog records the skip. Added Core tests: non-viable crop -> no Till/PlantSeed; season-agnostic location -> still tills/plants regardless of date. Verification: dotnet test 460 passed / 1 skip / 0 failed; deploy build 0/0 to Mods/Dayswork."
+**Context**: CONSTRUCTION - U-MC-05 playtest adjustment (viability notice + no-till); redeployed; still at playtest review gate

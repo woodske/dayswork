@@ -81,6 +81,8 @@
     "ui.manage_crops.tag_chest_only": "chest-supply only",
     "ui.manage_crops.lock_conflict": "That crop overlaps a season that is already assigned. Clear it first.",
     "ui.manage_crops.zone_overlap_protected": "Those tiles are already used by another crop group.",
+    "ui.manage_crops.clear_debris_toggle": "Clear debris before tilling",
+    "ui.manage_crops.clear_dead_plants_toggle": "Clear dead plants",
     "ui.priority.title": "Task Priority",
     "ui.priority.description": "Drag to reorder, or use the arrows. The farmhand finishes higher categories first.",
     "ui.common.back_btn": "Back",
@@ -117,6 +119,9 @@
     "notify.needs_attention": "Your farmhand contract needs attention before it can run again.",
     "notify.festival": "Your farmhand took the festival day off.",
     "notify.festival_refund": "Festival day: your farmhand contract fee of {{refund}}g was refunded.",
+    "notify.crop_tool_skip": "Your farmhand skipped a crop action — the needed tool was missing or too weak.",
+    "notify.crop_fertilizer_unavailable": "Your farmhand skipped planting a crop zone — the configured fertilizer wasn't available.",
+    "notify.crop_wont_grow": "Your farmhand skipped planting {{crop}} — it can't mature before the season ends.",
     "ui.summary.payment_timing_one_time": "The fixed contract price is charged now.",
     "ui.summary.payment_timing_recurring": "This fixed daily price starts on the next eligible contract day.",
     "ui.summary.payment_timing_recurring_edit": "The revised fixed daily price applies on the next eligible contract day.",
@@ -252,5 +257,8 @@
     "gmcm.common.action.collect_animal_product": "collecting one animal product",
     "gmcm.common.action.axe_swing": "one axe swing",
     "gmcm.common.action.pickaxe_swing": "one pickaxe swing",
-    "gmcm.common.action.scythe_swing": "one scythe swing"
+    "gmcm.common.action.scythe_swing": "one scythe swing",
+    "gmcm.common.action.hoe_swing": "one hoe swing (till)",
+    "gmcm.common.action.plant_seed": "planting one seed",
+    "gmcm.common.action.apply_fertilizer": "applying one fertilizer"
 }

@@ -141,6 +141,13 @@ internal sealed partial class ShiftOrchestrator
 
         if (_nav.NavigationFailed)
         {
+            if (_managedActive && _currentManagedAction is not null)
+            {
+                _currentManagedAction = null;
+                StartNextManagedAction();
+                return;
+            }
+
             if (_pendingBuildingExit)
             {
                 ModEntry.ModMonitor.Log(
@@ -191,6 +198,13 @@ internal sealed partial class ShiftOrchestrator
 
         if (_nav.HasArrived)
         {
+            if (_managedActive && _currentManagedAction is { } managedAction)
+            {
+                _ctx!.StateMachine.SetIntent(new IntentPerformManagedCropAction(managedAction));
+                _actionPending = false;
+                return;
+            }
+
             if (_pendingBuildingExit)
             {
                 FinishCurrentBatchAfterBuildingExit();

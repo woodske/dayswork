@@ -11,4 +11,7 @@ public enum WorkActionKind
     AxeSwing,
     PickaxeSwing,
     ScytheSwing,
+    HoeSwing,
+    PlantSeed,
+    ApplyFertilizer,
 }

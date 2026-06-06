@@ -19,7 +19,10 @@ internal sealed class PageShell : ILayoutElement
         Action onBack,
         string? description = null,
         IReadOnlyList<MenuButton>? footerButtons = null,
-        int footerBottomPadding = 14)
+        int footerBottomPadding = 14,
+        string? backLabel = null,
+        string backSound = "bigDeSelect",
+        int? backFixedWidth = 170)
     {
         var children = new List<ILayoutElement>();
 
@@ -40,7 +43,10 @@ internal sealed class PageShell : ILayoutElement
         var footerParts = new List<HStack.Column>
         {
             HStack.Auto(new MenuButton(
-                I18nHelper.Get("ui.common.back_btn"), onBack, sound: "bigDeSelect")),
+                backLabel ?? I18nHelper.Get("ui.common.back_btn"),
+                onBack,
+                fixedWidth: backFixedWidth,
+                sound: backSound)),
         };
 
         if (footerButtons is { Count: > 0 })

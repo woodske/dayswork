@@ -16,6 +16,11 @@ public enum BatchKind
     Greenhouse,
     OutdoorCrops,
     OutdoorClearing,
+
+    // Managed crops (U-MC-05): a contract's authored crop zones, prepared/planted/maintained
+    // per-tile from the pure CropShiftPlanner. The batch's CropZoneAssignments are carried
+    // out-of-band by the runtime (not as TaskKind TileWork).
+    ManagedCrops,
 }
 
 public enum AnimalProductKind

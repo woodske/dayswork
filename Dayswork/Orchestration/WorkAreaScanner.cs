@@ -49,13 +49,26 @@ internal sealed class WorkAreaScanner
     public WorkAreaScanner(ICapabilityEvaluator capability) =>
         _capability = capability;
 
+    private static bool IsInAnyZone(int x, int y, IReadOnlyList<Zone> zones)
+    {
+        foreach (var zone in zones)
+        {
+            if (x >= zone.TopLeft.X && x <= zone.BottomRight.X &&
+                y >= zone.TopLeft.Y && y <= zone.BottomRight.Y)
+                return true;
+        }
+
+        return false;
+    }
+
     public IReadOnlyList<WorkItem> ScanZones(
         GameLocation location,
         IEnumerable<Zone> zones,
         IReadOnlySet<TaskKind> enabled,
         ToolSnapshot snapshot,
         TileCoord origin,
-        OutputScopeProvenance? provenance = null)
+        OutputScopeProvenance? provenance = null,
+        IReadOnlyList<Zone>? excludedZones = null)
     {
         var seenWorkItems = new HashSet<(TaskKind Task, TileCoord Tile)>();
         var rawItems = new List<WorkItem>();
@@ -75,6 +88,12 @@ internal sealed class WorkAreaScanner
             for (var y = zone.TopLeft.Y; y <= zone.BottomRight.Y; y++)
             {
                 scannedTiles++;
+
+                // Coexistence (U-MC-05, FR-MC-28): a tile owned by a managed crop zone is serviced
+                // by the managed-crop path, so the general Water/Harvest/clearing scan skips it.
+                if (excludedZones is not null && IsInAnyZone(x, y, excludedZones))
+                    continue;
+
                 var tileVec = new Vector2(x, y);
                 var taskTile = new TileCoord(x, y);
 

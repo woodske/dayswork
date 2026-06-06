@@ -60,6 +60,21 @@ public sealed class ShiftPlanBuilder
                 batches.Add(CreateSkeleton(greenhouse.LocationName, BatchKind.Greenhouse, greenhouseTasks, feedBuilding: false));
         }
 
+        // Managed crops (U-MC-05): run the authored crop plan ahead of the general outdoor
+        // crop/clearing passes so harvest-first / ground prep happens early. One batch per
+        // open-farm managed location; greenhouse/shed managed locations are deferred to U-MC-07.
+        if (scopes.ManagedCrops is { IsEnabled: true } managedCrops)
+        {
+            foreach (var location in managedCrops.Assignments
+                         .Select(assignment => assignment.Zone.LocationName)
+                         .Where(name => string.Equals(name, "Farm", StringComparison.Ordinal))
+                         .Distinct(StringComparer.Ordinal)
+                         .OrderBy(name => name, StringComparer.Ordinal))
+            {
+                batches.Add(CreateSkeleton(location, BatchKind.ManagedCrops, Array.Empty<TaskKind>(), feedBuilding: false));
+            }
+        }
+
         var outdoorCropTasks = Order(enabledTasks.Where(TaskKindSets.IsOutdoorCropService));
         if (scopes.OutdoorWork is not null && outdoorCropTasks.Count > 0)
             batches.Add(CreateSkeleton("Farm", BatchKind.OutdoorCrops, outdoorCropTasks, feedBuilding: false));

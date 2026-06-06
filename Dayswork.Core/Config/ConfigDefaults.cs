@@ -36,6 +36,9 @@ public static class ConfigDefaults
             [WorkActionKind.AxeSwing] = 2,
             [WorkActionKind.PickaxeSwing] = 2,
             [WorkActionKind.ScytheSwing] = 1,
+            [WorkActionKind.HoeSwing] = 2,
+            [WorkActionKind.PlantSeed] = 1,
+            [WorkActionKind.ApplyFertilizer] = 1,
         };
 
         return ConfigSnapshotFactory.Create(

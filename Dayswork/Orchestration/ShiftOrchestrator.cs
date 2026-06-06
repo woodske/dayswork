@@ -328,7 +328,12 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
         var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
-        var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks);
+        var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks, contract.CropPlan);
+
+        DevLog.Log(
+            $"[Dayswork][managed-crops] StartShift cropPlan enabled={contract.CropPlan.IsEnabled} assignments={contract.CropPlan.Assignments.Count} " +
+            $"managedScope={(workScopes.ManagedCrops?.Assignments.Count ?? -1)} zoneLocations=[{string.Join(", ", contract.CropPlan.Assignments.Select(a => a.Zone.LocationName))}].",
+            LogLevel.Info);
 
         _farmExitTile = ResolveSpawnExitTile(farm);
         var batches = BuildInitialBatches(contract, workScopes, farm, snapshot);
@@ -340,6 +345,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                                  !batch.FeedBuilding))
         {
             ModEntry.ModMonitor.Log("[Dayswork] No applicable work found for today's contract — no worker spawned.", LogLevel.Trace);
+            DevLog.Log(
+                $"[Dayswork][managed-crops] no-worker guard fired. batches={batches.Count} kinds=[{string.Join(", ", batches.Select(b => $"{b.Kind}:{b.LocationName}"))}] managedScope={(workScopes.ManagedCrops?.Assignments.Count ?? -1)}.",
+                LogLevel.Info);
             return;
         }
 
@@ -377,6 +385,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
         _pendingExpansionRouteBatch = null;
         _expansionRouteNavigator.Clear();
+        ResetManagedCropState();
+        Dayswork.Integration.CropHudNotifier.ResetForShift();
 
         _ctx = new ShiftContext(
             contractId:       contract.Id,
@@ -439,6 +449,13 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks);
         var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
         var outdoorProvenance = OutputScopeProvenance.Outdoor();
+
+        // Coexistence (U-MC-05, FR-MC-28): tiles owned by a managed crop zone on the farm are
+        // serviced by the managed-crop batch, so exclude them from the general outdoor scans.
+        var managedFarmZones = (workScopes.ManagedCrops?.Assignments ?? Array.Empty<Dayswork.Core.Crops.CropZoneAssignment>())
+            .Where(assignment => string.Equals(assignment.Zone.LocationName, "Farm", StringComparison.Ordinal))
+            .Select(assignment => assignment.Zone)
+            .ToList();
         var greenhouseLocation = workScopes.GreenhouseWork?.LocationName ?? "Greenhouse";
 
         var batches = new List<WorkBatch>(skeletons.Count);
@@ -448,6 +465,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             {
                 case BatchKind.AnimalBuilding:
                 case BatchKind.Greenhouse:
+                case BatchKind.ManagedCrops:
+                    // ManagedCrops carries no TileWork; the managed-crop runner reads its zone
+                    // assignments from WorkScopeSet.ManagedCrops at batch start.
                     batches.Add(batch);
                     break;
 
@@ -488,7 +508,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                             batchTasks,
                             snapshot,
                             _farmExitTile,
-                            outdoorProvenance);
+                            outdoorProvenance,
+                            managedFarmZones);
                     batches.Add(batch with { TileWork = tileWork });
                     break;
                 }
@@ -556,6 +577,12 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        if (IsManagedCropBatch(batch))
+        {
+            BeginManagedCropBatch(batch);
+            return;
+        }
+
         if (IsExpansionGreenhouseBatch(batch))
         {
             if (TryStartExpansionRoute(
@@ -780,6 +807,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             case IntentPerformTaskAt intent:
                 HandleTaskAction(intent, currentLocation);
                 break;
+            case IntentPerformManagedCropAction intent:
+                HandleManagedCropAction(intent, currentLocation);
+                break;
             case IntentPetAnimal intent:
                 HandlePetAnimal(intent);
                 break;
@@ -965,6 +995,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
         _pendingExpansionRouteBatch = null;
         _expansionRouteNavigator.Clear();
+        ResetManagedCropState();
         _nav.Clear();
     }
 

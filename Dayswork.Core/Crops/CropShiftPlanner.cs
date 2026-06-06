@@ -40,14 +40,19 @@ public sealed class CropShiftPlanner
             .ThenBy(tile => tile.Tile.X)
             .ToList();
 
-        var independent = BuildSupplyIndependentActions(fieldState.LocationName, zoneTiles);
-        var candidates = zoneTiles
-            .Where(tile => tile.CanAcceptSeed)
-            .Where(_ => _viabilityCalculator.IsPlantingViable(
-                fieldState,
-                choice.Crop,
-                useFertilizer: choice.Crop.RequiresFertilizer))
-            .ToList();
+        // Viability gates planting AND ground preparation: if the crop cannot mature before the
+        // season ends, the farmhand neither tills nor plants the zone's bare tiles this shift
+        // (it would only be tilling ground it can't use). Harvest/water of existing crops and
+        // debris clearing still run.
+        var isViable = _viabilityCalculator.IsPlantingViable(
+            fieldState,
+            choice.Crop,
+            useFertilizer: choice.Crop.RequiresFertilizer);
+
+        var independent = BuildSupplyIndependentActions(fieldState.LocationName, zoneTiles, allowTill: isViable);
+        var candidates = isViable
+            ? zoneTiles.Where(tile => tile.CanAcceptSeed).ToList()
+            : new List<TileState>();
 
         var supplyTargets = _supplyPlanner.CalculatePurchaseTargets(
             choice.Crop,
@@ -72,7 +77,8 @@ public sealed class CropShiftPlanner
 
     private static IReadOnlyList<TileAction> BuildSupplyIndependentActions(
         string locationName,
-        IReadOnlyList<TileState> tiles)
+        IReadOnlyList<TileState> tiles,
+        bool allowTill)
     {
         var actions = new List<TileAction>();
         foreach (var tile in tiles)
@@ -81,7 +87,7 @@ public sealed class CropShiftPlanner
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Harvest));
             if (tile.HasDebris)
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.ClearDebris));
-            if (!tile.HasCrop && !tile.HasDebris && !tile.IsTilled)
+            if (allowTill && !tile.HasCrop && !tile.HasDebris && !tile.IsTilled)
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Till, RequiresDiggable: true));
             if (tile.HasCrop && !tile.IsWatered)
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Water));
