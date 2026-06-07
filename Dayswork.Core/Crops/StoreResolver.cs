@@ -98,6 +98,14 @@ public sealed class StoreResolver
                             stockGroup => stockGroup.Sum(kvp => kvp.Value),
                             StringComparer.Ordinal);
 
-                    return new ShopStockSnapshot(group.Key, group.Any(snapshot => snapshot.IsOpen), stock);
+                    var prices = group
+                        .SelectMany(snapshot => snapshot.Prices)
+                        .GroupBy(kvp => kvp.Key, StringComparer.Ordinal)
+                        .ToDictionary(
+                            priceGroup => priceGroup.Key,
+                            priceGroup => priceGroup.Max(kvp => kvp.Value),
+                            StringComparer.Ordinal);
+
+                    return new ShopStockSnapshot(group.Key, group.Any(snapshot => snapshot.IsOpen), stock, prices);
                 });
 }

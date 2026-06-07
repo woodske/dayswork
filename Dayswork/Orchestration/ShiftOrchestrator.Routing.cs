@@ -169,6 +169,69 @@ internal sealed partial class ShiftOrchestrator
         return preferred;
     }
 
+    private TileCoord ResolveReachableShiftExitTile(Farm farm)
+    {
+        if (_farmhand is null)
+            return _farmExitTile;
+
+        var source = new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y);
+        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, farm);
+        if (routeCosts.ContainsKey(_farmExitTile))
+            return _farmExitTile;
+
+        if (WorkerRouteSelector.TrySelectNearestReachableTile(
+                EnumerateNearbyPassableTiles(_farmExitTile, farm, maxRadius: 16),
+                routeCosts,
+                out var fallback))
+        {
+            DevLog.Log(
+                $"[Dayswork][exit] configured exit tile ({_farmExitTile.X},{_farmExitTile.Y}) unreachable from " +
+                $"({source.X},{source.Y}); using reachable nearby tile ({fallback.X},{fallback.Y}).",
+                LogLevel.Info);
+            return fallback;
+        }
+
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork][exit] configured exit tile ({_farmExitTile.X},{_farmExitTile.Y}) unreachable from " +
+            $"({source.X},{source.Y}) and no reachable nearby tile found; using configured tile.",
+            LogLevel.Warn);
+        return _farmExitTile;
+    }
+
+    private static IEnumerable<TileCoord> EnumerateNearbyPassableTiles(TileCoord preferred, Farm farm, int maxRadius)
+    {
+        var mapLayer = farm.Map.Layers[0];
+        var width = mapLayer.LayerWidth;
+        var height = mapLayer.LayerHeight;
+
+        bool IsPassable(int x, int y) =>
+            x >= 0 &&
+            y >= 0 &&
+            x < width &&
+            y < height &&
+            WorkerMovementDriver.IsTilePassableForWorker(new Point(x, y), farm);
+
+        if (IsPassable(preferred.X, preferred.Y))
+            yield return preferred;
+
+        for (var radius = 1; radius <= maxRadius; radius++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                for (var dy = -radius; dy <= radius; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != radius)
+                        continue;
+
+                    var x = preferred.X + dx;
+                    var y = preferred.Y + dy;
+                    if (IsPassable(x, y))
+                        yield return new TileCoord(x, y);
+                }
+            }
+        }
+    }
+
     private bool IsExpansionGreenhouseBatch(WorkBatch batch) =>
         batch.Kind == BatchKind.Greenhouse &&
         ModEntry.ExpansionCompat is { } compat &&

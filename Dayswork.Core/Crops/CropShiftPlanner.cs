@@ -28,7 +28,8 @@ public sealed class CropShiftPlanner
         FieldState fieldState,
         SupplyInventory inventory,
         IReadOnlyList<ShopStockSnapshot>? stockSnapshots,
-        bool isFestivalDay)
+        bool isFestivalDay,
+        StorePreference? storePreferenceOverride = null)
     {
         var choice = ResolveChoice(assignment, fieldState);
         if (choice is null)
@@ -58,7 +59,7 @@ public sealed class CropShiftPlanner
             choice.Crop,
             candidates.Count,
             inventory,
-            choice.StorePreference,
+            storePreferenceOverride ?? choice.StorePreference,
             stockSnapshots);
         var purchases = _storeResolver.ResolvePurchaseLines(supplyTargets, isFestivalDay, stockSnapshots);
         var projectedInventory = ProjectInventory(inventory, purchases);

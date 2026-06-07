@@ -41,6 +41,7 @@ public class RuntimeConfigSnapshotMapperTests
         Assert.Equal(1, normalized.WorkerActionAnimationMs);
         Assert.Equal(0, normalized.WorkerEntranceHoldTicks);
         Assert.Equal(defaults.WorkOnHolidays, normalized.WorkOnHolidays);
+        Assert.Equal("Either", normalized.PreferredCropStore);
         Assert.Equal(defaults.EnergyTierEnergy["FullDay"], normalized.EnergyTierEnergy["FullDay"]);
         Assert.Equal(defaults.EnergyTierPrice["FullDay"], normalized.EnergyTierPrice["FullDay"]);
         Assert.Equal(defaults.WorkActionCosts["AxeSwing"], normalized.WorkActionCosts["AxeSwing"]);
@@ -61,6 +62,17 @@ public class RuntimeConfigSnapshotMapperTests
         Assert.Equal(222, snapshot.EnergyTierEnergy[EnergyTier.FullDay]);
         Assert.Equal(999, snapshot.EnergyTierPrice[EnergyTier.FullDay]);
         Assert.Equal(7, snapshot.WorkActionCosts[WorkActionKind.AxeSwing]);
+    }
+
+    [Theory]
+    [InlineData("Pierre", "Pierre")]
+    [InlineData("Joja", "Joja")]
+    [InlineData("Bogus", "Either")]
+    public void Normalize_round_trips_preferred_crop_store(string configured, string expected)
+    {
+        var normalized = RuntimeConfigSnapshotMapper.Normalize(new ModConfig { PreferredCropStore = configured });
+
+        Assert.Equal(expected, normalized.PreferredCropStore);
     }
 
     [Fact]

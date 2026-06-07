@@ -28,6 +28,18 @@ public sealed class ModEntry : Mod
     // Expansion-compatibility seam (U-SVE-01). Vanilla-by-default; active profile resolved at GameLaunched.
     internal static ExpansionCompatService ExpansionCompat { get; private set; } = null!;
 
+    // Global Manage Crops preferred store (U-MC-06, DEV-MC-06-01). Read live from the editable config
+    // so a GMCM change applies on the next shift without restart.
+    private static ModConfigManager? _configManager;
+
+    internal static Dayswork.Core.Crops.StorePreference PreferredCropStore =>
+        _configManager?.Editable.PreferredCropStore switch
+        {
+            "Pierre" => Dayswork.Core.Crops.StorePreference.Pierre,
+            "Joja" => Dayswork.Core.Crops.StorePreference.Joja,
+            _ => Dayswork.Core.Crops.StorePreference.Either,
+        };
+
     public override void Entry(IModHelper helper)
     {
         ModMonitor = this.Monitor;
@@ -36,6 +48,7 @@ public sealed class ModEntry : Mod
         // ── Core singletons (dependency order) ──────────────────────────────
         var logWarning  = (string msg) => this.Monitor.Log(msg, LogLevel.Warn);
         var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, LogLevel.Warn));
+        _configManager = configManager;
         var config      = configManager.CurrentSnapshot;
         var configResolver = new ConfigValueResolver();
         var workScopeClassifier = new WorkScopeClassifier();

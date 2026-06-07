@@ -12,6 +12,10 @@ public sealed record StoreCase(StorePreference Preference, string ItemId, bool I
 
 public sealed record ShiftPlanCase(CropZoneAssignment Assignment, FieldState FieldState, SupplyInventory Inventory, IReadOnlyList<ShopStockSnapshot> Stock);
 
+public sealed record PurchaseClampCase(int Quantity, int SeedCost, int FertilizerCost, int WalletGold);
+
+public sealed record StoreHoursCase(Store Store, int TimeOfDay, int DayOfMonth);
+
 public static class ManageCropsGen
 {
     private static readonly string[] CropIds = { "crop.parsnip", "crop.blueberry", "crop.corn", "crop.ancient" };
@@ -117,6 +121,21 @@ public static class ManageCropsGen
              assignment.Mode == CropAssignmentMode.SeasonAgnostic,
              TilesInside(assignment.Zone))
          select new ShiftPlanCase(assignment, field, inventory, stock.ToList()))
+        .ToArbitrary();
+
+    public static Arbitrary<PurchaseClampCase> PurchaseClampCase() =>
+        (from quantity in Gen.Choose(0, 36)
+         from seedCost in Gen.Choose(1, 250)
+         from fertilizerCost in Gen.Choose(1, 250)
+         from wallet in Gen.Choose(0, 10000)
+         select new PurchaseClampCase(quantity, seedCost, fertilizerCost, wallet))
+        .ToArbitrary();
+
+    public static Arbitrary<StoreHoursCase> StoreHoursCase() =>
+        (from store in Gen.Elements(Store.Pierre, Store.Joja)
+         from time in Gen.Choose(0, 2600)
+         from day in Gen.Choose(1, 28)
+         select new StoreHoursCase(store, time, day))
         .ToArbitrary();
 
     private static Gen<IReadOnlyDictionary<string, int>> ItemQuantities() =>

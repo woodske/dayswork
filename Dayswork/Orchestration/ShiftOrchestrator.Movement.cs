@@ -139,6 +139,12 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
+        if (_managedShoppingInProgress)
+        {
+            HandleManagedShoppingMovement(location);
+            return;
+        }
+
         if (_nav.NavigationFailed)
         {
             if (_managedActive && _currentManagedAction is not null)

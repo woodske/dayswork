@@ -111,6 +111,17 @@ internal sealed class GMCMRegistrar
             () => I18nHelper.Get("gmcm.worker.work_on_holidays.tooltip"),
             fieldId: "worker-work-on-holidays");
 
+        // Global Manage Crops preferred store (U-MC-06, DEV-MC-06-01).
+        api.AddTextOption(
+            _manifest,
+            () => _config.Editable.PreferredCropStore,
+            value => _config.Editable.PreferredCropStore = value,
+            () => I18nHelper.Get("gmcm.worker.preferred_crop_store.name"),
+            () => I18nHelper.Get("gmcm.worker.preferred_crop_store.tooltip"),
+            allowedValues: new[] { "Either", "Pierre", "Joja" },
+            formatAllowedValue: value => I18nHelper.Get($"gmcm.worker.preferred_crop_store.value.{value.ToLowerInvariant()}"),
+            fieldId: "worker-preferred-crop-store");
+
         RegisterFloatOption(
             api,
             new FloatOptionSpec(

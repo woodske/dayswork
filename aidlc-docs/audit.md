@@ -18,6 +18,37 @@ Fix applied to `Dayswork/Orchestration/ShiftOrchestrator.cs`:
 
 ---
 
+## U-MC-06 Playtest Review Fix - post-return farm exit path unavailable
+**Timestamp**: 2026-06-07T01:44:06Z
+**User Input**: "[Dayswork] [Dayswork][managed-crops] field date=5/Summer tiles=16 supply=[] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=481 requiresFert=False independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=481 requiresFert=False independent=1 dependent=0.
+[Dayswork] [Dayswork][managed-crops] batch=Farm zones=2 actions=1.
+[Dayswork] [Dayswork][managed-crops][shopping] departing groups=1 estimatedCost=1280 wrapAfterReturn=False.
+[Dayswork] [Dayswork][managed-crops][shopping] store route selected store=Pierre exterior=Town interior=SeedShop entrance=(43,57) wait=(44,57) arrival=(6,29).
+[Dayswork] [Dayswork][managed-crops][shopping] route selected source=Farm target=Town hops=[Farm->Town approach=(139,22) arrival=(1,54)].
+[Dayswork] [Dayswork][managed-crops][shopping] counter selected store=Pierre interior=SeedShop tile=(5,19).
+[Dayswork] [Dayswork][managed-crops][shopping] store=Pierre bought=16 spent=1280 goldRemaining=3053426.
+[Dayswork] [Dayswork][managed-crops][shopping] route selected source=SeedShop target=Farm hops=[SeedShop->Town approach=(6,30) arrival=(43,57); Town->BusStop approach=(0,54) arrival=(42,23); BusStop->Farm approach=(0,22) arrival=(79,17)].
+[Dayswork] [Dayswork][managed-crops] field date=5/Summer tiles=16 supply=[481:16] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=481 requiresFert=False independent=0 dependent=24.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=481 requiresFert=False independent=0 dependent=8.
+[Dayswork] [Dayswork][exit] could not path to exit tile (79,52) — removing worker in place.
+
+it's better, but the farmhand still can't path once they're back in the farm"
+**AI Response**: "Investigating the remaining U-MC-06 failure as a post-return farm end-of-shift pathing issue. Shopping route/counter/pricing are now correct; the remaining bad target is the ordinary exit navigation to `_farmExitTile` after the farmhand returns to Farm and deposits/replans."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix; post-shopping farm exit path unavailable
+
+---
+
+## U-MC-06 Playtest Review Fix - reachable post-return exit fallback
+**Timestamp**: 2026-06-07T01:47:00Z
+**User Input**: "(none - completing the U-MC-06 post-return farm exit pathing review fix under the user's latest playtest feedback)"
+**AI Response**: "Updated end-of-shift exit navigation so `BeginExit` resolves an actual reachable tile from the farmhand's current farm position. The configured `_farmExitTile` is still used when reachable; if it is isolated on Grandpa's Farm after shopping return/deposit/replan, the orchestrator chooses a reachable passable nearby tile, logs the fallback, and finishes the shift from there. Updated RF13 in the U-MC-06 code-generation plan, code summary, state, and audit. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors), `dotnet test Dayswork.sln /p:EnableModDeploy=false` (473 passed / 1 expected skip / 0 failed), and deploy-enabled `dotnet build Dayswork.sln` copied the mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix complete; still at playtest review gate
+
+---
+
 ## U-MC-03 Contract Menu Overflow Review Fix - Complete
 **Timestamp**: 2026-06-06T16:03:57.6348145Z
 **User Input**: "(continuation of the approved implementation request from 2026-06-06T15:58:07.5663197Z)"
@@ -6008,3 +6039,269 @@ In add crop group, the seasons don't populate"
 **User Input**: "When managing crops, if a crop won't be planted because it won't grow in time, there should be a HUD message notifying the player. The farmhand should also avoid tilling those areas if no crop will be planted."
 **AI Response**: "Core CropShiftPlanner now gates ground preparation on viability: BuildSupplyIndependentActions takes allowTill = isViable, so a zone whose crop can't mature before season end emits no Till (and already no seed) for its bare tiles; harvest/water-existing/debris-clear still run. Runtime: added CropHudNotifier.CropWontGrowInTime() (i18n notify.crop_wont_grow, deduped per shift) fired from BuildManagedActions via NotifyCropNotViable when a non-season-agnostic zone has open (non-crop) tiles but the choice is not viable; an Info devlog records the skip. Added Core tests: non-viable crop -> no Till/PlantSeed; season-agnostic location -> still tills/plants regardless of date. Verification: dotnet test 460 passed / 1 skip / 0 failed; deploy build 0/0 to Mods/Dayswork."
 **Context**: CONSTRUCTION - U-MC-05 playtest adjustment (viability notice + no-till); redeployed; still at playtest review gate
+
+---
+
+## U-MC-05 Approval + Advance to U-MC-06 Functional Design
+**Timestamp**: 2026-06-06T12:00:00Z
+**User Input**: "continue AI-dlc workflow. I approved U-MC-05."
+**AI Response**: "Recorded U-MC-05 Code Generation approval (closing the U-MC-05 playtest review gate) and advanced the per-unit loop to U-MC-06 (Town Shopping) — the highest-risk unit (new cross-location town-store navigation + headless 1.6 live-game gold transactions). Reviewed the unit definition, FR-MC-12..20/41, spec §6.2, and the existing seams (Core StoreResolver/CropSupplyPlanner produce purchase targets/lines; CrossLocationRouteNavigator handles multi-hop warps; U-MC-05 left the carried-supply-return seam at ShiftOrchestrator.ManagedCrops.cs:307). Most behavior is pinned by the spec, but two design decisions are genuinely consequential and unsettled (multi-store trip policy; navigation/transaction failure resilience). Surfacing those to the user before generating FD artifacts rather than silently defaulting, given the unit's gold-transaction and new-navigation risk."
+**Context**: CONSTRUCTION - U-MC-06 Functional Design start; asking two consequential design questions before generating FD artifacts
+
+---
+
+## U-MC-06 Functional Design — answers + artifacts
+**Timestamp**: 2026-06-06T12:20:00Z
+**User Input (Q1, store trips)**: "store preference should be a global manage crops setting that applies to all crop group. all products should be attempted to be bought at the preferred store, anything missing should be bought at the other store."
+**User Input (Q2, if shopping fails)**: "Skip shopping, keep working"
+**AI Response**: "Captured the two answers as DEV-MC-06-01 (global PreferredCropStore config Pierre/Joja/Either applied to all crop groups, overriding per-SeasonCropChoice.StorePreference; existing StoreResolver.ResolvePreferred already buys preferred-else-other per item and groups by store, so the trip visits preferred first then the other only for missing items) and DEV-MC-06-02 (route/bind failure -> skip shopping with HUD notice, continue planting from on-hand chest supply; no gold spent, no item loss). Resolved spec-pinned decisions Q3-Q11 with recommended options (up-front planned-plantable-tile target FR-MC-12, shift-level manifest aggregation, price-bearing live ShopStockSnapshot, pure max-affordable with seed/fertilizer atomic parity, StoreHoursPolicy, festival skip, chest-supply-only no-trip, time-only cost, PBT full-mode). Wrote FD plan (u-mc-06-town-shopping-functional-design-plan.md) and the four FD artifacts under construction/u-mc-06-town-shopping/functional-design/ (business-logic-model, domain-entities, business-rules, business rules BR-MC6-01..20, frontend-components: GMCM global store dropdown + HUD notice set). Security Baseline N/A (disabled). Property-Based Testing full-mode compliant (all shopping decision logic pure in Core; live read/transaction/navigation are example/playtest-covered adapters). Presenting the standardized 2-option Functional Design completion message and waiting for explicit approval before NFR Requirements."
+**Context**: CONSTRUCTION - U-MC-06 Functional Design artifacts complete; awaiting approval gate
+
+---
+
+## U-MC-06 Functional Design — APPROVED; advance to NFR Requirements
+**Timestamp**: 2026-06-06T12:35:00Z
+**User Input**: "continue, do not use full auto-pilot for this one"
+**AI Response**: "Recorded U-MC-06 Functional Design approval and advanced to NFR Requirements. Per the user's instruction, NOT using full auto-pilot for U-MC-06 — proceeding stage by stage and stopping at each standardized 2-option approval gate. Executing U-MC-06 NFR Requirements next (quality bar for the live shop integration + town navigation), then will stop for approval before NFR Design."
+**Context**: CONSTRUCTION - U-MC-06 FD approved; NFR Requirements start (manual approval gates retained)
+
+---
+
+## U-MC-06 NFR Requirements — artifacts complete
+**Timestamp**: 2026-06-06T12:50:00Z
+**User Input**: "(none — executing NFR Requirements stage under retained manual approval gate)"
+**AI Response**: "Completed U-MC-06 NFR Requirements without a question round (FD + feature NFR-MC-01..09 + existing architecture fix the bar; the two real decisions were settled at FD). Wrote the plan (u-mc-06-town-shopping-nfr-requirements-plan.md) and artifacts (nfr-requirements.md NFR-MC6-01..10 + tech-stack-decisions.md). Focus reflects what is NEW vs earlier MC units: U-MC-06 is the first to MUTATE PLAYER GOLD and INTEGRATE A LIVE 1.6 API, so item/gold safety (NFR-MC6-03) and live-integration resilience (NFR-MC6-05) are promoted to BLOCKING — gold deducted only for granted items, no item loss (plant/input-chest/overflow-mail), failed bind spends no gold, route/bind failure skips with notice. Live shop read once per store per shift (perf); no schema change (one GMCM config key only); all decision logic pure in Core with full-mode PBT obligations; no new dependency. Security Baseline N/A (local in-game gold deduction, no network/PII/auth). Presenting the standardized 2-option NFR Requirements completion message and waiting for approval before NFR Design (manual gate retained per user instruction)."
+**Context**: CONSTRUCTION - U-MC-06 NFR Requirements complete; awaiting approval gate
+
+---
+
+## U-MC-06 NFR Requirements — APPROVED; advance to NFR Design
+**Timestamp**: 2026-06-06T13:00:00Z
+**User Input**: "continue"
+**AI Response**: "Recorded U-MC-06 NFR Requirements approval and advanced to NFR Design (manual approval gate still retained per the user's earlier no-auto-pilot instruction). Executing NFR Design next — pattern decisions + logical-component layout for the live shop integration, town navigation, pure manifest/affordability seams, and the gold-safety barrier."
+**Context**: CONSTRUCTION - U-MC-06 NFR Requirements approved; NFR Design start
+
+---
+
+## U-MC-06 NFR Design — artifacts complete
+**Timestamp**: 2026-06-06T13:10:00Z
+**User Input**: "(none — executing NFR Design stage under retained manual approval gate)"
+**AI Response**: "Completed U-MC-06 NFR Design (no question round; all five categories evaluated against approved FD + NFR Requirements). Wrote the plan (u-mc-06-town-shopping-nfr-design-plan.md) and artifacts (nfr-design-patterns.md P1..P10 + logical-components.md). Pattern set extends the pure-Core/thin-adapter architecture; the new element is P4 the gold-safety transaction barrier (ShopPurchaseService.BuyHeadless is the single exchange-atomic gold-mutation point — grant items then deduct only for granted) plus P5 the skip-on-failure resilience barrier (route/bind failure -> abort only the trip, notice, plant from chest, no gold/items lost). Also: P2 read-once live shop snapshot, P3 up-front planned-tile manifest, P6 pure store-hours deferral, P7 town routes on the existing navigator, P9 global-preference at the seam, P10 idempotent leftover settle. Components: new pure seams (PlannedPlantableTileCounter, ShiftSupplyAggregator, ShiftPurchaseManifest, PurchaseAffordabilityCalculator, StoreHoursPolicy) + live adapters (ShopStockReader, ShopPurchaseService, town routes); ShopStockSnapshot extended with prices; one GMCM key; no new dependency, no schema change. Security Baseline N/A. PBT full-mode compliant. Presenting standardized 2-option NFR Design completion message; waiting for approval before Code Generation (manual gate retained)."
+**Context**: CONSTRUCTION - U-MC-06 NFR Design complete; awaiting approval gate
+
+---
+
+## U-MC-06 NFR Design — APPROVED; Infrastructure Design SKIPPED; Code Generation planning
+**Timestamp**: 2026-06-06T13:20:00Z
+**User Input**: "continue"
+**AI Response**: "Recorded U-MC-06 NFR Design approval. Skipped Infrastructure Design (SMAPI mod; no cloud/container/IaC — consistent with all prior units; rationale logged). Advanced to Code Generation. Per the user's no-auto-pilot instruction, executing Code Generation Part 1 (Planning) only: producing the explicit step-by-step code-generation plan with checkboxes and stopping for approval BEFORE generating any code."
+**Context**: CONSTRUCTION - U-MC-06 NFR Design approved; Infrastructure Design skipped; Code Generation Part 1 (planning)
+
+---
+
+## U-MC-06 Code Generation Part 1 (Planning) — plan complete; approval requested
+**Timestamp**: 2026-06-06T13:30:00Z
+**User Input**: "(none — producing the Code Generation plan under retained manual approval gate)"
+**AI Response**: "Wrote the U-MC-06 Code Generation plan (construction/plans/u-mc-06-town-shopping-code-generation-plan.md): 22 numbered steps, package order Core -> Mod -> Tests -> Verify/close, brownfield in-place edits. Core (S1-S8): price-bearing ShopStockSnapshot, PlannedPlantableTileCounter, ShiftPurchaseManifest, ShiftSupplyAggregator, PurchaseAffordabilityCalculator (max-affordable w/ seed-fertilizer parity), StoreHoursPolicy, global-preference planning path. Mod (S9-S17): PreferredCropStore config+GMCM, ShopStockReader (live headless read), ShopPurchaseService (exchange-atomic BuyHeadless), town routes on CrossLocationRouteNavigator, CropHudNotifier notices, the shopping-phase insertion in ShiftOrchestrator.ManagedCrops with P5 skip-on-failure guard, planting-seam rewire, leftover settle, store-hours deferral. Tests (S18-S20): FsCheck for the pure seams + xUnit for adapters/config. Verify/close (S21-S22): build 0/0, tests green, deploy, code-summary, stop at playtest gate. Two risk callouts with fallbacks: R1 exact 1.6 ShopBuilder headless-read API, R2 vanilla town routes on the expansion-oriented navigator. Requesting explicit approval of the full plan before generating any code (manual gate retained per user instruction)."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation plan awaiting approval before Part 2 generation
+
+---
+
+## U-MC-06 Code Generation Continuation
+**Timestamp**: 2026-06-06T17:50:15Z
+**User Input**: "Continue ai-dlc process. Claude was in the middle of generating code for U-MC-06 but ran out of tokens. Complete the code generation portion where it left off. All unstaged changes were from this process."
+**AI Response**: "Resuming U-MC-06 Code Generation Part 2 from the existing working tree. The user's continuation request authorizes completing the already-started code generation portion. Loading rule details, enabled extension rules, U-MC-06 artifacts, and the code generation plan; will audit implemented work against S1-S22, complete remaining planned steps, update checkboxes/state/audit, and run build/test verification."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation Part 2 continuation
+
+---
+
+## U-MC-06 Code Generation Complete
+**Timestamp**: 2026-06-06T18:02:29Z
+**User Input**: "(none — completing Code Generation Part 2 under the user's continuation request)"
+**AI Response**: "Completed U-MC-06 Code Generation and stopped at the in-game playtest review gate. Added Core shopping seams (price-bearing ShopStockSnapshot, PlannedPlantableTileCounter, ShiftPurchaseManifest, AffordablePurchasePlan, PurchaseResult, ShiftSupplyAggregator, PurchaseAffordabilityCalculator, StoreHoursPolicy), runtime adapters (ShopStockReader, ShopPurchaseService), global PreferredCropStore config/GMCM/i18n/HUD notices, and managed-crop shopping insertion before action planning. Added FsCheck and xUnit coverage (TownShoppingPropertyTests, TownShoppingTests, preferred-store config normalization) and updated plan checkboxes, code summary, and aidlc-state.md. Verification passed: dotnet build Dayswork.sln /p:EnableModDeploy=false (0 warnings / 0 errors), dotnet test Dayswork.sln /p:EnableModDeploy=false (473 passed / 1 expected skip / 0 failed), dotnet build Dayswork.sln deployed to X:\\Steam\\steamapps\\common\\Stardew Valley\\Mods\\Dayswork. Extension compliance: Security Baseline skipped/N/A because disabled; Property-Based Testing full-mode compliant. Documented DEV-MC-06-03/04: current implementation is safe headless/input-chest shopping; visible town route/paced storefront beats and separate carried-supply settle are playtest risks/deviations."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation complete; playtest review gate
+
+---
+
+## U-MC-06 Playtest Feedback — pre-open shopping gap
+**Timestamp**: 2026-06-06T20:06:53Z
+**User Input**: "Playtesting feedback: When the season transitioned from spring to summer, the farmhand went and cleared dead crops then went back inside. They're supposed to walk to the stores and buy the missing seeds and fertilizers now right? or is that built later"
+**AI Response**: "Interpreting this as U-MC-06 review feedback. Current implementation attempts a safe headless purchase into the input chest before managed-crop action planning; it does not yet animate visible town-store walking. The observed clear-dead-crops-then-return behavior also indicates a pre-9am store-hours gap: shopping runs at batch start and sees both stores closed, so no purchase manifest is executed and the farmhand only performs supply-independent cleanup. This should be treated as a U-MC-06 review fix if visible/deferred shopping is required before approving the unit."
+**Context**: CONSTRUCTION - U-MC-06 playtest review feedback
+
+---
+
+## U-MC-06 Playtest Review Fix — visible store trip requested
+**Timestamp**: 2026-06-06T20:20:44Z
+**User Input**: "Yes let's implement having the farmhand walk to the stores now. Let's do the following:
+1. the farmhand does all of the pre-shopping labor (till tiles, clear debris, harvest crops, plant any crops/fertilizer available in the input chest, and anything else I missed)
+2. the farmhand immediately beings walking to the stores (with a HUD message saying the farmhand is going shopping)
+3. If the farmhand gets to the store before it opens, it waits one tile to the right of the entrance. If they need to wait, send another HUD message saying the farmhand is waiting until the store opens. Put a music emoji above the farmhand while the wait.
+4. As soon as the store opens, the farmhand enters and walks to the counter and purchases as much as they can. Give a HUD message with a summary of the purchases.
+5. Give a HUD message that the farmhand is returning to the farm and begin walking back to the farm.
+6. The farmhand should deposit all bought items into the input chest then resume tasks (or return into the cabin if out of energy)
+
+If the farmhand runs out of energy before entering the purchase seeds/fertilizer phase, they should stop their task and immediately enter the seeds/fertilizer phase. Walking and buying do not consume energy so they should go buy their stuff then deposit it into the input chest."
+**AI Response**: "Starting U-MC-06 review fix. Implement visible pre-shopping labor -> store trip -> wait if early -> counter purchase -> return/deposit -> post-shopping re-plan, with walking/buying energy-free and energy exhaustion forcing the shopping phase before wrap-up."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix
+
+---
+
+## U-MC-06 Playtest Review Fix — implementation complete
+**Timestamp**: 2026-06-06T20:39:03Z
+**User Input**: "(none — completing the U-MC-06 visible store-trip review fix under the user's approved playtest feedback request)"
+**AI Response**: "Implemented visible U-MC-06 shopping: removed the up-front invisible purchase, added `ShiftOrchestrator.ManagedCropShopping.cs` with a route/wait/counter/return/deposit state machine, made pre-shopping labor run first, redirected stamina-boundary wrap-up into shopping before cabin return, added carried-item purchases and sleep-safe settlement, added departure/wait/purchase-summary/return/deposit HUD messages, and updated docs/state/plan checkboxes. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors) and `dotnet test Dayswork.sln /p:EnableModDeploy=false` (473 passed / 1 expected skip / 0 failed). Deploy-enabled `dotnet build Dayswork.sln` compiled but auto-deploy failed because the live game locked `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork\Dayswork.Core.dll`; close SMAPI/Stardew and rerun deploy build before playtest."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix complete; still at playtest review gate
+
+---
+
+## U-MC-06 Playtest Review Fix — store route path unavailable
+**Timestamp**: 2026-06-06T20:57:43Z
+**User Input**: "[Dayswork] [Dayswork][managed-crops][shopping] departing groups=1 estimatedCost=1350 wrapAfterReturn=False.
+[Dayswork] [Dayswork][managed-crops][shopping] aborted reason=store_route_path_unavailable.
+[Dayswork] [Dayswork][managed-crops] field date=1/Summer tiles=41 supply=[368:975, 465:999, 473:999, 474:999, 477:974, FlashShifter.StardewValleyExpandedCP_Cucumber_Seed:987] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=FlashShifter.StardewValleyExpandedCP_Cucumber_Seed requiresFert=True independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=477 requiresFert=False independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,59)-(81,61) choice=477 requiresFert=False independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,63)-(82,65) choice=477 requiresFert=True independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (83,52)-(84,53) choice=474 requiresFert=True independent=0 dependent=0.
+
+the farmhand declared they were going shopping then went straight into the cabin"
+**AI Response**: "Investigating U-MC-06 visible shopping route failure. The shopping phase starts and builds a purchase group, but the live warp graph cannot find a path from the current farm location to the store exterior, causing the skip-on-failure path and immediate wrap-up. Will add diagnostics and a conservative fallback route for Farm/BusStop/Town style paths so the farmhand does not abort the shopping trip when the graph misses a common town route."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix; route path unavailable
+
+---
+
+## U-MC-06 Playtest Review Fix — store route graph widened
+**Timestamp**: 2026-06-06T21:02:30Z
+**User Input**: "(none — completing the U-MC-06 store-route path-unavailable review fix)"
+**AI Response**: "Fixed the visible shopping route graph to read map tile `Action Warp ...` transitions in addition to `GameLocation.warps`, and added route-unavailable diagnostics that print discovered locations and route edges if a Farm-to-store path still cannot be found. This targets the playtest abort `store_route_path_unavailable`, where the farmhand announced shopping then immediately wrapped up. Updated U-MC-06 plan RF9, code summary, state, and audit. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors) and `dotnet test Dayswork.sln /p:EnableModDeploy=false` (473 passed / 1 expected skip / 0 failed)."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix complete; still at playtest review gate
+
+---
+
+## U-MC-06 Playtest Review Fix — route graph deploy complete
+**Timestamp**: 2026-06-06T21:03:10Z
+**User Input**: "(none — attempting deploy-enabled build for U-MC-06 route graph fix)"
+**AI Response**: "Deploy-enabled `dotnet build Dayswork.sln` succeeded with 0 warnings / 0 errors and copied the updated mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`. Updated code summary and state to replace the previous DLL-lock note with successful deployment."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix deployed; still at playtest review gate
+
+---
+
+## U-MC-06 Playtest Review Fix - store exterior misresolved
+**Timestamp**: 2026-06-06T21:17:11Z
+**User Input**: "[Dayswork] [Dayswork][managed-crops] StartShift cropPlan enabled=True assignments=2 managedScope=2 zoneLocations=[Farm, Farm].
+[Dayswork] [Dayswork][managed-crops] field date=4/Summer tiles=16 supply=[] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=FlashShifter.StardewValleyExpandedCP_Cucumber_Seed requiresFert=True independent=2 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=FlashShifter.StardewValleyExpandedCP_Cucumber_Seed requiresFert=True independent=2 dependent=0.
+[Dayswork] [Dayswork][managed-crops] batch=Farm zones=2 actions=4.
+[Dayswork] [Dayswork][managed-crops][shopping] departing groups=1 estimatedCost=0 wrapAfterReturn=False.
+[Dayswork] [Dayswork][managed-crops][shopping] route unavailable source=Farm target=Sunroom locations=[AbandonedJojaMart, AdventureGuild, AnimalShop, ArchaeologyHouse, Backwoods, BathHouse_Entry, BathHouse_MensLocker, BathHouse_Pool, BathHouse_WomensLocker, Beach, BeachNightMarket, Blacksmith, BoatTunnel, BugLand, BusStop, Caldera, CaptainRoom, Cellar, Cellar2, Cellar3, Cellar4, Cellar5, Cellar6, Cellar7, Cellar8, Club, CommunityCenter, Custom_AdventurerSummit, Custom_Alesia_WarpRoom, Custom_AndyCellar, Custom_AndyHouse, Custom_ApplesRoom, Custom_Apples_WarpRoom, Custom_Atlantis, Custom_AuroraVineyard, Custom_AuroraVineyardCellarRefurbished, Custom_AuroraVineyardPictureMap, Custom_AuroraVineyardRefurbished, Custom_BlueMoonVineyard, Custom_Brianna_WarpRoom, Custom_Brock_WarpRoom, Custom_BusStop_NoBus, Custom_Camilla_WarpRoom, Custom_Cassandra_WarpRoom, Custom_CastleVillageOutpost, Custom_CastleVillage_DayEnd_WarpRoom, Custom_Charlie_WarpRoom, Custom_ClaireHouse, Custom_Claire_WarpRoom, Custom_Cordelia_WarpRoom, Custom_Countryside_BusStop_Bus, Custom_Countryside_BusStop_NoBus, Custom_Countryside_ClaireHouse, Custom_CrimsonBadlands, Custom_CrimsonBadlandsMap, Custom_DayEnd_WarpRoom, Custom_DesertRailway, Custom_DiamondCavern, Custom_DinoIsland_North, Custom_DinoIsland_South, Custom_Drake_WarpRoom, Custom_Edmund_WarpRoom, Custom_Emin_WarpRoom, Custom_EnchantedGrove, Custom_FableReef, Custom_FakeEnchantedGrove, Custom_FakeEnchantedGrove2, Custom_FarmCliff, Custom_FerngillRepublicFrontier, Custom_FerngillRepublicFrontier_Cave, Custom_FerngillRepublicFrontier_HotSpring, Custom_FirstSlashGuestRoom, Custom_FirstSlashGuild, Custom_FirstSlashHallway, Custom_ForbiddenMaze, Custom_ForestWest, Custom_ForestWestOld, Custom_Freya_WarpRoom, Custom_FrontierFarm_HiddenCave, Custom_FrontierFarm_UndergroundTunnel] edges=[AbandonedJojaMart->Town@(9,14), AdventureGuild->Custom_AdventurerSummit@(6,19), AnimalShop->Forest@(13,19), ArchaeologyHouse->Custom_GunthersRoom@(5,5), ArchaeologyHouse->Town@(3,15), Backwoods->BusStop@(49,28), Backwoods->BusStop@(49,29), Backwoods->BusStop@(49,30), Backwoods->BusStop@(49,31), Backwoods->BusStop@(49,32), Backwoods->Farm@(13,39), Backwoods->Farm@(14,39), Backwoods->Farm@(15,39), Backwoods->Mountain@(49,11), Backwoods->Mountain@(49,12), Backwoods->Mountain@(49,13), Backwoods->Mountain@(49,14), Backwoods->Mountain@(49,15), Backwoods->Mountain@(49,16), Backwoods->Tunnel@(22,29), Backwoods->Tunnel@(22,30), Backwoods->Tunnel@(22,31), Backwoods->Tunnel@(22,32), BathHouse_Entry->Railroad@(5,9), BathHouse_MensLocker->BathHouse_Entry@(3,27), BathHouse_MensLocker->BathHouse_Pool@(15,27), BathHouse_Pool->BathHouse_MensLocker@(21,0), BathHouse_Pool->BathHouse_WomensLocker@(6,0), BathHouse_WomensLocker->BathHouse_Entry@(13,27), BathHouse_WomensLocker->BathHouse_Pool@(2,27), Beach->Town@(37,0), Beach->Town@(38,0), Beach->Town@(39,0), Beach->Town@(40,0), BeachNightMarket->Custom_BlueMoonVineyard@(0,4), BeachNightMarket->Custom_BlueMoonVineyard@(0,5), BeachNightMarket->Custom_BlueMoonVineyard@(0,6), BeachNightMarket->Custom_BlueMoonVineyard@(0,7), BeachNightMarket->Town@(37,0), BeachNightMarket->Town@(38,0), BeachNightMarket->Town@(39,0), BeachNightMarket->Town@(40,0), BeachNightMarket->Town@(67,6), Blacksmith->Town@(5,19), BoatTunnel->FishShop@(6,13), BugLand->Sewer@(14,55), BugLand->Sewer@(15,55), BusStop->Backwoods@(11,6), BusStop->Backwoods@(11,7), BusStop->Backwoods@(11,8), BusStop->Backwoods@(11,9), BusStop->Custom_DayEnd_WarpRoom@(22,9), BusStop->Farm@(0,22), BusStop->Farm@(0,23), BusStop->Farm@(0,24), BusStop->Farm@(0,25), BusStop->Farm@(7,26), BusStop->Farm@(9,22), BusStop->Farm@(9,23), BusStop->Farm@(9,24), BusStop->Farm@(9,25), BusStop->Town@(44,22), BusStop->Town@(44,23), BusStop->Town@(44,24), BusStop->Town@(44,25), BusStop->Town@(64,22), BusStop->Town@(64,23), BusStop->Town@(64,24), BusStop->Town@(64,25), Caldera->VolcanoDungeon0@(11,36), Caldera->VolcanoDungeon9@(21,39), CaptainRoom->IslandWest@(0,5), CaptainRoom->IslandWest@(1,6), Cellar->FarmHouse@(3,1), Cellar->FarmHouse@(4,1), Cellar2->FarmHouse@(3,1), Cellar2->FarmHouse@(4,1), Cellar3->FarmHouse@(3,1), Cellar3->FarmHouse@(4,1), Cellar4->FarmHouse@(3,1), Cellar4->FarmHouse@(4,1), Cellar5->FarmHouse@(3,1), Cellar5->FarmHouse@(4,1), Cellar6->FarmHouse@(3,1), Cellar6->FarmHouse@(4,1), Cellar7->FarmHouse@(3,1), Cellar7->FarmHouse@(4,1), Cellar8->FarmHouse@(3,1), Cellar8->FarmHouse@(4,1), Club->SandyHouse@(8,13), CommunityCenter->Town@(32,24), CommunityCenter->Town@(33,24), Custom_AdventurerSummit->Mine@(19,14), Custom_AdventurerSummit->Mountain@(31,42), Custom_AdventurerSummit->Mountain@(32,42), Custom_AdventurerSummit->Mountain@(33,42), Custom_Alesia_WarpRoom->AdventureGuild@(0,3), Custom_Alesia_WarpRoom->Custom_CastleVillageOutpost@(6,3), Custom_AndyCellar->Custom_AndyHouse@(1,1), Custom_AndyHouse->Forest@(12,22), Custom_ApplesRoom->Custom_AuroraVineyard@(14,3), Custom_ApplesRoom->Custom_AuroraVineyard@(15,3), Custom_Apples_WarpRoom->Custom_ApplesRoom@(0,3), Custom_Atlantis->Custom_EnchantedGrove@(0,0), Custom_AuroraVineyard->Custom_ApplesRoom@(21,22), Custom_AuroraVineyard->Custom_ApplesRoom@(22,22), Custom_AuroraVineyard->Custom_ForestWest@(14,23), Custom_AuroraVineyardCellarRefurbished->Custom_AuroraVineyardRefurbished@(14,3), Custom_AuroraVineyardCellarRefurbished->Custom_AuroraVineyardRefurbished@(15,3), Custom_AuroraVineyardPictureMap->Forest@(6,11), Custom_AuroraVineyardRefurbished->Custom_AuroraVineyardCellarRefurbished@(21,22), Custom_AuroraVineyardRefurbished->Custom_AuroraVineyardCellarRefurbished@(22,22), Custom_AuroraVineyardRefurbished->Custom_ForestWest@(14,23), Custom_BlueMoonVineyard->Town@(56,49), Custom_Brianna_WarpRoom->AdventureGuild@(0,3), Custom_Brock_WarpRoom->AdventureGuild@(0,3), Custom_BusStop_NoBus->Town@(0,0), Custom_Camilla_WarpRoom->Custom_CastleVillageOutpost@(6,3), Custom_Camilla_WarpRoom->Custom_WizardBasement@(0,3), Custom_Cassandra_WarpRoom->AdventureGuild@(0,3)].
+[Dayswork] [Dayswork][managed-crops][shopping] aborted reason=store_route_path_unavailable.
+[Dayswork] [Dayswork][managed-crops] field date=4/Summer tiles=16 supply=[] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=FlashShifter.StardewValleyExpandedCP_Cucumber_Seed requiresFert=True independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=FlashShifter.StardewValleyExpandedCP_Cucumber_Seed requiresFert=True independent=0 dependent=0.
+
+the farmhand went back to the cabin again"
+**AI Response**: "Investigating U-MC-06 visible shopping route failure where the route resolver selected `Sunroom` as the store exterior. The route graph now sees Farm/BusStop/Town edges, so the next fix is to constrain store exterior selection to real public exteriors such as Town for Pierre/Joja instead of arbitrary action-warp maps."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix; store exterior misresolved
+
+---
+
+## U-MC-06 Playtest Review Fix - public store exterior enforced
+**Timestamp**: 2026-06-06T21:21:57Z
+**User Input**: "(none - completing the U-MC-06 `Sunroom` route-target review fix under the user's latest playtest feedback)"
+**AI Response**: "Updated `ShiftOrchestrator.ManagedCropShopping.cs` so Pierre/Joja store route resolution only uses the public `Town` exterior for visible shopping trips, logs the selected entrance/wait/arrival tiles, and reports non-public shop-like candidates such as `Sunroom` as ignored diagnostics instead of routing the farmhand there. Updated RF10 in the U-MC-06 code-generation plan, the code summary, state, and audit. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors), `dotnet test Dayswork.sln /p:EnableModDeploy=false` (473 passed / 1 expected skip / 0 failed), and deploy-enabled `dotnet build Dayswork.sln` copied the mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix complete; still at playtest review gate
+
+---
+
+## U-MC-06 Playtest Review Fix - public store entrance still unresolved
+**Timestamp**: 2026-06-06T21:28:17Z
+**User Input**: "[Dayswork] [Dayswork][managed-crops] field date=5/Summer tiles=16 supply=[] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=481 requiresFert=False independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=481 requiresFert=False independent=1 dependent=0.
+[Dayswork] [Dayswork][managed-crops] batch=Farm zones=2 actions=1.
+[Dayswork] [Dayswork][managed-crops][shopping] departing groups=1 estimatedCost=0 wrapAfterReturn=False.
+[Dayswork] [Dayswork][managed-crops][shopping] store route unresolved store=Pierre interior=SeedShop preferredExteriors=[Town] loadedPreferred=[Town] ignoredNonPublicCandidates=[Sunroom@(5,14)->SeedShop].
+[Dayswork] [Dayswork][managed-crops][shopping] aborted reason=store_route_unresolved.
+[Dayswork] [Dayswork][managed-crops] field date=5/Summer tiles=16 supply=[] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=481 requiresFert=False independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=481 requiresFert=False independent=0 dependent=0.
+
+same thing. make sure to look at the game's file and not guess at locations. This is also being tested on an SVE map, but the pathing should be similar to vanilla."
+**AI Response**: "Investigating the public store entrance by inspecting the installed Stardew/SVE files rather than guessing. The current diagnostic proves the preferred `Town` map is loaded but the route parser did not recognize the real `Town` entrance action to `SeedShop`; the next fix will be based on the installed map/content data."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix; public store entrance action unresolved
+
+---
+
+## U-MC-06 Playtest Review Fix - SVE LockedDoorWarp parsed
+**Timestamp**: 2026-06-06T21:31:13Z
+**User Input**: "(none - completing the U-MC-06 installed-map entrance-action review fix under the user's latest playtest feedback)"
+**AI Response**: "Inspected the installed SVE map files under `X:\Steam\steamapps\common\Stardew Valley\Mods\Stardew Valley Expanded\[CP] Stardew Valley Expanded\assets\Maps\Locations\Town.tmx` and found Pierre/Joja public store doors use `LockedDoorWarp` actions (`LockedDoorWarp 6 29 SeedShop 900 2100`, `LockedDoorWarp 13 29 JojaMart 1000 2200`, and `LockedDoorWarp 14 29 JojaMart 1000 2200`). Updated `ShiftOrchestrator.ManagedCropShopping.cs` to parse `LockedDoorWarp` as a navigable entrance action and prefer the rightmost duplicate doorway candidate so the wait tile lands to the right of the doorway. Updated RF11 in the U-MC-06 code-generation plan, code summary, state, and audit. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors), `dotnet test Dayswork.sln /p:EnableModDeploy=false` (473 passed / 1 expected skip / 0 failed), and deploy-enabled `dotnet build Dayswork.sln` copied the mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix complete; still at playtest review gate
+
+---
+
+## U-MC-06 Playtest Review Fix - store counter, pricing, and farm exit issues
+**Timestamp**: 2026-06-07T01:14:06Z
+**User Input**: "[Dayswork] [Dayswork][managed-crops] StartShift cropPlan enabled=True assignments=2 managedScope=2 zoneLocations=[Farm, Farm].
+[Dayswork] [Dayswork][managed-crops] field date=5/Summer tiles=16 supply=[] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=481 requiresFert=False independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=481 requiresFert=False independent=1 dependent=0.
+[Dayswork] [Dayswork][managed-crops] batch=Farm zones=2 actions=1.
+[Dayswork] [Dayswork][managed-crops][shopping] departing groups=1 estimatedCost=0 wrapAfterReturn=False.
+[Dayswork] [Dayswork][managed-crops][shopping] store route selected store=Pierre exterior=Town interior=SeedShop entrance=(43,57) wait=(44,57) arrival=(6,29).
+[Dayswork] [Dayswork][managed-crops][shopping] store=Pierre bought=16 spent=0 goldRemaining=3054706.
+[Dayswork] [Dayswork][managed-crops] field date=5/Summer tiles=16 supply=[481:16] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=481 requiresFert=False independent=0 dependent=24.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=481 requiresFert=False independent=0 dependent=8.
+[Dayswork] [Dayswork][exit] could not path to exit tile (79,52) — removing worker in place.
+
+A couple of issues:
+* the farmhand went inside pierre's store and went to the deposit bin instead of the seed counter to purchase
+* the farmhand spent 0 gold. It should be the same actions as if the player was buying the items
+* the farmhand took the north path up, but when I followed the were warped to a different spot. This is on Grandpa's farm. There are two exits out of the farm, if you turn on logging I can walk to the exit I'd like them to exit from and use the logs to describe where that is. "
+**AI Response**: "Investigating U-MC-06 store-counter targeting, real shop pricing/transaction behavior, and Grandpa's Farm exit selection/diagnostics. The route now enters SeedShop, but the counter finder and purchase pricing need to be corrected from live map/shop data, and the farm exit path needs installed-map diagnostics before choosing between Grandpa's Farm exits."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix; store counter/pricing/farm exit issues
+
+---
+
+## U-MC-06 Playtest Review Fix - counter, pricing, TouchAction routing
+**Timestamp**: 2026-06-07T01:27:18Z
+**User Input**: "(none - completing the U-MC-06 store counter, real pricing, and Grandpa's Farm route diagnostic review fix under the user's latest playtest feedback)"
+**AI Response**: "Updated `ShopStockReader` to prefer `ShopBuilder.GetShopStock(...)` and to expose live unit-price lookup for counter purchases; updated `ShopPurchaseService` to re-read authoritative prices and refuse unpriced purchases instead of granting free items; tightened `ShiftOrchestrator.ManagedCropShopping` counter detection to exact Pierre `Buy General` and Joja `OpenShop Joja` actions; added selected counter and route-hop logging; expanded the shopping route parser to read map `TouchAction LoadMap ...` transitions from installed SVE-style farm routes and rank reachable first-hop exits by walking cost; changed `PlayerTileStepLogger` to info-level logs for preferred-exit diagnostics. Updated RF12 in the U-MC-06 code-generation plan, code summary, state, and audit. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors), `dotnet test Dayswork.sln /p:EnableModDeploy=false` (473 passed / 1 expected skip / 0 failed), and deploy-enabled `dotnet build Dayswork.sln` copied the mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix complete; still at playtest review gate
+
+---
+
+## U-MC-06 Playtest Review Fix - post-return farm exit still unreachable
+**Timestamp**: 2026-06-07T01:44:06Z
+**User Input**: "[Dayswork] [Dayswork][managed-crops] field date=5/Summer tiles=16 supply=[] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=481 requiresFert=False independent=0 dependent=0.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=481 requiresFert=False independent=1 dependent=0.
+[Dayswork] [Dayswork][managed-crops] batch=Farm zones=2 actions=1.
+[Dayswork] [Dayswork][managed-crops][shopping] departing groups=1 estimatedCost=1280 wrapAfterReturn=False.
+[Dayswork] [Dayswork][managed-crops][shopping] store route selected store=Pierre exterior=Town interior=SeedShop entrance=(43,57) wait=(44,57) arrival=(6,29).
+[Dayswork] [Dayswork][managed-crops][shopping] route selected source=Farm target=Town hops=[Farm->Town approach=(139,22) arrival=(1,54)].
+[Dayswork] [Dayswork][managed-crops][shopping] counter selected store=Pierre interior=SeedShop tile=(5,19).
+[Dayswork] [Dayswork][managed-crops][shopping] store=Pierre bought=16 spent=1280 goldRemaining=3053426.
+[Dayswork] [Dayswork][managed-crops][shopping] route selected source=SeedShop target=Farm hops=[SeedShop->Town approach=(6,30) arrival=(43,57); Town->BusStop approach=(0,54) arrival=(42,23); BusStop->Farm approach=(0,22) arrival=(79,17)].
+[Dayswork] [Dayswork][managed-crops] field date=5/Summer tiles=16 supply=[481:16] festival=False inputChest=ok.
+[Dayswork] [Dayswork][managed-crops] zone (79,54)-(82,56) choice=481 requiresFert=False independent=0 dependent=24.
+[Dayswork] [Dayswork][managed-crops] zone (79,57)-(82,57) choice=481 requiresFert=False independent=0 dependent=8.
+[Dayswork] [Dayswork][exit] could not path to exit tile (79,52) — removing worker in place.
+
+it's better, but the farmhand still can't path once they're back in the farm"
+**AI Response**: "Investigating the post-shopping return/exit pathing issue. The store trip, counter selection, and pricing are now working, so the remaining failure is the normal end-of-shift exit navigation trying to use configured tile `(79,52)` after the worker is back on Grandpa's Farm."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix; post-return farm exit pathing
+
+---
+
+## U-MC-06 Playtest Review Fix - reachable post-return exit
+**Timestamp**: 2026-06-07T01:47:00Z
+**User Input**: "(none - completing the U-MC-06 post-shopping return exit pathing review fix under the user's latest playtest feedback)"
+**AI Response**: "Updated `BeginExit` and farm routing so the configured `_farmExitTile` remains the preferred home/exit tile, but final end-of-shift navigation first checks reachability from the farmhand's current tile and falls back to a reachable nearby passable tile when the configured tile is isolated. Added fallback diagnostics, updated RF13 in the code-generation plan, code summary, state, and audit. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors), `dotnet test Dayswork.sln /p:EnableModDeploy=false` (473 passed / 1 expected skip / 0 failed), and deploy-enabled `dotnet build Dayswork.sln` copied the mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`."
+**Context**: CONSTRUCTION - U-MC-06 Code Generation review fix complete; still at playtest review gate
+
+---

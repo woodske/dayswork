@@ -20,6 +20,10 @@ internal sealed partial class ShiftOrchestrator
     private readonly CropShiftPlanner _cropShiftPlanner = new();
     private readonly PlantingViabilityCalculator _viability = new();
     private readonly CabinChestService _cabinChests = new();
+    private readonly ShopStockReader _shopStockReader = new();
+    private readonly ShopPurchaseService _shopPurchaseService = new();
+    private readonly ShiftSupplyAggregator _shiftSupplyAggregator = new();
+    private readonly PurchaseAffordabilityCalculator _purchaseAffordability = new();
 
     // Managed-crop batch execution state. A single ordered queue of per-tile beats produced by the
     // pure CropShiftPlanner (harvest → clear → till → fertilize → seed → water), executed one beat
@@ -51,6 +55,7 @@ internal sealed partial class ShiftOrchestrator
         _managedAssignments = new();
         _managedReplanCount = 0;
         _lastManagedSignature = string.Empty;
+        ResetManagedShoppingState();
     }
 
     private static bool IsManagedCropBatch(WorkBatch batch) => batch.Kind == BatchKind.ManagedCrops;
@@ -110,7 +115,13 @@ internal sealed partial class ShiftOrchestrator
         var actions = new List<TileAction>();
         foreach (var assignment in _managedAssignments)
         {
-            var plan = _cropShiftPlanner.Plan(assignment, fieldState, supply, stockSnapshots: null, isFestivalDay: isFestival);
+            var plan = _cropShiftPlanner.Plan(
+                assignment,
+                fieldState,
+                supply,
+                stockSnapshots: null,
+                isFestivalDay: isFestival,
+                storePreferenceOverride: ModEntry.PreferredCropStore);
             foreach (var action in plan.AllActions)
             {
                 // Honor the plan-level toggles: skip debris/dead-plant clearing when disabled
@@ -252,6 +263,9 @@ internal sealed partial class ShiftOrchestrator
 
         if (ShouldWrapUpBeforeNextUnit())
         {
+            if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: true))
+                return;
+
             QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }
@@ -281,6 +295,9 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
+        if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: false))
+            return;
+
         CompleteManagedCropBatch();
     }
 
@@ -295,6 +312,21 @@ internal sealed partial class ShiftOrchestrator
         BeginCurrentBatch();
     }
 
+    private static void NotifyFallbackStoreIfUsed(ShiftPurchaseManifest manifest)
+    {
+        var preferred = ModEntry.PreferredCropStore switch
+        {
+            StorePreference.Pierre => Store.Pierre,
+            StorePreference.Joja => Store.Joja,
+            _ => (Store?)null,
+        };
+        if (preferred is null)
+            return;
+
+        if (manifest.Groups.Any(group => group.Store != preferred.Value))
+            CropHudNotifier.UsingFallbackStore(preferred.Value == Store.Pierre ? "Pierre's" : "JojaMart");
+    }
+
     private bool ShouldClearDebrisTile(TileCoord tile, GameLocation location)
     {
         var vec = new Vector2(tile.X, tile.Y);
@@ -303,9 +335,8 @@ internal sealed partial class ShiftOrchestrator
         return isDeadCrop ? _clearDeadPlants : _clearDebrisBeforeTilling;
     }
 
-    // U-MC-05 consumes supply directly from the input chest at the planting beat (no carried
-    // inventory yet), so there is nothing to settle back here. U-MC-06 adds the carried-supply
-    // return when town shopping is introduced.
+    // Visible shopping deposits bought supplies into the input chest before replanning, so there is
+    // no separate carried-supply settlement when the managed-crop batch completes normally.
     private void ReturnLeftoverSuppliesNoop() { }
 
     private void HandleManagedCropAction(IntentPerformManagedCropAction intent, GameLocation location)
@@ -355,6 +386,9 @@ internal sealed partial class ShiftOrchestrator
 
         if (boundary.ShouldWrapUpAfterCurrentUnit)
         {
+            if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: true))
+                return;
+
             QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }

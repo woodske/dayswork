@@ -38,6 +38,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     // See code-summary.md play-test checklist.
     private const int EmoteQuestion    = 8;  // confused "?" (stuck step 1)
     private const int EmoteExclamation = 2;  // surprised "!" (hit reaction)
+    private const int EmoteMusic       = 16; // music note while waiting for a shop to open
 
     // Melee proximity range for hit-detection (Manhattan distance in tiles).
     private const float HitRangeTiles = 2.0f;
@@ -77,6 +78,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,
     // because the warp tile varies by farm type and player map edits).
     private TileCoord     _farmExitTile;
+    private TileCoord     _currentExitTile;
 
     // Multi-trip deposit loop state (Pattern N): the ordered remaining trips and the in-flight one.
     private readonly Queue<DepositTrip> _depositTrips = new();
@@ -305,6 +307,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _ctx = null;
         _tickCount = 0;
         _farmExitTile = default;
+        _currentExitTile = default;
         _lastSampledGameTime = 0;
         _lastTilePos = default;
         _playerWasSwinging = false;
@@ -386,6 +389,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _pendingExpansionRouteBatch = null;
         _expansionRouteNavigator.Clear();
         ResetManagedCropState();
+        _shopStockReader.ResetForShift();
         Dayswork.Integration.CropHudNotifier.ResetForShift();
 
         _ctx = new ShiftContext(
@@ -786,7 +790,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         // Progress sampling + stuck detection (Pattern D).
         // Only meaningful while actively working.
-        if (phase == ShiftPhase.Working)
+        if (phase == ShiftPhase.Working && !_managedShoppingInProgress)
         {
             SampleProgress(currentLocation);
             // Re-read phase — SampleProgress may have triggered a transition.
@@ -856,6 +860,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         // Route collected-but-undelivered items through their safe final destination; explicit
         // shipping-bin output goes straight to the bin, while all other undelivered output uses
         // automatic overflow.
+        SettleManagedShoppingCarriedItems(showHud: false);
         AppendUndeliveredToOverflow();
 
         _ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
@@ -877,7 +882,11 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             (phase == ShiftPhase.Working || phase == ShiftPhase.Recovering))
         {
             ModEntry.ModMonitor.Log("[Dayswork] 8pm cap reached.", LogLevel.Trace);
-            if (IsWorkUnitInProgress())
+            if (_managedShoppingInProgress)
+            {
+                RequestBoundaryStop(ShiftStopReason.HardCap, e.NewTime);
+            }
+            else if (IsWorkUnitInProgress())
             {
                 RequestBoundaryStop(ShiftStopReason.HardCap, e.NewTime);
             }

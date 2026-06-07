@@ -339,7 +339,10 @@ internal sealed partial class ShiftOrchestrator
     private void BeginExit(Farm farm)
     {
         _ctx!.StateMachine.Transition(ShiftPhase.Exiting, new IntentExitFarm());
-        _nav.StartNavigation(_farmExitTile, farm, _farmhand!);
+        _currentExitTile = ResolveReachableShiftExitTile(farm);
+        _pendingNavTile = _currentExitTile;
+        _pendingTaskTile = _currentExitTile;
+        _nav.StartNavigation(_currentExitTile, farm, _farmhand!);
     }
 
     private void HandleExit(Farm farm)
@@ -354,7 +357,7 @@ internal sealed partial class ShiftOrchestrator
 
         if (_nav.NavigationFailed)
             ModEntry.ModMonitor.Log(
-                $"[Dayswork][exit] could not path to exit tile ({_farmExitTile.X},{_farmExitTile.Y}) — removing worker in place.",
+                $"[Dayswork][exit] could not path to exit tile ({_currentExitTile.X},{_currentExitTile.Y}) — removing worker in place.",
                 LogLevel.Warn);
         else
             ModEntry.ModMonitor.Log("[Dayswork][exit] worker reached farm exit — shift complete.", LogLevel.Trace);

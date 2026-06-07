@@ -71,7 +71,7 @@ internal sealed class PlayerTileStepLogger
         _lastLocationName = currentLocationName;
         _monitor.Log(
             $"[Dayswork][debug] Player tile step: {currentLocationName} ({currentTile.X}, {currentTile.Y})",
-            LogLevel.Debug);
+            LogLevel.Info);
     }
 
     private void SnapshotCurrentPosition()

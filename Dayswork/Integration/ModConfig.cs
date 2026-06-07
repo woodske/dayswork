@@ -14,6 +14,14 @@ public sealed class ModConfig
     public int WorkerActionAnimationMs { get; set; } = DefaultSnapshot.WorkerActionAnimationMs;
     public int WorkerEntranceHoldTicks { get; set; } = DefaultSnapshot.WorkerEntranceHoldTicks;
     public bool WorkOnHolidays { get; set; } = DefaultSnapshot.WorkOnHolidays;
+
+    /// <summary>
+    /// Global Manage Crops preferred store (U-MC-06, DEV-MC-06-01): <c>Either</c>, <c>Pierre</c>,
+    /// or <c>Joja</c>. Applies to every crop group; the farmhand buys at the preferred store and
+    /// falls back to the other store for anything it does not stock.
+    /// </summary>
+    public string PreferredCropStore { get; set; } = "Either";
+
     public Dictionary<string, int> EnergyTierEnergy { get; set; } = CreateEnergyTierEnergyDefaults();
     public Dictionary<string, int> EnergyTierPrice { get; set; } = CreateEnergyTierPriceDefaults();
     public Dictionary<string, int> WorkActionCosts { get; set; } = CreateWorkActionCostDefaults();
