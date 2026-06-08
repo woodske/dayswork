@@ -9,21 +9,26 @@ namespace Dayswork.Orchestration;
 /// <summary>
 /// Thin live-world → pure adapter (U-MC-05). Snapshots the managed-crop zone tiles of a live
 /// <see cref="GameLocation"/> into a pure <see cref="FieldState"/> the <see cref="CropShiftPlanner"/>
-/// consumes. Performs no mutation. Open farm only this unit (season-agnostic locations are U-MC-07).
+/// consumes. Performs no mutation.
 /// </summary>
 internal sealed class ManagedCropFieldReader
 {
     public FieldState Read(
         GameLocation location,
         GameDate date,
-        IReadOnlyList<CropZoneAssignment> assignments)
+        IReadOnlyList<CropZoneAssignment> assignments,
+        bool isSeasonAgnosticLocation)
     {
+        var locationName = location.NameOrUniqueName;
         var seen = new HashSet<TileCoord>();
         var tiles = new List<TileState>();
 
         foreach (var assignment in assignments)
         {
             var zone = assignment.Zone;
+            if (!string.Equals(zone.LocationName, locationName, StringComparison.Ordinal))
+                continue;
+
             for (var x = zone.TopLeft.X; x <= zone.BottomRight.X; x++)
             for (var y = zone.TopLeft.Y; y <= zone.BottomRight.Y; y++)
             {
@@ -36,7 +41,7 @@ internal sealed class ManagedCropFieldReader
             }
         }
 
-        return new FieldState(location.NameOrUniqueName, date, isSeasonAgnosticLocation: false, tiles);
+        return new FieldState(locationName, date, isSeasonAgnosticLocation, tiles);
     }
 
     private static bool TryReadTile(GameLocation location, TileCoord coord, out TileState state)

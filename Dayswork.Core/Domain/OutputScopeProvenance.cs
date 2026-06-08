@@ -12,4 +12,7 @@ public sealed record OutputScopeProvenance(OutputScopeFamily Family, string Scop
 
     public static OutputScopeProvenance Greenhouse(string locationName) =>
         new(OutputScopeFamily.Greenhouse, locationName);
+
+    public static OutputScopeProvenance ManagedCrop(string assignmentKey) =>
+        new(OutputScopeFamily.ManagedCrop, assignmentKey);
 }

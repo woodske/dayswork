@@ -156,11 +156,13 @@ internal sealed class HiringFlowCoordinator
         Game1.activeClickableMenu = new CropGroupEditorMenu(
             draft,
             group,
+            BuildCropGroupLocationOptions(),
             onBack: ShowManageCrops,
             onPickCrop: (id, season) => ShowCropPicker(draft, id, season),
             onPickFertilizer: (id, season) => ShowFertilizerPicker(draft, id, season),
             onPickChest: id => ShowCropOutputChestPicker(draft, id),
-            onBeginDraw: id => BeginCropZoneDraw(draft, id));
+            onBeginDraw: id => BeginCropZoneDraw(draft, id),
+            onSetLocation: (id, locationName) => SetCropGroupLocation(draft, id, locationName));
     }
 
     private void DeleteCropGroup(ContractDraft draft, string groupId)
@@ -171,7 +173,16 @@ internal sealed class HiringFlowCoordinator
 
     private void ShowCropPicker(ContractDraft draft, string groupId, Season season)
     {
-        var entries = EnsureCropCatalog().GetCatalog(season, greenhouse: false);
+        if (!draft.CropPlan.TryGetGroup(groupId, out var currentGroup))
+        {
+            ShowManageCrops(draft);
+            return;
+        }
+
+        var isSeasonAgnostic = currentGroup.IsSeasonAgnostic;
+        var entries = EnsureCropCatalog().GetCatalog(
+            isSeasonAgnostic ? null : season,
+            greenhouse: isSeasonAgnostic);
 
         var rows = new List<PickerRow> { new(I18nHelper.Get("ui.manage_crops.picker_none"), null) };
         rows.AddRange(entries.Select(entry => new PickerRow(entry.DisplayName, SupplyTagLabel(entry.Supply))));
@@ -190,13 +201,22 @@ internal sealed class HiringFlowCoordinator
 
                 if (index == 0)
                 {
-                    group.ClearSeason(season);
+                    if (group.IsSeasonAgnostic)
+                        group.ClearYearRound();
+                    else
+                        group.ClearSeason(season);
                 }
                 else
                 {
                     var entry = entries[index - 1];
-                    if (!group.TrySetCrop(season, entry.Crop, entry.DisplayName, out _))
+                    if (group.IsSeasonAgnostic)
+                    {
+                        group.SetYearRoundCrop(entry.Crop, entry.DisplayName);
+                    }
+                    else if (!group.TrySetCrop(season, entry.Crop, entry.DisplayName, out _))
+                    {
                         Game1.addHUDMessage(new HUDMessage(I18nHelper.Get("ui.manage_crops.lock_conflict"), HUDMessage.error_type));
+                    }
                 }
 
                 ShowCropGroupEditor(draft, groupId);
@@ -224,16 +244,59 @@ internal sealed class HiringFlowCoordinator
                 }
 
                 if (index == 0)
-                    group.SetFertilizer(season, null, string.Empty);
+                {
+                    if (group.IsSeasonAgnostic)
+                        group.SetYearRoundFertilizer(null, string.Empty);
+                    else
+                        group.SetFertilizer(season, null, string.Empty);
+                }
                 else
                 {
                     var option = fertilizers[index - 1];
-                    group.SetFertilizer(season, option.ItemId, option.DisplayName);
+                    if (group.IsSeasonAgnostic)
+                        group.SetYearRoundFertilizer(option.ItemId, option.DisplayName);
+                    else
+                        group.SetFertilizer(season, option.ItemId, option.DisplayName);
                 }
 
                 ShowCropGroupEditor(draft, groupId);
             },
             onCancel: () => ShowCropGroupEditor(draft, groupId));
+    }
+
+    private void SetCropGroupLocation(ContractDraft draft, string groupId, string locationName)
+    {
+        if (draft.CropPlan.TryGetGroup(groupId, out var group))
+            group.SetLocation(locationName);
+
+        RefreshPreview(draft);
+        ShowCropGroupEditor(draft, groupId);
+    }
+
+    private IReadOnlyList<CropGroupLocationOption> BuildCropGroupLocationOptions()
+    {
+        var options = new List<CropGroupLocationOption>
+        {
+            new("Farm", I18nHelper.Get("ui.manage_crops.location_farm")),
+            new("Greenhouse", I18nHelper.Get("ui.manage_crops.location_greenhouse")),
+        };
+
+        if (ModEntry.ExpansionCompat is { } compat)
+        {
+            foreach (var descriptor in compat.GetExpansionLocationDescriptors())
+            {
+                if (!descriptor.IsWorkScopeEligible)
+                    continue;
+
+                options.Add(new CropGroupLocationOption(descriptor.LocationName, descriptor.DisplayName));
+            }
+        }
+
+        return options
+            .GroupBy(option => option.LocationName, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList()
+            .AsReadOnly();
     }
 
     private void ShowCropOutputChestPicker(ContractDraft draft, string groupId)
@@ -282,8 +345,9 @@ internal sealed class HiringFlowCoordinator
             initialZones: group.Zones,
             allowBuildingSelection: false,
             overlapTogglesSelection: true,
-            protectedZones: draft.CropPlan.ProtectedZones(groupId),
-            zoneFillColor: Color.LimeGreen * 0.5f);
+            protectedZones: draft.CropPlan.ProtectedZones(groupId, group.LocationName),
+            zoneFillColor: Color.LimeGreen * 0.5f,
+            targetLocationName: group.LocationName);
     }
 
     private CropCatalogProvider EnsureCropCatalog() =>

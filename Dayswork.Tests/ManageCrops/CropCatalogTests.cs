@@ -42,6 +42,20 @@ public sealed class CropCatalogTests
     }
 
     [Fact]
+    public void Build_GreenhouseWithNullSeason_ReturnsAllCropsForYearRoundPicker()
+    {
+        var sources = new[]
+        {
+            Source("parsnip", pierre: true, joja: false, Season.Spring),
+            Source("pumpkin", pierre: true, joja: false, Season.Fall),
+        };
+
+        var all = CropCatalog.Build(sources, seasonFilter: null, greenhouse: true);
+
+        Assert.Equal(new[] { "seed.parsnip", "seed.pumpkin" }, all.Select(entry => entry.Crop.SeedItemId).OrderBy(id => id));
+    }
+
+    [Fact]
     public void Build_TagsAutoBuyableWhenStockedAtEitherStore()
     {
         var sources = new[]

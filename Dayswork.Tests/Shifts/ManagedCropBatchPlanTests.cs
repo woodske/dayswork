@@ -9,21 +9,26 @@ public sealed class ManagedCropBatchPlanTests
 {
     private readonly ShiftPlanBuilder _sut = new();
 
-    private static ManagedCropWorkScope FarmManagedScope()
+    private static ManagedCropWorkScope ManagedScope(params string[] locations)
     {
         var crop = new CropDescriptor("(O)24", "472", null, 4, null, null, new[] { Season.Spring });
         var choice = new SeasonCropChoice(Season.Spring, crop);
-        var assignment = new CropZoneAssignment(
-            new Zone("Farm", new TileCoord(0, 0), new TileCoord(2, 2)),
-            CropAssignmentMode.Seasonal,
-            new[] { choice });
-        return new ManagedCropWorkScope(new[] { assignment });
+        var assignments = locations.Select((location, index) => new CropZoneAssignment(
+            new Zone(location, new TileCoord(index, index), new TileCoord(index + 2, index + 2)),
+            string.Equals(location, "Farm", StringComparison.Ordinal)
+                ? CropAssignmentMode.Seasonal
+                : CropAssignmentMode.SeasonAgnostic,
+            new[] { choice }));
+        return new ManagedCropWorkScope(assignments.ToList());
     }
+
+    private static ManagedCropWorkScope FarmManagedScope() => ManagedScope("Farm");
 
     private static WorkScopeSet Scopes(
         OutdoorWorkScope? outdoor = null,
-        ManagedCropWorkScope? managed = null) =>
-        new(outdoor, System.Array.Empty<AnimalBuildingScope>(), System.Array.Empty<GreenhouseWorkScope>(), managed);
+        ManagedCropWorkScope? managed = null,
+        IReadOnlyList<GreenhouseWorkScope>? greenhouses = null) =>
+        new(outdoor, System.Array.Empty<AnimalBuildingScope>(), greenhouses ?? System.Array.Empty<GreenhouseWorkScope>(), managed);
 
     [Fact]
     public void ManagedPlanOnly_EmitsSingleManagedCropsBatchForFarm()
@@ -55,5 +60,32 @@ public sealed class ManagedCropBatchPlanTests
         var result = _sut.BuildBatchPlan(Scopes(managed: new ManagedCropWorkScope(System.Array.Empty<CropZoneAssignment>())), new HashSet<TaskKind>());
 
         Assert.DoesNotContain(result, batch => batch.Kind == BatchKind.ManagedCrops);
+    }
+
+    [Fact]
+    public void ManagedPlan_EmitsOneManagedBatchPerDistinctLocation()
+    {
+        var managed = ManagedScope("Farm", "Greenhouse", "Custom_GrandpasShedGreenhouse", "Greenhouse");
+
+        var result = _sut.BuildBatchPlan(Scopes(managed: managed), new HashSet<TaskKind>());
+
+        Assert.Equal(
+            new[] { "Custom_GrandpasShedGreenhouse", "Greenhouse", "Farm" },
+            result.Where(batch => batch.Kind == BatchKind.ManagedCrops).Select(batch => batch.LocationName));
+    }
+
+    [Fact]
+    public void ManagedGreenhouseBatch_IsOrderedBeforeGeneralGreenhouseBatch()
+    {
+        var managed = ManagedScope("Greenhouse");
+        var greenhouses = new[] { new GreenhouseWorkScope("Greenhouse") };
+        var enabled = new HashSet<TaskKind> { TaskKind.HarvestCrops };
+
+        var result = _sut.BuildBatchPlan(Scopes(managed: managed, greenhouses: greenhouses), enabled);
+
+        Assert.Equal(
+            new[] { BatchKind.ManagedCrops, BatchKind.Greenhouse },
+            result.Select(batch => batch.Kind));
+        Assert.All(result, batch => Assert.Equal("Greenhouse", batch.LocationName));
     }
 }

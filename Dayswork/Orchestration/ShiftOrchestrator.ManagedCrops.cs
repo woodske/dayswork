@@ -41,6 +41,7 @@ internal sealed partial class ShiftOrchestrator
     private List<Dayswork.Core.Crops.CropZoneAssignment> _managedAssignments = new();
     private int _managedReplanCount;
     private string _lastManagedSignature = string.Empty;
+    private string _managedBatchLocationName = "Farm";
 
     // Plan-level toggles (FR-MC-26/27). DEV-MC-05-01: honored at their default-ON behavior this
     // unit; the configurable OFF switch (GMCM/per-plan) is deferred to a follow-up.
@@ -55,6 +56,7 @@ internal sealed partial class ShiftOrchestrator
         _managedAssignments = new();
         _managedReplanCount = 0;
         _lastManagedSignature = string.Empty;
+        _managedBatchLocationName = "Farm";
         ResetManagedShoppingState();
     }
 
@@ -67,8 +69,17 @@ internal sealed partial class ShiftOrchestrator
 
         ResetManagedCropState();
 
-        var farm = Game1.getFarm();
-        _currentLocation = farm;
+        _managedBatchLocationName = batch.LocationName;
+        var activeLocation = ResolveManagedBatchLocation(batch.LocationName);
+        if (activeLocation is null)
+        {
+            DevLog.Log($"[Dayswork][managed-crops] skipped batch={batch.LocationName} reason=location_unavailable.", LogLevel.Warn);
+            _ctx.CurrentBatchIndex++;
+            BeginCurrentBatch();
+            return;
+        }
+
+        _currentLocation = activeLocation;
 
         _managedAssignments = (_ctx.WorkScopes.ManagedCrops?.Assignments ?? Array.Empty<CropZoneAssignment>())
             .Where(assignment => string.Equals(assignment.Zone.LocationName, batch.LocationName, StringComparison.Ordinal))
@@ -99,12 +110,16 @@ internal sealed partial class ShiftOrchestrator
     /// </summary>
     private List<TileAction> BuildManagedActions(bool logDetail)
     {
-        var farm = Game1.getFarm();
+        var location = _currentLocation ?? ResolveManagedBatchLocation(_managedBatchLocationName) ?? Game1.getFarm();
         var date = CurrentManagedGameDate();
         var isFestival = Utility.isFestivalDay(date.Day, Game1.season);
         var inputChest = TryGetInputChest();
         var supply = ReadSupply(inputChest);
-        var fieldState = _cropFieldReader.Read(farm, date, _managedAssignments);
+        var fieldState = _cropFieldReader.Read(
+            location,
+            date,
+            _managedAssignments,
+            IsCurrentManagedBatchSeasonAgnostic());
 
         if (logDetail)
             DevLog.Log(
@@ -126,7 +141,7 @@ internal sealed partial class ShiftOrchestrator
             {
                 // Honor the plan-level toggles: skip debris/dead-plant clearing when disabled
                 // (FR-MC-26/27). A skipped debris tile is simply not tilled/planted this shift.
-                if (action.Kind == ManagedCropActionKind.ClearDebris && !ShouldClearDebrisTile(action.Tile, farm))
+                if (action.Kind == ManagedCropActionKind.ClearDebris && !ShouldClearDebrisTile(action.Tile, location))
                     continue;
                 actions.Add(action);
             }
@@ -270,20 +285,20 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        var farm = _currentLocation ?? Game1.getFarm();
+        var location = _currentLocation ?? ResolveManagedBatchLocation(_managedBatchLocationName) ?? Game1.getFarm();
 
         while (_managedActions.Count > 0)
         {
             var action = _managedActions.Dequeue();
-            if (!IsManagedActionApplicable(action, farm))
+            if (!IsManagedActionApplicable(action, location))
                 continue;
 
             _currentManagedAction = action;
-            var navTile = ResolveManagedNavTile(action, farm);
+            var navTile = ResolveManagedNavTile(action, location);
             _pendingNavTile = navTile;
             _pendingTaskTile = action.Tile;
             EnsureWorkingIntent(new IntentMoveToTile(navTile));
-            _nav.StartNavigation(navTile, farm, _farmhand);
+            _nav.StartNavigation(navTile, location, _farmhand);
             return;
         }
 
@@ -306,9 +321,12 @@ internal sealed partial class ShiftOrchestrator
         if (_ctx is null)
             return;
 
+        var completedLocationName = _managedBatchLocationName;
+        var completedLocation = _currentLocation;
         ReturnLeftoverSuppliesNoop();
         ResetManagedCropState();
         _ctx.CurrentBatchIndex++;
+        ReturnManagedWorkerToFarmIfNeeded(completedLocationName, completedLocation);
         BeginCurrentBatch();
     }
 
@@ -494,7 +512,10 @@ internal sealed partial class ShiftOrchestrator
 
     private void ApplyManagedAction(TileAction action, WorkerTool debrisTool, GameLocation location)
     {
-        _pendingOutputProvenance = OutputScopeProvenance.Outdoor();
+        _pendingOutputProvenance =
+            action.Kind == ManagedCropActionKind.Harvest && action.OutputProvenance is not null
+                ? action.OutputProvenance
+                : OutputScopeProvenance.Outdoor();
         var vec = new Vector2(action.Tile.X, action.Tile.Y);
 
         switch (action.Kind)
@@ -732,5 +753,70 @@ internal sealed partial class ShiftOrchestrator
     {
         var season = Enum.Parse<Dayswork.Core.Domain.Season>(Game1.currentSeason, ignoreCase: true);
         return new GameDate(Game1.dayOfMonth, season, Game1.year);
+    }
+
+    private GameLocation? ResolveManagedBatchLocation(string locationName)
+    {
+        if (string.Equals(locationName, "Farm", StringComparison.Ordinal))
+            return Game1.getFarm();
+
+        return Game1.getLocationFromName(locationName);
+    }
+
+    private bool IsCurrentManagedBatchSeasonAgnostic() =>
+        !string.Equals(_managedBatchLocationName, "Farm", StringComparison.Ordinal)
+        || _managedAssignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
+
+    private void ReturnManagedWorkerToFarmIfNeeded(string locationName, GameLocation? location)
+    {
+        if (_farmhand is null || string.Equals(locationName, "Farm", StringComparison.Ordinal))
+            return;
+
+        var farm = Game1.getFarm();
+        var current = _farmhand.currentLocation ?? location ?? _currentLocation;
+        if (current is null || current == farm)
+        {
+            _currentLocation = farm;
+            return;
+        }
+
+        if (_buildingNavigator.TryResolveDoorTile(locationName, out var outdoorDoor, out _))
+        {
+            _buildingNavigator.ExitToFarm(_farmhand, outdoorDoor);
+            _currentLocation = farm;
+            return;
+        }
+
+        _nav.WarpWorker(_farmhand, current, farm, _farmExitTile);
+        _currentLocation = farm;
+    }
+
+    private bool RestoreManagedBatchLocationAfterShopping()
+    {
+        if (_farmhand is null || string.Equals(_managedBatchLocationName, "Farm", StringComparison.Ordinal))
+        {
+            _currentLocation = Game1.getFarm();
+            return true;
+        }
+
+        var target = ResolveManagedBatchLocation(_managedBatchLocationName);
+        if (target is null)
+        {
+            DevLog.Log(
+                $"[Dayswork][managed-crops][shopping] re-entry skipped location={_managedBatchLocationName} reason=location_unavailable.",
+                LogLevel.Warn);
+            return false;
+        }
+
+        var current = _farmhand.currentLocation ?? _currentLocation ?? Game1.getFarm();
+        if (!SameLocation(current, target))
+        {
+            var entryTile = _buildingNavigator.ResolveInteriorEntryTile(target);
+            _nav.WarpWorker(_farmhand, current, target, ResolvePassableNearbyInLocation(entryTile, target));
+        }
+
+        _currentLocation = target;
+        _nav.Clear();
+        return true;
     }
 }

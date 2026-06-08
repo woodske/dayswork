@@ -6305,3 +6305,99 @@ it's better, but the farmhand still can't path once they're back in the farm"
 **Context**: CONSTRUCTION - U-MC-06 Code Generation review fix complete; still at playtest review gate
 
 ---
+
+## U-MC-06 Code Generation Approval
+**Timestamp**: 2026-06-07T04:28:44Z
+**User Input**: "continue ai-dlc workflow. I approve U-MC-06, continue to the next stage."
+**AI Response**: "Recorded explicit U-MC-06 approval, resolved the next approved unit as U-MC-07 Output Routing + Greenhouse/Shed, loaded Functional Design and enabled PBT rules, and advanced the Manage Crops construction loop into U-MC-07 Functional Design."
+**Context**: CONSTRUCTION - U-MC-06 approval; transition to U-MC-07 Functional Design
+
+---
+
+## U-MC-07 Functional Design Stage
+**Timestamp**: 2026-06-07T04:28:44Z
+**User Input**: "(none - continuing the approved AI-DLC workflow into U-MC-07 Functional Design)"
+**AI Response**: "Generated the U-MC-07 Functional Design plan and artifacts: `business-logic-model.md`, `business-rules.md`, `domain-entities.md`, and `frontend-components.md`. The design defines managed-crop provenance-based per-zone output routing, season-agnostic greenhouse/SVE-shed authoring and runtime behavior, live-map `Diggable` gating, reuse of existing expansion routes, and PBT-01 property obligations. Logged the review prompt and updated `aidlc-state.md`."
+**Context**: CONSTRUCTION - U-MC-07 Functional Design complete; review required before NFR Requirements
+
+---
+
+## U-MC-07 Functional Design Approval
+**Timestamp**: 2026-06-07T04:46:22Z
+**User Input**: "continue"
+**AI Response**: "Recorded explicit U-MC-07 Functional Design approval, loaded NFR Requirements rules and enabled Property-Based Testing full-mode rules, and advanced the Manage Crops construction loop into U-MC-07 NFR Requirements."
+**Context**: CONSTRUCTION - U-MC-07 Functional Design approval; transition to NFR Requirements
+
+---
+
+## U-MC-07 NFR Requirements Stage
+**Timestamp**: 2026-06-07T04:46:22Z
+**User Input**: "(none - continuing the approved AI-DLC workflow into U-MC-07 NFR Requirements)"
+**AI Response**: "Generated the U-MC-07 NFR Requirements plan and artifacts: `nfr-requirements.md` and `tech-stack-decisions.md`. The NFR set documents bounded provenance destination lookup, assignment/location-scaled batch emission, live-zone field reads, safe greenhouse/shed route degradation, ordinary harvest-routing preservation, no schema/package additions, and PBT-09 compliance through the existing FsCheck.Xunit stack. Presenting the standardized NFR Requirements review prompt with the two approved options: Request Changes or Continue to Next Stage."
+**Context**: CONSTRUCTION - U-MC-07 NFR Requirements complete; review required before NFR Design
+
+---
+
+## U-MC-07 NFR Requirements Approval
+**Timestamp**: 2026-06-07T04:54:13Z
+**User Input**: "approved and continue"
+**AI Response**: "Recorded explicit U-MC-07 NFR Requirements approval, loaded NFR Design rules and enabled Property-Based Testing full-mode rules, and advanced the Manage Crops construction loop into U-MC-07 NFR Design."
+**Context**: CONSTRUCTION - U-MC-07 NFR Requirements approval; transition to NFR Design
+
+---
+
+## U-MC-07 NFR Design Stage
+**Timestamp**: 2026-06-07T04:54:13Z
+**User Input**: "(none - continuing the approved AI-DLC workflow into U-MC-07 NFR Design)"
+**AI Response**: "Generated the U-MC-07 NFR Design plan and artifacts: `nfr-design-patterns.md` and `logical-components.md`. The design incorporates provenance-first destination precedence, a backward-compatible deposit planner overload, stable assignment provenance keys, location-scoped managed batches, a live-location field reader boundary, route-gated greenhouse/shed runners, season-agnostic authoring through existing menus, fallback-separated chest selection, and pure FsCheck property seams. Presenting the standardized NFR Design review prompt with the two approved options: Request Changes or Continue to Next Stage."
+**Context**: CONSTRUCTION - U-MC-07 NFR Design complete; review required before Code Generation
+
+---
+
+## U-MC-07 NFR Design Approval
+**Timestamp**: 2026-06-07T04:59:05Z
+**User Input**: "approved and continue"
+**AI Response**: "Recorded explicit U-MC-07 NFR Design approval, loaded Code Generation rules, loaded U-MC-07 design artifacts and current code seams, and advanced the Manage Crops construction loop into U-MC-07 Code Generation Planning."
+**Context**: CONSTRUCTION - U-MC-07 NFR Design approval; transition to Code Generation Planning
+
+---
+
+## U-MC-07 Code Generation Planning
+**Timestamp**: 2026-06-07T04:59:05Z
+**User Input**: "(none - continuing the approved AI-DLC workflow into U-MC-07 Code Generation Planning)"
+**AI Response**: "Generated `aidlc-docs/construction/plans/u-mc-07-output-routing-greenhouse-shed-code-generation-plan.md`, a 26-step plan covering Core managed-crop provenance and destination routing, authoring UI, location-targeted zone drawing, greenhouse/SVE-shed runtime execution, shopping re-entry, deposit integration, tests, verification, deployment, and code summary closeout."
+**Context**: CONSTRUCTION - U-MC-07 Code Generation Part 1 planning complete; review required before Part 2 generation
+
+---
+
+## U-MC-07 Code Generation Plan Approval Prompt
+**Timestamp**: 2026-06-07T04:59:05Z
+**User Input**: "(none - approval prompt before U-MC-07 Code Generation Part 2)"
+**AI Response**: "Code generation plan complete. Please review `aidlc-docs/construction/plans/u-mc-07-output-routing-greenhouse-shed-code-generation-plan.md`. Approve to proceed with U-MC-07 Code Generation Part 2, or request changes to the plan."
+**Context**: CONSTRUCTION - U-MC-07 Code Generation plan approval prompt
+
+---
+
+## U-MC-07 Code Generation Plan Approval
+**Timestamp**: 2026-06-07T05:03:58Z
+**User Input**: "approved and continue"
+**AI Response**: "Recorded explicit U-MC-07 Code Generation plan approval and began U-MC-07 Code Generation Part 2 implementation."
+**Context**: CONSTRUCTION - U-MC-07 Code Generation plan approval; transition to Part 2 generation
+
+---
+
+## U-MC-07 Code Generation Stage
+**Timestamp**: 2026-06-07T05:22:02Z
+**User Input**: "(none - executing the approved U-MC-07 Code Generation Part 2 plan)"
+**AI Response**: "Completed U-MC-07 Code Generation Part 2. Implemented managed-crop provenance and provenance-first deposit routing, managed batches for Farm/Greenhouse/expansion greenhouse locations, season-agnostic greenhouse/shed crop authoring, location-targeted zone drawing, active-location managed-crop field reads, greenhouse/shed runtime entry and shopping re-entry, and explicit exclusion of both built-in office chests from selectable output destinations. Added and extended tests for provenance routing, managed output router keys/maps, crop action provenance, batch ordering, draft projection/hydration, greenhouse catalog picker behavior, and chest filtering. Verification passed: `dotnet build Dayswork.sln /p:EnableModDeploy=false` (0 warnings / 0 errors), `dotnet test Dayswork.sln /p:EnableModDeploy=false` (488 passed / 1 expected skip / 0 failed), and deploy-enabled `dotnet build Dayswork.sln` copied the mod to `X:\Steam\steamapps\common\Stardew Valley\Mods\Dayswork`."
+**Context**: CONSTRUCTION - U-MC-07 Code Generation Part 2 complete; review/playtest required
+
+---
+
+## U-MC-07 Code Generation Approval Prompt
+**Timestamp**: 2026-06-07T05:22:02Z
+**User Input**: "(none - approval prompt after U-MC-07 Code Generation completion)"
+**AI Response**: "Code Generation complete for U-MC-07. Presenting the standardized two-option review gate: Request Changes or Continue to Next Stage."
+**Context**: CONSTRUCTION - U-MC-07 Code Generation approval gate
+
+---

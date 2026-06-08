@@ -1,6 +1,7 @@
 using Dayswork.Core.Config;
 using Dayswork.Compat;
 using Dayswork.Core.Compat;
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
@@ -419,6 +420,7 @@ internal sealed partial class ShiftOrchestrator
         var plan = _depositPlanner.Plan(
             _ctx!.Buffer.Snapshot(),
             _ctx.TaskDestinations,
+            ManagedCropOutputRouter.BuildDestinationMap(_ctx.WorkScopes.ManagedCrops?.Assignments),
             ResolveShippingBinDepositTile(farm),
             workerTile,
             Manhattan);

@@ -33,6 +33,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private readonly bool _overlapToggles;
     private readonly Color _zoneFillColor;
     private readonly Color _protectedZoneFillColor;
+    private readonly string _targetLocationName;
     private readonly List<Zone> _protectedZones = new();
 
     IReadOnlyList<Zone>            IZoneDrawSource.CompletedZones    => _completedZones;
@@ -66,9 +67,11 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         bool allowBuildingSelection = true,
         bool overlapTogglesSelection = false,
         IReadOnlyList<Zone>? protectedZones = null,
-        Color? zoneFillColor = null)
+        Color? zoneFillColor = null,
+        string targetLocationName = "Farm")
         : base(0, 0, 0, 0)
     {
+        var drawLocation = ResolveDrawLocation(targetLocationName);
         _buildingOutlines = buildingOutlines;
         _helper           = helper;
         _onComplete       = onComplete;
@@ -77,10 +80,13 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         _overlapToggles   = overlapTogglesSelection;
         _zoneFillColor    = zoneFillColor ?? Color.LightBlue * 0.4f;
         _protectedZoneFillColor = Color.Red * 0.35f;
-        _protectedZones.AddRange(protectedZones ?? Array.Empty<Zone>());
+        _targetLocationName = drawLocation.NameOrUniqueName;
+        _protectedZones.AddRange((protectedZones ?? Array.Empty<Zone>())
+            .Where(zone => string.Equals(zone.LocationName, _targetLocationName, StringComparison.Ordinal)));
 
         // Restore prior selections (for the active layer only) so navigating back preserves work.
-        _completedZones.AddRange(initialZones ?? draft.OutdoorZones);
+        _completedZones.AddRange((initialZones ?? draft.OutdoorZones)
+            .Where(zone => string.Equals(zone.LocationName, _targetLocationName, StringComparison.Ordinal)));
 
         if (_allowBuildingSelection)
         {
@@ -105,13 +111,12 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             }
         }
 
-        // Swap displayed location to the farm (no warp) and freeze the camera so we control it
+        // Swap displayed location to the target map (no warp) and freeze the camera so we control it.
         _returnLocation = Game1.currentLocation;
-        var farm = Game1.getFarm();
-        Game1.currentLocation = farm;
+        Game1.currentLocation = drawLocation;
         Game1.viewportFreeze  = true;
         Game1.displayHUD      = false;
-        CenterViewport(farm);
+        CenterViewport(drawLocation);
 
         _overlay = new ZoneDrawOverlay(this, Game1.game1.GraphicsDevice);
         helper.Events.Display.RenderedWorld += _overlay.OnRenderedWorld;
@@ -300,7 +305,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             }
             else
             {
-                _completedZones.Add(new Zone("Farm", topLeft, bottomRight));
+                _completedZones.Add(new Zone(_targetLocationName, topLeft, bottomRight));
                 Game1.playSound("coin");
             }
 
@@ -311,7 +316,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         if (singleTile)
             return;
 
-        _completedZones.Add(new Zone("Farm", topLeft, bottomRight));
+        _completedZones.Add(new Zone(_targetLocationName, topLeft, bottomRight));
         Game1.playSound("coin");
     }
 
@@ -352,6 +357,14 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         new TileCoord(
             (Game1.viewport.X + Game1.getMouseX(false)) / Game1.tileSize,
             (Game1.viewport.Y + Game1.getMouseY(false)) / Game1.tileSize);
+
+    private static GameLocation ResolveDrawLocation(string locationName)
+    {
+        if (string.Equals(locationName, "Farm", StringComparison.Ordinal))
+            return Game1.getFarm();
+
+        return Game1.getLocationFromName(locationName) ?? Game1.getFarm();
+    }
 
     // ── Gamepad snapping ─────────────────────────────────────────────────────
 

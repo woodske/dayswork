@@ -122,8 +122,12 @@ internal sealed partial class ShiftOrchestrator
             return false;
         }
 
-        var farm = Game1.getFarm();
-        var fieldState = _cropFieldReader.Read(farm, date, _managedAssignments);
+        var fieldLocation = ResolveManagedBatchLocation(_managedBatchLocationName) ?? Game1.getFarm();
+        var fieldState = _cropFieldReader.Read(
+            fieldLocation,
+            date,
+            _managedAssignments,
+            IsCurrentManagedBatchSeasonAgnostic());
         var supply = ReadSupply(inputChest);
         var stock = _shopStockReader.ReadAll(date.Day, Game1.timeOfDay, includeClosedStock: true);
         var manifest = _shiftSupplyAggregator.BuildManifest(
@@ -543,6 +547,12 @@ internal sealed partial class ShiftOrchestrator
         if (wrapAfterReturn || ShouldWrapUpBeforeNextUnit())
         {
             QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            return;
+        }
+
+        if (!RestoreManagedBatchLocationAfterShopping())
+        {
+            CompleteManagedCropBatch();
             return;
         }
 

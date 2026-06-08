@@ -1,3 +1,4 @@
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
 namespace Dayswork.Core.Shifts;
@@ -50,6 +51,11 @@ public sealed class ShiftPlanBuilder
                     feedBuilding: false));
         }
 
+        var managedCropLocations = ManagedCropLocations(scopes.ManagedCrops);
+        EmitManagedCropBatches(
+            batches,
+            managedCropLocations.Where(location => !string.Equals(location, "Farm", StringComparison.Ordinal)));
+
         var greenhouseTasks = Order(enabledTasks.Where(TaskKindSets.IsGreenhouseService));
         if (greenhouseTasks.Count > 0)
         {
@@ -60,20 +66,12 @@ public sealed class ShiftPlanBuilder
                 batches.Add(CreateSkeleton(greenhouse.LocationName, BatchKind.Greenhouse, greenhouseTasks, feedBuilding: false));
         }
 
-        // Managed crops (U-MC-05): run the authored crop plan ahead of the general outdoor
-        // crop/clearing passes so harvest-first / ground prep happens early. One batch per
-        // open-farm managed location; greenhouse/shed managed locations are deferred to U-MC-07.
-        if (scopes.ManagedCrops is { IsEnabled: true } managedCrops)
-        {
-            foreach (var location in managedCrops.Assignments
-                         .Select(assignment => assignment.Zone.LocationName)
-                         .Where(name => string.Equals(name, "Farm", StringComparison.Ordinal))
-                         .Distinct(StringComparer.Ordinal)
-                         .OrderBy(name => name, StringComparer.Ordinal))
-            {
-                batches.Add(CreateSkeleton(location, BatchKind.ManagedCrops, Array.Empty<TaskKind>(), feedBuilding: false));
-            }
-        }
+        // Managed crops (U-MC-07): run the authored crop plan ahead of ordinary crop work in
+        // the same live location. Non-farm managed locations precede greenhouse batches; farm
+        // managed locations remain ahead of outdoor crop/clearing passes.
+        EmitManagedCropBatches(
+            batches,
+            managedCropLocations.Where(location => string.Equals(location, "Farm", StringComparison.Ordinal)));
 
         var outdoorCropTasks = Order(enabledTasks.Where(TaskKindSets.IsOutdoorCropService));
         if (scopes.OutdoorWork is not null && outdoorCropTasks.Count > 0)
@@ -88,6 +86,27 @@ public sealed class ShiftPlanBuilder
 
     private static IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> tasks) =>
         new TaskPriorityOrderer().Order(tasks);
+
+    private static IReadOnlyList<string> ManagedCropLocations(ManagedCropWorkScope? managedCrops)
+    {
+        if (managedCrops is not { IsEnabled: true })
+            return Array.Empty<string>();
+
+        return managedCrops.Assignments
+            .Select(assignment => assignment.Zone.LocationName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static void EmitManagedCropBatches(
+        List<WorkBatch> batches,
+        IEnumerable<string> locations)
+    {
+        foreach (var location in locations)
+            batches.Add(CreateSkeleton(location, BatchKind.ManagedCrops, Array.Empty<TaskKind>(), feedBuilding: false));
+    }
 
     private static WorkBatch CreateSkeleton(
         string locationName,

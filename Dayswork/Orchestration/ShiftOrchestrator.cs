@@ -454,12 +454,15 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
         var outdoorProvenance = OutputScopeProvenance.Outdoor();
 
-        // Coexistence (U-MC-05, FR-MC-28): tiles owned by a managed crop zone on the farm are
-        // serviced by the managed-crop batch, so exclude them from the general outdoor scans.
-        var managedFarmZones = (workScopes.ManagedCrops?.Assignments ?? Array.Empty<Dayswork.Core.Crops.CropZoneAssignment>())
-            .Where(assignment => string.Equals(assignment.Zone.LocationName, "Farm", StringComparison.Ordinal))
-            .Select(assignment => assignment.Zone)
-            .ToList();
+        // Coexistence (U-MC-07, FR-MC-28): tiles owned by a managed crop zone are serviced by
+        // the managed-crop batch for that live location, so general crop scans exclude only the
+        // zones that match the active scan location.
+        var managedZonesByLocation = (workScopes.ManagedCrops?.Assignments ?? Array.Empty<Dayswork.Core.Crops.CropZoneAssignment>())
+            .GroupBy(assignment => assignment.Zone.LocationName, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<Zone>)group.Select(assignment => assignment.Zone).ToList(),
+                StringComparer.Ordinal);
         var greenhouseLocation = workScopes.GreenhouseWork?.LocationName ?? "Greenhouse";
 
         var batches = new List<WorkBatch>(skeletons.Count);
@@ -513,7 +516,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                             snapshot,
                             _farmExitTile,
                             outdoorProvenance,
-                            managedFarmZones);
+                            ManagedZonesForLocation(batch.LocationName));
                     batches.Add(batch with { TileWork = tileWork });
                     break;
                 }
@@ -526,6 +529,11 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         DevLog.Log(
             $"[Dayswork][shift-plan] runtime batches={string.Join(", ", batches.Select(batch => $"{batch.Kind}:{batch.LocationName}:{string.Join("/", batch.Tasks)}"))} greenhouse={greenhouseLocation} outdoorTiles={outdoorZones.Count}.");
         return batches;
+
+        IReadOnlyList<Zone> ManagedZonesForLocation(string locationName) =>
+            managedZonesByLocation.TryGetValue(locationName, out var zones)
+                ? zones
+                : Array.Empty<Zone>();
     }
 
     private IReadOnlyList<AnimalWorkItem> BuildAnimalWork(
@@ -583,6 +591,43 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
         if (IsManagedCropBatch(batch))
         {
+            if (!string.Equals(batch.LocationName, "Farm", StringComparison.Ordinal))
+            {
+                if (ModEntry.ExpansionCompat is { } compat &&
+                    compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
+                    descriptor.Role == ExpansionLocationRole.GreenhouseWork)
+                {
+                    if (TryStartExpansionRoute(
+                            "Farm",
+                            batch.LocationName,
+                            ExpansionRoutePurpose.WorkEntry,
+                            PendingExpansionRouteKind.WorkEntry,
+                            batch))
+                        return;
+
+                    _ctx.CurrentBatchIndex++;
+                    BeginCurrentBatch();
+                    return;
+                }
+
+                if (!_buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out var interior))
+                {
+                    _ctx.CurrentBatchIndex++;
+                    BeginCurrentBatch();
+                    return;
+                }
+
+                _pendingBuildingEntry = true;
+                _pendingBuildingOutdoorDoor = outdoorDoor;
+                _pendingBuildingInterior = interior;
+                _pendingTask = TaskKind.HarvestCrops;
+                _pendingNavTile = outdoorDoor;
+                _pendingTaskTile = outdoorDoor;
+                EnsureWorkingIntent(new IntentMoveToTile(outdoorDoor));
+                _nav.StartNavigation(outdoorDoor, Game1.getFarm(), _farmhand);
+                return;
+            }
+
             BeginManagedCropBatch(batch);
             return;
         }

@@ -10,6 +10,21 @@ public sealed class DepositPlanner : IDepositPlanner
         IReadOnlyDictionary<TaskKind, DestinationKey> assignments,
         TileCoord shippingBinTile,
         TileCoord workerStart,
+        Func<TileCoord, TileCoord, int> distance) =>
+        Plan(
+            snapshot,
+            assignments,
+            new Dictionary<OutputScopeProvenance, DestinationKey>(),
+            shippingBinTile,
+            workerStart,
+            distance);
+
+    public DepositPlan Plan(
+        IReadOnlyList<BufferedItem> snapshot,
+        IReadOnlyDictionary<TaskKind, DestinationKey> taskAssignments,
+        IReadOnlyDictionary<OutputScopeProvenance, DestinationKey> provenanceAssignments,
+        TileCoord shippingBinTile,
+        TileCoord workerStart,
         Func<TileCoord, TileCoord, int> distance)
     {
         // Walkable destinations grouped by key → (representative tile, item id → qty).
@@ -18,7 +33,7 @@ public sealed class DepositPlanner : IDepositPlanner
 
         foreach (var item in snapshot)
         {
-            var dest = ResolveDestination(item.SourceTask, assignments);
+            var dest = ResolveDestination(item, taskAssignments, provenanceAssignments);
             switch (dest)
             {
                 case ChestDestination chest:
@@ -43,11 +58,18 @@ public sealed class DepositPlanner : IDepositPlanner
     }
 
     private static DestinationKey ResolveDestination(
-        TaskKind task,
-        IReadOnlyDictionary<TaskKind, DestinationKey> assignments) =>
-        assignments.TryGetValue(task, out var dest) && dest is not null
+        BufferedItem item,
+        IReadOnlyDictionary<TaskKind, DestinationKey> taskAssignments,
+        IReadOnlyDictionary<OutputScopeProvenance, DestinationKey> provenanceAssignments)
+    {
+        if (provenanceAssignments.TryGetValue(item.Provenance, out var provenanceDest)
+            && provenanceDest is not null)
+            return provenanceDest;
+
+        return taskAssignments.TryGetValue(item.SourceTask, out var dest) && dest is not null
             ? dest
             : AutomaticOutputDestination.Instance;
+    }
 
     private static void AddToGroup(
         Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, TaskKind SourceTask, OutputScopeProvenance Provenance), int> Items)> walkable,

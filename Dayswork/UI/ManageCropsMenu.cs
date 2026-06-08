@@ -10,7 +10,8 @@ namespace Dayswork.UI;
 internal sealed class ManageCropsMenu : LayoutMenu
 {
     private const int GroupColW = 96;
-    private const int SeasonColW = 156;
+    private const int LocationColW = 132;
+    private const int SeasonColW = 132;
     private const int ActionButtonW = 82;
     private const int RowHeight = 88;
     private const int RowGap = 8;
@@ -84,6 +85,7 @@ internal sealed class ManageCropsMenu : LayoutMenu
     private static ILayoutElement BuildHeaderRow() =>
         new HStack(8,
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_group"), color: HeaderColor), GroupColW),
+            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_location"), color: HeaderColor), LocationColW),
             HStack.Fixed(new Label(SeasonLabel(Season.Spring), color: HeaderColor), SeasonColW),
             HStack.Fixed(new Label(SeasonLabel(Season.Summer), color: HeaderColor), SeasonColW),
             HStack.Fixed(new Label(SeasonLabel(Season.Fall), color: HeaderColor), SeasonColW),
@@ -94,6 +96,7 @@ internal sealed class ManageCropsMenu : LayoutMenu
     {
         var topLine = new HStack(8,
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.group_label", new { index = displayIndex })), GroupColW),
+            HStack.Fixed(new Label(LocationLabel(group.LocationName), ellipsize: true), LocationColW),
             HStack.Fixed(new Label(SeasonSummary(group, Season.Spring), ellipsize: true), SeasonColW),
             HStack.Fixed(new Label(SeasonSummary(group, Season.Summer), ellipsize: true), SeasonColW),
             HStack.Fixed(new Label(SeasonSummary(group, Season.Fall), ellipsize: true), SeasonColW),
@@ -121,6 +124,11 @@ internal sealed class ManageCropsMenu : LayoutMenu
 
     private static string SeasonSummary(CropGroupDraft group, Season season)
     {
+        if (group.IsSeasonAgnostic)
+            return season == Season.Spring && group.YearRoundSlot.HasCrop
+                ? group.YearRoundSlot.CropDisplayName
+                : I18nHelper.Get("ui.manage_crops.summary_unassigned");
+
         if (!group.IsConfigured(season) && group.LockOrigin(season) is null)
             return I18nHelper.Get("ui.manage_crops.summary_unassigned");
 
@@ -146,4 +154,15 @@ internal sealed class ManageCropsMenu : LayoutMenu
         Season.Winter => I18nHelper.Get("ui.manage_crops.season.winter"),
         _ => season.ToString(),
     };
+
+    private static string LocationLabel(string locationName)
+    {
+        if (string.Equals(locationName, "Farm", StringComparison.Ordinal))
+            return I18nHelper.Get("ui.manage_crops.location_farm");
+
+        if (string.Equals(locationName, "Greenhouse", StringComparison.Ordinal))
+            return I18nHelper.Get("ui.manage_crops.location_greenhouse");
+
+        return locationName;
+    }
 }

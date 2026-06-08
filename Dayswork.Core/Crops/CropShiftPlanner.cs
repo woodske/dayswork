@@ -50,7 +50,7 @@ public sealed class CropShiftPlanner
             choice.Crop,
             useFertilizer: choice.Crop.RequiresFertilizer);
 
-        var independent = BuildSupplyIndependentActions(fieldState.LocationName, zoneTiles, allowTill: isViable);
+        var independent = BuildSupplyIndependentActions(assignment, fieldState.LocationName, zoneTiles, allowTill: isViable);
         var candidates = isViable
             ? zoneTiles.Where(tile => tile.CanAcceptSeed).ToList()
             : new List<TileState>();
@@ -77,15 +77,21 @@ public sealed class CropShiftPlanner
     }
 
     private static IReadOnlyList<TileAction> BuildSupplyIndependentActions(
+        CropZoneAssignment assignment,
         string locationName,
         IReadOnlyList<TileState> tiles,
         bool allowTill)
     {
         var actions = new List<TileAction>();
+        var harvestProvenance = ManagedCropOutputRouter.ProvenanceFor(assignment);
         foreach (var tile in tiles)
         {
             if (tile.ReadyToHarvest)
-                actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Harvest));
+                actions.Add(new TileAction(
+                    locationName,
+                    tile.Tile,
+                    ManagedCropActionKind.Harvest,
+                    OutputProvenance: harvestProvenance));
             if (tile.HasDebris)
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.ClearDebris));
             if (allowTill && !tile.HasCrop && !tile.HasDebris && !tile.IsTilled)

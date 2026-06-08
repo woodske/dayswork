@@ -23,9 +23,11 @@ internal sealed class ChestResolver
         var result = new List<ChestEntry>();
         string farmGroup = I18nHelper.Get("ui.zone_chest.group_farm");
 
-        // The office's built-in input chest is a crop-supply reservoir, not an output destination.
-        // The output chest remains visible/selectable and is also the automatic fallback.
+        // Built-in office chests are reserved system chests. The input chest is a crop-supply
+        // reservoir; the output chest remains the automatic fallback, but is not an explicit
+        // selectable destination.
         var officeInputChestTile = HiringBuilding.TryGetInputChestTile(farm as Farm);
+        var officeOutputChestTile = HiringBuilding.TryGetOutputChestTile(farm as Farm);
 
         // Open-farm chests
         foreach (var (tile, obj) in farm.Objects.Pairs)
@@ -34,7 +36,7 @@ internal sealed class ChestResolver
             {
                 var tileX = (int)tile.X;
                 var tileY = (int)tile.Y;
-                if (ShouldExcludeSelectableFarmChest(officeInputChestTile, tileX, tileY))
+                if (ShouldExcludeSelectableFarmChest(officeInputChestTile, officeOutputChestTile, tileX, tileY))
                     continue;
                 var chestRef = new ChestRef(farm.Name, new TileCoord(tileX, tileY));
                 result.Add(new ChestEntry(chestRef, GetDisplayName(chest, farm, tileX, tileY), farmGroup));
@@ -171,12 +173,35 @@ internal sealed class ChestResolver
         return result;
     }
 
-    internal static bool ShouldExcludeSelectableFarmChest(Point? officeInputChestTile, int tileX, int tileY) =>
-        ShouldExcludeSelectableFarmChest(officeInputChestTile?.X, officeInputChestTile?.Y, tileX, tileY);
+    internal static bool ShouldExcludeSelectableFarmChest(
+        Point? officeInputChestTile,
+        Point? officeOutputChestTile,
+        int tileX,
+        int tileY) =>
+        ShouldExcludeSelectableFarmChest(
+            officeInputChestTile?.X,
+            officeInputChestTile?.Y,
+            officeOutputChestTile?.X,
+            officeOutputChestTile?.Y,
+            tileX,
+            tileY);
 
     internal static bool ShouldExcludeSelectableFarmChest(int? officeInputChestTileX, int? officeInputChestTileY, int tileX, int tileY) =>
+        ShouldExcludeSelectableFarmChest(officeInputChestTileX, officeInputChestTileY, null, null, tileX, tileY);
+
+    internal static bool ShouldExcludeSelectableFarmChest(
+        int? officeInputChestTileX,
+        int? officeInputChestTileY,
+        int? officeOutputChestTileX,
+        int? officeOutputChestTileY,
+        int tileX,
+        int tileY) =>
         officeInputChestTileX.HasValue
         && officeInputChestTileY.HasValue
         && tileX == officeInputChestTileX.Value
-        && tileY == officeInputChestTileY.Value;
+        && tileY == officeInputChestTileY.Value
+        || officeOutputChestTileX.HasValue
+        && officeOutputChestTileY.HasValue
+        && tileX == officeOutputChestTileX.Value
+        && tileY == officeOutputChestTileY.Value;
 }

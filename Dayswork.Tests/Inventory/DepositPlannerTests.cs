@@ -52,6 +52,31 @@ public sealed class DepositPlannerTests
         });
     }
 
+    [Property(MaxTest = 1000, Replay = "")]
+    public Property Conservation_Holds_With_ProvenanceAssignments()
+    {
+        return Prop.ForAll(DepositInputGen.PlannerInputWithProvenance(), input =>
+        {
+            var (snapshot, taskAssignments, provenanceAssignments) = input;
+            var plan = new DepositPlanner().Plan(
+                snapshot,
+                taskAssignments,
+                provenanceAssignments,
+                BinTile,
+                Start,
+                Manhattan);
+
+            var inTotals = Totals(snapshot.Select(b => (b.QualifiedItemId, b.Quantity)));
+            var outTotals = Totals(
+                plan.Trips.SelectMany(t => t.Items).Concat(plan.AutomaticOverflow)
+                    .Select(s => (s.QualifiedItemId, s.Quantity)));
+
+            return (inTotals.Count == outTotals.Count
+                    && inTotals.All(kv => outTotals.TryGetValue(kv.Key, out var v) && v == kv.Value))
+                .Label($"in={inTotals.Values.Sum()} out={outTotals.Values.Sum()}");
+        });
+    }
+
     // PBT-U14-02: trip count equals the number of distinct walkable (chest/bin) destinations present.
     [Property(MaxTest = 1000, Replay = "")]
     public Property TripCount_Equals_Distinct_Walkable_Destinations()
@@ -183,6 +208,93 @@ public sealed class DepositPlannerTests
         Assert.Equal(chest.Tile, trip.Tile);
         Assert.All(trip.Items, item => Assert.Equal(TaskKind.CutTrees, item.SourceTask));
         Assert.Equal(3, trip.Items.Sum(item => item.Quantity));
+    }
+
+    [Fact]
+    public void ProvenanceAssignment_Wins_Before_TaskAssignment()
+    {
+        var managed = OutputScopeProvenance.ManagedCrop("group-a|Farm|0|0|1|1");
+        var managedChest = new ChestRef("Farm", new TileCoord(8, 8));
+        var taskChest = new ChestRef("Farm", new TileCoord(2, 2));
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)24", 3, TaskKind.HarvestCrops, managed),
+        };
+        var taskAssignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.HarvestCrops] = new ChestDestination(taskChest),
+        };
+        var provenanceAssignments = new Dictionary<OutputScopeProvenance, DestinationKey>
+        {
+            [managed] = new ChestDestination(managedChest),
+        };
+
+        var plan = new DepositPlanner().Plan(
+            snapshot,
+            taskAssignments,
+            provenanceAssignments,
+            BinTile,
+            Start,
+            Manhattan);
+
+        var trip = Assert.Single(plan.Trips);
+        Assert.Equal(managedChest.Tile, trip.Tile);
+    }
+
+    [Fact]
+    public void MissingProvenanceAssignment_FallsBack_To_TaskAssignment()
+    {
+        var taskChest = new ChestRef("Farm", new TileCoord(2, 2));
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)24", 3, TaskKind.HarvestCrops, OutputScopeProvenance.ManagedCrop("missing")),
+        };
+        var taskAssignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.HarvestCrops] = new ChestDestination(taskChest),
+        };
+
+        var plan = new DepositPlanner().Plan(
+            snapshot,
+            taskAssignments,
+            new Dictionary<OutputScopeProvenance, DestinationKey>(),
+            BinTile,
+            Start,
+            Manhattan);
+
+        var trip = Assert.Single(plan.Trips);
+        Assert.Equal(taskChest.Tile, trip.Tile);
+    }
+
+    [Fact]
+    public void ManagedProvenanceMap_Does_Not_Reroute_OrdinaryHarvest()
+    {
+        var managed = OutputScopeProvenance.ManagedCrop("group-a|Farm|0|0|1|1");
+        var managedChest = new ChestRef("Farm", new TileCoord(8, 8));
+        var ordinaryChest = new ChestRef("Farm", new TileCoord(2, 2));
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)24", 3, TaskKind.HarvestCrops, OutputScopeProvenance.Outdoor()),
+        };
+        var taskAssignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.HarvestCrops] = new ChestDestination(ordinaryChest),
+        };
+        var provenanceAssignments = new Dictionary<OutputScopeProvenance, DestinationKey>
+        {
+            [managed] = new ChestDestination(managedChest),
+        };
+
+        var plan = new DepositPlanner().Plan(
+            snapshot,
+            taskAssignments,
+            provenanceAssignments,
+            BinTile,
+            Start,
+            Manhattan);
+
+        var trip = Assert.Single(plan.Trips);
+        Assert.Equal(ordinaryChest.Tile, trip.Tile);
     }
 
     [Fact]

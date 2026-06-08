@@ -6,4 +6,5 @@ public enum OutputScopeFamily
     Outdoor,
     AnimalBuilding,
     Greenhouse,
+    ManagedCrop,
 }

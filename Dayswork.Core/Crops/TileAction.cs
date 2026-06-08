@@ -7,4 +7,5 @@ public sealed record TileAction(
     TileCoord Tile,
     ManagedCropActionKind Kind,
     string? ItemId = null,
-    bool RequiresDiggable = false);
+    bool RequiresDiggable = false,
+    OutputScopeProvenance? OutputProvenance = null);

@@ -13,4 +13,12 @@ public interface IDepositPlanner
         TileCoord shippingBinTile,
         TileCoord workerStart,
         Func<TileCoord, TileCoord, int> distance);
+
+    DepositPlan Plan(
+        IReadOnlyList<BufferedItem> snapshot,
+        IReadOnlyDictionary<TaskKind, DestinationKey> taskAssignments,
+        IReadOnlyDictionary<OutputScopeProvenance, DestinationKey> provenanceAssignments,
+        TileCoord shippingBinTile,
+        TileCoord workerStart,
+        Func<TileCoord, TileCoord, int> distance);
 }

@@ -38,6 +38,7 @@ internal sealed class CropGroupDraft
         new("__dayswork_crop_group_draft__", new TileCoord(0, 0), new TileCoord(0, 0));
 
     private readonly Dictionary<Season, SeasonSlotDraft> _slots = new();
+    private SeasonSlotDraft? _yearRoundSlot;
 
     public CropGroupDraft(string id)
     {
@@ -45,17 +46,34 @@ internal sealed class CropGroupDraft
     }
 
     public string Id { get; }
+    public string LocationName { get; private set; } = "Farm";
+    public CropAssignmentMode Mode { get; private set; } = CropAssignmentMode.Seasonal;
     public ChestRef? OutputChest { get; set; }
     public List<Zone> Zones { get; } = new();
 
-    public bool HasAnyConfiguredSeason => _slots.Values.Any(slot => slot.HasCrop);
+    public bool HasAnyConfiguredSeason => IsSeasonAgnostic
+        ? _yearRoundSlot?.HasCrop == true
+        : _slots.Values.Any(slot => slot.HasCrop);
     public bool HasAnyAssignment => HasAnyConfiguredSeason && Zones.Count > 0;
+    public bool IsSeasonAgnostic => Mode == CropAssignmentMode.SeasonAgnostic;
+    public SeasonSlotDraft YearRoundSlot => _yearRoundSlot ?? new SeasonSlotDraft();
 
     public SeasonSlotDraft Slot(Season season) =>
         _slots.TryGetValue(season, out var slot) ? slot : new SeasonSlotDraft();
 
     public bool IsConfigured(Season season) =>
         _slots.TryGetValue(season, out var slot) && slot.HasCrop;
+
+    public void SetLocation(string locationName)
+    {
+        var normalized = string.IsNullOrWhiteSpace(locationName) ? "Farm" : locationName.Trim();
+        if (string.Equals(LocationName, normalized, StringComparison.Ordinal))
+            return;
+
+        LocationName = normalized;
+        Mode = ModeForLocation(normalized);
+        Zones.Clear();
+    }
 
     /// <summary>Maps each multi-season-locked season to the origin season whose crop occupies it.</summary>
     public IReadOnlyDictionary<Season, Season> LockedSeasons()
@@ -128,6 +146,15 @@ internal sealed class CropGroupDraft
         return true;
     }
 
+    public void SetYearRoundCrop(CropDescriptor crop, string displayName)
+    {
+        var slot = GetOrCreateYearRound();
+        slot.Crop = crop;
+        slot.CropDisplayName = displayName;
+        slot.FertilizerItemId = null;
+        slot.FertilizerDisplayName = string.Empty;
+    }
+
     /// <summary>Clears a directly-configured season (releasing any seasons its crop locked). No-op for locked seasons.</summary>
     public void ClearSeason(Season season)
     {
@@ -137,9 +164,20 @@ internal sealed class CropGroupDraft
         _slots.Remove(season);
     }
 
+    public void ClearYearRound() => _yearRoundSlot = null;
+
     public void SetFertilizer(Season season, string? itemId, string displayName)
     {
         if (!_slots.TryGetValue(season, out var slot) || !slot.HasCrop)
+            return;
+
+        slot.FertilizerItemId = string.IsNullOrWhiteSpace(itemId) ? null : itemId;
+        slot.FertilizerDisplayName = slot.FertilizerItemId is null ? string.Empty : displayName;
+    }
+
+    public void SetYearRoundFertilizer(string? itemId, string displayName)
+    {
+        if (_yearRoundSlot is not { HasCrop: true } slot)
             return;
 
         slot.FertilizerItemId = string.IsNullOrWhiteSpace(itemId) ? null : itemId;
@@ -152,12 +190,30 @@ internal sealed class CropGroupDraft
             slot.AutoReplant = !slot.AutoReplant;
     }
 
+    public void ToggleYearRoundAutoReplant()
+    {
+        if (_yearRoundSlot is { HasCrop: true } slot)
+            slot.AutoReplant = !slot.AutoReplant;
+    }
+
     /// <summary>
     /// Consolidates the configured season slots into the persisted per-zone choice set, expanding
     /// and locking multi-season crops via the pure resolver. Fertilizer is folded onto each crop.
     /// </summary>
     public IReadOnlyList<SeasonCropChoice> BuildAssignmentChoices()
     {
+        if (IsSeasonAgnostic)
+        {
+            if (_yearRoundSlot?.Crop is null)
+                return Array.Empty<SeasonCropChoice>();
+
+            var crop = _yearRoundSlot.Crop.WithFertilizer(_yearRoundSlot.FertilizerItemId);
+            return new[]
+            {
+                new SeasonCropChoice(Season.Spring, crop, autoReplant: _yearRoundSlot.AutoReplant),
+            };
+        }
+
         var template = new CropZoneAssignment(
             TemplateZone,
             CropAssignmentMode.Seasonal,
@@ -186,7 +242,8 @@ internal sealed class CropGroupDraft
             return Array.Empty<CropZoneAssignment>();
 
         return Zones
-            .Select(zone => new CropZoneAssignment(zone, CropAssignmentMode.Seasonal, choices, OutputChest, Id))
+            .Select(zone => new Zone(LocationName, zone.TopLeft, zone.BottomRight))
+            .Select(zone => new CropZoneAssignment(zone, Mode, choices, OutputChest, Id))
             .ToList()
             .AsReadOnly();
     }
@@ -194,11 +251,18 @@ internal sealed class CropGroupDraft
     internal void HydrateSlotsFrom(CropZoneAssignment assignment)
     {
         _slots.Clear();
+        _yearRoundSlot = null;
+        LocationName = string.IsNullOrWhiteSpace(assignment.Zone.LocationName)
+            ? "Farm"
+            : assignment.Zone.LocationName;
+        Mode = assignment.Mode;
         OutputChest = assignment.OutputChest;
 
         foreach (var choice in assignment.Choices.Where(choice => !choice.IsLocked))
         {
-            var slot = GetOrCreate(choice.Season);
+            var slot = IsSeasonAgnostic
+                ? GetOrCreateYearRound()
+                : GetOrCreate(choice.Season);
             slot.Crop = new CropDescriptor(
                 choice.Crop.CropItemId,
                 choice.Crop.SeedItemId,
@@ -218,23 +282,32 @@ internal sealed class CropGroupDraft
         IReadOnlyList<CropCatalogEntry> crops,
         IReadOnlyList<FertilizerOption> fertilizers)
     {
-        foreach (var slot in _slots.Values)
-        {
-            if (slot.Crop is { } crop)
-            {
-                var match = crops.FirstOrDefault(entry =>
-                    string.Equals(entry.Crop.SeedItemId, crop.SeedItemId, StringComparison.Ordinal));
-                if (match is not null)
-                    slot.CropDisplayName = match.DisplayName;
-            }
+        if (_yearRoundSlot is { } yearRoundSlot)
+            EnrichSlot(yearRoundSlot, crops, fertilizers);
 
-            if (slot.FertilizerItemId is { } fertilizerId)
-            {
-                var match = fertilizers.FirstOrDefault(option =>
-                    string.Equals(option.ItemId, fertilizerId, StringComparison.Ordinal));
-                if (match is not null)
-                    slot.FertilizerDisplayName = match.DisplayName;
-            }
+        foreach (var slot in _slots.Values)
+            EnrichSlot(slot, crops, fertilizers);
+    }
+
+    private static void EnrichSlot(
+        SeasonSlotDraft slot,
+        IReadOnlyList<CropCatalogEntry> crops,
+        IReadOnlyList<FertilizerOption> fertilizers)
+    {
+        if (slot.Crop is { } crop)
+        {
+            var match = crops.FirstOrDefault(entry =>
+                string.Equals(entry.Crop.SeedItemId, crop.SeedItemId, StringComparison.Ordinal));
+            if (match is not null)
+                slot.CropDisplayName = match.DisplayName;
+        }
+
+        if (slot.FertilizerItemId is { } fertilizerId)
+        {
+            var match = fertilizers.FirstOrDefault(option =>
+                string.Equals(option.ItemId, fertilizerId, StringComparison.Ordinal));
+            if (match is not null)
+                slot.FertilizerDisplayName = match.DisplayName;
         }
     }
 
@@ -247,6 +320,17 @@ internal sealed class CropGroupDraft
         _slots[season] = slot;
         return slot;
     }
+
+    private SeasonSlotDraft GetOrCreateYearRound()
+    {
+        _yearRoundSlot ??= new SeasonSlotDraft();
+        return _yearRoundSlot;
+    }
+
+    private static CropAssignmentMode ModeForLocation(string locationName) =>
+        string.Equals(locationName, "Farm", StringComparison.Ordinal)
+            ? CropAssignmentMode.Seasonal
+            : CropAssignmentMode.SeasonAgnostic;
 }
 
 /// <summary>
@@ -292,13 +376,20 @@ internal sealed class CropPlanDraft
             return;
 
         group.Zones.Clear();
-        group.Zones.AddRange(zones);
+        group.Zones.AddRange(zones.Select(zone => new Zone(group.LocationName, zone.TopLeft, zone.BottomRight)));
     }
 
-    public IReadOnlyList<Zone> ProtectedZones(string activeGroupId) =>
+    public IReadOnlyList<Zone> ProtectedZones(string activeGroupId)
+    {
+        var locationName = TryGetGroup(activeGroupId, out var group) ? group.LocationName : "Farm";
+        return ProtectedZones(activeGroupId, locationName);
+    }
+
+    public IReadOnlyList<Zone> ProtectedZones(string activeGroupId, string locationName) =>
         _groups
             .Where(group => !string.Equals(group.Id, activeGroupId, StringComparison.Ordinal))
             .SelectMany(group => group.Zones)
+            .Where(zone => string.Equals(zone.LocationName, locationName, StringComparison.Ordinal))
             .ToList()
             .AsReadOnly();
 

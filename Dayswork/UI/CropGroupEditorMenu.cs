@@ -16,6 +16,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
     private const int FertColW = 230;
     private const int ReplantColW = 78;
     private const int Gap = 14;
+    private const int LocationButtonW = 210;
 
     private static readonly Color SecondaryTextColor = new(96, 72, 48);
     private static readonly Color HeaderColor = new(80, 60, 40);
@@ -23,30 +24,36 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
 
     private readonly ContractDraft _draft;
     private readonly CropGroupDraft _group;
+    private readonly IReadOnlyList<CropGroupLocationOption> _locationOptions;
     private readonly Action<ContractDraft> _onBack;
     private readonly Action<string, Season> _onPickCrop;
     private readonly Action<string, Season> _onPickFertilizer;
     private readonly Action<string> _onPickChest;
     private readonly Action<string> _onBeginDraw;
+    private readonly Action<string, string> _onSetLocation;
 
     public CropGroupEditorMenu(
         ContractDraft draft,
         CropGroupDraft group,
+        IReadOnlyList<CropGroupLocationOption> locationOptions,
         Action<ContractDraft> onBack,
         Action<string, Season> onPickCrop,
         Action<string, Season> onPickFertilizer,
         Action<string> onPickChest,
-        Action<string> onBeginDraw)
+        Action<string> onBeginDraw,
+        Action<string, string> onSetLocation)
         : base(ContractMenuLayout.ManageCropsWidth, ContractMenuLayout.Height,
             onBack: () => onBack(draft))
     {
         _draft = draft;
         _group = group;
+        _locationOptions = locationOptions;
         _onBack = onBack;
         _onPickCrop = onPickCrop;
         _onPickFertilizer = onPickFertilizer;
         _onPickChest = onPickChest;
         _onBeginDraw = onBeginDraw;
+        _onSetLocation = onSetLocation;
         Rebuild();
     }
 
@@ -54,17 +61,26 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
     {
         var rows = new List<ILayoutElement>
         {
+            BuildLocationRow(),
+            new Spacer(14),
             BuildHeaderRow(),
             new Spacer(4),
         };
 
-        foreach (var season in CropPlanDraft.AllSeasons)
+        if (_group.IsSeasonAgnostic)
         {
-            rows.Add(new FixedHeight(
-                _group.LockState(season) == SeasonLockState.MultiSeasonLocked
-                    ? BuildLockedRow(season)
-                    : BuildEditableRow(season),
-                RowHeight));
+            rows.Add(new FixedHeight(BuildYearRoundRow(), RowHeight));
+        }
+        else
+        {
+            foreach (var season in CropPlanDraft.AllSeasons)
+            {
+                rows.Add(new FixedHeight(
+                    _group.LockState(season) == SeasonLockState.MultiSeasonLocked
+                        ? BuildLockedRow(season)
+                        : BuildEditableRow(season),
+                    RowHeight));
+            }
         }
 
         rows.Add(new Spacer(12));
@@ -95,6 +111,29 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_fertilizer"), color: HeaderColor), FertColW),
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_replant"), color: HeaderColor), ReplantColW));
 
+    private ILayoutElement BuildLocationRow()
+    {
+        var parts = new List<HStack.Column>
+        {
+            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_location"), color: HeaderColor), SeasonColW),
+        };
+
+        foreach (var option in _locationOptions)
+        {
+            var isSelected = string.Equals(option.LocationName, _group.LocationName, StringComparison.Ordinal);
+            parts.Add(HStack.Auto(new MenuButton(
+                isSelected
+                    ? I18nHelper.Get("ui.manage_crops.location_selected", new { name = option.DisplayName })
+                    : option.DisplayName,
+                () => _onSetLocation(_group.Id, option.LocationName),
+                fixedWidth: LocationButtonW,
+                height: ButtonHeight,
+                textAlign: HAlign.Left)));
+        }
+
+        return new HStack(8, parts.ToArray());
+    }
+
     private ILayoutElement BuildEditableRow(Season season)
     {
         var configured = _group.IsConfigured(season);
@@ -120,6 +159,35 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
                 new Checkbox(
                     configured && _group.Slot(season).AutoReplant,
                     _ => { _group.ToggleAutoReplant(season); Rebuild(); },
+                    enabled: configured),
+                ReplantColW));
+    }
+
+    private ILayoutElement BuildYearRoundRow()
+    {
+        var configured = _group.YearRoundSlot.HasCrop;
+        var cropLabel = configured
+            ? _group.YearRoundSlot.CropDisplayName
+            : I18nHelper.Get("ui.manage_crops.choose_crop");
+
+        return new HStack(Gap,
+            HStack.Fixed(
+                new Label(I18nHelper.Get("ui.manage_crops.year_round")),
+                SeasonColW),
+            HStack.Fixed(
+                new MenuButton(cropLabel, () => _onPickCrop(_group.Id, Season.Spring),
+                    fixedWidth: CropColW, height: ButtonHeight, textAlign: HAlign.Left),
+                CropColW),
+            HStack.Fixed(
+                new MenuButton(FertilizerLabel(Season.Spring),
+                    () => _onPickFertilizer(_group.Id, Season.Spring),
+                    enabled: configured,
+                    fixedWidth: FertColW, height: ButtonHeight, textAlign: HAlign.Left),
+                FertColW),
+            HStack.Fixed(
+                new Checkbox(
+                    configured && _group.YearRoundSlot.AutoReplant,
+                    _ => { _group.ToggleYearRoundAutoReplant(); Rebuild(); },
                     enabled: configured),
                 ReplantColW));
     }
@@ -166,6 +234,16 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
 
     private string FertilizerLabel(Season season)
     {
+        if (_group.IsSeasonAgnostic)
+        {
+            if (!_group.YearRoundSlot.HasCrop)
+                return I18nHelper.Get("ui.manage_crops.fertilizer_disabled");
+
+            return string.IsNullOrEmpty(_group.YearRoundSlot.FertilizerDisplayName)
+                ? I18nHelper.Get("ui.manage_crops.fertilizer_none")
+                : _group.YearRoundSlot.FertilizerDisplayName;
+        }
+
         if (!_group.IsConfigured(season))
             return I18nHelper.Get("ui.manage_crops.fertilizer_disabled");
 

@@ -322,6 +322,12 @@ internal sealed partial class ShiftOrchestrator
         }
 
         _currentLocation = location;
+        if (batch.Kind == BatchKind.ManagedCrops)
+        {
+            BeginManagedCropBatch(batch);
+            return;
+        }
+
         var batchTasks = batch.Tasks.ToHashSet();
         var tileWork = _indoorScanner.ScanInterior(
             location,
@@ -424,6 +430,12 @@ internal sealed partial class ShiftOrchestrator
         _currentLocation = interior;
         _pendingBuildingEntry = false;
         _pendingBuildingInterior = null;
+
+        if (batch.Kind == BatchKind.ManagedCrops)
+        {
+            BeginManagedCropBatch(batch);
+            return;
+        }
 
         IReadOnlyList<WorkItem> tileWork;
         IReadOnlyList<AnimalWorkItem> animalWork;

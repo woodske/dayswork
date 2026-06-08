@@ -148,6 +148,92 @@ public sealed class CropPlanDraftTests
     }
 
     [Fact]
+    public void SeasonAgnosticGroup_ProjectsYearRoundChoiceWithLocationAndOutputChest()
+    {
+        var draft = new CropPlanDraft();
+        var group = draft.AddGroup();
+        group.SetLocation("Greenhouse");
+        group.SetYearRoundCrop(Parsnip(), "Parsnip");
+        group.SetYearRoundFertilizer("fert.basic", "Basic Fertilizer");
+        group.ToggleYearRoundAutoReplant();
+        group.OutputChest = new ChestRef("Greenhouse", new TileCoord(8, 8));
+        draft.SetGroupZones(group.Id, new[] { new Zone("Greenhouse", new TileCoord(1, 1), new TileCoord(2, 2)) });
+
+        var plan = draft.BuildCropPlan();
+
+        var assignment = Assert.Single(plan.Assignments);
+        Assert.Equal("Greenhouse", assignment.Zone.LocationName);
+        Assert.Equal(CropAssignmentMode.SeasonAgnostic, assignment.Mode);
+        Assert.Equal(group.Id, assignment.GroupId);
+        Assert.Equal(new ChestRef("Greenhouse", new TileCoord(8, 8)), assignment.OutputChest);
+        var choice = Assert.Single(assignment.Choices);
+        Assert.Equal("seed.parsnip", choice.Crop.SeedItemId);
+        Assert.Equal("fert.basic", choice.Crop.FertilizerItemId);
+        Assert.True(choice.AutoReplant);
+    }
+
+    [Fact]
+    public void HydrateFrom_RestoresSeasonAgnosticGroup()
+    {
+        var crop = Parsnip().WithFertilizer("fert.basic");
+        var plan = new CropPlan(new[]
+        {
+            new CropZoneAssignment(
+                new Zone("Greenhouse", new TileCoord(1, 1), new TileCoord(2, 2)),
+                CropAssignmentMode.SeasonAgnostic,
+                new[] { new SeasonCropChoice(Season.Spring, crop, autoReplant: true) },
+                new ChestRef("Greenhouse", new TileCoord(8, 8)),
+                "group-greenhouse"),
+        });
+
+        var draft = new CropPlanDraft();
+        draft.HydrateFrom(plan);
+
+        var group = draft.GetGroup("group-greenhouse");
+        Assert.Equal("Greenhouse", group.LocationName);
+        Assert.True(group.IsSeasonAgnostic);
+        Assert.True(group.YearRoundSlot.HasCrop);
+        Assert.Equal("seed.parsnip", group.YearRoundSlot.Crop!.SeedItemId);
+        Assert.Equal("fert.basic", group.YearRoundSlot.FertilizerItemId);
+        Assert.True(group.YearRoundSlot.AutoReplant);
+        Assert.Equal(new ChestRef("Greenhouse", new TileCoord(8, 8)), group.OutputChest);
+        Assert.Single(group.Zones);
+    }
+
+    [Fact]
+    public void SetLocation_ClearsStaleZones()
+    {
+        var draft = new CropPlanDraft();
+        var group = draft.AddGroup();
+        draft.SetGroupZones(group.Id, new[] { new Zone("Farm", new TileCoord(0, 0), new TileCoord(1, 1)) });
+
+        group.SetLocation("Greenhouse");
+
+        Assert.Empty(group.Zones);
+        Assert.True(group.IsSeasonAgnostic);
+    }
+
+    [Fact]
+    public void ProtectedZones_FiltersByLocation()
+    {
+        var draft = new CropPlanDraft();
+        var active = draft.AddGroup();
+        active.SetLocation("Greenhouse");
+        var farmOther = draft.AddGroup();
+        var greenhouseOther = draft.AddGroup();
+        greenhouseOther.SetLocation("Greenhouse");
+        var farmZone = new Zone("Farm", new TileCoord(0, 0), new TileCoord(1, 1));
+        var greenhouseZone = new Zone("Greenhouse", new TileCoord(4, 4), new TileCoord(5, 5));
+        draft.SetGroupZones(farmOther.Id, new[] { farmZone });
+        draft.SetGroupZones(greenhouseOther.Id, new[] { greenhouseZone });
+
+        var protectedZones = draft.ProtectedZones(active.Id, "Greenhouse");
+
+        var zone = Assert.Single(protectedZones);
+        Assert.Equal(greenhouseZone, zone);
+    }
+
+    [Fact]
     public void DeleteGroup_RemovesOnlyThatGroup()
     {
         var draft = new CropPlanDraft();
