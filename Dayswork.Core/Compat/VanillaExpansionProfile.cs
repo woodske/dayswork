@@ -11,8 +11,6 @@ public sealed class VanillaExpansionProfile : IExpansionProfile
 {
     public string Id => "vanilla";
 
-    public IReadOnlySet<string> FarmMapModIds { get; } = new HashSet<string>();
-
     public bool Matches(IReadOnlySet<string> installedModIds) => true;
 
     public bool TryGetEntranceOverride(FarmMapSignature signature, out TileCoord tile)
@@ -20,14 +18,6 @@ public sealed class VanillaExpansionProfile : IExpansionProfile
         tile = default;
         return false;
     }
-
-    public bool TryClassifyContentOverride(ContentDescriptor descriptor, out WorkClassification result)
-    {
-        result = WorkClassification.NoOverride;
-        return false;
-    }
-
-    public bool IsExpansionWorkLocation(string locationName) => false;
 
     public IReadOnlyList<ExpansionLocationDescriptor> GetLocationDescriptors() =>
         Array.Empty<ExpansionLocationDescriptor>();

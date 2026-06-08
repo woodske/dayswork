@@ -23,24 +23,6 @@ public sealed class ExpansionProfileNoOpTests
 
     [Theory]
     [MemberData(nameof(Profiles))]
-    public void Content_override_is_absent(IExpansionProfile profile)
-    {
-        var hasOverride = profile.TryClassifyContentOverride(
-            new ContentDescriptor(WorldContentKind.ResourceClump, "600"), out var result);
-
-        Assert.False(hasOverride);
-        Assert.Equal(WorkClassificationKind.None, result.Kind);
-    }
-
-    [Theory]
-    [MemberData(nameof(Profiles))]
-    public void Work_location_membership_is_false(IExpansionProfile profile)
-    {
-        Assert.False(profile.IsExpansionWorkLocation("Shed"));
-    }
-
-    [Theory]
-    [MemberData(nameof(Profiles))]
     public void Premium_tier_mapping_is_null(IExpansionProfile profile)
     {
         Assert.Null(profile.MapPremiumBuildingTier("Barn"));

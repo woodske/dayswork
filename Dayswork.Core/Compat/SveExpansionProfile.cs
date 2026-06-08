@@ -41,13 +41,6 @@ public sealed class SveExpansionProfile : IExpansionProfile
 
     public string Id => "sve";
 
-    public IReadOnlySet<string> FarmMapModIds { get; } = new HashSet<string>
-    {
-        ImmersiveFarm2ModId,
-        GrandpasFarmModId,
-        FrontierFarmModId,
-    };
-
     public bool Matches(IReadOnlySet<string> installedModIds) =>
         installedModIds.Contains(ContentModId) || installedModIds.Contains(CodeModId);
 
@@ -111,16 +104,6 @@ public sealed class SveExpansionProfile : IExpansionProfile
 
     public bool TryGetEntranceOverride(FarmMapSignature signature, out TileCoord tile) =>
         EntranceOverrides.TryGetValue(signature, out tile);
-
-    public bool TryClassifyContentOverride(ContentDescriptor descriptor, out WorkClassification result)
-    {
-        result = WorkClassification.NoOverride;
-        return false;
-    }
-
-    public bool IsExpansionWorkLocation(string locationName) =>
-        LocationDescriptors.Any(descriptor =>
-            string.Equals(descriptor.LocationName, locationName, StringComparison.OrdinalIgnoreCase));
 
     public IReadOnlyList<ExpansionLocationDescriptor> GetLocationDescriptors() => LocationDescriptors;
 

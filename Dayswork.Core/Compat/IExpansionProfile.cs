@@ -14,9 +14,6 @@ public interface IExpansionProfile
     /// <summary>Stable profile id (e.g., "vanilla", "sve").</summary>
     string Id { get; }
 
-    /// <summary>Farm-map mod ids this profile recognizes (used for per-map behavior in later units).</summary>
-    IReadOnlySet<string> FarmMapModIds { get; }
-
     /// <summary>True when this profile should be active given the set of installed mod ids.</summary>
     bool Matches(IReadOnlySet<string> installedModIds);
 
@@ -25,15 +22,6 @@ public interface IExpansionProfile
     /// uses the existing <c>Farm.warps</c> heuristic).
     /// </summary>
     bool TryGetEntranceOverride(FarmMapSignature signature, out TileCoord tile);
-
-    /// <summary>
-    /// Content-classification override. Returns false when no override applies (the caller then
-    /// uses the existing classifier, including its skip behavior).
-    /// </summary>
-    bool TryClassifyContentOverride(ContentDescriptor descriptor, out WorkClassification result);
-
-    /// <summary>Whether a location is an expansion work location (e.g., Grandpa's Shed).</summary>
-    bool IsExpansionWorkLocation(string locationName);
 
     /// <summary>Expansion locations that can participate in work selection or output routing.</summary>
     IReadOnlyList<ExpansionLocationDescriptor> GetLocationDescriptors();

@@ -118,20 +118,6 @@ internal sealed class ExpansionCompatService
     public AnimalBuildingTier ResolveAnimalBuildingTier(Building building, AnimalBuildingTier vanillaTier) =>
         _activeProfile.MapPremiumBuildingTier(building.buildingType.Value) ?? vanillaTier;
 
-    /// <summary>
-    /// Content-classification override hook. Descriptor construction from live world objects is
-    /// implemented in U-SVE-04; until then no override applies.
-    /// </summary>
-    public bool TryClassifyContentOverride(GameLocation location, TileCoord tile, out WorkClassification result)
-    {
-        result = WorkClassification.NoOverride;
-        return false;
-    }
-
-    /// <summary>Whether the location is an expansion work location (e.g., Grandpa's Shed).</summary>
-    public bool IsExpansionWorkLocation(GameLocation location) =>
-        _activeProfile.IsExpansionWorkLocation(location.NameOrUniqueName);
-
     public bool TryGetExpansionLocationDescriptor(string locationName, out ExpansionLocationDescriptor descriptor)
     {
         descriptor = _activeProfile.GetLocationDescriptors().FirstOrDefault(candidate =>

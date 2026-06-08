@@ -194,3 +194,25 @@ Skip rules confirmed in code:
   before `Saving`** (`StopForSleepAndSettle`), so it's never serialized into the save.
 - **Single-player only:** `MultiplayerGuard.IsMultiplayer()` = `Context.IsMultiplayer` (true also in
   split-screen); guards both the building interaction and the day-start scheduler.
+
+## Compatibility (SVE): shape & rationale
+
+The expansion layer (`Compat/`) is a small Strategy: `IExpansionProfile` with two implementations —
+`VanillaExpansionProfile` (a Null-Object: every lookup says "no override") and `SveExpansionProfile`
+(the single home for all SVE ids + playtest/source-verified data: farm-map signatures, entrance
+tiles, cross-location route hops, premium-building tier mapping). `ExpansionDetector` picks the
+active profile once at `GameLaunched`; `ExpansionCompatService` is the runtime seam consumers call.
+
+**Why this shape:** the win isn't polymorphism — it's that all SVE-specific content lives in one
+SMAPI-free, testable file, and vanilla behavior can't regress because vanilla takes the no-override
+path. For the **two** cases we support (vanilla + SVE) the interface/null-object/selector is
+slightly more ceremony than strictly needed; a nullable `SveContent` data class + `if (sve …)`
+guards would do the same. It earns its keep only if a **third** expansion (Ridgeside, East Scarp, …)
+is ever added — none is planned, so don't grow this further without that trigger. If SVE is ever
+dropped as a goal, collapse it to the nullable-field form. **SVE stays a soft/optional dependency**
+(runtime-detected, never in `manifest.json`).
+
+Speculative seams built for never-shipped "U-SVE-04" units (`TryClassifyContentOverride`,
+`FarmMapModIds`, `IsExpansionWorkLocation`, and the `ContentDescriptor`/`WorkClassification` types)
+were pruned — they had zero real consumers; live "is this an expansion location" checks go through
+`TryGetExpansionLocationDescriptor` / `IsExpansionDepositLocation`.
