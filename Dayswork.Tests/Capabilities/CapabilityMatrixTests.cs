@@ -4,10 +4,8 @@ using Xunit;
 
 namespace Dayswork.Tests.Capabilities;
 
-public class CapabilityEvaluatorTests
+public class CapabilityMatrixTests
 {
-    private readonly CapabilityEvaluator _sut = new CapabilityEvaluator();
-
     // ── CanChop table ──────────────────────────────
     // 20 cases: 5 AxeLevel × 4 non-FruitTree AxeTarget values
 
@@ -34,8 +32,7 @@ public class CapabilityEvaluatorTests
     [InlineData(ToolLevel.Iridium, AxeTarget.LargeLog,     true)]
     public void CanChop_ReturnsExpectedResult(ToolLevel axeLevel, AxeTarget target, bool expected)
     {
-        var snap = new ToolSnapshot(axeLevel, ToolLevel.Basic, ToolLevel.Basic);
-        Assert.Equal(expected, _sut.CanChop(snap, target));
+        Assert.Equal(expected, CapabilityMatrix.CanChop(axeLevel, target));
     }
 
     // ── FruitTree always false regardless of axe level ───────────
@@ -47,21 +44,9 @@ public class CapabilityEvaluatorTests
     [InlineData(ToolLevel.Steel)]
     [InlineData(ToolLevel.Gold)]
     [InlineData(ToolLevel.Iridium)]
-    public void FruitTree_AlwaysReturnsFalse_FR_SKIP_03(ToolLevel axeLevel)
+    public void FruitTree_AlwaysReturnsFalse(ToolLevel axeLevel)
     {
-        var snap = new ToolSnapshot(axeLevel, ToolLevel.Basic, ToolLevel.Basic);
-        Assert.False(_sut.CanChop(snap, AxeTarget.FruitTree));
-    }
-
-    [Fact]
-    public void CanChop_DoesNotDependOn_NonAxe_ToolLevels()
-    {
-        var basicSupport = new ToolSnapshot(ToolLevel.Steel, ToolLevel.Basic, ToolLevel.Basic);
-        var upgradedSupport = new ToolSnapshot(ToolLevel.Steel, ToolLevel.Iridium, ToolLevel.Iridium);
-
-        Assert.Equal(
-            _sut.CanChop(basicSupport, AxeTarget.LargeStump),
-            _sut.CanChop(upgradedSupport, AxeTarget.LargeStump));
+        Assert.False(CapabilityMatrix.CanChop(axeLevel, AxeTarget.FruitTree));
     }
 
     // ── CanBreak table ─────────────────────────────
@@ -85,18 +70,6 @@ public class CapabilityEvaluatorTests
     [InlineData(ToolLevel.Iridium, PickTarget.Meteorite,    true)]
     public void CanBreak_ReturnsExpectedResult(ToolLevel pickLevel, PickTarget target, bool expected)
     {
-        var snap = new ToolSnapshot(ToolLevel.Basic, pickLevel, ToolLevel.Basic);
-        Assert.Equal(expected, _sut.CanBreak(snap, target));
-    }
-
-    [Fact]
-    public void CanBreak_DoesNotDependOn_NonPickaxe_ToolLevels()
-    {
-        var basicSupport = new ToolSnapshot(ToolLevel.Basic, ToolLevel.Steel, ToolLevel.Basic);
-        var upgradedSupport = new ToolSnapshot(ToolLevel.Iridium, ToolLevel.Steel, ToolLevel.Iridium);
-
-        Assert.Equal(
-            _sut.CanBreak(basicSupport, PickTarget.LargeBoulder),
-            _sut.CanBreak(upgradedSupport, PickTarget.LargeBoulder));
+        Assert.Equal(expected, CapabilityMatrix.CanBreak(pickLevel, target));
     }
 }

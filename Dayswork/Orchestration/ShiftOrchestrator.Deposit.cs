@@ -611,7 +611,7 @@ internal sealed partial class ShiftOrchestrator
         foreach (var b in _ctx.Buffer.TakeAll())
         {
             var stack = new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance);
-            if (DepositFallbackPolicy.ResolveUndelivered(ResolveAssignedDestination(b.SourceTask, _ctx.TaskDestinations))
+            if (DepositPlanner.ResolveUndelivered(ResolveAssignedDestination(b.SourceTask, _ctx.TaskDestinations))
                 == UndeliveredDepositResolution.ShippingBin)
                 DepositIntoShippingBin(stack, animateWhenPlayerHere: false);
             else
@@ -637,7 +637,7 @@ internal sealed partial class ShiftOrchestrator
     {
         if (_ctx is null) return;
 
-        if (DepositFallbackPolicy.ResolveUndelivered(trip.Destination) == UndeliveredDepositResolution.ShippingBin)
+        if (DepositPlanner.ResolveUndelivered(trip.Destination) == UndeliveredDepositResolution.ShippingBin)
         {
             foreach (var stack in stacks)
                 DepositIntoShippingBin(stack, animateWhenPlayerHere: false);

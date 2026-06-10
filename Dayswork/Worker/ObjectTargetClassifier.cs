@@ -8,7 +8,7 @@ namespace Dayswork.Worker;
 /// <summary>
 /// Maps Stardew Valley object/terrain-feature instances to the pure-Core
 /// <see cref="AxeTarget"/> / <see cref="PickTarget"/> enums so that the pure
-/// <see cref="Dayswork.Core.Capabilities.CapabilityEvaluator"/> can decide
+/// <see cref="Dayswork.Core.Capabilities.CapabilityMatrix"/> can decide
 /// whether the worker's tool level is sufficient.
 ///
 /// Returns null for any object class the classifier cannot map — the caller skips

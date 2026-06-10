@@ -2,7 +2,9 @@ using Dayswork.Core.Domain;
 
 namespace Dayswork.Core.Shifts;
 
-/// <inheritdoc/>
+/// <summary>
+/// Orders enabled tasks by the contract's player-chosen category priority.
+/// </summary>
 public sealed class TaskPriorityOrderer
 {
     // Lower rank = higher priority. Rank is the index of a task's category in the contract's
@@ -26,13 +28,11 @@ public sealed class TaskPriorityOrderer
     /// <summary>Uses the default category priority (<see cref="TaskKindSets.DefaultCategoryPriority"/>).</summary>
     public TaskPriorityOrderer() : this(TaskKindSets.DefaultCategoryPriority) { }
 
-    /// <inheritdoc/>
     public IReadOnlyList<TaskKind> Order(IEnumerable<TaskKind> enabledTasks) =>
         enabledTasks
             .OrderBy(task => _categoryRank[TaskKindSets.CategoryOf(task)])
             .ThenBy(task => task)
             .ToList();
 
-    /// <inheritdoc/>
     public int Rank(TaskKind task) => _categoryRank[TaskKindSets.CategoryOf(task)];
 }

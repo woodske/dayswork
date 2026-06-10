@@ -3,7 +3,7 @@ namespace Dayswork.Core.Capabilities;
 /// <summary>
 /// Normalized classification of objects the pickaxe can target.
 /// The Mod layer maps Stardew Valley ResourceClump and Object types to these values
-/// before calling CapabilityEvaluator.
+/// before calling CapabilityMatrix.
 /// </summary>
 public enum PickTarget
 {

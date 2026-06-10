@@ -29,7 +29,6 @@ public sealed class StuckDetector
         _threshold = thresholdMinutes;
     }
 
-    /// <inheritdoc/>
     public void RecordTick(bool madeProgress, int elapsedMinutes)
     {
         if (madeProgress)
@@ -42,9 +41,7 @@ public sealed class StuckDetector
         }
     }
 
-    /// <inheritdoc/>
     public bool ShouldFireStuck() => _noProgressMinutes >= _threshold;
 
-    /// <inheritdoc/>
     public void Reset() => _noProgressMinutes = 0;
 }

@@ -319,9 +319,9 @@ public sealed class DepositPlannerTests
 
         Assert.Equal(
             UndeliveredDepositResolution.ShippingBin,
-            DepositFallbackPolicy.ResolveUndelivered(ShippingBinDestination.Instance));
+            DepositPlanner.ResolveUndelivered(ShippingBinDestination.Instance));
         Assert.Equal(
             UndeliveredDepositResolution.AutomaticOverflow,
-            DepositFallbackPolicy.ResolveUndelivered(chest));
+            DepositPlanner.ResolveUndelivered(chest));
     }
 }

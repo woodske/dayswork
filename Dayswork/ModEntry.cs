@@ -71,7 +71,7 @@ public sealed class ModEntry : Mod
         var toolReader      = new ToolLevelReader();
         var toolAnimator    = new ToolSwapAnimator();
         var movementDriver  = new WorkerMovementDriver();
-        var workAreaScanner = new WorkAreaScanner(new CapabilityEvaluator());
+        var workAreaScanner = new WorkAreaScanner();
         var indoorScanner   = new IndoorWorkScanner(workAreaScanner);
         var animalHandler   = new AnimalTaskHandler(this.Monitor);
         var buildingNavigator = new BuildingWorkNavigator(this.Monitor);

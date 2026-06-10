@@ -44,11 +44,6 @@ internal sealed class WorkAreaScanner
     // category that should NOT be auto-collected). Empty unless a real case is found.
     private static readonly HashSet<string> AnimalProductExcludedIds = new(StringComparer.Ordinal);
 
-    private readonly CapabilityEvaluator _capability;
-
-    public WorkAreaScanner(CapabilityEvaluator capability) =>
-        _capability = capability;
-
     private static bool IsInAnyZone(int x, int y, IReadOnlyList<Zone> zones)
     {
         foreach (var zone in zones)
@@ -206,7 +201,7 @@ internal sealed class WorkAreaScanner
             {
                 var axeTarget = ObjectTargetClassifier.ClassifyAxe(tileVec, loc);
                 if (axeTarget is null) return null;
-                if (!_capability.CanChop(snapshot, axeTarget.Value))
+                if (!CapabilityMatrix.CanChop(snapshot.AxeLevel, axeTarget.Value))
                 {
                     capabilitySkipped = true;
                     skippedKind = TaskKind.CutTrees;
@@ -220,7 +215,7 @@ internal sealed class WorkAreaScanner
             ObjectTargetClassifier.ClassifyAxe(tileVec, loc) is { } clumpAxeTarget &&
             clumpAxeTarget != AxeTarget.FruitTree)
         {
-            if (!_capability.CanChop(snapshot, clumpAxeTarget))
+            if (!CapabilityMatrix.CanChop(snapshot.AxeLevel, clumpAxeTarget))
             {
                 capabilitySkipped = true;
                 skippedKind = TaskKind.CutTrees;
@@ -243,7 +238,7 @@ internal sealed class WorkAreaScanner
                 var pickTarget = ObjectTargetClassifier.ClassifyPick(tileVec, loc);
                 if (pickTarget is not null)
                 {
-                    if (!_capability.CanBreak(snapshot, pickTarget.Value))
+                    if (!CapabilityMatrix.CanBreak(snapshot.PickaxeLevel, pickTarget.Value))
                     {
                         capabilitySkipped = true;
                         skippedKind = TaskKind.ClearRocks;
@@ -262,7 +257,7 @@ internal sealed class WorkAreaScanner
             var pickTarget = ObjectTargetClassifier.ClassifyPick(tileVec, loc);
             if (pickTarget is not null)
             {
-                if (!_capability.CanBreak(snapshot, pickTarget.Value))
+                if (!CapabilityMatrix.CanBreak(snapshot.PickaxeLevel, pickTarget.Value))
                 {
                     capabilitySkipped = true;
                     skippedKind = TaskKind.ClearRocks;

@@ -3,8 +3,8 @@ using Dayswork.Core.Domain;
 namespace Dayswork.Core.Capabilities;
 
 /// <summary>
-/// Static lookup table encoding the spec's Tool-inheritance table as threshold comparisons.
-/// Called internally by CapabilityEvaluator; never instantiated.
+/// Static lookup table encoding the tool-inheritance rules as threshold comparisons:
+/// what the player's tool levels allow is what the worker can do.
 /// </summary>
 public static class CapabilityMatrix
 {

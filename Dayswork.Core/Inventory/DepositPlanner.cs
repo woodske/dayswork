@@ -2,9 +2,22 @@ using Dayswork.Core.Domain;
 
 namespace Dayswork.Core.Inventory;
 
+internal enum UndeliveredDepositResolution
+{
+    AutomaticOverflow,
+    ShippingBin,
+}
+
 // DepositPlanner — pure, zero Stardew refs.
 public sealed class DepositPlanner
 {
+    // Where an undelivered stack falls back to: shipping-bin trips still ship; everything else
+    // goes to automatic overflow (items are never lost).
+    internal static UndeliveredDepositResolution ResolveUndelivered(DestinationKey destination) =>
+        destination is ShippingBinDestination
+            ? UndeliveredDepositResolution.ShippingBin
+            : UndeliveredDepositResolution.AutomaticOverflow;
+
     public DepositPlan Plan(
         IReadOnlyList<BufferedItem> snapshot,
         IReadOnlyDictionary<TaskKind, DestinationKey> assignments,
