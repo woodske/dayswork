@@ -34,27 +34,6 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        // Two-phase interior-chest entry: the worker has finished walking to the building's
-        // outdoor door (or failed to reach it). Cross the door now and continue to the chest.
-        if (_pendingDepositInterior is { } depositInterior)
-        {
-            if (_nav.NavigationFailed)
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork][deposit] could not walk to {depositInterior.Name} door; warping in.",
-                    LogLevel.Warn);
-            EnterDepositInterior(depositInterior);
-            return;
-        }
-
-        // Two-phase interior-chest exit: the worker has finished walking to the interior exit
-        // door after depositing. Advance the trip, which warps back out to the farm.
-        if (_pendingDepositExit)
-        {
-            _pendingDepositExit = false;
-            FinalizeAndAdvanceTrip(farm);
-            return;
-        }
-
         if (_nav.NavigationFailed)
         {
             MarkDepositTripUndelivered(_currentTrip);
@@ -103,7 +82,7 @@ internal sealed partial class ShiftOrchestrator
     private bool BeginDepositInteriorExitWalk()
     {
         if (_farmhand is null ||
-            _currentTrip is not { Destination: ChestDestination { Ref.LocationName: not "Farm" } })
+            _currentTrip is not { Destination: ChestDestination { Ref.LocationName: not "Farm" } chestDest })
             return false;
 
         if (_currentTrip.Destination is ChestDestination expansionChest &&
@@ -112,12 +91,12 @@ internal sealed partial class ShiftOrchestrator
         {
             var routeSource = (_currentLocation ?? _farmhand.currentLocation)?.NameOrUniqueName
                               ?? expansionChest.Ref.LocationName;
-            if (TryStartExpansionRoute(
+            if (TryStartExpansionTravel(
                     routeSource,
                     "Farm",
                     ExpansionRoutePurpose.ReturnToFarm,
-                    PendingExpansionRouteKind.DepositExit,
-                    batch: null))
+                    TravelFailurePolicy.WarpToDestination,
+                    TravelPurpose.DepositExit))
                 return true;
 
             WarpExpansionWorkerToFarm();
@@ -128,16 +107,10 @@ internal sealed partial class ShiftOrchestrator
         if (interior is null || interior == Game1.getFarm())
             return false;
 
-        var exitCandidates = _buildingNavigator.ResolveInteriorExitApproachTiles(interior);
-        var source = new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y);
-        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, interior);
-        var exitTile = BuildingWorkNavigator.SelectNearestReachableExitApproachTile(
-            exitCandidates,
-            routeCosts,
-            exitCandidates[0]);
-
-        _pendingDepositExit = true;
-        _nav.StartNavigation(exitTile, interior, _farmhand);
+        var farmArrival = _buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out _)
+            ? outdoorDoor
+            : _farmExitTile;
+        StartTravel(BuildBuildingExitPlan(interior, farmArrival), TravelPurpose.DepositExit);
         return true;
     }
 
@@ -396,6 +369,10 @@ internal sealed partial class ShiftOrchestrator
         if (_ctx.StateMachine.Phase is ShiftPhase.Depositing or ShiftPhase.Exiting or ShiftPhase.Done)
             return;
 
+        // A wrap-up (energy cap, 8pm, cancel, stuck-home) can fire mid-travel; stop the runner
+        // before the safety warp below repositions the worker.
+        CancelActiveTravel();
+
         var farm = Game1.getFarm();
         ReturnWorkerToFarmForDeposit();
         // Valid from Working, Stuck, Recovering (all have Depositing as a successor).
@@ -465,12 +442,12 @@ internal sealed partial class ShiftOrchestrator
                 compat.IsExpansionDepositLocation(chestDest.Ref.LocationName))
             {
                 var source = (_currentLocation ?? farm).NameOrUniqueName;
-                if (TryStartExpansionRoute(
+                if (TryStartExpansionTravel(
                         source,
                         chestDest.Ref.LocationName,
                         ExpansionRoutePurpose.DepositEntry,
-                        PendingExpansionRouteKind.DepositEntry,
-                        batch: null))
+                        TravelFailurePolicy.ReportFailure,
+                        TravelPurpose.DepositEntry))
                     return;
 
                 MarkDepositTripUndelivered(trip);
@@ -478,13 +455,12 @@ internal sealed partial class ShiftOrchestrator
                 return;
             }
 
-            if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out var interior))
+            if (TryBuildBuildingEntryPlan(
+                    chestDest.Ref.LocationName,
+                    TravelFailurePolicy.WarpToDestination,
+                    out var plan))
             {
-                // Walk across the farm to the building's outdoor door first; we only cross the
-                // door (warp into the interior) once the worker arrives there — see HandleDeposit.
-                _pendingDepositInterior = interior;
-                _currentLocation = farm;
-                _nav.StartNavigation(outdoorDoor, farm, _farmhand);
+                StartTravel(plan, TravelPurpose.DepositEntry);
                 return;
             }
 
@@ -502,18 +478,6 @@ internal sealed partial class ShiftOrchestrator
         }
 
         _nav.StartNavigation(trip.Tile, farm, _farmhand);
-    }
-
-    private void EnterDepositInterior(GameLocation interior)
-    {
-        _pendingDepositInterior = null;
-        if (_farmhand is null || _currentTrip is not { Destination: ChestDestination chestDest })
-            return;
-
-        var entryTile = _buildingNavigator.ResolveInteriorEntryTile(interior);
-        _buildingNavigator.Enter(_farmhand, interior, entryTile);
-        _currentLocation = interior;
-        StartChestDepositNavigation(_currentTrip, chestDest, interior);
     }
 
     private void StartChestDepositNavigation(DepositTrip trip, ChestDestination chestDest, GameLocation location)
@@ -553,9 +517,12 @@ internal sealed partial class ShiftOrchestrator
         yield return new TileCoord(tile.X - 1, tile.Y);
     }
 
+    // Safety warp for failure paths (undelivered trip, chest unreachable): the normal success path
+    // walks out via the DepositExit travel, which leaves the worker already on the farm here.
     private void CompleteDepositTripLocation(DepositTrip trip)
     {
         if (_farmhand is null ||
+            (_farmhand.currentLocation ?? _currentLocation) == Game1.getFarm() ||
             trip.Destination is not ChestDestination { Ref.LocationName: not "Farm" } chestDest)
             return;
 
@@ -565,8 +532,9 @@ internal sealed partial class ShiftOrchestrator
 
         if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out _))
         {
-            _buildingNavigator.ExitToFarm(_farmhand, outdoorDoor);
-            _currentLocation = Game1.getFarm();
+            var farm = Game1.getFarm();
+            _nav.WarpWorker(_farmhand, _farmhand.currentLocation ?? farm, farm, outdoorDoor);
+            _currentLocation = farm;
         }
     }
 
@@ -616,7 +584,7 @@ internal sealed partial class ShiftOrchestrator
             ? outdoorDoor
             : _farmExitTile;
 
-        _buildingNavigator.ExitToFarm(_farmhand, exitTile);
+        _nav.WarpWorker(_farmhand, _farmhand.currentLocation ?? farm, farm, exitTile);
         _currentLocation = farm;
     }
 

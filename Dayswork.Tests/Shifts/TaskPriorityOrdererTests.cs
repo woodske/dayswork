@@ -8,7 +8,7 @@ namespace Dayswork.Tests.Shifts;
 
 public class TaskPriorityOrdererTests
 {
-    private readonly ITaskPriorityOrderer _sut = new TaskPriorityOrderer();
+    private readonly TaskPriorityOrderer _sut = new TaskPriorityOrderer();
 
     // Default category priority [AnimalCare, Crops, Fieldwork], with tasks ordered by enum value
     // within each category (the within-category tie-break in TaskPriorityOrderer.Order).

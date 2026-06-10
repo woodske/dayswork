@@ -66,9 +66,17 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 
 ### Orchestration (`Dayswork/Orchestration/`) — the shift loop
 - **`ShiftOrchestrator`** (partial across `.cs`, `.WorkSelection`, `.TaskActions`, `.Movement`,
-  `.Routing`, `.Deposit`, `.Debris`, `.ManagedCrops`, `.ManagedCropShopping`) — the engine.
-  Owns the `ShiftContext`, the work batches, the per-tick intent dispatch, energy spend, deposits,
-  stuck recovery, and overflow settlement.
+  `.Routing`, `.Travel`, `.Deposit`, `.Debris`, `.ManagedCrops`, `.ManagedCropShopping`) — the
+  engine. Owns the `ShiftContext`, the work batches, the per-tick intent dispatch, energy spend,
+  deposits, stuck recovery, and overflow settlement.
+- **`Travel.cs` (`TravelPlan`/`TravelLeg`/`TravelRunner`)** — the single cross-location mover.
+  A plan is an ordered list of legs (walk to a tile, then optionally warp through to another
+  location); the runner drives it tick-by-tick. Building doors, SVE expansion hops, store entries,
+  and deposit-building trips are all just plans; `ShiftOrchestrator.Travel.cs` holds the
+  `TravelPurpose` dispatch (what to do when a travel arrives or fails) and the plan builders.
+  Each plan carries a failure policy: `ReportFailure` (caller decides: skip batch, mark trip
+  undelivered, abort shopping) or `WarpToDestination` (never strand the worker — warp straight to
+  the destination and continue).
 - **`RecurringContractScheduler`** — `DayStarted` hook: for each contract due today, handles
   festival skips, recurring-terms refresh + affordability, charges the player, and calls
   `StartShift`.
@@ -77,8 +85,8 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 - **`SessionResetHandler`** — clears in-memory worker runtime on `SaveLoaded` / `ReturnedToTitle`.
 - **`WorkAreaScanner`** — scans zones/whole locations into `WorkItem`s, applying tool-capability
   skip rules and computing navigation stand-tiles. **`AnimalTaskHandler`** enumerates animals and
-  performs feed/pet/collect. **`BuildingWorkNavigator`** / **`CrossLocationRouteNavigator`** handle
-  interior door crossings and expansion-location routes.
+  performs feed/pet/collect. **`BuildingWorkNavigator`** resolves building door / interior entry /
+  exit-approach tiles (a pure resolver — it never moves the worker).
 
 ### Core (`Dayswork.Core/`)
 - **Capabilities** — `CapabilityMatrix`/`CapabilityEvaluator`: the tool-level skip table.

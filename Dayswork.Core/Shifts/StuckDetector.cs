@@ -10,15 +10,15 @@ namespace Dayswork.Core.Shifts;
 ///               and true once sum &gt;= threshold.
 ///   PBT-U13-06  Reset() always returns the detector to the not-stuck state.
 /// </summary>
-public sealed class StuckDetector : IStuckDetector
+public sealed class StuckDetector
 {
     private readonly int _threshold;
     private int _noProgressMinutes;
 
     /// <param name="thresholdMinutes">
     /// In-game minutes of continuous no-progress before <see cref="ShouldFireStuck"/> returns true.
-    /// Pass <see cref="Core.Config.IConfigSnapshot.StuckInitialWaitMinutes"/> initially;
-    /// create a new instance with <see cref="Core.Config.IConfigSnapshot.StuckPostTeleportWaitMinutes"/>
+    /// Pass <see cref="Core.Config.ConfigSnapshot.StuckInitialWaitMinutes"/> initially;
+    /// create a new instance with <see cref="Core.Config.ConfigSnapshot.StuckPostTeleportWaitMinutes"/>
     /// after the first teleport recovery.
     /// </param>
     public StuckDetector(int thresholdMinutes)

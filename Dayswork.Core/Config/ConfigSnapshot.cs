@@ -14,7 +14,7 @@ public sealed record ConfigSnapshot(
     IReadOnlyDictionary<EnergyTier, int> EnergyTierEnergy,
     IReadOnlyDictionary<EnergyTier, int> EnergyTierPrice,
     IReadOnlyDictionary<WorkActionKind, int> WorkActionCosts
-) : IConfigSnapshot
+)
 {
     // IReadOnlyDictionary uses reference equality, so override to get structural equality.
     public bool Equals(ConfigSnapshot? other) =>

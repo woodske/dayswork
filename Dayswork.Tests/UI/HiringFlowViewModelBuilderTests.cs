@@ -8,7 +8,7 @@ using Xunit;
 
 public sealed class HiringFlowViewModelBuilderTests
 {
-    private readonly IConfigSnapshot _config = ConfigDefaults.Build();
+    private readonly ConfigSnapshot _config = ConfigDefaults.Build();
 
     [Fact]
     public void Build_NoOutdoorScopeForOutdoorTask_StaysInvalid()

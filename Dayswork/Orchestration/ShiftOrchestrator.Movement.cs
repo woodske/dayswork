@@ -44,6 +44,15 @@ internal sealed partial class ShiftOrchestrator
 
     private void BeginStuckEscalation(GameLocation _)
     {
+        if (_travelPurpose != TravelPurpose.None)
+        {
+            // A stalled travel resolves through its own failure policy (forced warp or
+            // report-to-caller), not the stuck teleport ladder.
+            _travel.ForceFailure();
+            _stuck.Reset();
+            return;
+        }
+
         if (_currentAnimalWork is not null)
         {
 //             ModEntry.ModMonitor.Log(
@@ -91,6 +100,7 @@ internal sealed partial class ShiftOrchestrator
     private void HandleTeleportToTile(IntentTeleportToTile intent, GameLocation location)
     {
         // Instant reposition to recovery tile, then resume working.
+        CancelActiveTravel();
         _farmhand!.Position = new Vector2(intent.Destination.X, intent.Destination.Y) * 64f;
         _farmhand.currentLocation = location;
         _currentLocation = location;
@@ -111,6 +121,7 @@ internal sealed partial class ShiftOrchestrator
     private void HandleTeleportHome(Farm farm)
     {
         // Step 3: reposition home and end shift via normal Depositing path (SAFE-U13-01).
+        CancelActiveTravel();
         _farmhand!.Position = new Vector2(_farmExitTile.X, _farmExitTile.Y) * 64f;
         _farmhand.currentLocation = farm;
         _currentLocation = farm;
@@ -133,43 +144,12 @@ internal sealed partial class ShiftOrchestrator
 
     private void HandleMovement(GameLocation location)
     {
-        if (_pendingExpansionRouteKind != PendingExpansionRouteKind.None)
-        {
-            HandleExpansionRouteMovement();
-            return;
-        }
-
-        if (_managedShoppingInProgress)
-        {
-            HandleManagedShoppingMovement(location);
-            return;
-        }
-
         if (_nav.NavigationFailed)
         {
             if (_managedActive && _currentManagedAction is not null)
             {
                 _currentManagedAction = null;
                 StartNextManagedAction();
-                return;
-            }
-
-            if (_pendingBuildingExit)
-            {
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork][building] could not walk to interior exit at ({_pendingInteriorExitTile.X},{_pendingInteriorExitTile.Y}); warping out.",
-                    LogLevel.Warn);
-                FinishCurrentBatchAfterBuildingExit();
-                return;
-            }
-
-            if (_pendingBuildingEntry)
-            {
-                _buildingNavigator.LogSkipped(_pendingBuildingInterior?.Name ?? "unknown");
-                _pendingBuildingEntry = false;
-                _pendingBuildingInterior = null;
-                _ctx!.CurrentBatchIndex++;
-                BeginCurrentBatch();
                 return;
             }
 
@@ -208,18 +188,6 @@ internal sealed partial class ShiftOrchestrator
             {
                 _ctx!.StateMachine.SetIntent(new IntentPerformManagedCropAction(managedAction));
                 _actionPending = false;
-                return;
-            }
-
-            if (_pendingBuildingExit)
-            {
-                FinishCurrentBatchAfterBuildingExit();
-                return;
-            }
-
-            if (_pendingBuildingEntry)
-            {
-                CompleteBuildingEntry();
                 return;
             }
 

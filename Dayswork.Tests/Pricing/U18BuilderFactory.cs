@@ -8,7 +8,7 @@ internal static class U18BuilderFactory
 {
     public static ConfigValueResolver CreateResolver() => new();
 
-    public static IContractTermsBuilder CreateTermsBuilder()
+    public static ContractTermsBuilder CreateTermsBuilder()
     {
         var resolver = CreateResolver();
         return new ContractTermsBuilder(

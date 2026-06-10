@@ -43,10 +43,10 @@ public static class U23PropertyGenerators
 
 public sealed record U23RecurringDecisionCase(
     Contract Contract,
-    IConfigSnapshot Config,
+    ConfigSnapshot Config,
     bool FestivalToday,
     int AvailableGold);
 
 public sealed record U23RecurringContractCase(
     Contract Contract,
-    IConfigSnapshot Config);
+    ConfigSnapshot Config);

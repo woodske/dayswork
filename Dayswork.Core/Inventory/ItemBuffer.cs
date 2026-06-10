@@ -2,7 +2,7 @@ using Dayswork.Core.Domain;
 
 namespace Dayswork.Core.Inventory;
 
-public sealed class ItemBuffer : IItemBuffer
+public sealed class ItemBuffer
 {
     private readonly List<BufferedItem> _items = new();
 

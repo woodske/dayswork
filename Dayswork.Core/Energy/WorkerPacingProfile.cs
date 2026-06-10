@@ -7,7 +7,7 @@ public sealed record WorkerPacingProfile(
     double ActionAnimationMs,
     int EntranceHoldTicks)
 {
-    public static WorkerPacingProfile FromConfig(IConfigSnapshot config) =>
+    public static WorkerPacingProfile FromConfig(ConfigSnapshot config) =>
         new(
             WalkPixelsPerTick: config.WorkerWalkPixelsPerTick,
             ActionAnimationMs: config.WorkerActionAnimationMs,

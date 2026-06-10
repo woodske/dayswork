@@ -1,5 +1,6 @@
 using Dayswork.Core.Crops;
 using Dayswork.Core.Capabilities;
+using Dayswork.Core.Compat;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
@@ -322,12 +323,150 @@ internal sealed partial class ShiftOrchestrator
             return;
 
         var completedLocationName = _managedBatchLocationName;
-        var completedLocation = _currentLocation;
         ReturnLeftoverSuppliesNoop();
         ResetManagedCropState();
+
+        // Walk out of a non-farm work location through its door, like every other batch exit.
+        if (TryStartManagedBatchExitTravel(completedLocationName))
+            return;
+
         _ctx.CurrentBatchIndex++;
-        ReturnManagedWorkerToFarmIfNeeded(completedLocationName, completedLocation);
         BeginCurrentBatch();
+    }
+
+    /// <summary>
+    /// Starts the walk-to-door exit back to the farm after a managed batch in a non-farm location.
+    /// Returns false when the worker is already on the farm (or the location can't be resolved) and
+    /// the caller should advance to the next batch synchronously.
+    /// </summary>
+    private bool TryStartManagedBatchExitTravel(string locationName)
+    {
+        if (_ctx is null || _farmhand is null)
+            return false;
+
+        var farm = Game1.getFarm();
+        if (string.Equals(locationName, "Farm", StringComparison.Ordinal))
+        {
+            _currentLocation = farm;
+            return false;
+        }
+
+        var current = _farmhand.currentLocation ?? _currentLocation;
+        if (current is null || current == farm)
+        {
+            _currentLocation = farm;
+            return false;
+        }
+
+        // Expansion greenhouse: hop home along the validated route.
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryGetExpansionLocationDescriptor(locationName, out var descriptor) &&
+            descriptor.Role == ExpansionLocationRole.GreenhouseWork)
+        {
+            _ctx.CurrentBatchIndex++;
+            if (!TryStartExpansionTravel(
+                    current.NameOrUniqueName,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    TravelFailurePolicy.WarpToDestination,
+                    TravelPurpose.WorkExit))
+            {
+                WarpExpansionWorkerToFarm();
+                BeginCurrentBatch();
+            }
+
+            return true;
+        }
+
+        // Vanilla building interior: walk to the interior door, warp out at the outdoor door.
+        var farmArrival = _buildingNavigator.TryResolveDoorTile(locationName, out var outdoorDoor, out _)
+            ? outdoorDoor
+            : _farmExitTile;
+        _ctx.CurrentBatchIndex++;
+        StartTravel(BuildBuildingExitPlan(current, farmArrival), TravelPurpose.WorkExit);
+        return true;
+    }
+
+    /// <summary>
+    /// Walks the worker back into the managed batch's building after a shopping trip, then resumes
+    /// planting via the ManagedReentry travel completion. Returns false when re-entry is impossible
+    /// and the caller should complete the batch instead.
+    /// </summary>
+    private bool TryStartManagedReentryTravel()
+    {
+        if (_farmhand is null)
+            return false;
+
+        var farm = Game1.getFarm();
+        var current = _farmhand.currentLocation ?? _currentLocation ?? farm;
+        var target = ResolveManagedBatchLocation(_managedBatchLocationName);
+        if (target is null)
+        {
+            DevLog.Log(
+                $"[Dayswork][managed-crops][shopping] re-entry skipped location={_managedBatchLocationName} reason=location_unavailable.",
+                LogLevel.Warn);
+            return false;
+        }
+
+        if (SameLocation(current, target))
+        {
+            _currentLocation = target;
+            ResumeManagedBatchAfterShopping();
+            return true;
+        }
+
+        // Expansion greenhouse: hop back in along the validated route.
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryGetExpansionLocationDescriptor(_managedBatchLocationName, out var descriptor) &&
+            descriptor.Role == ExpansionLocationRole.GreenhouseWork)
+        {
+            if (compat.TryValidateRoute(
+                    farm,
+                    current.NameOrUniqueName,
+                    _managedBatchLocationName,
+                    ExpansionRoutePurpose.WorkEntry,
+                    out var route,
+                    out var failure))
+            {
+                StartTravel(
+                    BuildExpansionPlan(route, TravelFailurePolicy.WarpToDestination),
+                    TravelPurpose.ManagedReentry);
+                return true;
+            }
+
+            LogExpansionRouteFailure(failure);
+            return false;
+        }
+
+        // Vanilla building: walk to its outdoor door, warp inside.
+        if (TryBuildBuildingEntryPlan(
+                _managedBatchLocationName,
+                TravelFailurePolicy.WarpToDestination,
+                out var plan))
+        {
+            StartTravel(plan, TravelPurpose.ManagedReentry);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Re-plan and resume planting once the worker is back in the managed batch's location.</summary>
+    private void ResumeManagedBatchAfterShopping()
+    {
+        _managedReplanCount = 0;
+        var actions = BuildManagedActions(logDetail: true);
+        foreach (var action in actions)
+            _managedActions.Enqueue(action);
+        _lastManagedSignature = Signature(actions);
+
+        if (_managedActions.Count == 0)
+        {
+            CompleteManagedCropBatch();
+            return;
+        }
+
+        StartNextManagedAction();
     }
 
     private static void NotifyFallbackStoreIfUsed(ShiftPurchaseManifest manifest)
@@ -767,56 +906,4 @@ internal sealed partial class ShiftOrchestrator
         !string.Equals(_managedBatchLocationName, "Farm", StringComparison.Ordinal)
         || _managedAssignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
 
-    private void ReturnManagedWorkerToFarmIfNeeded(string locationName, GameLocation? location)
-    {
-        if (_farmhand is null || string.Equals(locationName, "Farm", StringComparison.Ordinal))
-            return;
-
-        var farm = Game1.getFarm();
-        var current = _farmhand.currentLocation ?? location ?? _currentLocation;
-        if (current is null || current == farm)
-        {
-            _currentLocation = farm;
-            return;
-        }
-
-        if (_buildingNavigator.TryResolveDoorTile(locationName, out var outdoorDoor, out _))
-        {
-            _buildingNavigator.ExitToFarm(_farmhand, outdoorDoor);
-            _currentLocation = farm;
-            return;
-        }
-
-        _nav.WarpWorker(_farmhand, current, farm, _farmExitTile);
-        _currentLocation = farm;
-    }
-
-    private bool RestoreManagedBatchLocationAfterShopping()
-    {
-        if (_farmhand is null || string.Equals(_managedBatchLocationName, "Farm", StringComparison.Ordinal))
-        {
-            _currentLocation = Game1.getFarm();
-            return true;
-        }
-
-        var target = ResolveManagedBatchLocation(_managedBatchLocationName);
-        if (target is null)
-        {
-            DevLog.Log(
-                $"[Dayswork][managed-crops][shopping] re-entry skipped location={_managedBatchLocationName} reason=location_unavailable.",
-                LogLevel.Warn);
-            return false;
-        }
-
-        var current = _farmhand.currentLocation ?? _currentLocation ?? Game1.getFarm();
-        if (!SameLocation(current, target))
-        {
-            var entryTile = _buildingNavigator.ResolveInteriorEntryTile(target);
-            _nav.WarpWorker(_farmhand, current, target, ResolvePassableNearbyInLocation(entryTile, target));
-        }
-
-        _currentLocation = target;
-        _nav.Clear();
-        return true;
-    }
 }

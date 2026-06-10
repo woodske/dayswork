@@ -7,8 +7,8 @@ using Xunit;
 
 public sealed class ContractTermsBuilderTests
 {
-    private readonly IContractTermsBuilder _builder = U18BuilderFactory.CreateTermsBuilder();
-    private readonly IConfigSnapshot _config = ConfigDefaults.Build();
+    private readonly ContractTermsBuilder _builder = U18BuilderFactory.CreateTermsBuilder();
+    private readonly ConfigSnapshot _config = ConfigDefaults.Build();
 
     [Theory]
     [InlineData(EnergyTier.HalfDay)]

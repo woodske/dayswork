@@ -3,7 +3,7 @@ using Dayswork.Core.Domain;
 namespace Dayswork.Core.Capabilities;
 
 /// <inheritdoc/>
-public sealed class CapabilityEvaluator : ICapabilityEvaluator
+public sealed class CapabilityEvaluator
 {
     /// <inheritdoc/>
     public bool CanChop(ToolSnapshot snap, AxeTarget target) =>

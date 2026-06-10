@@ -68,7 +68,7 @@ internal static class RuntimeConfigSnapshotMapper
             workActionCosts);
     }
 
-    private static readonly IConfigSnapshot DefaultSnapshot = ConfigDefaults.Build();
+    private static readonly ConfigSnapshot DefaultSnapshot = ConfigDefaults.Build();
 
     private static Dictionary<string, int> NormalizeNonNegativeDictionary(
         Dictionary<string, int>? actual,

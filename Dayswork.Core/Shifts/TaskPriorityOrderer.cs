@@ -3,7 +3,7 @@ using Dayswork.Core.Domain;
 namespace Dayswork.Core.Shifts;
 
 /// <inheritdoc/>
-public sealed class TaskPriorityOrderer : ITaskPriorityOrderer
+public sealed class TaskPriorityOrderer
 {
     // Lower rank = higher priority. Rank is the index of a task's category in the contract's
     // player-ordered category list; tasks sharing a category share a rank, so route cost

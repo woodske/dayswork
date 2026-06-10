@@ -6,7 +6,7 @@ namespace Dayswork.Tests.Capabilities;
 
 public class CapabilityEvaluatorTests
 {
-    private readonly ICapabilityEvaluator _sut = new CapabilityEvaluator();
+    private readonly CapabilityEvaluator _sut = new CapabilityEvaluator();
 
     // ── CanChop table (FR-SKIP-01, FR-TOOL-02) ──────────────────────────────
     // 20 cases: 5 AxeLevel × 4 non-FruitTree AxeTarget values

@@ -5,7 +5,7 @@ namespace Dayswork.Integration;
 
 public sealed class ModConfig
 {
-    private static readonly IConfigSnapshot DefaultSnapshot = ConfigDefaults.Build();
+    private static readonly ConfigSnapshot DefaultSnapshot = ConfigDefaults.Build();
 
     public int HardCapTime { get; set; } = DefaultSnapshot.HardCapTime;
     public int StuckInitialWaitMinutes { get; set; } = DefaultSnapshot.StuckInitialWaitMinutes;

@@ -13,16 +13,18 @@ namespace Dayswork.Orchestration;
 
 internal sealed partial class ShiftOrchestrator
 {
+    // The travel→action→travel sequencer for a shopping trip. Each phase's travel is started with
+    // TravelPurpose.ShoppingStep; OnManagedShoppingTravelArrived dispatches on the phase when it
+    // completes (buy at the counter, walk to the next store, return home, settle the input chest).
     private enum ManagedShoppingPhase
     {
         None,
-        Routing,
-        AtStoreExterior,
+        TravelingToStoreExterior,
         WalkingToWaitTile,
         WaitingForOpen,
         WalkingToEntrance,
         WalkingToCounter,
-        AtFarm,
+        TravelingToFarm,
         WalkingToInputChest,
     }
 
@@ -58,11 +60,8 @@ internal sealed partial class ShiftOrchestrator
     private bool _managedShoppingInProgress;
     private bool _managedShoppingWrapAfterReturn;
     private ManagedShoppingPhase _managedShoppingPhase;
-    private ManagedShoppingPhase _managedShoppingAfterRoute;
     private readonly Queue<StorePurchaseGroup> _managedShoppingGroups = new();
     private StorePurchaseGroup? _managedShoppingGroup;
-    private readonly Queue<ManagedShoppingRouteHop> _managedShoppingRoute = new();
-    private ManagedShoppingRouteHop? _managedShoppingHop;
     private ManagedStoreRoute? _managedShoppingStoreRoute;
     private readonly List<Item> _managedShoppingCarriedItems = new();
     private readonly List<PurchaseLineOutcome> _managedShoppingOutcomes = new();
@@ -79,11 +78,8 @@ internal sealed partial class ShiftOrchestrator
         _managedShoppingInProgress = false;
         _managedShoppingWrapAfterReturn = false;
         _managedShoppingPhase = ManagedShoppingPhase.None;
-        _managedShoppingAfterRoute = ManagedShoppingPhase.None;
         _managedShoppingGroups.Clear();
         _managedShoppingGroup = null;
-        _managedShoppingRoute.Clear();
-        _managedShoppingHop = null;
         _managedShoppingStoreRoute = null;
         _managedShoppingWaitTicks = 0;
         if (clearCarriedItems)
@@ -215,7 +211,8 @@ internal sealed partial class ShiftOrchestrator
 
             if (TryBuildManagedShoppingRoute(current, route.Exterior, out var hops))
             {
-                StartManagedShoppingRoute(hops, ManagedShoppingPhase.AtStoreExterior);
+                _managedShoppingPhase = ManagedShoppingPhase.TravelingToStoreExterior;
+                StartTravel(BuildShoppingPlan(hops), TravelPurpose.ShoppingStep);
                 return;
             }
 
@@ -226,39 +223,28 @@ internal sealed partial class ShiftOrchestrator
         BeginManagedShoppingReturnToFarm();
     }
 
-    private void HandleManagedShoppingMovement(GameLocation location)
+    /// <summary>Dispatches a completed ShoppingStep travel to the next phase of the trip.</summary>
+    private void OnManagedShoppingTravelArrived()
     {
         if (_ctx is null || _farmhand is null)
             return;
 
-        if (_managedShoppingPhase == ManagedShoppingPhase.WaitingForOpen)
-        {
-            ContinueManagedShoppingWait();
-            return;
-        }
-
-        if (_nav.NavigationFailed)
-        {
-            AbortManagedShoppingTrip($"navigation_failed_{_managedShoppingPhase}");
-            return;
-        }
-
-        if (!_nav.HasArrived)
-            return;
-
         switch (_managedShoppingPhase)
         {
-            case ManagedShoppingPhase.Routing:
-                CompleteManagedShoppingHop();
+            case ManagedShoppingPhase.TravelingToStoreExterior:
+                BeginManagedShoppingStoreExterior();
                 break;
             case ManagedShoppingPhase.WalkingToWaitTile:
                 BeginManagedShoppingWait();
                 break;
             case ManagedShoppingPhase.WalkingToEntrance:
-                EnterManagedShoppingStore();
+                BeginManagedShoppingCounterWalk();
                 break;
             case ManagedShoppingPhase.WalkingToCounter:
                 BuyManagedShoppingGroup();
+                break;
+            case ManagedShoppingPhase.TravelingToFarm:
+                BeginManagedShoppingInputChestWalk();
                 break;
             case ManagedShoppingPhase.WalkingToInputChest:
                 CompleteManagedShoppingReturn();
@@ -269,77 +255,12 @@ internal sealed partial class ShiftOrchestrator
         }
     }
 
-    private void StartManagedShoppingRoute(
-        IEnumerable<ManagedShoppingRouteHop> hops,
-        ManagedShoppingPhase afterRoute)
+    private static TravelPlan BuildShoppingPlan(IEnumerable<ManagedShoppingRouteHop> hops)
     {
-        _managedShoppingRoute.Clear();
-        foreach (var hop in hops)
-            _managedShoppingRoute.Enqueue(hop);
-        _managedShoppingAfterRoute = afterRoute;
-
-        if (_managedShoppingRoute.Count == 0)
-        {
-            CompleteManagedShoppingRoute();
-            return;
-        }
-
-        StartNextManagedShoppingHop();
-    }
-
-    private void StartNextManagedShoppingHop()
-    {
-        if (_farmhand is null)
-            return;
-
-        _managedShoppingHop = _managedShoppingRoute.Dequeue();
-        _managedShoppingPhase = ManagedShoppingPhase.Routing;
-        _currentLocation = _managedShoppingHop.Source;
-        _pendingNavTile = _managedShoppingHop.ApproachTile;
-        _pendingTaskTile = _managedShoppingHop.ApproachTile;
-        EnsureWorkingIntent(new IntentMoveToTile(_managedShoppingHop.ApproachTile));
-        _nav.StartNavigation(_managedShoppingHop.ApproachTile, _managedShoppingHop.Source, _farmhand);
-    }
-
-    private void CompleteManagedShoppingHop()
-    {
-        if (_farmhand is null || _managedShoppingHop is null)
-            return;
-
-        _nav.WarpWorker(
-            _farmhand,
-            _managedShoppingHop.Source,
-            _managedShoppingHop.Target,
-            _managedShoppingHop.ArrivalTile);
-        _currentLocation = _managedShoppingHop.Target;
-        _managedShoppingHop = null;
-
-        if (_managedShoppingRoute.Count > 0)
-        {
-            StartNextManagedShoppingHop();
-            return;
-        }
-
-        CompleteManagedShoppingRoute();
-    }
-
-    private void CompleteManagedShoppingRoute()
-    {
-        var afterRoute = _managedShoppingAfterRoute;
-        _managedShoppingAfterRoute = ManagedShoppingPhase.None;
-
-        switch (afterRoute)
-        {
-            case ManagedShoppingPhase.AtStoreExterior:
-                BeginManagedShoppingStoreExterior();
-                break;
-            case ManagedShoppingPhase.AtFarm:
-                BeginManagedShoppingInputChestWalk();
-                break;
-            default:
-                AbortManagedShoppingTrip($"unexpected_route_target_{afterRoute}");
-                break;
-        }
+        var legs = hops
+            .Select(hop => new TravelLeg(hop.Source, hop.ApproachTile, hop.Target, hop.ArrivalTile))
+            .ToList();
+        return new TravelPlan(legs, TravelFailurePolicy.ReportFailure);
     }
 
     private void BeginManagedShoppingStoreExterior()
@@ -365,10 +286,9 @@ internal sealed partial class ShiftOrchestrator
         }
 
         _managedShoppingPhase = ManagedShoppingPhase.WalkingToWaitTile;
-        _pendingNavTile = _managedShoppingStoreRoute.WaitTile;
-        _pendingTaskTile = _managedShoppingStoreRoute.WaitTile;
-        EnsureWorkingIntent(new IntentMoveToTile(_managedShoppingStoreRoute.WaitTile));
-        _nav.StartNavigation(_managedShoppingStoreRoute.WaitTile, _managedShoppingStoreRoute.Exterior, _farmhand!);
+        StartTravel(
+            WalkOnlyPlan(_managedShoppingStoreRoute.Exterior, _managedShoppingStoreRoute.WaitTile),
+            TravelPurpose.ShoppingStep);
     }
 
     private void BeginManagedShoppingWait()
@@ -414,25 +334,22 @@ internal sealed partial class ShiftOrchestrator
         if (_managedShoppingStoreRoute is null || _farmhand is null)
             return;
 
+        // One leg: walk to the store door, warp through to the interior arrival tile.
+        var route = _managedShoppingStoreRoute;
         _managedShoppingPhase = ManagedShoppingPhase.WalkingToEntrance;
-        _pendingNavTile = _managedShoppingStoreRoute.EntranceTile;
-        _pendingTaskTile = _managedShoppingStoreRoute.EntranceTile;
-        EnsureWorkingIntent(new IntentMoveToTile(_managedShoppingStoreRoute.EntranceTile));
-        _nav.StartNavigation(_managedShoppingStoreRoute.EntranceTile, _managedShoppingStoreRoute.Exterior, _farmhand);
+        StartTravel(
+            new TravelPlan(
+                new[] { new TravelLeg(route.Exterior, route.EntranceTile, route.Interior, route.InteriorArrivalTile) },
+                TravelFailurePolicy.ReportFailure),
+            TravelPurpose.ShoppingStep);
     }
 
-    private void EnterManagedShoppingStore()
+    private void BeginManagedShoppingCounterWalk()
     {
         if (_managedShoppingStoreRoute is null || _farmhand is null)
             return;
 
-        _nav.WarpWorker(
-            _farmhand,
-            _managedShoppingStoreRoute.Exterior,
-            _managedShoppingStoreRoute.Interior,
-            _managedShoppingStoreRoute.InteriorArrivalTile);
         _currentLocation = _managedShoppingStoreRoute.Interior;
-
         var counterTile = FindStoreCounterStandTile(_managedShoppingStoreRoute.Interior, _managedShoppingStoreRoute.Store);
         DevLog.Log(
             $"[Dayswork][managed-crops][shopping] counter selected store={_managedShoppingStoreRoute.Store} " +
@@ -440,10 +357,9 @@ internal sealed partial class ShiftOrchestrator
             LogLevel.Info);
 
         _managedShoppingPhase = ManagedShoppingPhase.WalkingToCounter;
-        _pendingNavTile = counterTile;
-        _pendingTaskTile = counterTile;
-        EnsureWorkingIntent(new IntentMoveToTile(counterTile));
-        _nav.StartNavigation(counterTile, _managedShoppingStoreRoute.Interior, _farmhand);
+        StartTravel(
+            WalkOnlyPlan(_managedShoppingStoreRoute.Interior, counterTile),
+            TravelPurpose.ShoppingStep);
     }
 
     private void BuyManagedShoppingGroup()
@@ -498,7 +414,8 @@ internal sealed partial class ShiftOrchestrator
 
         if (TryBuildManagedShoppingRoute(current, farm, out var hops))
         {
-            StartManagedShoppingRoute(hops, ManagedShoppingPhase.AtFarm);
+            _managedShoppingPhase = ManagedShoppingPhase.TravelingToFarm;
+            StartTravel(BuildShoppingPlan(hops), TravelPurpose.ShoppingStep);
             return;
         }
 
@@ -527,10 +444,7 @@ internal sealed partial class ShiftOrchestrator
         }
 
         _managedShoppingPhase = ManagedShoppingPhase.WalkingToInputChest;
-        _pendingNavTile = standTile;
-        _pendingTaskTile = new TileCoord(chestPoint.X, chestPoint.Y);
-        EnsureWorkingIntent(new IntentMoveToTile(standTile));
-        _nav.StartNavigation(standTile, farm, _farmhand);
+        StartTravel(WalkOnlyPlan(farm, standTile), TravelPurpose.ShoppingStep);
     }
 
     private void CompleteManagedShoppingReturn()
@@ -550,30 +464,23 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        if (!RestoreManagedBatchLocationAfterShopping())
+        // Farm batches resume in place; building batches walk back in through the door first
+        // (ManagedReentry travel), then ResumeManagedBatchAfterShopping re-plans and continues.
+        if (string.Equals(_managedBatchLocationName, "Farm", StringComparison.Ordinal))
         {
-            CompleteManagedCropBatch();
+            _currentLocation = Game1.getFarm();
+            ResumeManagedBatchAfterShopping();
             return;
         }
 
-        _managedReplanCount = 0;
-        var actions = BuildManagedActions(logDetail: true);
-        foreach (var action in actions)
-            _managedActions.Enqueue(action);
-        _lastManagedSignature = Signature(actions);
-
-        if (_managedActions.Count == 0)
-        {
+        if (!TryStartManagedReentryTravel())
             CompleteManagedCropBatch();
-            return;
-        }
-
-        StartNextManagedAction();
     }
 
     private void AbortManagedShoppingTrip(string reason)
     {
         DevLog.Log($"[Dayswork][managed-crops][shopping] aborted reason={reason}.", LogLevel.Warn);
+        CancelActiveTravel();
         CropHudNotifier.ShoppingUnavailable();
         WarpManagedShoppingWorkerToFarm();
         SettleManagedShoppingCarriedItems(showHud: false);

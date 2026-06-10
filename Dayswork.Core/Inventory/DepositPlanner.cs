@@ -3,7 +3,7 @@ using Dayswork.Core.Domain;
 namespace Dayswork.Core.Inventory;
 
 // C-11 DepositPlanner — pure, zero Stardew refs (Pattern M / MAINT-U14-01).
-public sealed class DepositPlanner : IDepositPlanner
+public sealed class DepositPlanner
 {
     public DepositPlan Plan(
         IReadOnlyList<BufferedItem> snapshot,

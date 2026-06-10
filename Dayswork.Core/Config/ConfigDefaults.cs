@@ -6,7 +6,7 @@ using Dayswork.Core.Energy;
 
 public static class ConfigDefaults
 {
-    public static IConfigSnapshot Build()
+    public static ConfigSnapshot Build()
     {
         // Purchased energy tiers: Energy becomes the worker's daily capacity; Price is paid up front
         // (one-time) or each eligible morning (recurring). Overtime is priced at a premium per energy.

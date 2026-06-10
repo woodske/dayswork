@@ -50,7 +50,9 @@ service and the SMAPI event it hangs off is visible there.
 ## Where things live
 
 - `Dayswork/Orchestration/` — the shift engine (`ShiftOrchestrator.*` partials), day-start
-  scheduler, work scanning, animal handling, routing/navigation.
+  scheduler, work scanning, animal handling. All cross-location movement (building doors,
+  expansion hops, store trips) runs through one primitive: `Travel.cs` (`TravelPlan` +
+  `TravelRunner`), with the completion dispatch in `ShiftOrchestrator.Travel.cs`.
 - `Dayswork/Integration/` — building definition + interaction, persistence, config/GMCM, chest and
   shop resolution.
 - `Dayswork/UI/` — the hub-and-spoke hiring menus + a small layout toolkit (`UI/Layout/`).

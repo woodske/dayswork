@@ -3,7 +3,7 @@ namespace Dayswork.Core.Pricing;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
-public sealed class WorkScopeClassifier : IWorkScopeClassifier
+public sealed class WorkScopeClassifier
 {
     public WorkScopeSet Classify(ContractScopeSelection selection, IReadOnlySet<TaskKind> enabledTasks, CropPlan? cropPlan = null)
     {

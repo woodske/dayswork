@@ -26,7 +26,7 @@ internal sealed class ContractListMenu : IClickableMenu
     private const int RowBtnHeight   = BtnHeight + 8;
     private const int BodySidePadding = 16;
 
-    private readonly IContractStore _store;
+    private readonly ContractStore _store;
 
     private List<ContractRowData> _allRows = new();
     private List<VisibleContractRow> _visibleRows = new();
@@ -65,7 +65,7 @@ internal sealed class ContractListMenu : IClickableMenu
         ClickableComponent CancelBtn,
         ClickableComponent EditBtn);
 
-    internal ContractListMenu(IContractStore store, IModHelper helper)
+    internal ContractListMenu(ContractStore store, IModHelper helper)
         : base(0, 0, MenuWidth, ContractMenuLayout.Height)
     {
         _store = store;

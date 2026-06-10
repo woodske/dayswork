@@ -44,9 +44,9 @@ internal sealed class WorkAreaScanner
     // category that should NOT be auto-collected). Empty unless a real case is found. (BR-SVE4-04)
     private static readonly HashSet<string> AnimalProductExcludedIds = new(StringComparer.Ordinal);
 
-    private readonly ICapabilityEvaluator _capability;
+    private readonly CapabilityEvaluator _capability;
 
-    public WorkAreaScanner(ICapabilityEvaluator capability) =>
+    public WorkAreaScanner(CapabilityEvaluator capability) =>
         _capability = capability;
 
     private static bool IsInAnyZone(int x, int y, IReadOnlyList<Zone> zones)

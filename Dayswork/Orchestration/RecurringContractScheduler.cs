@@ -17,7 +17,7 @@ namespace Dayswork.Orchestration;
 // most one contract per day.
 internal sealed class RecurringContractScheduler
 {
-    private readonly IContractStore _store;
+    private readonly ContractStore _store;
     private readonly ShiftOrchestrator _orchestrator;
     private readonly CalendarHandlers _calendar;
     private readonly RecurringDayStartDecisionEngine _decisionEngine;
@@ -25,7 +25,7 @@ internal sealed class RecurringContractScheduler
     private readonly IShiftOutcomeDispatcher _shiftOutcomes;
 
     public RecurringContractScheduler(
-        IContractStore store,
+        ContractStore store,
         ShiftOrchestrator orchestrator,
         CalendarHandlers calendar,
         RecurringDayStartDecisionEngine decisionEngine,
@@ -103,7 +103,7 @@ internal sealed class RecurringContractScheduler
 
     // Full per-recurring-day sequence: rebuild first, persist refreshed terms when valid, then select
     // the festival / needs-attention / cannot-afford / start-shift path from the same rebuilt terms.
-    private void StartRecurring(Contract contract, IConfigSnapshot config, bool festivalToday)
+    private void StartRecurring(Contract contract, ConfigSnapshot config, bool festivalToday)
     {
         var outcome = _decisionEngine.Evaluate(contract, config, festivalToday, Game1.player.Money);
         if (outcome.ShouldPersistTermsSnapshot && outcome.Refresh.TermsSnapshot is not null)

@@ -2,7 +2,7 @@ using Dayswork.Core.Domain;
 
 namespace Dayswork.Core.Persistence;
 
-public sealed class ContractStore : IContractStore
+public sealed class ContractStore
 {
     private readonly Dictionary<ContractId, Contract> _contracts = new();
     private readonly Action<string> _logWarning;

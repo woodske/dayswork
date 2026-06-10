@@ -14,9 +14,9 @@ namespace Dayswork.UI;
 
 internal sealed class HiringFlowCoordinator
 {
-    private readonly IContractTermsBuilder _termsBuilder;
+    private readonly ContractTermsBuilder _termsBuilder;
     private readonly ModConfigManager _configManager;
-    private readonly IContractStore _contractStore;
+    private readonly ContractStore _contractStore;
     private readonly ChestResolver _chestResolver;
     private readonly IModHelper _helper;
 
@@ -25,9 +25,9 @@ internal sealed class HiringFlowCoordinator
     private CropCatalogProvider? _cropCatalog;
 
     public HiringFlowCoordinator(
-        IContractTermsBuilder termsBuilder,
+        ContractTermsBuilder termsBuilder,
         ModConfigManager configManager,
-        IContractStore contractStore,
+        ContractStore contractStore,
         ChestResolver chestResolver,
         IModHelper helper)
     {

@@ -77,21 +77,6 @@ internal sealed class WorkerMovementDriver
         }
     }
 
-    public void StartForcedPixelRoute(GameLocation location, FarmhandNpc worker, params Vector2[] pixelWaypoints)
-    {
-        Clear();
-
-        _worker = worker;
-        worker.currentLocation = location;
-        worker.StopTaskAnimation();
-        HasArrived = false;
-
-        foreach (var point in pixelWaypoints)
-            _waypoints.Enqueue(point);
-
-        MarkArrivedIfNoWaypoints(worker);
-    }
-
     public void WarpWorker(FarmhandNpc worker, GameLocation from, GameLocation to, TileCoord entryTile)
     {
         Clear();

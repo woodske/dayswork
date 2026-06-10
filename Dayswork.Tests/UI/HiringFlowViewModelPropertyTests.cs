@@ -73,7 +73,7 @@ public sealed class HiringFlowViewModelPropertyTests
     private static DraftPreviewState BuildState(
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
-        IConfigSnapshot config,
+        ConfigSnapshot config,
         ContractSchedule schedule,
         ContractId? editingId)
     {

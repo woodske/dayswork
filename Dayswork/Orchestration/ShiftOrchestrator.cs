@@ -22,15 +22,6 @@ namespace Dayswork.Orchestration;
 
 internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 {
-    private enum PendingExpansionRouteKind
-    {
-        None,
-        WorkEntry,
-        WorkExit,
-        DepositEntry,
-        DepositExit,
-    }
-
     // Fallback shipping-bin stand tile for Standard Farm when the live building cannot be resolved.
     private static readonly TileCoord FallbackShippingBinTile = new(71, 13);
 
@@ -52,23 +43,23 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private readonly ToolLevelReader      _toolReader;
     private readonly ToolSwapAnimator     _toolAnimator;
     // Rebuilt per shift from the active contract's player-defined category priority (see StartShift).
-    private ITaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
+    private TaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
     private readonly ShiftPlanBuilder     _shiftPlanBuilder = new();
-    private readonly IWorkScopeClassifier _scopeClassifier;
-    private IConfigSnapshot               _config;
+    private readonly WorkScopeClassifier _scopeClassifier;
+    private ConfigSnapshot               _config;
     private readonly WorkerMovementDriver _nav;
     private readonly WorkAreaScanner      _workAreaScanner;
     private readonly IndoorWorkScanner    _indoorScanner;
     private readonly AnimalTaskHandler    _animalHandler;
     private readonly BuildingWorkNavigator _buildingNavigator;
     private readonly ChestResolver        _chestResolver;
-    private readonly IDepositPlanner      _depositPlanner;
+    private readonly DepositPlanner      _depositPlanner;
     private readonly IShiftOutcomeDispatcher _shiftOutcomeDispatcher;
     private readonly WorkerEnergyLedger _energyLedger = new();
     private readonly WorkUnitBoundaryClassifier _boundaryClassifier = new();
     private readonly OverflowCategorizer _overflowCategorizer = new();
     private readonly WorkerRouteSelector _routeSelector = new();
-    private readonly CrossLocationRouteNavigator _expansionRouteNavigator;
+    private readonly TravelRunner _travel;
 
     private ShiftContext? _ctx;
     private FarmhandNpc?  _farmhand;
@@ -100,14 +91,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private Chest?        _currentTripChest;
     private GameLocation? _currentTripLocation;
     private bool          _currentTripChestAnimated;   // we triggered the open-lid animation
-    // Set while the worker is walking across the farm to a building door for an interior-chest
-    // deposit. Cleared when we cross the door (warp into the interior) on arrival.
-    private GameLocation? _pendingDepositInterior;
-    // Set while the worker is walking to the interior exit door after depositing in a building.
-    // Cleared when we cross the door (warp back to the farm) on arrival.
-    private bool          _pendingDepositExit;
-    private PendingExpansionRouteKind _pendingExpansionRouteKind;
-    private WorkBatch? _pendingExpansionRouteBatch;
 
     // Per-WorkItem state — the nav tile and task tile are tracked separately (trellis crops).
     private bool      _actionPending;
@@ -116,11 +99,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private TileCoord _pendingTaskTile;
     private OutputScopeProvenance _pendingOutputProvenance = OutputScopeProvenance.Unknown;
     private bool      _waitingForDebrisBeforeDeposit;
-    private bool      _pendingBuildingEntry;
-    private bool      _pendingBuildingExit;
-    private TileCoord _pendingBuildingOutdoorDoor;
-    private GameLocation? _pendingBuildingInterior;
-    private TileCoord _pendingInteriorExitTile;
     private FeedWorkPlan? _currentFeedPlan;
     private int _hayInHand;
     private LaborBeatOutcome? _pendingBeatOutcome;
@@ -134,7 +112,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private AnimalWorkItem? _currentAnimalWork;
 
     // Stuck detection. Replaced after first teleport recovery to switch threshold.
-    private IStuckDetector _stuck;
+    private StuckDetector _stuck;
 
     // Time tracking for stuck accumulation (game uses HHMM format; 10-unit increments).
     private int _lastSampledGameTime;
@@ -149,8 +127,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     public ShiftOrchestrator(
         ToolLevelReader toolReader,
-        IConfigSnapshot config,
-        IWorkScopeClassifier scopeClassifier,
+        ConfigSnapshot config,
+        WorkScopeClassifier scopeClassifier,
         ToolSwapAnimator toolAnimator,
         WorkerMovementDriver nav,
         WorkAreaScanner workAreaScanner,
@@ -158,7 +136,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         AnimalTaskHandler animalHandler,
         BuildingWorkNavigator buildingNavigator,
         ChestResolver chestResolver,
-        IDepositPlanner depositPlanner,
+        DepositPlanner depositPlanner,
         IShiftOutcomeDispatcher shiftOutcomeDispatcher)
     {
         _toolReader        = toolReader;
@@ -173,7 +151,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _chestResolver     = chestResolver;
         _depositPlanner    = depositPlanner;
         _shiftOutcomeDispatcher = shiftOutcomeDispatcher;
-        _expansionRouteNavigator = new CrossLocationRouteNavigator(nav);
+        _travel            = new TravelRunner(nav);
         _stuck             = new StuckDetector(config.StuckInitialWaitMinutes);
     }
 
@@ -314,7 +292,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _stuck = new StuckDetector(_config.StuckInitialWaitMinutes);
     }
 
-    public void StartShift(Contract contract, IConfigSnapshot runtimeConfig)
+    public void StartShift(Contract contract, ConfigSnapshot runtimeConfig)
     {
         if (_ctx is not null)
         {
@@ -370,9 +348,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _playerWasSwinging   = false;
         _actionPending       = false;
         _waitingForDebrisBeforeDeposit = false;
-        _pendingBuildingEntry = false;
-        _pendingBuildingExit = false;
-        _pendingBuildingInterior = null;
+        CancelActiveTravel();
         _currentFeedPlan = null;
         _hayInHand = 0;
         _animalWork.Clear();
@@ -385,9 +361,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _pendingDebrisSweeps.Clear();
         _pendingBeatOutcome = null;
         _pendingOutputProvenance = OutputScopeProvenance.Unknown;
-        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
-        _pendingExpansionRouteBatch = null;
-        _expansionRouteNavigator.Clear();
         ResetManagedCropState();
         _shopStockReader.ResetForShift();
         Dayswork.Integration.CropHudNotifier.ResetForShift();
@@ -576,9 +549,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _currentAnimalWork = null;
         _activeBatchSelectionAttempts = 0;
         _activeBatchMaxSelectionAttempts = 4;
-        _pendingBuildingEntry = false;
-        _pendingBuildingExit = false;
-        _pendingBuildingInterior = null;
         _currentFeedPlan = null;
         _hayInHand = 0;
 
@@ -597,12 +567,12 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                     compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
                     descriptor.Role == ExpansionLocationRole.GreenhouseWork)
                 {
-                    if (TryStartExpansionRoute(
+                    if (TryStartExpansionTravel(
                             "Farm",
                             batch.LocationName,
                             ExpansionRoutePurpose.WorkEntry,
-                            PendingExpansionRouteKind.WorkEntry,
-                            batch))
+                            TravelFailurePolicy.ReportFailure,
+                            TravelPurpose.WorkEntry))
                         return;
 
                     _ctx.CurrentBatchIndex++;
@@ -610,21 +580,14 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                     return;
                 }
 
-                if (!_buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out var interior))
+                if (TryBuildBuildingEntryPlan(batch.LocationName, TravelFailurePolicy.ReportFailure, out var plan))
                 {
-                    _ctx.CurrentBatchIndex++;
-                    BeginCurrentBatch();
+                    StartTravel(plan, TravelPurpose.WorkEntry);
                     return;
                 }
 
-                _pendingBuildingEntry = true;
-                _pendingBuildingOutdoorDoor = outdoorDoor;
-                _pendingBuildingInterior = interior;
-                _pendingTask = TaskKind.HarvestCrops;
-                _pendingNavTile = outdoorDoor;
-                _pendingTaskTile = outdoorDoor;
-                EnsureWorkingIntent(new IntentMoveToTile(outdoorDoor));
-                _nav.StartNavigation(outdoorDoor, Game1.getFarm(), _farmhand);
+                _ctx.CurrentBatchIndex++;
+                BeginCurrentBatch();
                 return;
             }
 
@@ -634,12 +597,12 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         if (IsExpansionGreenhouseBatch(batch))
         {
-            if (TryStartExpansionRoute(
+            if (TryStartExpansionTravel(
                     "Farm",
                     batch.LocationName,
                     ExpansionRoutePurpose.WorkEntry,
-                    PendingExpansionRouteKind.WorkEntry,
-                    batch))
+                    TravelFailurePolicy.ReportFailure,
+                    TravelPurpose.WorkEntry))
                 return;
 
             _ctx.CurrentBatchIndex++;
@@ -649,21 +612,14 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         if (BatchRequiresInteriorEntry(batch))
         {
-            if (!_buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out var interior))
+            if (TryBuildBuildingEntryPlan(batch.LocationName, TravelFailurePolicy.ReportFailure, out var plan))
             {
-                _ctx.CurrentBatchIndex++;
-                BeginCurrentBatch();
+                StartTravel(plan, TravelPurpose.WorkEntry);
                 return;
             }
 
-            _pendingBuildingEntry = true;
-            _pendingBuildingOutdoorDoor = outdoorDoor;
-            _pendingBuildingInterior = interior;
-            _pendingTask = TaskKind.FeedAnimals;
-            _pendingNavTile = outdoorDoor;
-            _pendingTaskTile = outdoorDoor;
-            EnsureWorkingIntent(new IntentMoveToTile(outdoorDoor));
-            _nav.StartNavigation(outdoorDoor, Game1.getFarm(), _farmhand);
+            _ctx.CurrentBatchIndex++;
+            BeginCurrentBatch();
             return;
         }
 
@@ -724,22 +680,18 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         {
             var currentName = (_currentLocation ?? _farmhand.currentLocation)?.NameOrUniqueName
                               ?? batch.LocationName;
-            if (string.Equals(currentName, "Farm", StringComparison.OrdinalIgnoreCase))
-            {
-                CompleteExpansionWorkExit();
-                return;
-            }
-
-            if (TryStartExpansionRoute(
+            _ctx.CurrentBatchIndex++;
+            if (!string.Equals(currentName, "Farm", StringComparison.OrdinalIgnoreCase) &&
+                TryStartExpansionTravel(
                     currentName,
                     "Farm",
                     ExpansionRoutePurpose.ReturnToFarm,
-                    PendingExpansionRouteKind.WorkExit,
-                    batch))
+                    TravelFailurePolicy.WarpToDestination,
+                    TravelPurpose.WorkExit))
                 return;
 
             WarpExpansionWorkerToFarm();
-            CompleteExpansionWorkExit();
+            BeginCurrentBatch();
             return;
         }
 
@@ -748,44 +700,15 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             var interior = _currentLocation;
             if (interior is not null && interior != Game1.getFarm())
             {
-                var exitCandidates = _buildingNavigator.ResolveInteriorExitApproachTiles(interior);
-                var fallbackExitTile = exitCandidates[0];
-                var source = new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y);
-                var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, interior);
-                var exitTile = BuildingWorkNavigator.SelectNearestReachableExitApproachTile(
-                    exitCandidates,
-                    routeCosts,
-                    fallbackExitTile);
-                _pendingBuildingExit = true;
-                _pendingInteriorExitTile = exitTile;
-                _pendingTask = TaskKind.FeedAnimals;
-                _pendingNavTile = exitTile;
-                _pendingTaskTile = exitTile;
-                _toolAnimator.StopSwing();
-                EnsureWorkingIntent(new IntentMoveToTile(exitTile));
-                _nav.StartNavigation(exitTile, interior, _farmhand);
+                var farmArrival = _buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out _)
+                    ? outdoorDoor
+                    : _farmExitTile;
+                _ctx.CurrentBatchIndex++;
+                StartTravel(BuildBuildingExitPlan(interior, farmArrival), TravelPurpose.WorkExit);
                 return;
             }
         }
 
-        FinishCurrentBatchAfterBuildingExit();
-    }
-
-    private void FinishCurrentBatchAfterBuildingExit()
-    {
-        if (_ctx is null || _farmhand is null)
-            return;
-
-        var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
-        if (BatchRequiresInteriorEntry(batch))
-        {
-            _buildingNavigator.ExitToFarm(_farmhand, _pendingBuildingOutdoorDoor);
-            _currentLocation = Game1.getFarm();
-        }
-
-        _pendingBuildingExit = false;
-        _currentFeedPlan = null;
-        _hayInHand = 0;
         _ctx.CurrentBatchIndex++;
         BeginCurrentBatch();
     }
@@ -846,6 +769,21 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         // Hit-reaction watcher (Pattern H) — independent of work state.
         CheckHitReaction();
+
+        // Shopping wait loop: parked at the wait tile until the store opens (no travel active).
+        if (_managedShoppingPhase == ManagedShoppingPhase.WaitingForOpen)
+        {
+            ContinueManagedShoppingWait();
+            return;
+        }
+
+        // An active travel owns the worker's movement until it completes or fails; its
+        // completion handler restores the right intent for whatever comes next.
+        if (_travelPurpose != TravelPurpose.None)
+        {
+            HandleTravel();
+            return;
+        }
 
         // Dispatch on current intent.
         switch (_ctx.StateMachine.CurrentIntent)
@@ -1022,11 +960,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _pendingTaskTile = default;
         _pendingOutputProvenance = OutputScopeProvenance.Unknown;
         _waitingForDebrisBeforeDeposit = false;
-        _pendingBuildingEntry = false;
-        _pendingBuildingExit = false;
-        _pendingBuildingOutdoorDoor = default;
-        _pendingBuildingInterior = null;
-        _pendingInteriorExitTile = default;
+        CancelActiveTravel();
         _currentFeedPlan = null;
         _hayInHand = 0;
         _animalWork.Clear();
@@ -1044,11 +978,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _currentTripChest = null;
         _currentTripLocation = null;
         _currentTripChestAnimated = false;
-        _pendingDepositInterior = null;
-        _pendingDepositExit = false;
-        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
-        _pendingExpansionRouteBatch = null;
-        _expansionRouteNavigator.Clear();
         ResetManagedCropState();
         _nav.Clear();
     }

@@ -74,7 +74,7 @@ public sealed class ModEntry : Mod
         var workAreaScanner = new WorkAreaScanner(new CapabilityEvaluator());
         var indoorScanner   = new IndoorWorkScanner(workAreaScanner);
         var animalHandler   = new AnimalTaskHandler(this.Monitor);
-        var buildingNavigator = new BuildingWorkNavigator(this.Monitor, movementDriver);
+        var buildingNavigator = new BuildingWorkNavigator(this.Monitor);
         var depositPlanner  = new DepositPlanner();
         // U-25 WS2: missed/overflow items are deposited into the hiring building's static chest and
         // notices are shown as HUD messages — no Mail Framework Mod, no mailbox delivery.

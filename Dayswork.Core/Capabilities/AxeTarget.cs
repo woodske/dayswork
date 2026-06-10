@@ -3,7 +3,7 @@ namespace Dayswork.Core.Capabilities;
 /// <summary>
 /// Normalized classification of objects the axe can target.
 /// The Mod layer maps Stardew Valley ResourceClump and Tree types to these values
-/// before calling ICapabilityEvaluator.
+/// before calling CapabilityEvaluator.
 /// </summary>
 public enum AxeTarget
 {
