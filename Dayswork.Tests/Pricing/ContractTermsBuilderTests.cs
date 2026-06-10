@@ -1,6 +1,7 @@
 namespace Dayswork.Tests.Pricing;
 
 using Dayswork.Core.Config;
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Pricing;
 using Xunit;
@@ -66,6 +67,37 @@ public sealed class ContractTermsBuilderTests
         Assert.Contains(
             preview.ValidationIssues,
             issue => issue.Code == ContractValidationCode.NoChargeableScopeTaskPair);
+    }
+
+    [Fact]
+    public void BuildPreview_ManagedCropsOnly_IsValid()
+    {
+        var crop = new CropDescriptor(
+            cropItemId: "(O)24",
+            seedItemId: "(O)473",
+            fertilizerItemId: null,
+            daysToFirstHarvest: 8,
+            fertilizedDaysToFirstHarvest: null,
+            regrowDays: null,
+            seasons: new[] { Season.Spring });
+        var assignment = new CropZoneAssignment(
+            zone: new Zone("Farm", new TileCoord(0, 0), new TileCoord(5, 5)),
+            mode: CropAssignmentMode.Seasonal,
+            choices: new[] { new SeasonCropChoice(Season.Spring, crop) });
+        var cropPlan = new CropPlan(new[] { assignment });
+
+        var preview = _builder.BuildPreview(
+            new ContractScopeSelection(
+                OutdoorZones: Array.Empty<Zone>(),
+                AnimalBuildings: Array.Empty<AnimalBuildingSelection>(),
+                Greenhouse: null),
+            new HashSet<TaskKind>(),
+            EnergyTier.FullDay,
+            _config,
+            cropPlan);
+
+        Assert.True(preview.IsValid);
+        Assert.NotNull(preview.ProposedTerms);
     }
 
     [Fact]

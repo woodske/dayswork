@@ -1,6 +1,7 @@
 namespace Dayswork.Core.Pricing;
 
 using Dayswork.Core.Config;
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 
@@ -37,9 +38,10 @@ public sealed class ContractTermsBuilder
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
         EnergyTier tier,
-        ConfigSnapshot config)
+        ConfigSnapshot config,
+        CropPlan? cropPlan = null)
     {
-        var scopes = _scopeClassifier.Classify(selection, enabledTasks);
+        var scopes = _scopeClassifier.Classify(selection, enabledTasks, cropPlan);
         var issues = BuildValidationIssues(scopes, enabledTasks);
         if (!HasChargeableScopeTaskPair(scopes, enabledTasks))
         {
@@ -111,6 +113,7 @@ public sealed class ContractTermsBuilder
         var hasOutdoorPair = scopes.OutdoorWork is not null && enabledTasks.Any(TaskKindSets.IsOutdoorService);
         var hasAnimalPair = scopes.AnimalBuildings.Count > 0 && enabledTasks.Any(TaskKindSets.IsAnimalService);
         var hasGreenhousePair = scopes.GreenhouseWork is not null && enabledTasks.Any(TaskKindSets.IsGreenhouseService);
-        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair;
+        var hasManagedCrops = scopes.ManagedCrops is not null;
+        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair || hasManagedCrops;
     }
 }

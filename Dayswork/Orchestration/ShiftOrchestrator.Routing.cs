@@ -239,7 +239,7 @@ internal sealed partial class ShiftOrchestrator
         descriptor.Role == ExpansionLocationRole.GreenhouseWork;
 
     private void LogExpansionRouteFailure(ExpansionRouteFailure failure) =>
-        ModEntry.ModMonitor.Log(ExpansionCompatService.FormatRouteFailure(failure), LogLevel.Warn);
+        ModEntry.ModMonitor.Log(ExpansionCompatService.FormatRouteFailure(failure), LogLevel.Debug);
 
     internal void WarpExpansionWorkerToFarm()
     {

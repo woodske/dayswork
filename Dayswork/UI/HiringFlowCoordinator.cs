@@ -407,7 +407,8 @@ internal sealed class HiringFlowCoordinator
                 draft.ScopeSelection,
                 draft.EnabledTasks,
                 tier,
-                _configManager.CurrentSnapshot);
+                _configManager.CurrentSnapshot,
+                draft.CropPlan.BuildCropPlan());
             var terms = preview.ProposedTerms;
             options.Add(new EnergyTierOption(tier, terms?.Energy.DailyCapacity, terms?.Pricing.TotalPrice));
         }
@@ -463,7 +464,8 @@ internal sealed class HiringFlowCoordinator
             draft.ScopeSelection,
             draft.EnabledTasks,
             draft.Tier,
-            _configManager.CurrentSnapshot);
+            _configManager.CurrentSnapshot,
+            draft.CropPlan.BuildCropPlan());
 
         draft.PreviewState = HiringFlowViewModelBuilder.Build(draft, preview);
     }
