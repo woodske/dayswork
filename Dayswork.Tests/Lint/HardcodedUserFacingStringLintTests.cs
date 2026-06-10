@@ -17,6 +17,8 @@ public class HardcodedUserFacingStringLintTests
 
     private static readonly Regex[] ApprovedLinePatterns =
     {
+        // Exception messages are developer-facing (they surface in the SMAPI log, not the HUD).
+        new(@"new \w*Exception\(", RegexOptions.Compiled),
         new(@"I18nHelper\.Get\(", RegexOptions.Compiled),
         new(@"_helper\.Translation\.Get\(", RegexOptions.Compiled),
         new(@"\.Log\(", RegexOptions.Compiled),

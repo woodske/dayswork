@@ -26,23 +26,16 @@ internal sealed partial class ShiftOrchestrator
     private readonly ShiftSupplyAggregator _shiftSupplyAggregator = new();
     private readonly PurchaseAffordabilityCalculator _purchaseAffordability = new();
 
-    // Managed-crop batch execution state. A single ordered queue of per-tile beats produced by the
+    // Managed-crop batch execution: a single ordered queue of per-tile beats produced by the
     // pure CropShiftPlanner (harvest → clear → till → fertilize → seed → water), executed one beat
-    // at a time through the existing tick/intent loop.
-    private readonly Queue<TileAction> _managedActions = new();
-    private TileAction? _currentManagedAction;
-    private bool _managedActive;
-
+    // at a time through the existing tick/intent loop. The queue and its state live on the session.
+    //
     // Re-plan support: the managed plan is snapshotted from the live field, so a tile that is debris
     // at snapshot only gets a ClearDebris action this pass. Once the queue drains we re-read the field
     // and re-plan, so newly-cleared tiles get tilled/planted on a following pass (clear -> till ->
     // fertilize -> seed -> water across passes). Bounded by a pass cap + a no-progress signature
     // check so un-clearable debris cannot loop forever.
     private const int MaxManagedReplans = 8;
-    private List<Dayswork.Core.Crops.CropZoneAssignment> _managedAssignments = new();
-    private int _managedReplanCount;
-    private string _lastManagedSignature = string.Empty;
-    private string _managedBatchLocationName = "Farm";
 
     // Plan-level toggles, fixed at their default-ON behavior for now; a configurable OFF switch
     // (GMCM/per-plan) is deferred to a follow-up.
@@ -51,13 +44,17 @@ internal sealed partial class ShiftOrchestrator
 
     private void ResetManagedCropState()
     {
-        _managedActions.Clear();
-        _currentManagedAction = null;
-        _managedActive = false;
-        _managedAssignments = new();
-        _managedReplanCount = 0;
-        _lastManagedSignature = string.Empty;
-        _managedBatchLocationName = "Farm";
+        if (_session is { } s)
+        {
+            s.ManagedActions.Clear();
+            s.CurrentManagedAction = null;
+            s.ManagedActive = false;
+            s.ManagedAssignments = new();
+            s.ManagedReplanCount = 0;
+            s.LastManagedSignature = string.Empty;
+            s.ManagedBatchLocationName = "Farm";
+        }
+
         ResetManagedShoppingState();
     }
 
@@ -65,42 +62,42 @@ internal sealed partial class ShiftOrchestrator
 
     private void BeginManagedCropBatch(WorkBatch batch)
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
         ResetManagedCropState();
 
-        _managedBatchLocationName = batch.LocationName;
+        Session.ManagedBatchLocationName = batch.LocationName;
         var activeLocation = ResolveManagedBatchLocation(batch.LocationName);
         if (activeLocation is null)
         {
             DevLog.Log($"[Dayswork][managed-crops] skipped batch={batch.LocationName} reason=location_unavailable.", LogLevel.Warn);
-            _ctx.CurrentBatchIndex++;
+            Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
         }
 
-        _currentLocation = activeLocation;
+        Session.CurrentLocation = activeLocation;
 
-        _managedAssignments = (_ctx.WorkScopes.ManagedCrops?.Assignments ?? Array.Empty<CropZoneAssignment>())
+        Session.ManagedAssignments = (Session.Ctx.WorkScopes.ManagedCrops?.Assignments ?? Array.Empty<CropZoneAssignment>())
             .Where(assignment => string.Equals(assignment.Zone.LocationName, batch.LocationName, StringComparison.Ordinal))
             .ToList();
 
-        if (_managedAssignments.Count == 0)
+        if (Session.ManagedAssignments.Count == 0)
         {
-            _ctx.CurrentBatchIndex++;
+            Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
         }
 
         var actions = BuildManagedActions(logDetail: true);
         foreach (var action in actions)
-            _managedActions.Enqueue(action);
-        _lastManagedSignature = Signature(actions);
+            Session.ManagedActions.Enqueue(action);
+        Session.LastManagedSignature = Signature(actions);
 
-        DevLog.Log($"[Dayswork][managed-crops] batch={batch.LocationName} zones={_managedAssignments.Count} actions={_managedActions.Count}.", LogLevel.Info);
+        DevLog.Log($"[Dayswork][managed-crops] batch={batch.LocationName} zones={Session.ManagedAssignments.Count} actions={Session.ManagedActions.Count}.", LogLevel.Info);
 
-        _managedActive = true;
+        Session.ManagedActive = true;
         StartNextManagedAction();
     }
 
@@ -111,7 +108,7 @@ internal sealed partial class ShiftOrchestrator
     /// </summary>
     private List<TileAction> BuildManagedActions(bool logDetail)
     {
-        var location = _currentLocation ?? ResolveManagedBatchLocation(_managedBatchLocationName) ?? Game1.getFarm();
+        var location = Session.CurrentLocation ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName) ?? Game1.getFarm();
         var date = CurrentManagedGameDate();
         var isFestival = Utility.isFestivalDay(date.Day, Game1.season);
         var inputChest = TryGetInputChest();
@@ -119,7 +116,7 @@ internal sealed partial class ShiftOrchestrator
         var fieldState = _cropFieldReader.Read(
             location,
             date,
-            _managedAssignments,
+            Session.ManagedAssignments,
             IsCurrentManagedBatchSeasonAgnostic());
 
         if (logDetail)
@@ -129,7 +126,7 @@ internal sealed partial class ShiftOrchestrator
                 LogLevel.Info);
 
         var actions = new List<TileAction>();
-        foreach (var assignment in _managedAssignments)
+        foreach (var assignment in Session.ManagedAssignments)
         {
             var plan = _cropShiftPlanner.Plan(
                 assignment,
@@ -223,7 +220,7 @@ internal sealed partial class ShiftOrchestrator
     /// </summary>
     private bool TryReplanManagedBatch()
     {
-        if (_ctx is null || _managedReplanCount >= MaxManagedReplans)
+        if (_session is null || Session.ManagedReplanCount >= MaxManagedReplans)
             return false;
 
         var actions = BuildManagedActions(logDetail: false);
@@ -231,15 +228,15 @@ internal sealed partial class ShiftOrchestrator
             return false;
 
         var signature = Signature(actions);
-        if (signature == _lastManagedSignature)
+        if (signature == Session.LastManagedSignature)
             return false;
 
-        _lastManagedSignature = signature;
-        _managedReplanCount++;
+        Session.LastManagedSignature = signature;
+        Session.ManagedReplanCount++;
         foreach (var action in actions)
-            _managedActions.Enqueue(action);
+            Session.ManagedActions.Enqueue(action);
 
-        DevLog.Log($"[Dayswork][managed-crops] re-plan pass={_managedReplanCount} actions={actions.Count}.", LogLevel.Info);
+        DevLog.Log($"[Dayswork][managed-crops] re-plan pass={Session.ManagedReplanCount} actions={actions.Count}.", LogLevel.Info);
         return true;
     }
 
@@ -271,35 +268,35 @@ internal sealed partial class ShiftOrchestrator
 
     private void StartNextManagedAction()
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
-        _stuck.Reset();
-        _actionPending = false;
+        Session.Stuck.Reset();
+        Session.ActionPending = false;
 
         if (ShouldWrapUpBeforeNextUnit())
         {
             if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: true))
                 return;
 
-            QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }
 
-        var location = _currentLocation ?? ResolveManagedBatchLocation(_managedBatchLocationName) ?? Game1.getFarm();
+        var location = Session.CurrentLocation ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName) ?? Game1.getFarm();
 
-        while (_managedActions.Count > 0)
+        while (Session.ManagedActions.Count > 0)
         {
-            var action = _managedActions.Dequeue();
+            var action = Session.ManagedActions.Dequeue();
             if (!IsManagedActionApplicable(action, location))
                 continue;
 
-            _currentManagedAction = action;
+            Session.CurrentManagedAction = action;
             var navTile = ResolveManagedNavTile(action, location);
-            _pendingNavTile = navTile;
-            _pendingTaskTile = action.Tile;
+            Session.PendingNavTile = navTile;
+            Session.PendingTaskTile = action.Tile;
             EnsureWorkingIntent(new IntentMoveToTile(navTile));
-            _nav.StartNavigation(navTile, location, _farmhand);
+            _nav.StartNavigation(navTile, location, Session.Worker);
             return;
         }
 
@@ -319,10 +316,10 @@ internal sealed partial class ShiftOrchestrator
 
     private void CompleteManagedCropBatch()
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
-        var completedLocationName = _managedBatchLocationName;
+        var completedLocationName = Session.ManagedBatchLocationName;
         ReturnLeftoverSuppliesNoop();
         ResetManagedCropState();
 
@@ -330,7 +327,7 @@ internal sealed partial class ShiftOrchestrator
         if (TryStartManagedBatchExitTravel(completedLocationName))
             return;
 
-        _ctx.CurrentBatchIndex++;
+        Session.Ctx.CurrentBatchIndex++;
         BeginCurrentBatch();
     }
 
@@ -341,20 +338,20 @@ internal sealed partial class ShiftOrchestrator
     /// </summary>
     private bool TryStartManagedBatchExitTravel(string locationName)
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return false;
 
         var farm = Game1.getFarm();
         if (string.Equals(locationName, "Farm", StringComparison.Ordinal))
         {
-            _currentLocation = farm;
+            Session.CurrentLocation = farm;
             return false;
         }
 
-        var current = _farmhand.currentLocation ?? _currentLocation;
+        var current = Session.Worker.currentLocation ?? Session.CurrentLocation;
         if (current is null || current == farm)
         {
-            _currentLocation = farm;
+            Session.CurrentLocation = farm;
             return false;
         }
 
@@ -363,7 +360,7 @@ internal sealed partial class ShiftOrchestrator
             compat.TryGetExpansionLocationDescriptor(locationName, out var descriptor) &&
             descriptor.Role == ExpansionLocationRole.GreenhouseWork)
         {
-            _ctx.CurrentBatchIndex++;
+            Session.Ctx.CurrentBatchIndex++;
             if (!TryStartExpansionTravel(
                     current.NameOrUniqueName,
                     "Farm",
@@ -381,8 +378,8 @@ internal sealed partial class ShiftOrchestrator
         // Vanilla building interior: walk to the interior door, warp out at the outdoor door.
         var farmArrival = _buildingNavigator.TryResolveDoorTile(locationName, out var outdoorDoor, out _)
             ? outdoorDoor
-            : _farmExitTile;
-        _ctx.CurrentBatchIndex++;
+            : Session.FarmExitTile;
+        Session.Ctx.CurrentBatchIndex++;
         StartTravel(BuildBuildingExitPlan(current, farmArrival), TravelPurpose.WorkExit);
         return true;
     }
@@ -394,36 +391,36 @@ internal sealed partial class ShiftOrchestrator
     /// </summary>
     private bool TryStartManagedReentryTravel()
     {
-        if (_farmhand is null)
+        if (Session.Worker is null)
             return false;
 
         var farm = Game1.getFarm();
-        var current = _farmhand.currentLocation ?? _currentLocation ?? farm;
-        var target = ResolveManagedBatchLocation(_managedBatchLocationName);
+        var current = Session.Worker.currentLocation ?? Session.CurrentLocation ?? farm;
+        var target = ResolveManagedBatchLocation(Session.ManagedBatchLocationName);
         if (target is null)
         {
             DevLog.Log(
-                $"[Dayswork][managed-crops][shopping] re-entry skipped location={_managedBatchLocationName} reason=location_unavailable.",
+                $"[Dayswork][managed-crops][shopping] re-entry skipped location={Session.ManagedBatchLocationName} reason=location_unavailable.",
                 LogLevel.Warn);
             return false;
         }
 
         if (SameLocation(current, target))
         {
-            _currentLocation = target;
+            Session.CurrentLocation = target;
             ResumeManagedBatchAfterShopping();
             return true;
         }
 
         // Expansion greenhouse: hop back in along the validated route.
         if (ModEntry.ExpansionCompat is { } compat &&
-            compat.TryGetExpansionLocationDescriptor(_managedBatchLocationName, out var descriptor) &&
+            compat.TryGetExpansionLocationDescriptor(Session.ManagedBatchLocationName, out var descriptor) &&
             descriptor.Role == ExpansionLocationRole.GreenhouseWork)
         {
             if (compat.TryValidateRoute(
                     farm,
                     current.NameOrUniqueName,
-                    _managedBatchLocationName,
+                    Session.ManagedBatchLocationName,
                     ExpansionRoutePurpose.WorkEntry,
                     out var route,
                     out var failure))
@@ -440,7 +437,7 @@ internal sealed partial class ShiftOrchestrator
 
         // Vanilla building: walk to its outdoor door, warp inside.
         if (TryBuildBuildingEntryPlan(
-                _managedBatchLocationName,
+                Session.ManagedBatchLocationName,
                 TravelFailurePolicy.WarpToDestination,
                 out var plan))
         {
@@ -454,13 +451,13 @@ internal sealed partial class ShiftOrchestrator
     /// <summary>Re-plan and resume planting once the worker is back in the managed batch's location.</summary>
     private void ResumeManagedBatchAfterShopping()
     {
-        _managedReplanCount = 0;
+        Session.ManagedReplanCount = 0;
         var actions = BuildManagedActions(logDetail: true);
         foreach (var action in actions)
-            _managedActions.Enqueue(action);
-        _lastManagedSignature = Signature(actions);
+            Session.ManagedActions.Enqueue(action);
+        Session.LastManagedSignature = Signature(actions);
 
-        if (_managedActions.Count == 0)
+        if (Session.ManagedActions.Count == 0)
         {
             CompleteManagedCropBatch();
             return;
@@ -498,12 +495,12 @@ internal sealed partial class ShiftOrchestrator
 
     private void HandleManagedCropAction(IntentPerformManagedCropAction intent, GameLocation location)
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
         var action = intent.Action;
 
-        if (!_actionPending)
+        if (!Session.ActionPending)
         {
             var debrisTool = WorkerTool.None;
             if (action.Kind == ManagedCropActionKind.ClearDebris)
@@ -524,21 +521,21 @@ internal sealed partial class ShiftOrchestrator
             }
 
             _toolAnimator.StopSwing();
-            _toolAnimator.PlaySwing(tool, FacingToward(_farmhand.TilePoint, action.Tile, _farmhand.FacingDirection));
+            _toolAnimator.PlaySwing(tool, FacingToward(Session.Worker.TilePoint, action.Tile, Session.Worker.FacingDirection));
             ApplyManagedActionGuarded(action, debrisTool, location);
             SpendStaminaForBeat(ManagedCropActionMap.EnergyKind(action.Kind, debrisTool));
-            _actionPending = true;
+            Session.ActionPending = true;
             return;
         }
 
         if (_toolAnimator.IsSwinging)
             return;
 
-        _actionPending = false;
+        Session.ActionPending = false;
 
         var boundary = _boundaryClassifier.EvaluateAfterBeat(
             unitResolved: true,
-            _ctx.EnergyState,
+            Session.Ctx.EnergyState,
             HasBoundaryStopRequested());
 
         if (boundary.ShouldWrapUpAfterCurrentUnit)
@@ -546,7 +543,7 @@ internal sealed partial class ShiftOrchestrator
             if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: true))
                 return;
 
-            QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }
 
@@ -651,7 +648,7 @@ internal sealed partial class ShiftOrchestrator
 
     private void ApplyManagedAction(TileAction action, WorkerTool debrisTool, GameLocation location)
     {
-        _pendingOutputProvenance =
+        Session.PendingOutputProvenance =
             action.Kind == ManagedCropActionKind.Harvest && action.OutputProvenance is not null
                 ? action.OutputProvenance
                 : OutputScopeProvenance.Outdoor();
@@ -660,7 +657,7 @@ internal sealed partial class ShiftOrchestrator
         switch (action.Kind)
         {
             case ManagedCropActionKind.Harvest:
-                _pendingTask = TaskKind.HarvestCrops;
+                Session.PendingTask = TaskKind.HarvestCrops;
                 InvokeHarvest(action.Tile, location);
                 break;
 
@@ -738,28 +735,28 @@ internal sealed partial class ShiftOrchestrator
         if (ObjectTargetClassifier.ClassifyAxe(vec, location) is not null
             || (location.objects.TryGetValue(vec, out var twig) && twig.Name == "Twig"))
         {
-            _pendingTask = TaskKind.CutTrees;
+            Session.PendingTask = TaskKind.CutTrees;
             InvokeCutTree(tile, location);
             return;
         }
 
         if (ObjectTargetClassifier.ClassifyPick(vec, location) is not null)
         {
-            _pendingTask = TaskKind.ClearRocks;
+            Session.PendingTask = TaskKind.ClearRocks;
             InvokeClearRock(tile, location);
             return;
         }
 
         if (location.objects.TryGetValue(vec, out var obj) && obj.IsWeeds())
         {
-            _pendingTask = TaskKind.ClearWeeds;
+            Session.PendingTask = TaskKind.ClearWeeds;
             InvokeClearWeed(tile, location);
             return;
         }
 
         if (tf is Grass)
         {
-            _pendingTask = TaskKind.ClearGrass;
+            Session.PendingTask = TaskKind.ClearGrass;
             InvokeClearGrass(tile, location);
         }
     }
@@ -779,14 +776,14 @@ internal sealed partial class ShiftOrchestrator
         if (ObjectTargetClassifier.ClassifyAxe(vec, location) is { } axeTarget)
         {
             tool = WorkerTool.Axe;
-            capable = CapabilityMatrix.CanChop(_ctx!.ToolSnapshot.AxeLevel, axeTarget);
+            capable = CapabilityMatrix.CanChop(Session.Ctx.ToolSnapshot.AxeLevel, axeTarget);
             return;
         }
 
         if (ObjectTargetClassifier.ClassifyPick(vec, location) is { } pickTarget)
         {
             tool = WorkerTool.Pickaxe;
-            capable = CapabilityMatrix.CanBreak(_ctx!.ToolSnapshot.PickaxeLevel, pickTarget);
+            capable = CapabilityMatrix.CanBreak(Session.Ctx.ToolSnapshot.PickaxeLevel, pickTarget);
             return;
         }
 
@@ -903,7 +900,7 @@ internal sealed partial class ShiftOrchestrator
     }
 
     private bool IsCurrentManagedBatchSeasonAgnostic() =>
-        !string.Equals(_managedBatchLocationName, "Farm", StringComparison.Ordinal)
-        || _managedAssignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
+        !string.Equals(Session.ManagedBatchLocationName, "Farm", StringComparison.Ordinal)
+        || Session.ManagedAssignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
 
 }

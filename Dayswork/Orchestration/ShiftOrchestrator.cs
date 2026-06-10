@@ -41,8 +41,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     private readonly ToolLevelReader      _toolReader;
     private readonly ToolSwapAnimator     _toolAnimator;
-    // Rebuilt per shift from the active contract's player-defined category priority (see StartShift).
-    private TaskPriorityOrderer _priorityOrderer = new TaskPriorityOrderer();
     private readonly ShiftPlanBuilder     _shiftPlanBuilder = new();
     private readonly WorkScopeClassifier _scopeClassifier;
     private ConfigSnapshot               _config;
@@ -60,27 +58,16 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private readonly WorkerRouteSelector _routeSelector = new();
     private readonly TravelRunner _travel;
 
-    private ShiftContext? _ctx;
-    private FarmhandNpc?  _farmhand;
-    private GameLocation? _currentLocation;
-    private int           _tickCount;
-    private int           _morningEntranceHoldTicks;
-    // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,
-    // because the warp tile varies by farm type and player map edits).
-    private TileCoord     _farmExitTile;
-    private TileCoord     _currentExitTile;
+    // The one nullable per-shift reference: all mutable shift state lives on the session
+    // (created at StartShift once spawn succeeds, discarded when the shift ends). Code that
+    // runs only during a shift uses the throwing accessor below.
+    private ShiftSession? _session;
+    private ShiftSession Session =>
+        _session ?? throw new InvalidOperationException("No active shift session.");
 
     // Multi-trip deposit loop state: the ordered remaining trips and the in-flight one.
     private readonly Queue<DepositTrip> _depositTrips = new();
     private DepositTrip? _currentTrip;
-
-    // Guards the FarmForage pre-completion rescan against re-enqueuing the same tile forever.
-    // A forage tile the worker cannot reach (or cannot remove) would otherwise be re-detected on
-    // every completion cycle once ClearRemainingActiveBatchWork drops it from the work queues,
-    // producing an infinite "rescan picked up 1 new tile item" loop. We enqueue each tile at most
-    // once per batch; the set resets when the active batch index changes.
-    private int _rescanBatchIndex = -1;
-    private readonly HashSet<TileCoord> _rescanEnqueuedTiles = new();
 
     // Per-stack paced execution within the in-flight trip. Each stack is one beat gated by
     // _toolAnimator.IsSwinging (duration == WorkerActionAnimationMs), so the deposit cadence
@@ -90,39 +77,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private Chest?        _currentTripChest;
     private GameLocation? _currentTripLocation;
     private bool          _currentTripChestAnimated;   // we triggered the open-lid animation
-
-    // Per-WorkItem state — the nav tile and task tile are tracked separately (trellis crops).
-    private bool      _actionPending;
-    private TaskKind  _pendingTask;
-    private TileCoord _pendingNavTile;
-    private TileCoord _pendingTaskTile;
-    private OutputScopeProvenance _pendingOutputProvenance = OutputScopeProvenance.Unknown;
-    private bool      _waitingForDebrisBeforeDeposit;
-    private FeedWorkPlan? _currentFeedPlan;
-    private int _hayInHand;
-    private LaborBeatOutcome? _pendingBeatOutcome;
-
-    private readonly Queue<AnimalWorkItem> _animalWork = new();
-    private readonly List<WorkItem> _deferredTileWork = new();
-    private readonly List<AnimalWorkItem> _deferredAnimalWork = new();
-    private int _activeBatchSelectionAttempts;
-    private int _activeBatchMaxSelectionAttempts = 4;
-    private WorkItem? _currentTileWork;
-    private AnimalWorkItem? _currentAnimalWork;
-
-    // Stuck detection. Replaced after first teleport recovery to switch threshold.
-    private StuckDetector _stuck;
-
-    // Time tracking for stuck accumulation (game uses HHMM format; 10-unit increments).
-    private int _lastSampledGameTime;
-
-    // Last observed tile position for progress detection.
-    private Point _lastTilePos;
-
-    // Hit-reaction debounce — one emote per player swing.
-    private bool _playerWasSwinging;
-
-    private readonly List<PendingDebrisSweep> _pendingDebrisSweeps = new();
 
     public ShiftOrchestrator(
         ToolLevelReader toolReader,
@@ -151,31 +105,30 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _depositPlanner    = depositPlanner;
         _shiftOutcomeDispatcher = shiftOutcomeDispatcher;
         _travel            = new TravelRunner(nav);
-        _stuck             = new StuckDetector(config.StuckInitialWaitMinutes);
     }
 
     private static int Manhattan(TileCoord a, TileCoord b) =>
         Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
 
-    private bool HasBoundaryStopRequested() => _ctx?.PendingStopReason is not null;
+    private bool HasBoundaryStopRequested() => _session?.Ctx.PendingStopReason is not null;
 
-    private bool IsWorkUnitInProgress() => _actionPending;
+    private bool IsWorkUnitInProgress() => Session.ActionPending;
 
     private bool ShouldWrapUpBeforeNextUnit() =>
-        _ctx is not null && (_ctx.PendingStopReason is not null || !_ctx.EnergyState.CanStartNewWorkUnit);
+        _session is not null && (Session.Ctx.PendingStopReason is not null || !Session.Ctx.EnergyState.CanStartNewWorkUnit);
 
     private void RequestBoundaryStop(ShiftStopReason reason, int? stopTime = null)
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
-        _ctx.PendingStopReason ??= reason;
-        _ctx.ShiftEndTime ??= stopTime ?? Game1.timeOfDay;
+        Session.Ctx.PendingStopReason ??= reason;
+        Session.Ctx.ShiftEndTime ??= stopTime ?? Game1.timeOfDay;
     }
 
     private void QueueWrapUpNow(ShiftStopReason reason, int? stopTime = null)
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
         RequestBoundaryStop(reason, stopTime);
@@ -184,29 +137,29 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     private void SpendStaminaForBeat(WorkActionKind action)
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
-        var spendResult = _energyLedger.ApplyActionCost(_ctx.EnergyState, action);
-        _ctx.EnergyState = spendResult.State;
-        _farmhand?.SetStamina(_ctx.EnergyState.RemainingEnergy, _ctx.EnergyState.Capacity);
+        var spendResult = _energyLedger.ApplyActionCost(Session.Ctx.EnergyState, action);
+        Session.Ctx.EnergyState = spendResult.State;
+        Session.Worker?.SetStamina(Session.Ctx.EnergyState.RemainingEnergy, Session.Ctx.EnergyState.Capacity);
         if (spendResult.ReachedZeroOnThisBeat)
             RequestBoundaryStop(ShiftStopReason.Exhausted);
     }
 
     private void FinishResolvedAnimalWork(GameLocation location, bool madeProgress = true)
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
         var boundary = _boundaryClassifier.EvaluateAfterBeat(
             unitResolved: true,
-            energyState: _ctx.EnergyState,
+            energyState: Session.Ctx.EnergyState,
             boundaryStopRequested: HasBoundaryStopRequested());
 
         if (boundary.ShouldWrapUpAfterCurrentUnit)
         {
-            QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }
 
@@ -231,17 +184,17 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             _ => throw new ArgumentOutOfRangeException(nameof(task), task, null),
         };
 
-    public ContractId? ActiveContractId => _ctx?.ContractId;
+    public ContractId? ActiveContractId => _session?.Ctx.ContractId;
 
     public void EndShiftEarly()
     {
-        if (_ctx is null)
+        if (_session is null)
         {
             ModEntry.ModMonitor.Log("[Dayswork] No active shift to cancel.", LogLevel.Trace);
             return;
         }
 
-        var phase = _ctx.StateMachine.Phase;
+        var phase = Session.Ctx.StateMachine.Phase;
         if (phase is ShiftPhase.Depositing or ShiftPhase.Exiting or ShiftPhase.Done)
         {
             ModEntry.ModMonitor.Log("[Dayswork] Shift is already finishing — nothing to cancel.", LogLevel.Trace);
@@ -249,29 +202,21 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         ModEntry.ModMonitor.Log("[Dayswork] Player cancelled shift early — worker will deposit and leave.", LogLevel.Trace);
-        _ctx.ShiftEndTime = Game1.timeOfDay;
+        Session.Ctx.ShiftEndTime = Game1.timeOfDay;
 
         // Stuck is a transient working state; bridge it to Recovering so that
         // BeginDeposit (which transitions Recovering → Depositing) is legal.
         if (phase == ShiftPhase.Stuck)
-            _ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
+            Session.Ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
 
         QueueWrapUpNow(ShiftStopReason.Cancelled);
     }
 
     public void ResetForSessionBoundary(SessionResetBoundary boundary)
     {
-        var hadRuntimeState = _ctx is not null ||
-                              _farmhand is not null ||
-                              _currentLocation is not null ||
+        var hadRuntimeState = _session is not null ||
                               _depositTrips.Count > 0 ||
-                              _pendingDebrisSweeps.Count > 0 ||
-                              _animalWork.Count > 0 ||
-                              _deferredTileWork.Count > 0 ||
-                              _deferredAnimalWork.Count > 0 ||
-                              _currentTrip is not null ||
-                              _currentTileWork is not null ||
-                              _currentAnimalWork is not null;
+                              _currentTrip is not null;
 
         if (hadRuntimeState)
         {
@@ -280,27 +225,20 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                 LogLevel.Trace);
         }
 
-        ClearWorker();
-        _ctx = null;
-        _tickCount = 0;
-        _farmExitTile = default;
-        _currentExitTile = default;
-        _lastSampledGameTime = 0;
-        _lastTilePos = default;
-        _playerWasSwinging = false;
-        _stuck = new StuckDetector(_config.StuckInitialWaitMinutes);
+        DespawnWorker();
+        _session = null;
     }
 
     public void StartShift(Contract contract, ConfigSnapshot runtimeConfig)
     {
-        if (_ctx is not null)
+        if (_session is not null)
         {
             ModEntry.ModMonitor.Log("[Dayswork] StartShift called while a shift is already active — ignoring.", LogLevel.Warn);
             return;
         }
 
         _config = runtimeConfig;
-        _priorityOrderer = new TaskPriorityOrderer(contract.CategoryPriority);
+        var priorityOrderer = new TaskPriorityOrderer(contract.CategoryPriority);
         var contractTerms = contract.TermsSnapshot;
         var energyState = _energyLedger.StartShift(contractTerms.Energy);
         var pacingProfile = WorkerPacingProfile.FromConfig(runtimeConfig);
@@ -315,8 +253,10 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             $"managedScope={(workScopes.ManagedCrops?.Assignments.Count ?? -1)} zoneLocations=[{string.Join(", ", contract.CropPlan.Assignments.Select(a => a.Zone.LocationName))}].",
             LogLevel.Info);
 
-        _farmExitTile = ResolveSpawnExitTile(farm);
-        var batches = BuildInitialBatches(contract, workScopes, farm, snapshot);
+        // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,
+        // because the warp tile varies by farm type and player map edits).
+        var farmExitTile = ResolveSpawnExitTile(farm);
+        var batches = BuildInitialBatches(contract, workScopes, farm, snapshot, farmExitTile, priorityOrderer);
 
         if (batches.Count == 0 ||
             batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing or BatchKind.FarmForage &&
@@ -331,40 +271,21 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
-        var spawnPos = new Vector2(_farmExitTile.X, _farmExitTile.Y) * 64f;
-        _farmhand = new FarmhandNpc(spawnPos);
-        farm.addCharacter(_farmhand);
-        _currentLocation = farm;
-        _toolAnimator.SetWorker(_farmhand);
+        var spawnPos = new Vector2(farmExitTile.X, farmExitTile.Y) * 64f;
+        var farmhand = new FarmhandNpc(spawnPos);
+        farm.addCharacter(farmhand);
+        _toolAnimator.SetWorker(farmhand);
         _toolAnimator.SetPacingProfile(pacingProfile);
         _nav.SetPacingProfile(pacingProfile);
-        _farmhand.SetStamina(energyState.RemainingEnergy, energyState.Capacity);
+        farmhand.SetStamina(energyState.RemainingEnergy, energyState.Capacity);
 
-        // Reset shift-level state.
-        _stuck              = new StuckDetector(_config.StuckInitialWaitMinutes);
-        _lastSampledGameTime = Game1.timeOfDay;
-        _lastTilePos         = _farmhand.TilePoint;
-        _playerWasSwinging   = false;
-        _actionPending       = false;
-        _waitingForDebrisBeforeDeposit = false;
-        CancelActiveTravel();
-        _currentFeedPlan = null;
-        _hayInHand = 0;
-        _animalWork.Clear();
-        _deferredTileWork.Clear();
-        _deferredAnimalWork.Clear();
-        _currentTileWork = null;
-        _currentAnimalWork = null;
-        _activeBatchSelectionAttempts = 0;
-        _activeBatchMaxSelectionAttempts = 4;
-        _pendingDebrisSweeps.Clear();
-        _pendingBeatOutcome = null;
-        _pendingOutputProvenance = OutputScopeProvenance.Unknown;
-        ResetManagedCropState();
+        // Reset the shift-scoped pieces that outlive a session.
+        _travel.Clear();
+        ResetManagedShoppingState();
         _shopStockReader.ResetForShift();
         Dayswork.Integration.CropHudNotifier.ResetForShift();
 
-        _ctx = new ShiftContext(
+        var ctx = new ShiftContext(
             contractId:       contract.Id,
             workScopes:       workScopes,
             enabledTasks:     contract.EnabledTasks,
@@ -377,7 +298,18 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             shiftStartTime:   Game1.timeOfDay,
             batches:          batches);
 
-        _morningEntranceHoldTicks = pacingProfile.EntranceHoldTicks;
+        _session = new ShiftSession(
+            ctx,
+            farmhand,
+            farm,
+            farmExitTile,
+            priorityOrderer,
+            new StuckDetector(_config.StuckInitialWaitMinutes))
+        {
+            LastSampledGameTime = Game1.timeOfDay,
+            LastTilePos = farmhand.TilePoint,
+            MorningEntranceHoldTicks = pacingProfile.EntranceHoldTicks,
+        };
 
         Game1.addHUDMessage(new HUDMessage(
             I18nHelper.Get("notify.shift_started", new { price = contract.TermsSnapshot.Pricing.TotalPrice }),
@@ -420,7 +352,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         Contract contract,
         WorkScopeSet workScopes,
         Farm farm,
-        ToolSnapshot snapshot)
+        ToolSnapshot snapshot,
+        TileCoord farmExitTile,
+        TaskPriorityOrderer priorityOrderer)
     {
         var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks);
         var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
@@ -457,7 +391,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                     // by the trailing FarmForage batch.
                     var batchTasks = batch.Tasks.ToHashSet();
                     var buildingHomes = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
-                    var animalWork = BuildAnimalWork(farm, buildingHomes, batchTasks);
+                    var animalWork = BuildAnimalWork(farm, buildingHomes, batchTasks, priorityOrderer);
                     batches.Add(batch with { TileWork = Array.Empty<WorkItem>(), AnimalWork = animalWork });
                     break;
                 }
@@ -469,7 +403,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                         farm,
                         batch.Tasks.ToHashSet(),
                         snapshot,
-                        _farmExitTile,
+                        farmExitTile,
                         OutputScopeProvenance.AnimalBuilding(string.Empty));
                     batches.Add(batch with { TileWork = tileWork, AnimalWork = Array.Empty<AnimalWorkItem>() });
                     break;
@@ -486,7 +420,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                             outdoorZones,
                             batchTasks,
                             snapshot,
-                            _farmExitTile,
+                            farmExitTile,
                             outdoorProvenance,
                             ManagedZonesForLocation(batch.LocationName));
                     batches.Add(batch with { TileWork = tileWork });
@@ -511,7 +445,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private IReadOnlyList<AnimalWorkItem> BuildAnimalWork(
         GameLocation location,
         IReadOnlySet<string> selectedAnimalHomes,
-        IReadOnlySet<TaskKind> enabledTasks)
+        IReadOnlySet<TaskKind> enabledTasks,
+        TaskPriorityOrderer priorityOrderer)
     {
         if (selectedAnimalHomes.Count == 0)
             return Array.Empty<AnimalWorkItem>();
@@ -532,32 +467,32 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         return work
             .GroupBy(item => item.Animal.Id)
-            .SelectMany(group => group.OrderBy(item => _priorityOrderer.Order(new[] { item.Task })[0]))
+            .SelectMany(group => group.OrderBy(item => priorityOrderer.Order(new[] { item.Task })[0]))
             .ToList();
     }
 
     private void BeginCurrentBatch()
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
-        _animalWork.Clear();
-        _deferredTileWork.Clear();
-        _deferredAnimalWork.Clear();
-        _currentTileWork = null;
-        _currentAnimalWork = null;
-        _activeBatchSelectionAttempts = 0;
-        _activeBatchMaxSelectionAttempts = 4;
-        _currentFeedPlan = null;
-        _hayInHand = 0;
+        Session.AnimalWork.Clear();
+        Session.DeferredTileWork.Clear();
+        Session.DeferredAnimalWork.Clear();
+        Session.CurrentTileWork = null;
+        Session.CurrentAnimalWork = null;
+        Session.BatchSelectionAttempts = 0;
+        Session.MaxBatchSelectionAttempts = 4;
+        Session.CurrentFeedPlan = null;
+        Session.HayInHand = 0;
 
-        if (_ctx.CurrentBatchIndex >= _ctx.Batches.Count)
+        if (Session.Ctx.CurrentBatchIndex >= Session.Ctx.Batches.Count)
         {
             QueueWrapUpNow(ShiftStopReason.Completed);
             return;
         }
 
-        var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        var batch = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex];
         if (IsManagedCropBatch(batch))
         {
             if (!string.Equals(batch.LocationName, "Farm", StringComparison.Ordinal))
@@ -574,7 +509,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                             TravelPurpose.WorkEntry))
                         return;
 
-                    _ctx.CurrentBatchIndex++;
+                    Session.Ctx.CurrentBatchIndex++;
                     BeginCurrentBatch();
                     return;
                 }
@@ -585,7 +520,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                     return;
                 }
 
-                _ctx.CurrentBatchIndex++;
+                Session.Ctx.CurrentBatchIndex++;
                 BeginCurrentBatch();
                 return;
             }
@@ -604,7 +539,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                     TravelPurpose.WorkEntry))
                 return;
 
-            _ctx.CurrentBatchIndex++;
+            Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
         }
@@ -617,23 +552,23 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                 return;
             }
 
-            _ctx.CurrentBatchIndex++;
+            Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
         }
 
-        _currentLocation = Game1.getFarm();
+        Session.CurrentLocation = Game1.getFarm();
         if (batch.Kind == BatchKind.OutdoorAnimals)
-            batch = RefreshBuildingGrazingWork(batch, _currentLocation);
+            batch = RefreshBuildingGrazingWork(batch, Session.CurrentLocation);
         else if (batch.Kind == BatchKind.FarmForage)
-            batch = RefreshFarmForageWork(batch, _currentLocation);
-        QueueBatchWork(batch, _currentLocation);
+            batch = RefreshFarmForageWork(batch, Session.CurrentLocation);
+        QueueBatchWork(batch, Session.CurrentLocation);
         StartNextAnimalOrTileOrAdvance();
     }
 
     private WorkBatch RefreshBuildingGrazingWork(WorkBatch batch, GameLocation farm)
     {
-        if (_ctx is null || batch.Kind != BatchKind.OutdoorAnimals)
+        if (_session is null || batch.Kind != BatchKind.OutdoorAnimals)
             return batch;
 
         // Per-building grazing pass: rebuild this one building's grazing-animal work at
@@ -641,7 +576,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         // building's home key; farm-wide forage is handled by the separate FarmForage batch.
         var buildingHomes = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
         var batchTasks = batch.Tasks.ToHashSet();
-        var refreshedAnimalWork = BuildAnimalWork(farm, buildingHomes, batchTasks);
+        var refreshedAnimalWork = BuildAnimalWork(farm, buildingHomes, batchTasks, Session.PriorityOrderer);
 
         DevLog.Log($"[Dayswork][building-grazing] home={batch.LocationName} animalWork={refreshedAnimalWork.Count}.");
         return batch with { TileWork = Array.Empty<WorkItem>(), AnimalWork = refreshedAnimalWork };
@@ -649,7 +584,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     private WorkBatch RefreshFarmForageWork(WorkBatch batch, GameLocation farm)
     {
-        if (_ctx is null || batch.Kind != BatchKind.FarmForage)
+        if (_session is null || batch.Kind != BatchKind.FarmForage)
             return batch;
 
         // Truffles spawn on the farm continuously through the day as pigs forage. The initial
@@ -660,8 +595,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             ? _workAreaScanner.ScanWholeLocation(
                 farm,
                 batchTasks,
-                _ctx.ToolSnapshot,
-                _farmExitTile,
+                Session.Ctx.ToolSnapshot,
+                Session.FarmExitTile,
                 OutputScopeProvenance.AnimalBuilding(string.Empty))
             : (IReadOnlyList<WorkItem>)Array.Empty<WorkItem>();
 
@@ -671,15 +606,15 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     private void CompleteCurrentBatch()
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
-        var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        var batch = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex];
         if (IsExpansionGreenhouseBatch(batch))
         {
-            var currentName = (_currentLocation ?? _farmhand.currentLocation)?.NameOrUniqueName
+            var currentName = (Session.CurrentLocation ?? Session.Worker.currentLocation)?.NameOrUniqueName
                               ?? batch.LocationName;
-            _ctx.CurrentBatchIndex++;
+            Session.Ctx.CurrentBatchIndex++;
             if (!string.Equals(currentName, "Farm", StringComparison.OrdinalIgnoreCase) &&
                 TryStartExpansionTravel(
                     currentName,
@@ -696,64 +631,64 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         if (BatchRequiresInteriorEntry(batch))
         {
-            var interior = _currentLocation;
+            var interior = Session.CurrentLocation;
             if (interior is not null && interior != Game1.getFarm())
             {
                 var farmArrival = _buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out _)
                     ? outdoorDoor
-                    : _farmExitTile;
-                _ctx.CurrentBatchIndex++;
+                    : Session.FarmExitTile;
+                Session.Ctx.CurrentBatchIndex++;
                 StartTravel(BuildBuildingExitPlan(interior, farmArrival), TravelPurpose.WorkExit);
                 return;
             }
         }
 
-        _ctx.CurrentBatchIndex++;
+        Session.Ctx.CurrentBatchIndex++;
         BeginCurrentBatch();
     }
 
     private void EnsureWorkingIntent(ShiftIntent intent)
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
-        if (_ctx.StateMachine.Phase == ShiftPhase.WaitingForSpawn ||
-            _ctx.StateMachine.Phase == ShiftPhase.Recovering)
+        if (Session.Ctx.StateMachine.Phase == ShiftPhase.WaitingForSpawn ||
+            Session.Ctx.StateMachine.Phase == ShiftPhase.Recovering)
         {
-            _ctx.StateMachine.Transition(ShiftPhase.Working, intent);
+            Session.Ctx.StateMachine.Transition(ShiftPhase.Working, intent);
             return;
         }
 
-        _ctx.StateMachine.SetIntent(intent);
+        Session.Ctx.StateMachine.SetIntent(intent);
     }
 
     public void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
-        if (_ctx is null || _ctx.StateMachine.Phase == ShiftPhase.Done) return;
+        if (_session is null || Session.Ctx.StateMachine.Phase == ShiftPhase.Done) return;
         if (!Game1.shouldTimePass(false)) return;
-        if (_morningEntranceHoldTicks > 0 && _ctx.StateMachine.Phase == ShiftPhase.Working)
+        if (Session.MorningEntranceHoldTicks > 0 && Session.Ctx.StateMachine.Phase == ShiftPhase.Working)
         {
-            _morningEntranceHoldTicks--;
+            Session.MorningEntranceHoldTicks--;
             return;
         }
 
         _toolAnimator.Update(Game1.currentGameTime);
         _nav.Update();
         ProcessPendingDebrisSweeps();
-        if (_waitingForDebrisBeforeDeposit)
+        if (Session.WaitingForDebrisBeforeDeposit)
         {
-            if (_pendingDebrisSweeps.Count == 0)
+            if (Session.PendingDebrisSweeps.Count == 0)
             {
-                _waitingForDebrisBeforeDeposit = false;
+                Session.WaitingForDebrisBeforeDeposit = false;
                 BeginDeposit();
             }
             return;
         }
-        if (++_tickCount % 4 != 0) return; // tick throttle
+        if (++Session.TickCount % 4 != 0) return; // tick throttle
 
         var farm  = Game1.getFarm();
-        var currentLocation = _currentLocation ?? farm;
-        var phase = _ctx.StateMachine.Phase;
+        var currentLocation = Session.CurrentLocation ?? farm;
+        var phase = Session.Ctx.StateMachine.Phase;
 
         // Progress sampling + stuck detection.
         // Only meaningful while actively working.
@@ -761,7 +696,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         {
             SampleProgress(currentLocation);
             // Re-read phase — SampleProgress may have triggered a transition.
-            phase = _ctx.StateMachine.Phase;
+            phase = Session.Ctx.StateMachine.Phase;
             if (phase != ShiftPhase.Working)
                 return; // let the new intent dispatch next tick
         }
@@ -778,14 +713,14 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         // An active travel owns the worker's movement until it completes or fails; its
         // completion handler restores the right intent for whatever comes next.
-        if (_travelPurpose != TravelPurpose.None)
+        if (Session.TravelPurpose != TravelPurpose.None)
         {
             HandleTravel();
             return;
         }
 
         // Dispatch on current intent.
-        switch (_ctx.StateMachine.CurrentIntent)
+        switch (Session.Ctx.StateMachine.CurrentIntent)
         {
             case IntentMoveToTile:
                 HandleMovement(currentLocation);
@@ -823,39 +758,40 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     public void StopForSleepAndSettle()
     {
-        if (_ctx is null)
+        if (_session is null)
         {
-            ClearWorker();
+            DespawnWorker();
             return;
         }
 
         FlushPendingDebrisSweeps();
 
-        if (!_ctx.ShiftEndTime.HasValue)
+        var ctx = _session.Ctx;
+        if (!ctx.ShiftEndTime.HasValue)
         {
-            _ctx.ShiftEndTime = Game1.timeOfDay;
+            ctx.ShiftEndTime = Game1.timeOfDay;
             ModEntry.ModMonitor.Log(
-                $"[Dayswork] Player slept during active shift; stopping worker at {_ctx.ShiftEndTime}.",
+                $"[Dayswork] Player slept during active shift; stopping worker at {ctx.ShiftEndTime}.",
                 LogLevel.Trace);
         }
 
         // Route collected-but-undelivered items through their safe final destination; explicit
         // shipping-bin output goes straight to the bin, while all other undelivered output uses
-        // automatic overflow.
+        // automatic overflow. This must all happen BEFORE the session is discarded.
         SettleManagedShoppingCarriedItems(showHud: false);
         AppendUndeliveredToOverflow();
 
-        _ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
+        ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
         DispatchShiftOverflow();
 
-        ClearWorker();
-        _ctx = null;
+        DespawnWorker();
+        _session = null;
     }
 
     public void OnTimeChanged(object? sender, TimeChangedEventArgs e)
     {
-        if (_ctx is null) return;
-        var phase = _ctx.StateMachine.Phase;
+        if (_session is null) return;
+        var phase = Session.Ctx.StateMachine.Phase;
 
         // 8pm hard cap (HardCapTime).
         // Only fires from Working or Recovering — both have Depositing as a valid successor.
@@ -939,37 +875,23 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             ? destination
             : AutomaticOutputDestination.Instance;
 
-    private void ClearWorker()
+    // Removes the NPC from the world and clears the shift-scoped state that lives on the
+    // orchestrator rather than the session (travel runner, deposit trips, shopping runtime).
+    // Every caller discards the session right after, which is the rest of the reset.
+    private void DespawnWorker()
     {
-        if (_farmhand is not null)
+        if (_session?.Worker is { } worker)
         {
-            _farmhand.controller = null;
-            (_farmhand.currentLocation ?? _currentLocation)?.characters.Remove(_farmhand);
+            worker.controller = null;
+            (worker.currentLocation ?? _session.CurrentLocation)?.characters.Remove(worker);
             if (Context.IsWorldReady)
-                Game1.getFarm().characters.Remove(_farmhand);
+                Game1.getFarm().characters.Remove(worker);
+            _session.Worker = null;
+            _session.CurrentLocation = null;
         }
 
         _toolAnimator.SetWorker(null);
-        _farmhand = null;
-        _currentLocation = null;
-        _actionPending = false;
-        _morningEntranceHoldTicks = 0;
-        _pendingTask = default;
-        _pendingNavTile = default;
-        _pendingTaskTile = default;
-        _pendingOutputProvenance = OutputScopeProvenance.Unknown;
-        _waitingForDebrisBeforeDeposit = false;
         CancelActiveTravel();
-        _currentFeedPlan = null;
-        _hayInHand = 0;
-        _animalWork.Clear();
-        _deferredTileWork.Clear();
-        _deferredAnimalWork.Clear();
-        _activeBatchSelectionAttempts = 0;
-        _currentTileWork = null;
-        _currentAnimalWork = null;
-        _pendingBeatOutcome = null;
-        _pendingDebrisSweeps.Clear();
         _depositTrips.Clear();
         _currentTrip = null;
         _currentTripExecutionStarted = false;
@@ -977,37 +899,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _currentTripChest = null;
         _currentTripLocation = null;
         _currentTripChestAnimated = false;
-        ResetManagedCropState();
+        ResetManagedShoppingState();
         _nav.Clear();
-    }
-
-    private sealed class PendingDebrisSweep
-    {
-        public PendingDebrisSweep(
-            GameLocation location,
-            Vector2 origin,
-            HashSet<Debris> baseline,
-            int ticksRemaining,
-            int radiusTiles,
-            TaskKind sourceTask,
-            OutputScopeProvenance provenance)
-        {
-            Location = location;
-            Origin = origin;
-            Baseline = baseline;
-            TicksRemaining = ticksRemaining;
-            RadiusTiles = radiusTiles;
-            SourceTask = sourceTask;
-            Provenance = provenance;
-        }
-
-        public GameLocation Location { get; }
-        public Vector2 Origin { get; }
-        public HashSet<Debris> Baseline { get; }
-        public int TicksRemaining { get; set; }
-        public int RadiusTiles { get; }
-        public TaskKind SourceTask { get; }
-        public OutputScopeProvenance Provenance { get; }
     }
 
     private sealed record ActiveWorkCandidate(
@@ -1017,7 +910,5 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         TileCoord TaskTile,
         IReadOnlyList<TileCoord> NavigationTiles,
         int StableOrder);
-
-    private sealed record LaborBeatOutcome(bool UnitResolved, bool TaskFullyComplete);
 
 }

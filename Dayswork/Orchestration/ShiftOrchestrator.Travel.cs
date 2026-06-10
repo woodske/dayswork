@@ -9,54 +9,52 @@ using StardewValley;
 
 namespace Dayswork.Orchestration;
 
+/// <summary>What the orchestrator does when the active travel completes (or fails).</summary>
+internal enum TravelPurpose
+{
+    None,
+    WorkEntry,       // into the active batch's work location
+    WorkExit,        // back to the farm after a batch (batch index already advanced)
+    DepositEntry,    // to the active deposit trip's chest location
+    DepositExit,     // back to the farm after an interior deposit
+    ShoppingStep,    // managed shopping; sub-dispatched on the shopping phase
+    ManagedReentry,  // back into the managed-crop field location after shopping
+}
+
 internal sealed partial class ShiftOrchestrator
 {
-    /// <summary>What the orchestrator does when the active travel completes (or fails).</summary>
-    private enum TravelPurpose
-    {
-        None,
-        WorkEntry,       // into the active batch's work location
-        WorkExit,        // back to the farm after a batch (batch index already advanced)
-        DepositEntry,    // to the active deposit trip's chest location
-        DepositExit,     // back to the farm after an interior deposit
-        ShoppingStep,    // managed shopping; sub-dispatched on _managedShoppingPhase
-        ManagedReentry,  // back into the managed-crop field location after shopping
-    }
-
-    private TravelPurpose _travelPurpose;
-
     private void StartTravel(TravelPlan plan, TravelPurpose purpose)
     {
-        if (_farmhand is null)
+        if (Session.Worker is null)
             return;
 
         _toolAnimator.StopSwing();
-        _travelPurpose = purpose;
+        Session.TravelPurpose = purpose;
 
         if (plan.Legs.Count > 0)
         {
             var firstLeg = plan.Legs[0];
-            _pendingNavTile = firstLeg.WalkTarget;
-            _pendingTaskTile = firstLeg.WalkTarget;
+            Session.PendingNavTile = firstLeg.WalkTarget;
+            Session.PendingTaskTile = firstLeg.WalkTarget;
             EnsureWorkingIntent(new IntentMoveToTile(firstLeg.WalkTarget));
-            _currentLocation = firstLeg.WalkLocation;
+            Session.CurrentLocation = firstLeg.WalkLocation;
         }
 
         DevLog.Log(
             $"[Dayswork][travel] start purpose={purpose} legs={plan.Legs.Count} policy={plan.OnFailure} " +
             $"destination={DescribeTravelDestination(plan)}.");
-        _travel.Start(plan, _farmhand);
+        _travel.Start(plan, Session.Worker);
     }
 
     private void HandleTravel()
     {
         _travel.Update();
-        if (_farmhand?.currentLocation is { } location)
-            _currentLocation = location;
+        if (Session.Worker?.currentLocation is { } location)
+            Session.CurrentLocation = location;
 
         if (_travel.Failed)
         {
-            var purpose = _travelPurpose;
+            var purpose = Session.TravelPurpose;
             var detail = _travel.FailureDetail;
             CancelActiveTravel();
             OnTravelFailed(purpose, detail);
@@ -66,7 +64,7 @@ internal sealed partial class ShiftOrchestrator
         if (!_travel.IsComplete)
             return;
 
-        var arrived = _travelPurpose;
+        var arrived = Session.TravelPurpose;
         if (_travel.CompletedWithForcedWarp)
             DevLog.Log(
                 $"[Dayswork][travel] purpose={arrived} forced warp to destination ({_travel.FailureDetail}).",
@@ -78,7 +76,8 @@ internal sealed partial class ShiftOrchestrator
     private void CancelActiveTravel()
     {
         _travel.Clear();
-        _travelPurpose = TravelPurpose.None;
+        if (_session is { } s)
+            s.TravelPurpose = TravelPurpose.None;
     }
 
     private void OnTravelArrived(TravelPurpose purpose)
@@ -148,7 +147,7 @@ internal sealed partial class ShiftOrchestrator
     private TravelPlan BuildBuildingExitPlan(GameLocation interior, TileCoord farmArrivalTile)
     {
         var exitCandidates = _buildingNavigator.ResolveInteriorExitApproachTiles(interior);
-        var source = new TileCoord(_farmhand!.TilePoint.X, _farmhand.TilePoint.Y);
+        var source = new TileCoord(Session.Worker!.TilePoint.X, Session.Worker.TilePoint.Y);
         var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, interior);
         var exitTile = BuildingWorkNavigator.SelectNearestReachableExitApproachTile(
             exitCandidates,
@@ -183,7 +182,7 @@ internal sealed partial class ShiftOrchestrator
         TravelFailurePolicy policy,
         TravelPurpose travelPurpose)
     {
-        if (_farmhand is null || ModEntry.ExpansionCompat is not { } compat)
+        if (Session.Worker is null || ModEntry.ExpansionCompat is not { } compat)
             return false;
 
         if (!compat.TryValidateRoute(
@@ -207,19 +206,19 @@ internal sealed partial class ShiftOrchestrator
     /// <summary>The worker is inside the active batch's work location; scan it and start working.</summary>
     private void CompleteWorkEntryTravel()
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
-        var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
-        var location = _farmhand.currentLocation ?? Game1.getLocationFromName(batch.LocationName);
+        var batch = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex];
+        var location = Session.Worker.currentLocation ?? Game1.getLocationFromName(batch.LocationName);
         if (location is null)
         {
-            _ctx.CurrentBatchIndex++;
+            Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
         }
 
-        _currentLocation = location;
+        Session.CurrentLocation = location;
         ModEntry.ModMonitor.Log(
             I18nHelper.Get("log.building.entering", new { location = location.Name }),
             LogLevel.Trace);
@@ -239,31 +238,31 @@ internal sealed partial class ShiftOrchestrator
             tileWork = _indoorScanner.ScanInterior(
                 location,
                 batchTasks,
-                _ctx.ToolSnapshot,
+                Session.Ctx.ToolSnapshot,
                 OutputScopeProvenance.AnimalBuilding(batch.LocationName));
             if (batch.FeedBuilding)
             {
-                _currentFeedPlan = _animalHandler.CreateFeedWork(location);
-                tileWork = _currentFeedPlan.WorkItems.Concat(tileWork).ToList();
-                _hayInHand = 0;
+                Session.CurrentFeedPlan = _animalHandler.CreateFeedWork(location);
+                tileWork = Session.CurrentFeedPlan.WorkItems.Concat(tileWork).ToList();
+                Session.HayInHand = 0;
             }
             else
             {
-                _currentFeedPlan = null;
-                _hayInHand = 0;
+                Session.CurrentFeedPlan = null;
+                Session.HayInHand = 0;
             }
 
             var selectedHome = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
-            animalWork = BuildAnimalWork(location, selectedHome, batchTasks);
+            animalWork = BuildAnimalWork(location, selectedHome, batchTasks, Session.PriorityOrderer);
         }
         else
         {
-            _currentFeedPlan = null;
-            _hayInHand = 0;
+            Session.CurrentFeedPlan = null;
+            Session.HayInHand = 0;
             tileWork = _indoorScanner.ScanInterior(
                 location,
                 batchTasks,
-                _ctx.ToolSnapshot,
+                Session.Ctx.ToolSnapshot,
                 OutputScopeProvenance.Greenhouse(batch.LocationName));
             animalWork = Array.Empty<AnimalWorkItem>();
         }
@@ -275,10 +274,10 @@ internal sealed partial class ShiftOrchestrator
     /// <summary>The worker is back on the farm; the batch index was advanced before the travel started.</summary>
     private void CompleteWorkExitTravel()
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
-        _currentLocation = Game1.getFarm();
+        Session.CurrentLocation = Game1.getFarm();
         BeginCurrentBatch();
     }
 
@@ -291,17 +290,17 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        _ctx!.StateMachine.SetIntent(ToDepositIntent(_currentTrip));
-        StartChestDepositNavigation(_currentTrip, chestDest, _currentLocation ?? Game1.getFarm());
+        Session.Ctx.StateMachine.SetIntent(ToDepositIntent(_currentTrip));
+        StartChestDepositNavigation(_currentTrip, chestDest, Session.CurrentLocation ?? Game1.getFarm());
     }
 
     private void SkipCurrentBatchAfterEntryFailure()
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
-        _buildingNavigator.LogSkipped(_ctx.Batches[_ctx.CurrentBatchIndex].LocationName);
-        _ctx.CurrentBatchIndex++;
+        _buildingNavigator.LogSkipped(Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex].LocationName);
+        Session.Ctx.CurrentBatchIndex++;
         BeginCurrentBatch();
     }
 

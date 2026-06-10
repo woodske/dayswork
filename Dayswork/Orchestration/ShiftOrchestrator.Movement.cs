@@ -23,61 +23,61 @@ internal sealed partial class ShiftOrchestrator
 {
     private void SampleProgress(GameLocation location)
     {
-        if (_farmhand is null) return;
+        if (Session.Worker is null) return;
 
-        var currentTile = _farmhand.TilePoint;
+        var currentTile = Session.Worker.TilePoint;
 
         // Progress = tile moved OR action in progress.
-        bool madeProgress = _actionPending || currentTile != _lastTilePos;
-        _lastTilePos = currentTile;
+        bool madeProgress = Session.ActionPending || currentTile != Session.LastTilePos;
+        Session.LastTilePos = currentTile;
 
         // Compute elapsed in-game minutes since last sample.
         // Game.timeOfDay advances in 10-unit steps (e.g. 600 → 610 = 10 in-game minutes).
-        int elapsedMinutes = (Game1.timeOfDay - _lastSampledGameTime) / 10;
-        _lastSampledGameTime = Game1.timeOfDay;
+        int elapsedMinutes = (Game1.timeOfDay - Session.LastSampledGameTime) / 10;
+        Session.LastSampledGameTime = Game1.timeOfDay;
 
-        _stuck.RecordTick(madeProgress, elapsedMinutes);
+        Session.Stuck.RecordTick(madeProgress, elapsedMinutes);
 
-        if (_stuck.ShouldFireStuck())
+        if (Session.Stuck.ShouldFireStuck())
             BeginStuckEscalation(location);
     }
 
     private void BeginStuckEscalation(GameLocation _)
     {
-        if (_travelPurpose != TravelPurpose.None)
+        if (Session.TravelPurpose != TravelPurpose.None)
         {
             // A stalled travel resolves through its own failure policy (forced warp or
             // report-to-caller), not the stuck teleport ladder.
             _travel.ForceFailure();
-            _stuck.Reset();
+            Session.Stuck.Reset();
             return;
         }
 
-        if (_currentAnimalWork is not null)
+        if (Session.CurrentAnimalWork is not null)
         {
 //             ModEntry.ModMonitor.Log(
-//                 $"[Dayswork][animal] skipping unreachable animal {_currentAnimalWork.Animal.DisplayName} ({_currentAnimalWork.Task}).",
+//                 $"[Dayswork][animal] skipping unreachable animal {Session.CurrentAnimalWork.Animal.DisplayName} ({Session.CurrentAnimalWork.Task}).",
 //                 LogLevel.Trace);
-            _currentAnimalWork = null;
+            Session.CurrentAnimalWork = null;
             StartNextAnimalOrTileOrAdvance();
             return;
         }
 
-        _ctx!.StateMachine.Transition(ShiftPhase.Stuck, new IntentPlayEmote(EmoteQuestion));
+        Session.Ctx.StateMachine.Transition(ShiftPhase.Stuck, new IntentPlayEmote(EmoteQuestion));
     }
 
     private void HandlePlayEmote(IntentPlayEmote intent, GameLocation location)
     {
-        _farmhand!.doEmote(intent.EmoteId);
+        Session.Worker!.doEmote(intent.EmoteId);
         QueueStuckTeleport(location);
     }
 
     private void QueueStuckTeleport(GameLocation location)
     {
         // Step 3 trigger: already attempted one recovery.
-        if (_ctx!.RecoveryAttempts >= 1)
+        if (Session.Ctx.RecoveryAttempts >= 1)
         {
-            _ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
+            Session.Ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
             return;
         }
 
@@ -89,11 +89,11 @@ internal sealed partial class ShiftOrchestrator
         if (recoveryTile is null)
         {
             // No reachable tile — skip straight to step 3.
-            _ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
+            Session.Ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
         }
         else
         {
-            _ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportToTile(recoveryTile.Value));
+            Session.Ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportToTile(recoveryTile.Value));
         }
     }
 
@@ -101,19 +101,19 @@ internal sealed partial class ShiftOrchestrator
     {
         // Instant reposition to recovery tile, then resume working.
         CancelActiveTravel();
-        _farmhand!.Position = new Vector2(intent.Destination.X, intent.Destination.Y) * 64f;
-        _farmhand.currentLocation = location;
-        _currentLocation = location;
+        Session.Worker!.Position = new Vector2(intent.Destination.X, intent.Destination.Y) * 64f;
+        Session.Worker.currentLocation = location;
+        Session.CurrentLocation = location;
         _nav.Clear();
 
         // Switch to post-teleport threshold and reset detector.
-        _stuck = new StuckDetector(_config.StuckPostTeleportWaitMinutes);
-        _lastSampledGameTime = Game1.timeOfDay;
-        _lastTilePos         = _farmhand!.TilePoint;
-        _ctx!.RecoveryAttempts++;
+        Session.Stuck = new StuckDetector(_config.StuckPostTeleportWaitMinutes);
+        Session.LastSampledGameTime = Game1.timeOfDay;
+        Session.LastTilePos         = Session.Worker!.TilePoint;
+        Session.Ctx.RecoveryAttempts++;
 
         // Recovering → Working: continue from the teleport tile.
-        _actionPending = false;
+        Session.ActionPending = false;
         // The next work item drives the real nav through route-ranked active-batch selection.
         StartNextAnimalOrTileOrAdvance();
     }
@@ -122,61 +122,61 @@ internal sealed partial class ShiftOrchestrator
     {
         // Step 3: reposition home and end shift via normal Depositing path.
         CancelActiveTravel();
-        _farmhand!.Position = new Vector2(_farmExitTile.X, _farmExitTile.Y) * 64f;
-        _farmhand.currentLocation = farm;
-        _currentLocation = farm;
+        Session.Worker!.Position = new Vector2(Session.FarmExitTile.X, Session.FarmExitTile.Y) * 64f;
+        Session.Worker.currentLocation = farm;
+        Session.CurrentLocation = farm;
         _nav.Clear();
         QueueWrapUpNow(ShiftStopReason.StuckAbort);
     }
 
     private void CheckHitReaction()
     {
-        if (_farmhand is null || _ctx is null) return;
+        if (_session is null || Session.Worker is null) return;
 
         bool isSwinging = Game1.player.UsingTool && Game1.player.CurrentTool is MeleeWeapon;
-        float dist = Math.Abs(_farmhand.TilePoint.X - Game1.player.TilePoint.X)
-                   + Math.Abs(_farmhand.TilePoint.Y - Game1.player.TilePoint.Y);
-        if (HitReactionPolicy.ShouldTriggerEmote(isSwinging, _playerWasSwinging, dist, HitRangeTiles))
-            _farmhand.doEmote(EmoteExclamation);
+        float dist = Math.Abs(Session.Worker.TilePoint.X - Game1.player.TilePoint.X)
+                   + Math.Abs(Session.Worker.TilePoint.Y - Game1.player.TilePoint.Y);
+        if (HitReactionPolicy.ShouldTriggerEmote(isSwinging, Session.PlayerWasSwinging, dist, HitRangeTiles))
+            Session.Worker.doEmote(EmoteExclamation);
 
-        _playerWasSwinging = isSwinging;
+        Session.PlayerWasSwinging = isSwinging;
     }
 
     private void HandleMovement(GameLocation location)
     {
         if (_nav.NavigationFailed)
         {
-            if (_managedActive && _currentManagedAction is not null)
+            if (Session.ManagedActive && Session.CurrentManagedAction is not null)
             {
-                _currentManagedAction = null;
+                Session.CurrentManagedAction = null;
                 StartNextManagedAction();
                 return;
             }
 
-            if (_currentAnimalWork is not null)
+            if (Session.CurrentAnimalWork is not null)
             {
 //                 ModEntry.ModMonitor.Log(
-//                     $"[Dayswork][animal] navigation failed for {_currentAnimalWork.Animal.DisplayName} ({_currentAnimalWork.Task}); deferring within active batch.",
+//                     $"[Dayswork][animal] navigation failed for {Session.CurrentAnimalWork.Animal.DisplayName} ({Session.CurrentAnimalWork.Task}); deferring within active batch.",
 //                     LogLevel.Trace);
-                _deferredAnimalWork.Add(_currentAnimalWork);
-                _currentAnimalWork = null;
+                Session.DeferredAnimalWork.Add(Session.CurrentAnimalWork);
+                Session.CurrentAnimalWork = null;
                 StartNextAnimalOrTileOrAdvance();
                 return;
             }
 
-            if (_currentTileWork is not null)
+            if (Session.CurrentTileWork is not null)
             {
 //                 ModEntry.ModMonitor.Log(
-//                     $"[Dayswork][nav] failed task={_currentTileWork.Task} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_currentTileWork.TaskTile.X},{_currentTileWork.TaskTile.Y}); deferring within active batch.",
+//                     $"[Dayswork][nav] failed task={Session.CurrentTileWork.Task} nav=({Session.PendingNavTile.X},{Session.PendingNavTile.Y}) task=({Session.CurrentTileWork.TaskTile.X},{Session.CurrentTileWork.TaskTile.Y}); deferring within active batch.",
 //                     LogLevel.Trace);
-                _deferredTileWork.Add(_currentTileWork);
-                _currentTileWork = null;
+                Session.DeferredTileWork.Add(Session.CurrentTileWork);
+                Session.CurrentTileWork = null;
                 StartNextAnimalOrTileOrAdvance();
                 return;
             }
 
             ModEntry.ModMonitor.Log(
-                $"[Dayswork][nav] failed task={_pendingTask} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_pendingTaskTile.X},{_pendingTaskTile.Y}); skipping.",
+                $"[Dayswork][nav] failed task={Session.PendingTask} nav=({Session.PendingNavTile.X},{Session.PendingNavTile.Y}) task=({Session.PendingTaskTile.X},{Session.PendingTaskTile.Y}); skipping.",
                 LogLevel.Warn);
             AdvanceWorkList(location);
             return;
@@ -184,49 +184,49 @@ internal sealed partial class ShiftOrchestrator
 
         if (_nav.HasArrived)
         {
-            if (_managedActive && _currentManagedAction is { } managedAction)
+            if (Session.ManagedActive && Session.CurrentManagedAction is { } managedAction)
             {
-                _ctx!.StateMachine.SetIntent(new IntentPerformManagedCropAction(managedAction));
-                _actionPending = false;
+                Session.Ctx.StateMachine.SetIntent(new IntentPerformManagedCropAction(managedAction));
+                Session.ActionPending = false;
                 return;
             }
 
-            if (_currentAnimalWork is not null)
+            if (Session.CurrentAnimalWork is not null)
             {
-                var animal = _animalHandler.FindLiveAnimal(location, _currentAnimalWork.Animal);
-                if (animal is null || !IsAnimalWorkActionable(_currentAnimalWork, animal))
+                var animal = _animalHandler.FindLiveAnimal(location, Session.CurrentAnimalWork.Animal);
+                if (animal is null || !IsAnimalWorkActionable(Session.CurrentAnimalWork, animal))
                 {
-                    _currentAnimalWork = null;
+                    Session.CurrentAnimalWork = null;
                     StartNextAnimalOrTileOrAdvance();
                     return;
                 }
 
-                _ctx!.StateMachine.SetIntent(_currentAnimalWork.Task == TaskKind.PetAnimals
-                    ? new IntentPetAnimal(_currentAnimalWork.Animal)
-                    : new IntentCollectFromAnimal(_currentAnimalWork.Animal));
+                Session.Ctx.StateMachine.SetIntent(Session.CurrentAnimalWork.Task == TaskKind.PetAnimals
+                    ? new IntentPetAnimal(Session.CurrentAnimalWork.Animal)
+                    : new IntentCollectFromAnimal(Session.CurrentAnimalWork.Animal));
                 return;
             }
 
-            if (_currentTileWork is not null && !IsTileWorkActionable(_currentTileWork, location))
+            if (Session.CurrentTileWork is not null && !IsTileWorkActionable(Session.CurrentTileWork, location))
             {
-                _currentTileWork = null;
+                Session.CurrentTileWork = null;
                 StartNextAnimalOrTileOrAdvance();
                 return;
             }
 
 //             ModEntry.ModMonitor.Log(
-//                 $"[Dayswork][nav] arrived task={_pendingTask} nav=({_pendingNavTile.X},{_pendingNavTile.Y}) task=({_pendingTaskTile.X},{_pendingTaskTile.Y}) worker=({_farmhand!.TilePoint.X},{_farmhand.TilePoint.Y}) fallback={_nav.UsedDirectFallback}.",
+//                 $"[Dayswork][nav] arrived task={Session.PendingTask} nav=({Session.PendingNavTile.X},{Session.PendingNavTile.Y}) task=({Session.PendingTaskTile.X},{Session.PendingTaskTile.Y}) worker=({Session.Worker!.TilePoint.X},{Session.Worker.TilePoint.Y}) fallback={_nav.UsedDirectFallback}.",
 //                 LogLevel.Trace);
-            _ctx!.StateMachine.SetIntent(new IntentPerformTaskAt(_pendingTaskTile, _pendingTask));
-            _actionPending = false;
+            Session.Ctx.StateMachine.SetIntent(new IntentPerformTaskAt(Session.PendingTaskTile, Session.PendingTask));
+            Session.ActionPending = false;
         }
     }
 
     private int FacingTowardDestination()
     {
-        if (_currentTrip is null || _farmhand is null)
-            return _farmhand?.FacingDirection ?? 2;
-        return FacingToward(_farmhand.TilePoint, _currentTrip.Tile, _farmhand.FacingDirection);
+        if (_currentTrip is null || Session.Worker is null)
+            return Session.Worker?.FacingDirection ?? 2;
+        return FacingToward(Session.Worker.TilePoint, _currentTrip.Tile, Session.Worker.FacingDirection);
     }
 
     private static int FacingToward(Point from, TileCoord to, int fallback)

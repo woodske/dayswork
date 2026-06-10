@@ -46,7 +46,7 @@ internal sealed partial class ShiftOrchestrator
         // already route the items to overflow inside BeginTripExecution and return false so we skip the loop.
         if (!_currentTripExecutionStarted)
         {
-            if (!BeginTripExecution(_currentTrip, _currentLocation ?? farm))
+            if (!BeginTripExecution(_currentTrip, Session.CurrentLocation ?? farm))
             {
                 FinalizeAndAdvanceTrip(farm);
             }
@@ -81,7 +81,7 @@ internal sealed partial class ShiftOrchestrator
 
     private bool BeginDepositInteriorExitWalk()
     {
-        if (_farmhand is null ||
+        if (Session.Worker is null ||
             _currentTrip is not { Destination: ChestDestination { Ref.LocationName: not "Farm" } chestDest })
             return false;
 
@@ -89,7 +89,7 @@ internal sealed partial class ShiftOrchestrator
             ModEntry.ExpansionCompat is { } compat &&
             compat.IsExpansionDepositLocation(expansionChest.Ref.LocationName))
         {
-            var routeSource = (_currentLocation ?? _farmhand.currentLocation)?.NameOrUniqueName
+            var routeSource = (Session.CurrentLocation ?? Session.Worker.currentLocation)?.NameOrUniqueName
                               ?? expansionChest.Ref.LocationName;
             if (TryStartExpansionTravel(
                     routeSource,
@@ -103,13 +103,13 @@ internal sealed partial class ShiftOrchestrator
             return false;
         }
 
-        var interior = _currentLocation;
+        var interior = Session.CurrentLocation;
         if (interior is null || interior == Game1.getFarm())
             return false;
 
         var farmArrival = _buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out _)
             ? outdoorDoor
-            : _farmExitTile;
+            : Session.FarmExitTile;
         StartTravel(BuildBuildingExitPlan(interior, farmArrival), TravelPurpose.DepositExit);
         return true;
     }
@@ -130,7 +130,7 @@ internal sealed partial class ShiftOrchestrator
         {
             var next = _depositTrips.Dequeue();
             _currentTrip = next;
-            _ctx!.StateMachine.SetIntent(ToDepositIntent(next));
+            Session.Ctx.StateMachine.SetIntent(ToDepositIntent(next));
             StartDepositTrip(next);
             return;
         }
@@ -153,7 +153,7 @@ internal sealed partial class ShiftOrchestrator
             {
                 // Chest moved/destroyed: everything for it goes to automatic overflow.
                 foreach (var stack in trip.Items)
-                    _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
+                    Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork][deposit] chest missing at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) routed to automatic overflow.",
                     LogLevel.Trace);
@@ -165,7 +165,7 @@ internal sealed partial class ShiftOrchestrator
                 // A farmer (player) has the chest UI open. Defer the whole trip to overflow
                 // rather than mutating items behind the player's back.
                 foreach (var stack in trip.Items)
-                    _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestBusy));
+                    Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestBusy));
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork][deposit] chest busy at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) routed to automatic overflow.",
                     LogLevel.Trace);
@@ -193,7 +193,7 @@ internal sealed partial class ShiftOrchestrator
 
     private void DepositCurrentTripStack()
     {
-        if (_currentTrip is null || _ctx is null)
+        if (_currentTrip is null || _session is null)
             return;
 
         var stack = _currentTrip.Items[_currentTripStackIndex];
@@ -207,7 +207,7 @@ internal sealed partial class ShiftOrchestrator
             if (chest.GetMutex().IsLocked())
             {
                 for (var i = _currentTripStackIndex; i < _currentTrip.Items.Count; i++)
-                    _ctx.Overflow.Add(new OverflowItem(_currentTrip.Items[i], OverflowReason.ChestBusy));
+                    Session.Ctx.Overflow.Add(new OverflowItem(_currentTrip.Items[i], OverflowReason.ChestBusy));
                 _currentTripStackIndex = _currentTrip.Items.Count;  // skip ahead to "trip complete"
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork][deposit] chest became busy mid-trip; remaining stacks routed to automatic overflow.",
@@ -301,7 +301,7 @@ internal sealed partial class ShiftOrchestrator
         if (leftover is not null && leftover.Stack > 0)
         {
             // Chest full: route the remainder to automatic overflow.
-            _ctx!.Overflow.Add(new OverflowItem(
+            Session.Ctx.Overflow.Add(new OverflowItem(
                 new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance),
                 OverflowReason.ChestFull));
             ModEntry.ModMonitor.Log(
@@ -312,11 +312,11 @@ internal sealed partial class ShiftOrchestrator
 
     private void BeginExit(Farm farm)
     {
-        _ctx!.StateMachine.Transition(ShiftPhase.Exiting, new IntentExitFarm());
-        _currentExitTile = ResolveReachableShiftExitTile(farm);
-        _pendingNavTile = _currentExitTile;
-        _pendingTaskTile = _currentExitTile;
-        _nav.StartNavigation(_currentExitTile, farm, _farmhand!);
+        Session.Ctx.StateMachine.Transition(ShiftPhase.Exiting, new IntentExitFarm());
+        Session.CurrentExitTile = ResolveReachableShiftExitTile(farm);
+        Session.PendingNavTile = Session.CurrentExitTile;
+        Session.PendingTaskTile = Session.CurrentExitTile;
+        _nav.StartNavigation(Session.CurrentExitTile, farm, Session.Worker!);
     }
 
     private void HandleExit(Farm farm)
@@ -331,13 +331,13 @@ internal sealed partial class ShiftOrchestrator
 
         if (_nav.NavigationFailed)
             ModEntry.ModMonitor.Log(
-                $"[Dayswork][exit] could not path to exit tile ({_currentExitTile.X},{_currentExitTile.Y}) — removing worker in place.",
+                $"[Dayswork][exit] could not path to exit tile ({Session.CurrentExitTile.X},{Session.CurrentExitTile.Y}) — removing worker in place.",
                 LogLevel.Warn);
         else
             ModEntry.ModMonitor.Log("[Dayswork][exit] worker reached farm exit — shift complete.", LogLevel.Trace);
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork] Shift complete. StopReason={_ctx!.StateMachine.StopReason}. Remaining stamina={_ctx.EnergyState.RemainingEnergy}/{_ctx.EnergyState.Capacity}.",
+            $"[Dayswork] Shift complete. StopReason={Session.Ctx.StateMachine.StopReason}. Remaining stamina={Session.Ctx.EnergyState.RemainingEnergy}/{Session.Ctx.EnergyState.Capacity}.",
             LogLevel.Trace);
 
         // One settlement letter next morning for overflow items only; refunds are not settled here.
@@ -348,25 +348,26 @@ internal sealed partial class ShiftOrchestrator
         // Reset next morning on DayStarted (ModEntry).
         HiringBuilding.WorkCompletedToday = true;
 
-        ClearWorker();
-        _ctx.StateMachine.Transition(ShiftPhase.Done);
-        _ctx = null;
+        var session = Session;
+        DespawnWorker();
+        session.Ctx.StateMachine.Transition(ShiftPhase.Done);
+        _session = null;
     }
 
     private void AdvanceWorkList(GameLocation location)
     {
-        _stuck.Reset(); // any advance = progress signal
-        _currentTileWork = null;
+        Session.Stuck.Reset(); // any advance = progress signal
+        Session.CurrentTileWork = null;
         RecordActiveBatchProgress();
         StartNextAnimalOrTileOrAdvance();
     }
 
     private void BeginDeposit()
     {
-        if (_ctx is null)
+        if (_session is null)
             return;
 
-        if (_ctx.StateMachine.Phase is ShiftPhase.Depositing or ShiftPhase.Exiting or ShiftPhase.Done)
+        if (Session.Ctx.StateMachine.Phase is ShiftPhase.Depositing or ShiftPhase.Exiting or ShiftPhase.Done)
             return;
 
         // A wrap-up (energy cap, 8pm, cancel, stuck-home) can fire mid-travel; stop the runner
@@ -376,14 +377,14 @@ internal sealed partial class ShiftOrchestrator
         var farm = Game1.getFarm();
         ReturnWorkerToFarmForDeposit();
         // Valid from Working, Stuck, Recovering (all have Depositing as a successor).
-        _morningEntranceHoldTicks = 0;
-        if (_pendingDebrisSweeps.Count > 0)
+        Session.MorningEntranceHoldTicks = 0;
+        if (Session.PendingDebrisSweeps.Count > 0)
         {
-            _waitingForDebrisBeforeDeposit = true;
-            _actionPending = true;
+            Session.WaitingForDebrisBeforeDeposit = true;
+            Session.ActionPending = true;
             _toolAnimator.StopSwing();
 //             ModEntry.ModMonitor.Log(
-//                 $"[Dayswork][debris] waiting for {_pendingDebrisSweeps.Count} pending debris sweep(s) before deposit.",
+//                 $"[Dayswork][debris] waiting for {Session.PendingDebrisSweeps.Count} pending debris sweep(s) before deposit.",
 //                 LogLevel.Trace);
             return;
         }
@@ -391,23 +392,23 @@ internal sealed partial class ShiftOrchestrator
         FlushPendingDebrisSweeps();
 
         // Plan the deposit run from the task-tagged buffer.
-        var workerTile = _farmhand is not null
-            ? new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y)
-            : _farmExitTile;
+        var workerTile = Session.Worker is not null
+            ? new TileCoord(Session.Worker.TilePoint.X, Session.Worker.TilePoint.Y)
+            : Session.FarmExitTile;
         var plan = _depositPlanner.Plan(
-            _ctx!.Buffer.Snapshot(),
-            _ctx.TaskDestinations,
-            ManagedCropOutputRouter.BuildDestinationMap(_ctx.WorkScopes.ManagedCrops?.Assignments),
+            Session.Ctx.Buffer.Snapshot(),
+            Session.Ctx.TaskDestinations,
+            ManagedCropOutputRouter.BuildDestinationMap(Session.Ctx.WorkScopes.ManagedCrops?.Assignments),
             ResolveShippingBinDepositTile(farm),
             workerTile,
             Manhattan);
 
         // Items resolved straight to automatic delivery are seeded into the overflow set.
         foreach (var stack in plan.AutomaticOverflow)
-            _ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NoChestAssigned));
+            Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NoChestAssigned));
 
         // The buffer is now consumed into the plan; clear it so nothing is double-counted.
-        _ctx.Buffer.TakeAll();
+        Session.Ctx.Buffer.TakeAll();
 
         _depositTrips.Clear();
         foreach (var trip in plan.Trips)
@@ -415,24 +416,24 @@ internal sealed partial class ShiftOrchestrator
         _currentTrip = null;
 
         // Enter Depositing. With no walkable trips, pass straight through to Exiting.
-        var stopReason = _ctx.PendingStopReason ?? ShiftStopReason.Completed;
-        _ctx.PendingStopReason = null;
+        var stopReason = Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed;
+        Session.Ctx.PendingStopReason = null;
         if (_depositTrips.Count == 0)
         {
-            _ctx.StateMachine.BeginWrapUp(new IntentDepositInShippingBin(), stopReason);
+            Session.Ctx.StateMachine.BeginWrapUp(new IntentDepositInShippingBin(), stopReason);
             BeginExit(farm);
             return;
         }
 
         var first = _depositTrips.Dequeue();
         _currentTrip = first;
-        _ctx.StateMachine.BeginWrapUp(ToDepositIntent(first), stopReason);
+        Session.Ctx.StateMachine.BeginWrapUp(ToDepositIntent(first), stopReason);
         StartDepositTrip(first);
     }
 
     private void StartDepositTrip(DepositTrip trip)
     {
-        if (_farmhand is null)
+        if (Session.Worker is null)
             return;
 
         var farm = Game1.getFarm();
@@ -441,7 +442,7 @@ internal sealed partial class ShiftOrchestrator
             if (ModEntry.ExpansionCompat is { } compat &&
                 compat.IsExpansionDepositLocation(chestDest.Ref.LocationName))
             {
-                var source = (_currentLocation ?? farm).NameOrUniqueName;
+                var source = (Session.CurrentLocation ?? farm).NameOrUniqueName;
                 if (TryStartExpansionTravel(
                         source,
                         chestDest.Ref.LocationName,
@@ -465,29 +466,29 @@ internal sealed partial class ShiftOrchestrator
             }
 
             foreach (var stack in trip.Items)
-                _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
+                Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
             _currentTrip = null;
             return;
         }
 
-        _currentLocation = farm;
+        Session.CurrentLocation = farm;
         if (trip.Destination is ChestDestination farmChest)
         {
             StartChestDepositNavigation(trip, farmChest, farm);
             return;
         }
 
-        _nav.StartNavigation(trip.Tile, farm, _farmhand);
+        _nav.StartNavigation(trip.Tile, farm, Session.Worker);
     }
 
     private void StartChestDepositNavigation(DepositTrip trip, ChestDestination chestDest, GameLocation location)
     {
-        if (_farmhand is null)
+        if (Session.Worker is null)
             return;
 
-        if (TrySelectChestDepositStandTile(chestDest.Ref.Tile, location, _farmhand, out var standTile))
+        if (TrySelectChestDepositStandTile(chestDest.Ref.Tile, location, Session.Worker, out var standTile))
         {
-            _nav.StartNavigation(standTile, location, _farmhand);
+            _nav.StartNavigation(standTile, location, Session.Worker);
             return;
         }
 
@@ -521,8 +522,8 @@ internal sealed partial class ShiftOrchestrator
     // walks out via the DepositExit travel, which leaves the worker already on the farm here.
     private void CompleteDepositTripLocation(DepositTrip trip)
     {
-        if (_farmhand is null ||
-            (_farmhand.currentLocation ?? _currentLocation) == Game1.getFarm() ||
+        if (Session.Worker is null ||
+            (Session.Worker.currentLocation ?? Session.CurrentLocation) == Game1.getFarm() ||
             trip.Destination is not ChestDestination { Ref.LocationName: not "Farm" } chestDest)
             return;
 
@@ -533,24 +534,24 @@ internal sealed partial class ShiftOrchestrator
         if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out _))
         {
             var farm = Game1.getFarm();
-            _nav.WarpWorker(_farmhand, _farmhand.currentLocation ?? farm, farm, outdoorDoor);
-            _currentLocation = farm;
+            _nav.WarpWorker(Session.Worker, Session.Worker.currentLocation ?? farm, farm, outdoorDoor);
+            Session.CurrentLocation = farm;
         }
     }
 
     private void ReturnWorkerToFarmForDeposit()
     {
-        if (_farmhand is null)
+        if (Session.Worker is null)
             return;
 
         var farm = Game1.getFarm();
-        if ((_farmhand.currentLocation ?? farm) == farm)
+        if ((Session.Worker.currentLocation ?? farm) == farm)
         {
-            _currentLocation = farm;
+            Session.CurrentLocation = farm;
             return;
         }
 
-        var currentLocation = _farmhand.currentLocation ?? _currentLocation;
+        var currentLocation = Session.Worker.currentLocation ?? Session.CurrentLocation;
         if (currentLocation is not null &&
             ModEntry.ExpansionCompat is { } compat &&
             compat.IsExpansionDepositLocation(currentLocation.NameOrUniqueName))
@@ -564,8 +565,8 @@ internal sealed partial class ShiftOrchestrator
                     out var failure))
             {
                 var farmArrival = route.Hops[^1].Hop.ArrivalTile;
-                _nav.WarpWorker(_farmhand, currentLocation, farm, farmArrival);
-                _currentLocation = farm;
+                _nav.WarpWorker(Session.Worker, currentLocation, farm, farmArrival);
+                Session.CurrentLocation = farm;
                 return;
             }
 
@@ -574,18 +575,18 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        var batch = _ctx is not null && _ctx.CurrentBatchIndex < _ctx.Batches.Count
-            ? _ctx.Batches[_ctx.CurrentBatchIndex]
+        var batch = _session is not null && Session.Ctx.CurrentBatchIndex < Session.Ctx.Batches.Count
+            ? Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex]
             : null;
 
         var exitTile = batch is not null &&
                        BatchRequiresInteriorEntry(batch) &&
                        _buildingNavigator.TryResolveDoorTile(batch.LocationName, out var outdoorDoor, out _)
             ? outdoorDoor
-            : _farmExitTile;
+            : Session.FarmExitTile;
 
-        _nav.WarpWorker(_farmhand, _farmhand.currentLocation ?? farm, farm, exitTile);
-        _currentLocation = farm;
+        _nav.WarpWorker(Session.Worker, Session.Worker.currentLocation ?? farm, farm, exitTile);
+        Session.CurrentLocation = farm;
     }
 
     private static bool BatchRequiresInteriorEntry(WorkBatch batch) =>
@@ -593,29 +594,29 @@ internal sealed partial class ShiftOrchestrator
 
     private void DispatchShiftOverflow()
     {
-        if (_ctx is null) return;
+        if (_session is null) return;
 
-        IReadOnlyList<ItemStack> items = _ctx.Overflow.Count > 0
-            ? ConsolidateOverflow(_ctx.Overflow)
+        IReadOnlyList<ItemStack> items = Session.Ctx.Overflow.Count > 0
+            ? ConsolidateOverflow(Session.Ctx.Overflow)
             : Array.Empty<ItemStack>();
-        var categories = _overflowCategorizer.Categorize(_ctx.Overflow);
+        var categories = _overflowCategorizer.Categorize(Session.Ctx.Overflow);
 
         _shiftOutcomeDispatcher.DispatchOverflowDelivery(items, categories);
-        _ctx.Overflow.Clear();
+        Session.Ctx.Overflow.Clear();
     }
 
     private void AppendUndeliveredToOverflow()
     {
-        if (_ctx is null) return;
+        if (_session is null) return;
 
-        foreach (var b in _ctx.Buffer.TakeAll())
+        foreach (var b in Session.Ctx.Buffer.TakeAll())
         {
             var stack = new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance);
-            if (DepositPlanner.ResolveUndelivered(ResolveAssignedDestination(b.SourceTask, _ctx.TaskDestinations))
+            if (DepositPlanner.ResolveUndelivered(ResolveAssignedDestination(b.SourceTask, Session.Ctx.TaskDestinations))
                 == UndeliveredDepositResolution.ShippingBin)
                 DepositIntoShippingBin(stack, animateWhenPlayerHere: false);
             else
-                _ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
+                Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
         }
 
         if (_currentTrip is not null)
@@ -635,7 +636,7 @@ internal sealed partial class ShiftOrchestrator
 
     private void RouteUndeliveredTripStacks(DepositTrip trip, IEnumerable<RoutedItemStack> stacks)
     {
-        if (_ctx is null) return;
+        if (_session is null) return;
 
         if (DepositPlanner.ResolveUndelivered(trip.Destination) == UndeliveredDepositResolution.ShippingBin)
         {
@@ -645,6 +646,6 @@ internal sealed partial class ShiftOrchestrator
         }
 
         foreach (var stack in stacks)
-            _ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
+            Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
     }
 }
