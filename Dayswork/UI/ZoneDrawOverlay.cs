@@ -25,7 +25,7 @@ internal sealed class ZoneDrawOverlay : IDisposable
     }
 
     // Fires after the world is drawn, before the UI layer.
-    // SpriteBatch is already begun — draw directly, no Begin/End needed (NFR-ONBOARD-01).
+    // SpriteBatch is already begun — draw directly, no Begin/End needed.
     internal void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
     {
         if (_disposed || _pixelTexture == null) return;
@@ -34,7 +34,7 @@ internal sealed class ZoneDrawOverlay : IDisposable
         if (_source.IsInZoneDrawMode)
             DrawTileGrid(e.SpriteBatch);
 
-        // Completed zones — semi-transparent fill in the layer's color (O(zone count), not O(tile count) — NFR-PERF-03)
+        // Completed zones — semi-transparent fill in the layer's color (O(zone count), not O(tile count))
         foreach (var zone in _source.CompletedZones)
             DrawZoneFill(e.SpriteBatch, zone.TopLeft, zone.BottomRight, _source.ZoneFillColor);
 

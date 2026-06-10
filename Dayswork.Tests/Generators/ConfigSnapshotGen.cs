@@ -1,4 +1,4 @@
-// PBT-07: centralized FsCheck arbitrary for ConfigSnapshot.
+// Centralized FsCheck arbitrary for ConfigSnapshot.
 // Generates only invariant-preserving snapshots (all INV-CFG-* satisfied by construction).
 namespace Dayswork.Tests.Generators;
 

@@ -2,7 +2,7 @@ namespace Dayswork.Core.Crops;
 
 /// <summary>
 /// The wallet-clamped subset of a <see cref="ShiftPurchaseManifest"/> the farmhand can actually
-/// afford this shift (U-MC-06, FR-MC-12). When the wallet covers the whole manifest the plan
+/// afford this shift. When the wallet covers the whole manifest the plan
 /// equals the manifest; otherwise it is the largest affordable prefix and <see cref="Shortfall"/>
 /// is set so the runtime emits a single insufficient-funds notice.
 /// </summary>

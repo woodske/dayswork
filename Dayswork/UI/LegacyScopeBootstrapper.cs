@@ -68,7 +68,7 @@ internal static class LegacyScopeBootstrapper
         // Expansion premium buildings (e.g., SVE Premium Coop/Barn) map to their nearest vanilla
         // tier before the vanilla name-substring inference, which would otherwise misclassify them as
         // the cheapest Coop/Barn tier. DisplayName carries the raw building type. Vanilla buildings
-        // get no mapping and fall through unchanged. (U-SVE-03 / BR-SVE3-06)
+        // get no mapping and fall through unchanged.
         if (ModEntry.ExpansionCompat is { } compat &&
             compat.TryResolvePremiumBuildingTier(outline.DisplayName, out var premiumTier))
         {
@@ -78,7 +78,7 @@ internal static class LegacyScopeBootstrapper
 
         // Infer the tier from the building type (DisplayName), falling back to the location name, but
         // always key the selection on the UNIQUE outline.LocationName so two same-type buildings stay
-        // distinct (TODO-08). TryInferAnimalBuildingSelection embeds whatever name it was given as the
+        // distinct. TryInferAnimalBuildingSelection embeds whatever name it was given as the
         // selection's LocationName, so take only its Tier and rebuild with the unique key.
         var inferred = TryInferAnimalBuildingSelection(outline.DisplayName)
                        ?? TryInferAnimalBuildingSelection(outline.LocationName);

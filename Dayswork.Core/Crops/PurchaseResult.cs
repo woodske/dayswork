@@ -1,6 +1,6 @@
 namespace Dayswork.Core.Crops;
 
-/// <summary>Outcome of one purchase line at the counter (U-MC-06), used to pace HUD notices.</summary>
+/// <summary>Outcome of one purchase line at the counter, used to pace HUD notices.</summary>
 public enum PurchaseOutcomeKind
 {
     Full,
@@ -23,7 +23,7 @@ public sealed record PurchaseLineOutcome(
     public int SpentGold => Math.Max(0, BoughtQty) * Math.Max(0, UnitCost);
 }
 
-/// <summary>Aggregate result of a headless store transaction (M-26 ShopPurchaseService).</summary>
+/// <summary>Aggregate result of a headless store transaction (ShopPurchaseService).</summary>
 public sealed record PurchaseResult
 {
     public static PurchaseResult BindFailure { get; } =

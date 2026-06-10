@@ -67,7 +67,7 @@ public class TaskPriorityOrdererTests
         Assert.Empty(result);
     }
 
-    // ── PBT-03 properties ────────────────────────────────────────────────────
+    // ── Property tests ─────────────────────────────────────────────────────────
 
     // Arbitrary that generates a non-empty subset of TaskKind values
     private static Arbitrary<TaskKind[]> ArbTaskSubset =>

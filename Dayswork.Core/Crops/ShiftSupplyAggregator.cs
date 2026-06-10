@@ -3,10 +3,10 @@ namespace Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
 /// <summary>
-/// Pure shift-level supply aggregator (U-MC-06). Builds one <see cref="ShiftPurchaseManifest"/>
+/// Pure shift-level supply aggregator. Builds one <see cref="ShiftPurchaseManifest"/>
 /// for the whole shift by sizing each managed zone's purchase from its planned plantable tiles
-/// (FR-MC-12), summing demand across zones against a single shared input-chest reservoir, then
-/// resolving each item to a store with the global preference (DEV-MC-06-01) and live stock+prices.
+///, summing demand across zones against a single shared input-chest reservoir, then
+/// resolving each item to a store with the global preference and live stock+prices.
 /// </summary>
 public sealed class ShiftSupplyAggregator
 {

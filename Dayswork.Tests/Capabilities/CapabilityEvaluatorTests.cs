@@ -8,7 +8,7 @@ public class CapabilityEvaluatorTests
 {
     private readonly CapabilityEvaluator _sut = new CapabilityEvaluator();
 
-    // ── CanChop table (FR-SKIP-01, FR-TOOL-02) ──────────────────────────────
+    // ── CanChop table ──────────────────────────────
     // 20 cases: 5 AxeLevel × 4 non-FruitTree AxeTarget values
 
     [Theory]
@@ -38,7 +38,7 @@ public class CapabilityEvaluatorTests
         Assert.Equal(expected, _sut.CanChop(snap, target));
     }
 
-    // ── FR-SKIP-03: FruitTree always false regardless of axe level ───────────
+    // ── FruitTree always false regardless of axe level ───────────
     // 5 cases — explicit named test for the hard rule
 
     [Theory]
@@ -64,7 +64,7 @@ public class CapabilityEvaluatorTests
             _sut.CanChop(upgradedSupport, AxeTarget.LargeStump));
     }
 
-    // ── CanBreak table (FR-SKIP-02, FR-TOOL-02) ─────────────────────────────
+    // ── CanBreak table ─────────────────────────────
     // 15 cases: 5 PickaxeLevel × 3 PickTarget values
 
     [Theory]

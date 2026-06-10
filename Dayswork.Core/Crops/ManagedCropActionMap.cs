@@ -5,7 +5,7 @@ using Dayswork.Core.Energy;
 
 /// <summary>
 /// Pure, total mapping from a managed-crop tile action to its capability tool and energy kind
-/// (U-MC-05). Planting and fertilizing are not tool-gated (they gate on item availability);
+///. Planting and fertilizing are not tool-gated (they gate on item availability);
 /// clearing debris resolves its tool from the live debris type, supplied by the runtime.
 /// </summary>
 public static class ManagedCropActionMap

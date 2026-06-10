@@ -8,7 +8,7 @@ using Microsoft.Xna.Framework.Graphics;
 namespace Dayswork.Integration;
 
 /// <summary>
-/// The placeable farm building that is the hiring/contract anchor (U-25 WS2). Replaces the bulletin
+/// The placeable farm building that is the hiring/contract anchor. Replaces the bulletin
 /// board as the entry point. Interaction and the static output chest are handled in C# (see
 /// HiringBuildingInteraction) rather than via Data/Buildings sub-schemas, to keep that logic under
 /// our control and reuse the existing chest pipeline.

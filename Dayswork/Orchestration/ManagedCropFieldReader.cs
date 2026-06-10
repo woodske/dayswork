@@ -7,7 +7,7 @@ using StardewValley.TerrainFeatures;
 namespace Dayswork.Orchestration;
 
 /// <summary>
-/// Thin live-world → pure adapter (U-MC-05). Snapshots the managed-crop zone tiles of a live
+/// Thin live-world → pure adapter. Snapshots the managed-crop zone tiles of a live
 /// <see cref="GameLocation"/> into a pure <see cref="FieldState"/> the <see cref="CropShiftPlanner"/>
 /// consumes. Performs no mutation.
 /// </summary>

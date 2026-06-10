@@ -27,7 +27,7 @@ internal sealed partial class ShiftOrchestrator
 
         var currentTile = _farmhand.TilePoint;
 
-        // FD-Q3=A: progress = tile moved OR action in progress.
+        // Progress = tile moved OR action in progress.
         bool madeProgress = _actionPending || currentTile != _lastTilePos;
         _lastTilePos = currentTile;
 
@@ -88,7 +88,7 @@ internal sealed partial class ShiftOrchestrator
 
         if (recoveryTile is null)
         {
-            // No reachable tile — skip straight to step 3 (REL-U13-02).
+            // No reachable tile — skip straight to step 3.
             _ctx.StateMachine.Transition(ShiftPhase.Recovering, new IntentTeleportHome());
         }
         else
@@ -120,7 +120,7 @@ internal sealed partial class ShiftOrchestrator
 
     private void HandleTeleportHome(Farm farm)
     {
-        // Step 3: reposition home and end shift via normal Depositing path (SAFE-U13-01).
+        // Step 3: reposition home and end shift via normal Depositing path.
         CancelActiveTravel();
         _farmhand!.Position = new Vector2(_farmExitTile.X, _farmExitTile.Y) * 64f;
         _farmhand.currentLocation = farm;

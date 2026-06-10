@@ -8,7 +8,7 @@ public sealed record WorkScopeSet
     public IReadOnlyList<AnimalBuildingScope> AnimalBuildings { get; }
     public ManagedCropWorkScope? ManagedCrops { get; }
 
-    /// <summary>All greenhouse work scopes (one per selected greenhouse, TODO-10).</summary>
+    /// <summary>All greenhouse work scopes (one per selected greenhouse).</summary>
     public IReadOnlyList<GreenhouseWorkScope> GreenhouseWorks { get; }
 
     /// <summary>Back-compat accessor: the first greenhouse work scope, or null when none.</summary>

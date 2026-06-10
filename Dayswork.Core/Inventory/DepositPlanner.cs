@@ -2,7 +2,7 @@ using Dayswork.Core.Domain;
 
 namespace Dayswork.Core.Inventory;
 
-// C-11 DepositPlanner — pure, zero Stardew refs (Pattern M / MAINT-U14-01).
+// DepositPlanner — pure, zero Stardew refs.
 public sealed class DepositPlanner
 {
     public DepositPlan Plan(
@@ -42,7 +42,7 @@ public sealed class DepositPlanner
                 case ShippingBinDestination:
                     AddToGroup(walkable, dest, shippingBinTile, item);
                     break;
-                default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow (FD-Q2=A / FR-OUT-04)
+                default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow
                     Accumulate(automaticOverflow, (item.QualifiedItemId, item.SourceTask, item.Provenance), item.Quantity);
                     break;
             }

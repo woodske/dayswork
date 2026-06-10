@@ -8,11 +8,11 @@ using CoreSeason = Dayswork.Core.Domain.Season;
 namespace Dayswork.Integration;
 
 /// <summary>
-/// Live-game adapter (M-25) for the Manage Crops authoring UI. Reads 1.6 crop, object, and shop
+/// Live-game adapter for the Manage Crops authoring UI. Reads 1.6 crop, object, and shop
 /// data, maps it into pure <see cref="CropCatalogSource"/> records, and delegates season-filtering /
-/// supply-tagging / ordering to the pure <see cref="CropCatalog"/> (Q3=A). Catalog data is read once
-/// per authoring session and memoized per season context (NFR-MC3-PERF-01/02); unmappable records are
-/// skipped rather than thrown (NFR-MC3-REL-01).
+/// supply-tagging / ordering to the pure <see cref="CropCatalog"/>. Catalog data is read once
+/// per authoring session and memoized per season context; unmappable records are
+/// skipped rather than thrown.
 /// </summary>
 internal sealed class CropCatalogProvider
 {

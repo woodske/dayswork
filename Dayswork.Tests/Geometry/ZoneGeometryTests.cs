@@ -118,7 +118,7 @@ public class ZoneGeometryTests
         Assert.NotEqual<DestinationKey>(AutomaticOutputDestination.Instance, ShippingBinDestination.Instance);
     }
 
-    // ── PBT-02: Zone JSON round-trip ─────────────────────────────────────────
+    // ── Zone JSON round-trip ─────────────────────────────────────────
 
     [Property(MaxTest = 1000)]
     public Property Zone_JsonRoundTrip() =>
@@ -129,7 +129,7 @@ public class ZoneGeometryTests
             return zone.Equals(deserialized);
         });
 
-    // ── PBT-03: EnumerateUniqueTiles invariants ──────────────────────────────
+    // ── EnumerateUniqueTiles invariants ──────────────────────────────
 
     [Property(MaxTest = 1000)]
     public Property EnumerateUniqueTiles_Commutativity() =>

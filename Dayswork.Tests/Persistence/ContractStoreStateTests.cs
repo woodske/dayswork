@@ -6,7 +6,7 @@ using FsCheck.Xunit;
 
 namespace Dayswork.Tests.Persistence;
 
-// FsCheck PBT-03 invariants for ContractStore state transitions (Pause / Resume / Cancel).
+// FsCheck invariants for ContractStore state transitions (Pause / Resume / Cancel).
 // The xUnit facts in ContractStoreTests cover the specific behaviors; these properties
 // verify the same invariants hold across the full space of randomly generated contracts.
 public sealed class ContractStoreStateTests

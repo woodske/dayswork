@@ -10,10 +10,9 @@ using StardewValley;
 
 namespace Dayswork.Orchestration;
 
-// M-13 RecurringContractScheduler (Pattern R / Service S-D). Promoted from the U-10 one-time stub to
-// the rebuilt fixed-price day-start lifecycle: recurring terms refresh at 6am, affordability/notice
+// The fixed-price day-start lifecycle: recurring terms refresh at 6am, affordability/notice
 // decisions from the rebuilt terms snapshot, festival no-charge skips, and same-day HUD notices.
-// Single-active-contract invariant (DEV-U15-01) is enforced at hire time, so the loop processes at
+// Single-active-contract invariant is enforced at hire time, so the loop processes at
 // most one contract per day.
 internal sealed class RecurringContractScheduler
 {
@@ -42,7 +41,7 @@ internal sealed class RecurringContractScheduler
 
     public void OnDayStarted(object? sender, DayStartedEventArgs e)
     {
-        // REL-U10-01: multiplayer guard — no-op in multiplayer sessions.
+        // Multiplayer guard — no-op in multiplayer sessions.
         if (MultiplayerGuard.IsMultiplayer())
             return;
 

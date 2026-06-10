@@ -44,8 +44,8 @@ internal sealed partial class ShiftOrchestrator
     private string _lastManagedSignature = string.Empty;
     private string _managedBatchLocationName = "Farm";
 
-    // Plan-level toggles (FR-MC-26/27). DEV-MC-05-01: honored at their default-ON behavior this
-    // unit; the configurable OFF switch (GMCM/per-plan) is deferred to a follow-up.
+    // Plan-level toggles, fixed at their default-ON behavior for now; a configurable OFF switch
+    // (GMCM/per-plan) is deferred to a follow-up.
     private const bool _clearDebrisBeforeTilling = true;
     private const bool _clearDeadPlants = true;
 
@@ -141,7 +141,7 @@ internal sealed partial class ShiftOrchestrator
             foreach (var action in plan.AllActions)
             {
                 // Honor the plan-level toggles: skip debris/dead-plant clearing when disabled
-                // (FR-MC-26/27). A skipped debris tile is simply not tilled/planted this shift.
+                //. A skipped debris tile is simply not tilled/planted this shift.
                 if (action.Kind == ManagedCropActionKind.ClearDebris && !ShouldClearDebrisTile(action.Tile, location))
                     continue;
                 actions.Add(action);
@@ -262,7 +262,7 @@ internal sealed partial class ShiftOrchestrator
             return;
 
         // The zone configures a fertilizer but none is on hand (no shopping this unit), so the
-        // atomicity gate planted nothing. Fire one notice for the zone (FR-MC-22).
+        // atomicity gate planted nothing. Fire one notice for the zone.
         var hasFertilizer = supply.QuantityOf(choice.Crop.FertilizerItemId!) > 0;
         var hasSeedCandidates = plan.SupplyDependentActions.Count > 0;
         if (!hasFertilizer && !hasSeedCandidates)

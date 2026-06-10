@@ -1,7 +1,7 @@
 namespace Dayswork.Core.Crops;
 
 /// <summary>
-/// Pure wallet clamp (U-MC-06, FR-MC-12). Reduces a <see cref="ShiftPurchaseManifest"/> to the
+/// Pure wallet clamp. Reduces a <see cref="ShiftPurchaseManifest"/> to the
 /// maximum the player's wallet can afford this shift. Groups are visited in manifest order
 /// (preferred store first). Within each group, paired seed/fertilizer lines are clamped to the
 /// same quantity before unrelated lines are funded, so a shortfall doesn't buy fertilizer without

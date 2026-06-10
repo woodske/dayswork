@@ -11,8 +11,8 @@ namespace Dayswork.Compat;
 /// The single runtime seam consumers use for expansion compatibility. Holds the active
 /// <see cref="IExpansionProfile"/> (resolved once at startup) plus the pure
 /// <see cref="AnimalBuildingCapacityPolicy"/>, and applies them to live game objects. When the
-/// active profile is the Vanilla Null-Object (or, in U-SVE-01, the SVE profile with empty tables),
-/// every operation is a passthrough/no-op, so behavior is identical to vanilla (P-SVE-02/03/04).
+/// active profile is the Vanilla Null-Object, every operation is a passthrough/no-op, so behavior
+/// is identical to vanilla.
 /// </summary>
 internal sealed class ExpansionCompatService
 {
@@ -51,7 +51,7 @@ internal sealed class ExpansionCompatService
     /// <summary>
     /// Computes the farm-map signature from the live map (dimensions; an optional discriminator is
     /// reserved for maps that share dimensions). Guarded so a missing/odd map never throws — the
-    /// caller then falls back to the warp heuristic (NFRU2-02).
+    /// caller then falls back to the warp heuristic.
     /// </summary>
     private static bool TryComputeSignature(GameLocation farm, out FarmMapSignature signature)
     {
@@ -76,17 +76,16 @@ internal sealed class ExpansionCompatService
     }
 
     /// <summary>
-    /// Derives the animal house's feed capacity from its real trough tiles. The MaxOccupants upper
-    /// bound is wired in U-SVE-03 (where vanilla parity is verified against building data); until
-    /// then the trough count is authoritative.
+    /// Derives the animal house's feed capacity from its real trough tiles, bounded by the
+    /// building's real max occupants (vanilla parity is verified against building data by tests).
     /// </summary>
     public int ResolveAnimalFeedCapacity(AnimalHouse house)
     {
         var troughs = CountTroughTiles(house);
 
         // Bound by the building's real max occupants (= 16 for SVE premium). When the parent building
-        // or its occupant cap is unavailable, fall back to the trough count so capacity is unchanged
-        // from the U-SVE-01 behavior and never over-fills.
+        // or its occupant cap is unavailable, fall back to the trough count so capacity never
+        // over-fills.
         var maxOccupants = house.ParentBuilding?.maxOccupants.Value ?? 0;
         if (maxOccupants <= 0)
             maxOccupants = troughs;

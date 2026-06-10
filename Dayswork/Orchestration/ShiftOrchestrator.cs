@@ -26,7 +26,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private static readonly TileCoord FallbackShippingBinTile = new(71, 13);
 
     // Emote IDs — play-test TODO: confirm "?" and "!" are 8 and 2 in vanilla.
-    // See code-summary.md play-test checklist.
     private const int EmoteQuestion    = 8;  // confused "?" (stuck step 1)
     private const int EmoteExclamation = 2;  // surprised "!" (hit reaction)
     private const int EmoteMusic       = 16; // music note while waiting for a shop to open
@@ -71,7 +70,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private TileCoord     _farmExitTile;
     private TileCoord     _currentExitTile;
 
-    // Multi-trip deposit loop state (Pattern N): the ordered remaining trips and the in-flight one.
+    // Multi-trip deposit loop state: the ordered remaining trips and the in-flight one.
     private readonly Queue<DepositTrip> _depositTrips = new();
     private DepositTrip? _currentTrip;
 
@@ -117,7 +116,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     // Time tracking for stuck accumulation (game uses HHMM format; 10-unit increments).
     private int _lastSampledGameTime;
 
-    // Last observed tile position for progress detection (Pattern D / FD-Q3=A).
+    // Last observed tile position for progress detection.
     private Point _lastTilePos;
 
     // Hit-reaction debounce — one emote per player swing.
@@ -427,7 +426,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
         var outdoorProvenance = OutputScopeProvenance.Outdoor();
 
-        // Coexistence (U-MC-07, FR-MC-28): tiles owned by a managed crop zone are serviced by
+        // Coexistence: tiles owned by a managed crop zone are serviced by
         // the managed-crop batch for that live location, so general crop scans exclude only the
         // zones that match the active scan location.
         var managedZonesByLocation = (workScopes.ManagedCrops?.Assignments ?? Array.Empty<Dayswork.Core.Crops.CropZoneAssignment>())
@@ -453,7 +452,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
                 case BatchKind.OutdoorAnimals:
                 {
-                    // Per-building grazing pass (TODO-09): service only the grazing animals whose
+                    // Per-building grazing pass: service only the grazing animals whose
                     // home key matches this batch's building. Farm-wide forage is handled separately
                     // by the trailing FarmForage batch.
                     var batchTasks = batch.Tasks.ToHashSet();
@@ -637,7 +636,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         if (_ctx is null || batch.Kind != BatchKind.OutdoorAnimals)
             return batch;
 
-        // Per-building grazing pass (TODO-09): rebuild this one building's grazing-animal work at
+        // Per-building grazing pass: rebuild this one building's grazing-animal work at
         // batch start (animals roam, so the shift-start snapshot is stale). Scoped to the single
         // building's home key; farm-wide forage is handled by the separate FarmForage batch.
         var buildingHomes = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
@@ -750,13 +749,13 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             }
             return;
         }
-        if (++_tickCount % 4 != 0) return; // PERF-U13-01 throttle
+        if (++_tickCount % 4 != 0) return; // tick throttle
 
         var farm  = Game1.getFarm();
         var currentLocation = _currentLocation ?? farm;
         var phase = _ctx.StateMachine.Phase;
 
-        // Progress sampling + stuck detection (Pattern D).
+        // Progress sampling + stuck detection.
         // Only meaningful while actively working.
         if (phase == ShiftPhase.Working && !_managedShoppingInProgress)
         {
@@ -767,7 +766,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                 return; // let the new intent dispatch next tick
         }
 
-        // Hit-reaction watcher (Pattern H) — independent of work state.
+        // Hit-reaction watcher — independent of work state.
         CheckHitReaction();
 
         // Shopping wait loop: parked at the wait tile until the store opens (no travel active).
@@ -858,7 +857,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         if (_ctx is null) return;
         var phase = _ctx.StateMachine.Phase;
 
-        // 8pm hard cap (BR-12 / HardCapTime).
+        // 8pm hard cap (HardCapTime).
         // Only fires from Working or Recovering — both have Depositing as a valid successor.
         // Stuck is transient (emote fires immediately) and resolves to Recovering within one tick.
         if (e.NewTime >= _config.HardCapTime &&

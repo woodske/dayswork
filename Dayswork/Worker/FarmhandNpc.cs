@@ -7,7 +7,7 @@ namespace Dayswork.Worker;
 
 internal sealed class FarmhandNpc : NPC
 {
-    // Placeholder sprite uses the vanilla Marnie texture — custom art is post-v1 (FR-NPC-01).
+    // Placeholder sprite uses the vanilla Marnie texture — custom art is post-v1.
     internal const string PlaceholderSpritePath   = "Characters\\Marnie";
     internal const string PlaceholderPortraitPath = "Portraits\\Marnie";
     internal const string InternalName            = "DaysworkFarmhand";

@@ -11,8 +11,8 @@ using StardewValley.Menus;
 namespace Dayswork.UI;
 
 // Contract management menu — opened from the hiring building's "Manage" action.
-// Lists Active and Paused contracts with Pause/Resume/Cancel/Edit actions (S-12).
-// All display strings are pre-computed in BuildRows(); draw() reads fields only (NFR-PERF-01).
+// Lists Active and Paused contracts with Pause/Resume/Cancel/Edit actions.
+// All display strings are pre-computed in BuildRows(); draw() reads fields only.
 internal sealed class ContractListMenu : IClickableMenu
 {
     private const int MenuWidth    = 800;

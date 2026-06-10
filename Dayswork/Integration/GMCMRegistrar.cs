@@ -111,7 +111,7 @@ internal sealed class GMCMRegistrar
             () => I18nHelper.Get("gmcm.worker.work_on_holidays.tooltip"),
             fieldId: "worker-work-on-holidays");
 
-        // Global Manage Crops preferred store (U-MC-06, DEV-MC-06-01).
+        // Global Manage Crops preferred store.
         api.AddTextOption(
             _manifest,
             () => _config.Editable.PreferredCropStore,

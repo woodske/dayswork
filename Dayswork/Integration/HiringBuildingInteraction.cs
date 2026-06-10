@@ -8,10 +8,10 @@ using StardewValley.Buildings;
 namespace Dayswork.Integration;
 
 /// <summary>
-/// Handles action-clicks on the hiring building (U-25 WS2). The hire/manage flow opens only when
+/// Handles action-clicks on the hiring building. The hire/manage flow opens only when
 /// the player clicks the drawn-in bulletin board (upper-right of the cabin); the output chest opens
 /// from its porch tile. Clicking anywhere else on the building does nothing. Single-player only
-/// (REL-U10-01).
+///.
 /// </summary>
 internal sealed class HiringBuildingInteraction
 {

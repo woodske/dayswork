@@ -30,7 +30,7 @@ public sealed class DepositPlannerTests
     private static BufferedItem Buffered(string itemId, int quantity, TaskKind task, OutputScopeProvenance? provenance = null) =>
         new(itemId, quantity, task, provenance ?? OutputScopeProvenance.Unknown);
 
-    // PBT-U14-01: conservation — every buffered item appears exactly once across trips ∪ automatic overflow.
+    // Conservation — every buffered item appears exactly once across trips ∪ automatic overflow.
     [Property(MaxTest = 1000, Replay = "")]
     public Property Conservation_Holds()
     {
@@ -77,7 +77,7 @@ public sealed class DepositPlannerTests
         });
     }
 
-    // PBT-U14-02: trip count equals the number of distinct walkable (chest/bin) destinations present.
+    // Trip count equals the number of distinct walkable (chest/bin) destinations present.
     [Property(MaxTest = 1000, Replay = "")]
     public Property TripCount_Equals_Distinct_Walkable_Destinations()
     {
@@ -97,7 +97,7 @@ public sealed class DepositPlannerTests
         });
     }
 
-    // PBT-U14-03: no trip is empty and no trip targets AutomaticOutputDestination.
+    // No trip is empty and no trip targets AutomaticOutputDestination.
     [Property(MaxTest = 1000, Replay = "")]
     public Property No_Empty_Or_AutomaticOutput_Trips()
     {
@@ -111,7 +111,7 @@ public sealed class DepositPlannerTests
         });
     }
 
-    // PBT-U14-04: resolution totality — total quantity in equals total quantity out (nothing lost/created).
+    // Resolution totality — total quantity in equals total quantity out (nothing lost/created).
     [Property(MaxTest = 1000, Replay = "")]
     public Property Total_Quantity_Preserved()
     {
@@ -152,7 +152,7 @@ public sealed class DepositPlannerTests
         Assert.Equal(far.Tile, plan.Trips[1].Tile);
     }
 
-    // Unassigned output resolves to automatic overflow, not a trip (FD-Q2=A / FR-OUT-04).
+    // Unassigned output resolves to automatic overflow, not a trip.
     [Fact]
     public void Unassigned_Task_Output_Goes_To_AutomaticOverflow()
     {

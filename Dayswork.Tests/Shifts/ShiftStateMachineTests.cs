@@ -10,7 +10,7 @@ public sealed class ShiftStateMachineTests
 {
     private static readonly ShiftPhase[] AllPhases = Enum.GetValues<ShiftPhase>();
 
-    // ── PBT-U13-01: once Done, every Transition throws. ─────────────────────
+    // ── Once Done, every Transition throws. ─────────────────────
     [Property(MaxTest = 500, Replay = "")]
     public Property Done_Is_Terminal()
     {
@@ -25,12 +25,12 @@ public sealed class ShiftStateMachineTests
         });
     }
 
-    // ── PBT-U13-02: any target NOT in the legal successor set throws. ────────
-    // (Includes Stuck/Recovering edges introduced in U-13.)
+    // ── Any target NOT in the legal successor set throws. ────────
+    // (Includes the Stuck/Recovering edges.)
     [Property(MaxTest = 2000, Replay = "")]
     public Property Illegal_Transitions_Always_Throw()
     {
-        // Generate any non-Done phase (Done is covered by PBT-U13-01) and any target.
+        // Generate any non-Done phase (Done is covered above) and any target.
         var sourceGen = Gen.Elements(
             ShiftPhase.WaitingForSpawn,
             ShiftPhase.Working,
@@ -53,7 +53,7 @@ public sealed class ShiftStateMachineTests
             });
     }
 
-    // ── PBT-U13-03: Stuck/Recovering reachability. ──────────────────────────
+    // ── Stuck/Recovering reachability. ──────────────────────────
     // Stuck is reachable only from Working; Recovering only from Stuck; neither from Done.
     [Property(MaxTest = 500, Replay = "")]
     public Property Stuck_Only_Reachable_From_Working()

@@ -108,7 +108,7 @@ internal sealed class HubMenu : LayoutMenu
     private HubStatus OutputStatus() =>
         _draft.Destinations.Count > 0 ? Done() : Optional();
 
-    // Crop management is opt-in: "Ready" once at least one zone has been drawn/configured (Q8=A).
+    // Crop management is opt-in: "Ready" once at least one zone has been drawn/configured.
     private HubStatus ManageCropsStatus() =>
         _draft.CropPlan.HasAnyAssignment ? Done() : Optional();
 

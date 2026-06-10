@@ -3,7 +3,7 @@ namespace Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
 /// <summary>
-/// Pure helper (U-MC-06, FR-MC-12) that sizes the shift's seed/fertilizer purchase from the
+/// Pure helper that sizes the shift's seed/fertilizer purchase from the
 /// tiles the farmhand <em>plans</em> to plant this shift — independent of how many happen to be
 /// tilled by the time it shops. A fresh untilled zone has no tilled-empty tiles yet, so the
 /// purchase must be sized from all non-cropped tiles the worker intends to till and plant

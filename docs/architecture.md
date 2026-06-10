@@ -220,7 +220,7 @@ is ever added — none is planned, so don't grow this further without that trigg
 dropped as a goal, collapse it to the nullable-field form. **SVE stays a soft/optional dependency**
 (runtime-detected, never in `manifest.json`).
 
-Speculative seams built for never-shipped "U-SVE-04" units (`TryClassifyContentOverride`,
+Speculative seams built for never-shipped expansion features (`TryClassifyContentOverride`,
 `FarmMapModIds`, `IsExpansionWorkLocation`, and the `ContentDescriptor`/`WorkClassification` types)
 were pruned — they had zero real consumers; live "is this an expansion location" checks go through
 `TryGetExpansionLocationDescriptor` / `IsExpansionDepositLocation`.

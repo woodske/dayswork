@@ -151,7 +151,7 @@ internal sealed partial class ShiftOrchestrator
             var chest = _chestResolver.ResolveChest(chestDest.Ref);
             if (chest is null)
             {
-                // Chest moved/destroyed (FR-OUT-03): everything for it goes to automatic overflow.
+                // Chest moved/destroyed: everything for it goes to automatic overflow.
                 foreach (var stack in trip.Items)
                     _ctx!.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
                 ModEntry.ModMonitor.Log(
@@ -300,7 +300,7 @@ internal sealed partial class ShiftOrchestrator
         var leftover = chest.addItem(item);
         if (leftover is not null && leftover.Stack > 0)
         {
-            // Chest full (FR-OUT-02): route the remainder to automatic overflow.
+            // Chest full: route the remainder to automatic overflow.
             _ctx!.Overflow.Add(new OverflowItem(
                 new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance),
                 OverflowReason.ChestFull));
@@ -340,7 +340,7 @@ internal sealed partial class ShiftOrchestrator
             $"[Dayswork] Shift complete. StopReason={_ctx!.StateMachine.StopReason}. Remaining stamina={_ctx.EnergyState.RemainingEnergy}/{_ctx.EnergyState.Capacity}.",
             LogLevel.Trace);
 
-        // One settlement letter next morning for overflow items only; U-21 removes refund settlement.
+        // One settlement letter next morning for overflow items only; refunds are not settled here.
         DispatchShiftOverflow();
 
         // The worker has finished and left for the day — light the office windows/lantern and
@@ -390,7 +390,7 @@ internal sealed partial class ShiftOrchestrator
 
         FlushPendingDebrisSweeps();
 
-        // Plan the deposit run from the task-tagged buffer (Pattern M).
+        // Plan the deposit run from the task-tagged buffer.
         var workerTile = _farmhand is not null
             ? new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y)
             : _farmExitTile;
@@ -402,7 +402,7 @@ internal sealed partial class ShiftOrchestrator
             workerTile,
             Manhattan);
 
-        // Items resolved straight to automatic delivery are seeded into the overflow set (Pattern O / FD-Q2=A).
+        // Items resolved straight to automatic delivery are seeded into the overflow set.
         foreach (var stack in plan.AutomaticOverflow)
             _ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NoChestAssigned));
 
@@ -414,7 +414,7 @@ internal sealed partial class ShiftOrchestrator
             _depositTrips.Enqueue(trip);
         _currentTrip = null;
 
-        // Enter Depositing. With no walkable trips, pass straight through to Exiting (Pattern N).
+        // Enter Depositing. With no walkable trips, pass straight through to Exiting.
         var stopReason = _ctx.PendingStopReason ?? ShiftStopReason.Completed;
         _ctx.PendingStopReason = null;
         if (_depositTrips.Count == 0)

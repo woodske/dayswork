@@ -69,7 +69,7 @@ internal sealed class AnimalTaskHandler
         // Data-driven capacity (trough count clamped to the building's real max occupants) via the
         // expansion compat seam; falls back to the legacy tier ladder when the seam is unavailable
         // (e.g., unit tests / compat not yet resolved). Fixes premium-building under/over-feeding
-        // without changing vanilla capacities (parity covered by tests). (U-SVE-03 / BR-SVE3-02)
+        // without changing vanilla capacities (parity covered by tests).
         var capacity = ModEntry.ExpansionCompat?.ResolveAnimalFeedCapacity(animalHouse)
                        ?? FeedCapacity(parent?.buildingType.Value);
         var filled = Math.Clamp(CountPlacedHay(animalHouse), 0, capacity);
@@ -257,7 +257,7 @@ internal sealed class AnimalTaskHandler
     {
         // Match the animal's home against the selection by either its unique interior name (new,
         // precise — services only the selected building) or its type name / building type (legacy
-        // contracts that stored the type name still service all of that type). (U-SVE-04 / TODO-08)
+        // contracts that stored the type name still service all of that type).
         if (selectedHomeLocations is not null &&
             !HomeLocationKeys(animal).Any(selectedHomeLocations.Contains))
             return;

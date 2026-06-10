@@ -8,7 +8,7 @@ using StardewValley.Objects;
 
 namespace Dayswork.Integration;
 
-// U-25 WS2: missed/overflow items are deposited into the hiring building's static output chest
+// Missed/overflow items are deposited into the hiring building's static output chest
 // (falling back to the shipping bin so nothing is ever lost), and text notices are shown as
 // in-game HUD messages. Festival one-time refunds are credited directly to the player's gold.
 internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher

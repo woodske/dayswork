@@ -12,7 +12,7 @@ internal sealed class ToolLevelReader
             PickaxeLevel:     FindLevel<Pickaxe>(player),
             WateringCanLevel: FindLevel<WateringCan>(player));
 
-    // Returns Basic (0) when the tool is not in the player's inventory (FR-TOOL-03, FD-Q3: A).
+    // Returns Basic (0) when the tool is not in the player's inventory.
     private static ToolLevel FindLevel<T>(Farmer player) where T : Tool
     {
         foreach (var item in player.Items)

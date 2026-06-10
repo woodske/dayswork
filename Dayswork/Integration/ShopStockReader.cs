@@ -7,7 +7,7 @@ using StardewValley;
 using StardewValley.Internal;
 
 /// <summary>
-/// Live shop snapshot adapter for U-MC-06. It reads Stardew 1.6 <c>Data/Shops</c> once per store
+/// Live shop snapshot adapter. It reads Stardew 1.6 <c>Data/Shops</c> once per store
 /// per shift and maps stock plus unit prices into the pure shopping seams. Odd or conditional shop
 /// rows are skipped rather than thrown; a failed read yields a closed/empty snapshot so the runtime
 /// takes the planned skip-on-failure path.

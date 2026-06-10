@@ -21,7 +21,7 @@ internal sealed class HiringFlowCoordinator
     private readonly IModHelper _helper;
 
     // Live crop/fertilizer/shop catalog adapter, rebuilt per hiring-flow session so its per-season
-    // memo is fresh (NFR-MC3-PERF-02). Created lazily when the Manage Crops page first opens.
+    // memo is fresh. Created lazily when the Manage Crops page first opens.
     private CropCatalogProvider? _cropCatalog;
 
     public HiringFlowCoordinator(
@@ -120,7 +120,7 @@ internal sealed class HiringFlowCoordinator
             onBack: ShowHub);
     }
 
-    // ── Manage Crops authoring (U-MC-03) ─────────────────────────────────────
+    // ── Manage Crops authoring ─────────────────────────────────────
     private void ShowManageCrops(ContractDraft draft)
     {
         var catalog = EnsureCropCatalog();

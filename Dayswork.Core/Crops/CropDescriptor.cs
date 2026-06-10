@@ -42,7 +42,7 @@ public sealed record CropDescriptor
     /// <summary>
     /// Returns a copy of this descriptor with a different configured fertilizer item id (or none),
     /// preserving all growth fields. Used by the Manage Crops authoring UI when the player picks a
-    /// fertilizer for a crop independently of the catalog crop (U-MC-03).
+    /// fertilizer for a crop independently of the catalog crop.
     /// </summary>
     public CropDescriptor WithFertilizer(string? fertilizerItemId) =>
         new(

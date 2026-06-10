@@ -5,7 +5,7 @@ using StardewModdingAPI.Events;
 
 namespace Dayswork.Integration;
 
-// Bridges SMAPI's save-data API with ContractStore + SaveDataSerializer (M-15).
+// Bridges SMAPI's save-data API with ContractStore + SaveDataSerializer.
 // The adapter now passes schema-agnostic raw JSON payloads so serializer-owned
 // version branching can handle both legacy v1 drop behavior and current v2 loads.
 internal sealed class ContractPersistenceAdapter

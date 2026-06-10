@@ -10,7 +10,7 @@ public enum AxeTarget
     /// <summary>Normal felled tree (any species except fruit trees).</summary>
     StandingTree,
 
-    /// <summary>Fruit tree — always skipped regardless of axe level (FR-SKIP-03 hard rule).</summary>
+    /// <summary>Fruit tree — always skipped regardless of axe level (hard rule).</summary>
     FruitTree,
 
     /// <summary>Small stump left after the player fells a tree. Choppable at any axe level.</summary>

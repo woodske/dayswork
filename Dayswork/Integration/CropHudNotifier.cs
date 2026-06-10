@@ -6,8 +6,8 @@ using StardewValley;
 namespace Dayswork.Integration;
 
 /// <summary>
-/// i18n-backed HUD notices for managed-crop shift behavior (U-MC-05). Purchase / store-fallback /
-/// festival notices are added in U-MC-06. Notices are deduplicated per shift so a repeated cause
+/// i18n-backed HUD notices for managed-crop shift behavior, including purchase / store-fallback /
+/// festival notices. Notices are deduplicated per shift so a repeated cause
 /// (e.g. the same missing tool across many tiles) only surfaces once.
 /// </summary>
 internal static class CropHudNotifier
@@ -38,7 +38,7 @@ internal static class CropHudNotifier
         _wontGrowShownCrops.Clear();
     }
 
-    /// <summary>One notice per purchase line (FR-MC-19) — not deduplicated.</summary>
+    /// <summary>One notice per purchase line — not deduplicated.</summary>
     internal static void PurchaseCompleted(string itemName, int quantity)
     {
         Game1.addHUDMessage(new HUDMessage(

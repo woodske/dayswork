@@ -2,13 +2,13 @@ namespace Dayswork.Core.Shifts;
 
 /// <summary>
 /// Accumulates no-progress in-game minutes and fires when the threshold is reached.
-/// Pure Core — zero Stardew/SMAPI references (MAINT-U13-01, C-09).
+/// Pure Core — zero Stardew/SMAPI references.
 ///
-/// PBT properties:
-///   PBT-U13-04  Any tick with madeProgress=true resets the accumulator → ShouldFireStuck() false.
-///   PBT-U13-05  With only no-progress ticks, ShouldFireStuck() is false while sum &lt; threshold
-///               and true once sum &gt;= threshold.
-///   PBT-U13-06  Reset() always returns the detector to the not-stuck state.
+/// Invariants (property-tested):
+///   - Any tick with madeProgress=true resets the accumulator → ShouldFireStuck() false.
+///   - With only no-progress ticks, ShouldFireStuck() is false while sum &lt; threshold
+///     and true once sum &gt;= threshold.
+///   - Reset() always returns the detector to the not-stuck state.
 /// </summary>
 public sealed class StuckDetector
 {

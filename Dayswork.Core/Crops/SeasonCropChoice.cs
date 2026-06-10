@@ -12,7 +12,7 @@ public sealed record SeasonCropChoice
 
     /// <summary>
     /// When true, the farmhand refills this season's crop on emptied/empty prepared tiles each
-    /// shift (spec §6.4). Authored in the Manage Crops UI (U-MC-03); consumed at runtime (U-MC-05).
+    /// shift. Authored in the Manage Crops UI; consumed at runtime.
     /// </summary>
     public bool AutoReplant { get; }
 

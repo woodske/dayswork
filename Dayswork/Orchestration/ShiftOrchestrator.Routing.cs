@@ -35,9 +35,9 @@ internal sealed partial class ShiftOrchestrator
 
     private static TileCoord FindFarmExitTile(Farm farm)
     {
-        // SVE/expansion entrance override (U-SVE-02): consult the compat seam first. If it supplies
+        // SVE/expansion entrance override: consult the compat seam first. If it supplies
         // a verified per-map entrance for this farm's signature, use it; otherwise fall through to
-        // the existing warp heuristic (FR-SVE-06). The override is best-effort and never throws.
+        // the existing warp heuristic. The override is best-effort and never throws.
         if (ModEntry.ExpansionCompat is { } compat &&
             compat.TryGetFarmEntranceOverride(farm, out var overrideTile))
             return ResolvePassableNearby(new TileCoord(overrideTile.X, overrideTile.Y), farm);

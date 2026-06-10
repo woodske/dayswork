@@ -6,7 +6,7 @@ using StardewValley;
 using StardewValley.Objects;
 
 /// <summary>
-/// Gold/item transaction boundary for U-MC-06. Purchases are exchange-atomic per line: build the
+/// Gold/item transaction boundary. Purchases are exchange-atomic per line: build the
 /// item stack, deposit as much as the input chest accepts, then deduct gold only for the accepted
 /// quantity. Any bind/create failure returns <see cref="PurchaseResult.BindFailure"/> without
 /// mutating gold.

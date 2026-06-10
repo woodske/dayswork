@@ -6,7 +6,7 @@ public sealed record ShopStockSnapshot
     public bool IsOpen { get; }
     public IReadOnlyDictionary<string, int> Stock { get; }
 
-    /// <summary>Live unit price per item id (U-MC-06). Empty when prices are unknown.</summary>
+    /// <summary>Live unit price per item id. Empty when prices are unknown.</summary>
     public IReadOnlyDictionary<string, int> Prices { get; }
 
     public ShopStockSnapshot(Store store, bool isOpen, IReadOnlyDictionary<string, int>? stock)

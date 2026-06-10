@@ -5,7 +5,7 @@ namespace Dayswork.Core.Compat;
 /// <summary>
 /// Immutable description of one expansion's compatibility data plus the pure lookups over it.
 /// The Vanilla profile is a Null-Object — every lookup reports "no override" so consumers keep
-/// their existing behavior (NFR-SVE-01 / S-21). Concrete expansions (e.g., SVE) override only
+/// their existing behavior. Concrete expansions (e.g., SVE) override only
 /// where their content differs from vanilla. Implementations hold no live game objects and operate
 /// solely on primitive descriptors, so they are unit/property-testable without SMAPI.
 /// </summary>

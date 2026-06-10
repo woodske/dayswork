@@ -10,11 +10,11 @@ public static class CapabilityMatrix
 {
     /// <summary>
     /// Returns true if the given axe level can process the target object.
-    /// FruitTree always returns false regardless of level (FR-SKIP-03).
+    /// FruitTree always returns false regardless of level.
     /// </summary>
     public static bool CanChop(ToolLevel axeLevel, AxeTarget target) => target switch
     {
-        AxeTarget.FruitTree    => false,                          // FR-SKIP-03: unconditional hard rule
+        AxeTarget.FruitTree    => false,                          // Unconditional hard rule
         AxeTarget.LargeLog     => axeLevel >= ToolLevel.Gold,     // Gold+ only
         AxeTarget.LargeStump   => axeLevel >= ToolLevel.Steel,    // Steel+ only
         AxeTarget.StandingTree => true,                           // any level

@@ -4,8 +4,8 @@ using StardewModdingAPI;
 namespace Dayswork.Compat;
 
 /// <summary>
-/// Discovers which expansion is installed via SMAPI and resolves the active profile (pattern
-/// P-SVE-01). Guarded: any failure logs a warning and falls back to the Vanilla profile, so
+/// Discovers which expansion is installed via SMAPI and resolves the active profile.
+/// Guarded: any failure logs a warning and falls back to the Vanilla profile, so
 /// compatibility detection can never crash or disable the mod.
 /// </summary>
 internal sealed class ExpansionDetector
