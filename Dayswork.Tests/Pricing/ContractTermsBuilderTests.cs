@@ -7,7 +7,7 @@ using Xunit;
 
 public sealed class ContractTermsBuilderTests
 {
-    private readonly ContractTermsBuilder _builder = U18BuilderFactory.CreateTermsBuilder();
+    private readonly ContractTermsBuilder _builder = ContractTermsBuilderFactory.CreateTermsBuilder();
     private readonly ConfigSnapshot _config = ConfigDefaults.Build();
 
     [Theory]

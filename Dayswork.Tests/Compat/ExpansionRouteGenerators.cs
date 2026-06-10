@@ -4,7 +4,7 @@ using FsCheck;
 
 namespace Dayswork.Tests.Compat;
 
-public static class Todo10RouteGenerators
+public static class ExpansionRouteGenerators
 {
     private static readonly string[] LocationNames =
     {

@@ -18,7 +18,7 @@ public sealed class ContractStoreTests
     // ── helpers ────────────────────────────────────────────────────────────
 
     private static Contract MakeContract(ContractStatus status = ContractStatus.Active) =>
-        U19PersistenceGen.CreateExampleCurrentSchemaContract() with
+        PersistenceGenerators.CreateExampleCurrentSchemaContract() with
         {
             Id = ContractId.New(),
             Status = status,
@@ -163,8 +163,8 @@ public sealed class ContractStoreTests
     [Fact]
     public void ReplaceTermsSnapshot_UpdatesOnlyTermsSnapshot()
     {
-        var originalTerms = U19PersistenceGen.CreateExampleCurrentSchemaContract().TermsSnapshot!;
-        var replacementTerms = U19PersistenceGen.CreateAlternateTermsSnapshot();
+        var originalTerms = PersistenceGenerators.CreateExampleCurrentSchemaContract().TermsSnapshot!;
+        var replacementTerms = PersistenceGenerators.CreateAlternateTermsSnapshot();
         var contract = MakeContract() with { TermsSnapshot = originalTerms };
 
         _store.Add(contract);
@@ -179,7 +179,7 @@ public sealed class ContractStoreTests
     [Fact]
     public void ReplaceTermsSnapshot_UnknownId_Throws()
     {
-        var terms = U19PersistenceGen.CreateAlternateTermsSnapshot();
+        var terms = PersistenceGenerators.CreateAlternateTermsSnapshot();
         Assert.Throws<KeyNotFoundException>(() => _store.ReplaceTermsSnapshot(ContractId.New(), terms));
     }
 

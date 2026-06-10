@@ -2,14 +2,14 @@ using Dayswork.Core.Inventory;
 using FsCheck;
 using FsCheck.Xunit;
 
-namespace Dayswork.Tests.U22;
+namespace Dayswork.Tests.Inventory;
 
 public sealed class OverflowCategorizerPropertyTests
 {
     [Property(MaxTest = 500)]
     public Property Categorize_Is_Stable_Across_Permutations()
     {
-        return Prop.ForAll(U22PropertyGenerators.OverflowItems(), overflow =>
+        return Prop.ForAll(OverflowGenerators.OverflowItems(), overflow =>
         {
             var categorizer = new OverflowCategorizer();
             var expected = categorizer.Categorize(overflow);

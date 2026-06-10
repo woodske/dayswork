@@ -1,4 +1,4 @@
-namespace Dayswork.Tests.U24;
+namespace Dayswork.Tests.Shifts;
 
 using Dayswork.Core.Shifts;
 using Xunit;

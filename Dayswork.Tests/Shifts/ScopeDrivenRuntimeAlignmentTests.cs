@@ -2,7 +2,7 @@ using Dayswork.Core.Domain;
 using Dayswork.Core.Shifts;
 using Xunit;
 
-namespace Dayswork.Tests.U22;
+namespace Dayswork.Tests.Shifts;
 
 public sealed class ScopeDrivenRuntimeAlignmentTests
 {

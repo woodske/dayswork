@@ -2,9 +2,9 @@ using Dayswork.Core.Domain;
 using Dayswork.Core.Inventory;
 using FsCheck;
 
-namespace Dayswork.Tests.U22;
+namespace Dayswork.Tests.Inventory;
 
-public static class U22PropertyGenerators
+public static class OverflowGenerators
 {
     private static readonly string[] ItemIds = { "(O)388", "(O)390", "(O)430", "(O)709" };
     private static readonly OverflowReason[] Reasons = Enum.GetValues<OverflowReason>();

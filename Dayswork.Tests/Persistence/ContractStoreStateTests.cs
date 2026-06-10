@@ -83,11 +83,11 @@ public sealed class ContractStoreStateTests
                 return store.Get(contract.Id).Status == ContractStatus.Cancelled;
             });
 
-    [Property(Arbitrary = new[] { typeof(U19PersistenceGen) }, MaxTest = 300)]
+    [Property(Arbitrary = new[] { typeof(PersistenceGenerators) }, MaxTest = 300)]
     public Property ReplaceTermsSnapshot_PreservesNonTermsFields() =>
         Prop.ForAll(
-            U19PersistenceGen.CurrentSchemaContract(),
-            U19PersistenceGen.TermsSnapshot(),
+            PersistenceGenerators.CurrentSchemaContract(),
+            PersistenceGenerators.TermsSnapshot(),
             (contract, replacementTerms) =>
             {
                 var store = MakeStore();

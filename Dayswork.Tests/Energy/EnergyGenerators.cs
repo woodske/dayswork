@@ -1,4 +1,4 @@
-namespace Dayswork.Tests.U21;
+namespace Dayswork.Tests.Energy;
 
 using System.Collections.ObjectModel;
 using Dayswork.Core.Config;
@@ -8,7 +8,7 @@ using FsCheck;
 
 public sealed record U21LedgerCase(int Capacity, WorkActionKind[] Actions);
 
-public static class U21PropertyGenerators
+public static class EnergyGenerators
 {
     public static Arbitrary<U21LedgerCase> LedgerCase()
     {

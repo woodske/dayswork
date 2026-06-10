@@ -6,9 +6,9 @@ using Xunit;
 
 namespace Dayswork.Tests.Compat;
 
-public sealed class Todo10RoutePropertyTests
+public sealed class ExpansionRoutePropertyTests
 {
-    [Property(Arbitrary = new[] { typeof(Todo10RouteGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(ExpansionRouteGenerators) }, MaxTest = 500)]
     public void Sve_route_lookup_is_deterministic(ExpansionRouteRequest request)
     {
         var profile = new SveExpansionProfile();
@@ -20,7 +20,7 @@ public sealed class Todo10RoutePropertyTests
         Assert.Equal(first, second);
     }
 
-    [Property(Arbitrary = new[] { typeof(Todo10RouteGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(ExpansionRouteGenerators) }, MaxTest = 500)]
     public void Route_hop_ordinals_are_contiguous(ExpansionRouteDefinition route)
     {
         var expected = Enumerable.Range(1, route.Hops.Count).ToArray();
@@ -29,7 +29,7 @@ public sealed class Todo10RoutePropertyTests
         Assert.Equal(expected, actual);
     }
 
-    [Property(Arbitrary = new[] { typeof(Todo10RouteGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(ExpansionRouteGenerators) }, MaxTest = 500)]
     public void Route_hops_are_contiguous_by_location(ExpansionRouteDefinition route)
     {
         for (var i = 1; i < route.Hops.Count; i++)
@@ -38,7 +38,7 @@ public sealed class Todo10RoutePropertyTests
         }
     }
 
-    [Property(Arbitrary = new[] { typeof(Todo10RouteGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(ExpansionRouteGenerators) }, MaxTest = 500)]
     public void Expansion_chest_visibility_requires_associated_greenhouse_selection(
         ExpansionLocationDescriptor descriptor,
         bool selectAssociated)
@@ -53,7 +53,7 @@ public sealed class Todo10RoutePropertyTests
         Assert.Equal(descriptor.IsDepositDestinationEligible && selectAssociated, visible);
     }
 
-    [Property(Arbitrary = new[] { typeof(Todo10RouteGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(ExpansionRouteGenerators) }, MaxTest = 500)]
     public void Route_failure_log_payload_contains_reason_target_and_purpose(ExpansionRouteFailure failure)
     {
         var message = ExpansionCompatService.FormatRouteFailure(failure);

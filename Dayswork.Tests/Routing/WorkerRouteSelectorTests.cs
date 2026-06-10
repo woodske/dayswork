@@ -2,7 +2,7 @@ using Dayswork.Core.Domain;
 using Dayswork.Core.Shifts;
 using Xunit;
 
-namespace Dayswork.Tests.UWR;
+namespace Dayswork.Tests.Routing;
 
 public sealed class WorkerRouteSelectorTests
 {

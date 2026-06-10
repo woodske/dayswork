@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Dayswork.Tests.UI;
 
-public sealed class Todo10ExpansionDestinationFilteringTests
+public sealed class ExpansionDestinationFilteringTests
 {
     private static ExpansionCompatService Service()
     {

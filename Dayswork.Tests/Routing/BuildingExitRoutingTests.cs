@@ -2,7 +2,7 @@ using Dayswork.Core.Domain;
 using Dayswork.Orchestration;
 using Xunit;
 
-namespace Dayswork.Tests.UWR;
+namespace Dayswork.Tests.Routing;
 
 public sealed class BuildingExitRoutingTests
 {

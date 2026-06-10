@@ -2,7 +2,7 @@ using Dayswork.Core.Domain;
 using Dayswork.Core.Inventory;
 using Xunit;
 
-namespace Dayswork.Tests.U22;
+namespace Dayswork.Tests.Inventory;
 
 public sealed class OverflowCategorizerTests
 {

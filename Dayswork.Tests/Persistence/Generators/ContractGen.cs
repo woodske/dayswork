@@ -13,7 +13,7 @@ public static class ContractGen
          from schedule in Gen.Elements(ContractSchedule.OneTime, ContractSchedule.Recurring)
          from status in Gen.Elements(ContractStatus.Active, ContractStatus.Paused, ContractStatus.Cancelled)
          from hireDate in GameDateGen()
-         select U19PersistenceGen.CreateExampleCurrentSchemaContract() with
+         select PersistenceGenerators.CreateExampleCurrentSchemaContract() with
          {
              Id = new ContractId(id),
              Schedule = schedule,

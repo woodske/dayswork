@@ -1,4 +1,4 @@
-namespace Dayswork.Tests.U21;
+namespace Dayswork.Tests.Shifts;
 
 using Dayswork.Core.Domain;
 using Dayswork.Core.Shifts;

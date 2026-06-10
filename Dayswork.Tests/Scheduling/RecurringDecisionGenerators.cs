@@ -4,14 +4,14 @@ using Dayswork.Tests.Generators;
 using Dayswork.Tests.Persistence.Generators;
 using FsCheck;
 
-namespace Dayswork.Tests.U23;
+namespace Dayswork.Tests.Scheduling;
 
-public static class U23PropertyGenerators
+public static class RecurringDecisionGenerators
 {
     public static Arbitrary<U23RecurringDecisionCase> DecisionCase()
     {
         var gen =
-            from contract in U19PersistenceGen.CurrentSchemaContract().Generator
+            from contract in PersistenceGenerators.CurrentSchemaContract().Generator
             from config in ConfigSnapshotGen.Snapshot().Generator
             from festivalToday in Arb.Generate<bool>()
             from availableGold in Gen.Choose(0, 100_000)
@@ -28,7 +28,7 @@ public static class U23PropertyGenerators
     public static Arbitrary<U23RecurringContractCase> SupportedRecurringContractCase()
     {
         var gen =
-            from contract in U19PersistenceGen.CurrentSchemaContract().Generator
+            from contract in PersistenceGenerators.CurrentSchemaContract().Generator
             from config in ConfigSnapshotGen.Snapshot().Generator
             let recurringContract = contract with
             {

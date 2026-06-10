@@ -8,7 +8,7 @@ using FsCheck;
 
 namespace Dayswork.Tests.Persistence.Generators;
 
-public static class U19PersistenceGen
+public static class PersistenceGenerators
 {
     private static readonly TaskKind[] OutputProducingTasks =
     {
@@ -26,7 +26,7 @@ public static class U19PersistenceGen
          from enabledTasks in EnabledTasksFor(canonicalScope)
          from config in ConfigSnapshotGen.Snapshot().Generator
          from tier in TierGen()
-         let preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, tier, config)
+         let preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, tier, config)
          where preview.IsValid && preview.ProposedTerms is not null
          from id in Arb.Generate<Guid>().Where(guid => guid != Guid.Empty)
          from schedule in Gen.Elements(ContractSchedule.OneTime, ContractSchedule.Recurring)
@@ -54,7 +54,7 @@ public static class U19PersistenceGen
          from enabledTasks in EnabledTasksFor(canonicalScope)
          from config in ConfigSnapshotGen.Snapshot().Generator
          from tier in TierGen()
-         let preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, tier, config)
+         let preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, tier, config)
          where preview.IsValid && preview.ProposedTerms is not null
          select preview.ProposedTerms)
         .ToArbitrary();
@@ -134,7 +134,7 @@ public static class U19PersistenceGen
             .ToArbitrary();
 
     public static Arbitrary<ContractScopeSelection> ScopeSelection() =>
-        U18ContractTermsGen.ScopeSelection()
+        ContractTermsGenerators.ScopeSelection()
             .Filter(selection =>
                 selection.OutdoorZones.Count > 0
                 || selection.AnimalBuildings.Count > 0
@@ -218,5 +218,5 @@ public static class U19PersistenceGen
         ContractScopeSelection scopeSelection,
         IReadOnlySet<TaskKind> enabledTasks,
         EnergyTier tier) =>
-        U18BuilderFactory.CreateTermsBuilder().BuildTerms(scopeSelection, enabledTasks, tier, ConfigDefaults.Build());
+        ContractTermsBuilderFactory.CreateTermsBuilder().BuildTerms(scopeSelection, enabledTasks, tier, ConfigDefaults.Build());
 }

@@ -4,7 +4,7 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Energy;
 using Dayswork.Core.Pricing;
 
-internal static class U18BuilderFactory
+internal static class ContractTermsBuilderFactory
 {
     public static ConfigValueResolver CreateResolver() => new();
 

@@ -13,7 +13,7 @@ public sealed class HiringFlowViewModelPropertyTests
     [Property(MaxTest = 300)]
     public Property BuildState_IsDeterministicForEquivalentOutdoorSelections() =>
         Prop.ForAll(
-            U18ContractTermsGen.EquivalentOutdoorSelections(),
+            ContractTermsGenerators.EquivalentOutdoorSelections(),
             ConfigSnapshotGen.Snapshot(),
             (equivalentSelections, config) =>
             {
@@ -32,12 +32,12 @@ public sealed class HiringFlowViewModelPropertyTests
     [Property(MaxTest = 300)]
     public Property ScheduleChange_DoesNotChangePricingOrEnergy() =>
         Prop.ForAll(
-            U18ContractTermsGen.ScopeSelection(),
-            U18ContractTermsGen.EnabledTaskSet(),
+            ContractTermsGenerators.ScopeSelection(),
+            ContractTermsGenerators.EnabledTaskSet(),
             ConfigSnapshotGen.Snapshot(),
             (selection, enabledTasks, config) =>
             {
-                var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
+                var preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
                 if (!preview.IsValid || preview.ProposedTerms is null)
                     return true;
 
@@ -50,12 +50,12 @@ public sealed class HiringFlowViewModelPropertyTests
     [Property(MaxTest = 300)]
     public Property DestinationChanges_DoNotChangePricingOrEnergy() =>
         Prop.ForAll(
-            U18ContractTermsGen.ScopeSelection(),
-            U18ContractTermsGen.EnabledTaskSet(),
+            ContractTermsGenerators.ScopeSelection(),
+            ContractTermsGenerators.EnabledTaskSet(),
             ConfigSnapshotGen.Snapshot(),
             (selection, enabledTasks, config) =>
             {
-                var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
+                var preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
                 if (!preview.IsValid || preview.ProposedTerms is null)
                     return true;
 
@@ -78,7 +78,7 @@ public sealed class HiringFlowViewModelPropertyTests
         ContractId? editingId)
     {
         var draft = CreateDraft(selection, enabledTasks, schedule, editingId);
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
+        var preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(selection, enabledTasks, Dayswork.Core.Domain.EnergyTier.FullDay, config);
         return HiringFlowViewModelBuilder.Build(draft, preview);
     }
 

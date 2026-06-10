@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Dayswork.Tests.Compat;
 
-public sealed class Todo10RouteDefinitionTests
+public sealed class ExpansionRouteDefinitionTests
 {
     [Theory]
     [InlineData(140, 93, 20, 22)]

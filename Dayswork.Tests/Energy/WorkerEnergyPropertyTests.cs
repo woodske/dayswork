@@ -1,15 +1,15 @@
-namespace Dayswork.Tests.U21;
+namespace Dayswork.Tests.Energy;
 
 using Dayswork.Core.Energy;
 using FsCheck.Xunit;
 
 public sealed class WorkerEnergyPropertyTests
 {
-    [Property(Arbitrary = new[] { typeof(U21PropertyGenerators) }, MaxTest = 200)]
+    [Property(Arbitrary = new[] { typeof(EnergyGenerators) }, MaxTest = 200)]
     public bool Energy_sequences_stay_within_bounds_and_never_regain_new_unit_privilege(U21LedgerCase input)
     {
         var ledger = new WorkerEnergyLedger();
-        var profile = U21PropertyGenerators.BuildProfile(input.Capacity);
+        var profile = EnergyGenerators.BuildProfile(input.Capacity);
         var state = ledger.StartShift(profile);
         var hasLostStartPrivilege = false;
 

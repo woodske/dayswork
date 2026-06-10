@@ -2,9 +2,9 @@ using Dayswork.Core.Domain;
 using Dayswork.Core.Shifts;
 using FsCheck;
 
-namespace Dayswork.Tests.UWR;
+namespace Dayswork.Tests.Routing;
 
-public static class UWRPropertyGenerators
+public static class WorkerRoutingGenerators
 {
     private static readonly TaskKind[] AllTasks = Enum.GetValues<TaskKind>();
     private static readonly TaskPriorityOrderer PriorityOrderer = new();

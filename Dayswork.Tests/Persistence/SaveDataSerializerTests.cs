@@ -99,7 +99,7 @@ public sealed class SaveDataSerializerTests
     [Fact]
     public void Deserialize_MalformedCurrentSchemaContractAmongValid_PreservesValidSibling()
     {
-        var validContract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var validContract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
         var validEnvelope = JObject.Parse(_serializer.Serialize(new[] { validContract }, "0.2.0"));
         var contracts = (JArray)validEnvelope["Contracts"]!;
 
@@ -136,7 +136,7 @@ public sealed class SaveDataSerializerTests
     [Fact]
     public void Deserialize_CurrentSchemaContract_RoundTrips()
     {
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
 
         var result = _serializer.Deserialize(_serializer.Serialize(new[] { contract }, "0.2.0"));
 
@@ -154,7 +154,7 @@ public sealed class SaveDataSerializerTests
     [Fact]
     public void Serialize_CurrentSchemaContract_IncludesAuthoritativeScopeAndTerms()
     {
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
 
         var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
         var dto = payload["Contracts"]!.Single()!;
@@ -166,7 +166,7 @@ public sealed class SaveDataSerializerTests
     [Fact]
     public void Serialize_EmptyCropPlan_OmitsCropPlan()
     {
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
 
         var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
         var dto = payload["Contracts"]!.Single()!;
@@ -177,7 +177,7 @@ public sealed class SaveDataSerializerTests
     [Fact]
     public void Deserialize_MissingCropPlan_DefaultsToEmpty()
     {
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
         var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
         ((JObject)payload["Contracts"]!.Single()!).Remove("CropPlan");
 
@@ -190,7 +190,7 @@ public sealed class SaveDataSerializerTests
     [Fact]
     public void Deserialize_MalformedCropPlan_SkipsOnlyAffectedContract()
     {
-        var validContract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var validContract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
         var payload = JObject.Parse(_serializer.Serialize(new[] { validContract }, "0.2.0"));
         var malformed = (JObject)((JObject)payload["Contracts"]!.Single()!).DeepClone();
         malformed["Id"] = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";

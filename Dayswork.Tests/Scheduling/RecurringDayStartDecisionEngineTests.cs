@@ -7,16 +7,16 @@ using Dayswork.Tests.Persistence.Generators;
 using Dayswork.Tests.Pricing;
 using Xunit;
 
-namespace Dayswork.Tests.U23;
+namespace Dayswork.Tests.Scheduling;
 
 public sealed class RecurringDayStartDecisionEngineTests
 {
-    private readonly RecurringDayStartDecisionEngine _engine = new(U18BuilderFactory.CreateTermsBuilder());
+    private readonly RecurringDayStartDecisionEngine _engine = new(ContractTermsBuilderFactory.CreateTermsBuilder());
 
     [Fact]
     public void FestivalDay_ValidRecurringContract_RefreshesTermsWithoutChargeOrSpawn()
     {
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
         var config = ConfigDefaults.Build();
 
         var outcome = _engine.Evaluate(contract, config, festivalToday: true, availableGold: int.MaxValue);
@@ -33,9 +33,9 @@ public sealed class RecurringDayStartDecisionEngineTests
     [Fact]
     public void ExactAffordability_StartsShiftAndChargesPrice()
     {
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
         var config = ConfigDefaults.Build();
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(contract.ScopeSelection!, contract.EnabledTasks, contract.Tier, config);
+        var preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(contract.ScopeSelection!, contract.EnabledTasks, contract.Tier, config);
         var exactGold = preview.ProposedTerms!.Pricing.TotalPrice;
 
         var outcome = _engine.Evaluate(contract, config, festivalToday: false, availableGold: exactGold);
@@ -52,9 +52,9 @@ public sealed class RecurringDayStartDecisionEngineTests
     [Fact]
     public void UnaffordableRefresh_SkipsWorkButKeepsRefreshedTermsEligibleForPersistence()
     {
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract();
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
         var config = ConfigDefaults.Build();
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(contract.ScopeSelection!, contract.EnabledTasks, contract.Tier, config);
+        var preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(contract.ScopeSelection!, contract.EnabledTasks, contract.Tier, config);
         var dailyPrice = preview.ProposedTerms!.Pricing.TotalPrice;
 
         var outcome = _engine.Evaluate(contract, config, festivalToday: false, availableGold: Math.Max(0, dailyPrice - 1));

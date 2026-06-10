@@ -2,13 +2,13 @@ using Dayswork.Core.Shifts;
 using FsCheck.Xunit;
 using Xunit;
 
-namespace Dayswork.Tests.UWR;
+namespace Dayswork.Tests.Routing;
 
 public sealed class WorkerRouteSelectorPropertyTests
 {
     private readonly WorkerRouteSelector _selector = new();
 
-    [Property(Arbitrary = new[] { typeof(UWRPropertyGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(WorkerRoutingGenerators) }, MaxTest = 500)]
     public void Selected_candidate_has_best_priority_then_minimum_cost(
         IReadOnlyList<WorkerRouteCandidate> candidates)
     {
@@ -34,7 +34,7 @@ public sealed class WorkerRouteSelectorPropertyTests
         Assert.Equal(minCostInBestRank, selected.RouteCost);
     }
 
-    [Property(Arbitrary = new[] { typeof(UWRPropertyGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(WorkerRoutingGenerators) }, MaxTest = 500)]
     public void Selection_matches_priority_then_cost_tie_break_oracle(
         IReadOnlyList<WorkerRouteCandidate> candidates)
     {
@@ -50,7 +50,7 @@ public sealed class WorkerRouteSelectorPropertyTests
         Assert.Equal(expected, actual);
     }
 
-    [Property(Arbitrary = new[] { typeof(UWRPropertyGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(WorkerRoutingGenerators) }, MaxTest = 500)]
     public void Unreachable_candidates_are_never_selected_when_reachable_candidates_exist(
         IReadOnlyList<WorkerRouteCandidate> candidates)
     {
@@ -63,7 +63,7 @@ public sealed class WorkerRouteSelectorPropertyTests
         }
     }
 
-    [Property(Arbitrary = new[] { typeof(UWRPropertyGenerators) }, MaxTest = 500)]
+    [Property(Arbitrary = new[] { typeof(WorkerRoutingGenerators) }, MaxTest = 500)]
     public void Best_priority_zero_cost_candidate_wins(
         IReadOnlyList<WorkerRouteCandidate> candidates)
     {

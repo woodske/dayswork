@@ -1,4 +1,4 @@
-namespace Dayswork.Tests.U21;
+namespace Dayswork.Tests.Energy;
 
 using Dayswork.Core.Energy;
 using Xunit;
@@ -9,7 +9,7 @@ public sealed class WorkUnitBoundaryClassifierTests
     public void Unresolved_unit_continues_even_when_boundary_stop_is_requested()
     {
         var classifier = new WorkUnitBoundaryClassifier();
-        var state = WorkerEnergyState.FromProfile(U21PropertyGenerators.BuildProfile(0));
+        var state = WorkerEnergyState.FromProfile(EnergyGenerators.BuildProfile(0));
 
         var decision = classifier.EvaluateAfterBeat(
             unitResolved: false,
@@ -25,7 +25,7 @@ public sealed class WorkUnitBoundaryClassifierTests
     public void Resolved_unit_wraps_up_when_stop_is_requested()
     {
         var classifier = new WorkUnitBoundaryClassifier();
-        var state = WorkerEnergyState.FromProfile(U21PropertyGenerators.BuildProfile(10));
+        var state = WorkerEnergyState.FromProfile(EnergyGenerators.BuildProfile(10));
 
         var decision = classifier.EvaluateAfterBeat(
             unitResolved: true,
@@ -41,7 +41,7 @@ public sealed class WorkUnitBoundaryClassifierTests
     public void Resolved_unit_can_start_next_when_energy_remains_and_no_stop_is_requested()
     {
         var classifier = new WorkUnitBoundaryClassifier();
-        var state = WorkerEnergyState.FromProfile(U21PropertyGenerators.BuildProfile(10));
+        var state = WorkerEnergyState.FromProfile(EnergyGenerators.BuildProfile(10));
 
         var decision = classifier.EvaluateAfterBeat(
             unitResolved: true,

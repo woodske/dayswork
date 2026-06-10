@@ -3,7 +3,7 @@ namespace Dayswork.Tests.Generators;
 using Dayswork.Core.Domain;
 using FsCheck;
 
-public static class U18ContractTermsGen
+public static class ContractTermsGenerators
 {
     private static readonly string[] AnimalLocationNames =
     {
