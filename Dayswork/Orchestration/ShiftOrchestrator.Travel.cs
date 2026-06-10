@@ -23,7 +23,7 @@ internal enum TravelPurpose
 
 internal sealed partial class ShiftOrchestrator
 {
-    private void StartTravel(TravelPlan plan, TravelPurpose purpose)
+    internal void StartTravel(TravelPlan plan, TravelPurpose purpose)
     {
         if (Session.Worker is null)
             return;
@@ -73,7 +73,7 @@ internal sealed partial class ShiftOrchestrator
         OnTravelArrived(arrived);
     }
 
-    private void CancelActiveTravel()
+    internal void CancelActiveTravel()
     {
         _travel.Clear();
         if (_session is { } s)
@@ -100,7 +100,7 @@ internal sealed partial class ShiftOrchestrator
                 FinalizeAndAdvanceTrip(Game1.getFarm());
                 break;
             case TravelPurpose.ShoppingStep:
-                OnManagedShoppingTravelArrived();
+                Session.Shopping.OnTravelArrived();
                 break;
         }
     }
@@ -119,7 +119,7 @@ internal sealed partial class ShiftOrchestrator
                 FinalizeAndAdvanceTrip(Game1.getFarm());
                 break;
             case TravelPurpose.ShoppingStep:
-                AbortManagedShoppingTrip($"navigation_failed_{_managedShoppingPhase}");
+                Session.Shopping.AbortTripForNavigationFailure();
                 break;
         }
     }
@@ -159,7 +159,7 @@ internal sealed partial class ShiftOrchestrator
     }
 
     /// <summary>A walk within one location, no warp (counter walks, wait tiles, chest stand tiles).</summary>
-    private static TravelPlan WalkOnlyPlan(
+    internal static TravelPlan WalkOnlyPlan(
         GameLocation location,
         TileCoord tile,
         TravelFailurePolicy policy = TravelFailurePolicy.ReportFailure) =>

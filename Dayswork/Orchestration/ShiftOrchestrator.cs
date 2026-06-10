@@ -28,7 +28,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     // Emote IDs — play-test TODO: confirm "?" and "!" are 8 and 2 in vanilla.
     private const int EmoteQuestion    = 8;  // confused "?" (stuck step 1)
     private const int EmoteExclamation = 2;  // surprised "!" (hit reaction)
-    private const int EmoteMusic       = 16; // music note while waiting for a shop to open
+    internal const int EmoteMusic      = 16; // music note while waiting for a shop to open
 
     // Melee proximity range for hit-detection (Manhattan distance in tiles).
     private const float HitRangeTiles = 2.0f;
@@ -114,7 +114,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     private bool IsWorkUnitInProgress() => Session.ActionPending;
 
-    private bool ShouldWrapUpBeforeNextUnit() =>
+    internal bool ShouldWrapUpBeforeNextUnit() =>
         _session is not null && (Session.Ctx.PendingStopReason is not null || !Session.Ctx.EnergyState.CanStartNewWorkUnit);
 
     private void RequestBoundaryStop(ShiftStopReason reason, int? stopTime = null)
@@ -126,7 +126,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         Session.Ctx.ShiftEndTime ??= stopTime ?? Game1.timeOfDay;
     }
 
-    private void QueueWrapUpNow(ShiftStopReason reason, int? stopTime = null)
+    internal void QueueWrapUpNow(ShiftStopReason reason, int? stopTime = null)
     {
         if (_session is null)
             return;
@@ -281,7 +281,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         // Reset the shift-scoped pieces that outlive a session.
         _travel.Clear();
-        ResetManagedShoppingState();
         _shopStockReader.ResetForShift();
         Dayswork.Integration.CropHudNotifier.ResetForShift();
 
@@ -310,6 +309,16 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             LastTilePos = farmhand.TilePoint,
             MorningEntranceHoldTicks = pacingProfile.EntranceHoldTicks,
         };
+        _session.Shopping = new ManagedShoppingCoordinator(
+            _session,
+            this,
+            _nav,
+            _toolAnimator,
+            _cropFieldReader,
+            _shiftSupplyAggregator,
+            _shopStockReader,
+            _purchaseAffordability,
+            _shopPurchaseService);
 
         Game1.addHUDMessage(new HUDMessage(
             I18nHelper.Get("notify.shift_started", new { price = contract.TermsSnapshot.Pricing.TotalPrice }),
@@ -692,7 +701,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         // Progress sampling + stuck detection.
         // Only meaningful while actively working.
-        if (phase == ShiftPhase.Working && !_managedShoppingInProgress)
+        if (phase == ShiftPhase.Working && !Session.Shopping.IsInProgress)
         {
             SampleProgress(currentLocation);
             // Re-read phase — SampleProgress may have triggered a transition.
@@ -705,9 +714,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         CheckHitReaction();
 
         // Shopping wait loop: parked at the wait tile until the store opens (no travel active).
-        if (_managedShoppingPhase == ManagedShoppingPhase.WaitingForOpen)
+        if (Session.Shopping.IsWaitingForOpen)
         {
-            ContinueManagedShoppingWait();
+            Session.Shopping.ContinueWaitTick();
             return;
         }
 
@@ -778,7 +787,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         // Route collected-but-undelivered items through their safe final destination; explicit
         // shipping-bin output goes straight to the bin, while all other undelivered output uses
         // automatic overflow. This must all happen BEFORE the session is discarded.
-        SettleManagedShoppingCarriedItems(showHud: false);
+        _session.Shopping.SettleCarriedItems(showHud: false);
         AppendUndeliveredToOverflow();
 
         ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
@@ -800,7 +809,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             (phase == ShiftPhase.Working || phase == ShiftPhase.Recovering))
         {
             ModEntry.ModMonitor.Log("[Dayswork] 8pm cap reached.", LogLevel.Trace);
-            if (_managedShoppingInProgress)
+            if (Session.Shopping.IsInProgress)
             {
                 RequestBoundaryStop(ShiftStopReason.HardCap, e.NewTime);
             }
@@ -899,7 +908,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _currentTripChest = null;
         _currentTripLocation = null;
         _currentTripChestAnimated = false;
-        ResetManagedShoppingState();
         _nav.Clear();
     }
 

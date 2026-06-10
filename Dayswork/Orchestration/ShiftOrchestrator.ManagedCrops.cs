@@ -55,7 +55,7 @@ internal sealed partial class ShiftOrchestrator
             s.ManagedBatchLocationName = "Farm";
         }
 
-        ResetManagedShoppingState();
+        _session?.Shopping.ResetState();
     }
 
     private static bool IsManagedCropBatch(WorkBatch batch) => batch.Kind == BatchKind.ManagedCrops;
@@ -276,7 +276,7 @@ internal sealed partial class ShiftOrchestrator
 
         if (ShouldWrapUpBeforeNextUnit())
         {
-            if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: true))
+            if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: true))
                 return;
 
             QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
@@ -308,13 +308,13 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: false))
+        if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: false))
             return;
 
         CompleteManagedCropBatch();
     }
 
-    private void CompleteManagedCropBatch()
+    internal void CompleteManagedCropBatch()
     {
         if (_session is null)
             return;
@@ -389,7 +389,7 @@ internal sealed partial class ShiftOrchestrator
     /// planting via the ManagedReentry travel completion. Returns false when re-entry is impossible
     /// and the caller should complete the batch instead.
     /// </summary>
-    private bool TryStartManagedReentryTravel()
+    internal bool TryStartManagedReentryTravel()
     {
         if (Session.Worker is null)
             return false;
@@ -449,7 +449,7 @@ internal sealed partial class ShiftOrchestrator
     }
 
     /// <summary>Re-plan and resume planting once the worker is back in the managed batch's location.</summary>
-    private void ResumeManagedBatchAfterShopping()
+    internal void ResumeManagedBatchAfterShopping()
     {
         Session.ManagedReplanCount = 0;
         var actions = BuildManagedActions(logDetail: true);
@@ -466,7 +466,7 @@ internal sealed partial class ShiftOrchestrator
         StartNextManagedAction();
     }
 
-    private static void NotifyFallbackStoreIfUsed(ShiftPurchaseManifest manifest)
+    internal static void NotifyFallbackStoreIfUsed(ShiftPurchaseManifest manifest)
     {
         var preferred = ModEntry.PreferredCropStore switch
         {
@@ -540,7 +540,7 @@ internal sealed partial class ShiftOrchestrator
 
         if (boundary.ShouldWrapUpAfterCurrentUnit)
         {
-            if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: true))
+            if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: true))
                 return;
 
             QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
@@ -801,7 +801,7 @@ internal sealed partial class ShiftOrchestrator
 
     // ── Input-chest supply ───────────────────────────────────────────────────
 
-    private Chest? TryGetInputChest()
+    internal Chest? TryGetInputChest()
     {
         var farm = Game1.getFarm();
         foreach (var building in farm.buildings)
@@ -815,7 +815,7 @@ internal sealed partial class ShiftOrchestrator
         return null;
     }
 
-    private static SupplyInventory ReadSupply(Chest? chest)
+    internal static SupplyInventory ReadSupply(Chest? chest)
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         if (chest is not null)
@@ -885,13 +885,13 @@ internal sealed partial class ShiftOrchestrator
         return id.StartsWith("(", StringComparison.Ordinal) && close >= 0 ? id[(close + 1)..] : id;
     }
 
-    private static GameDate CurrentManagedGameDate()
+    internal static GameDate CurrentManagedGameDate()
     {
         var season = Enum.Parse<Dayswork.Core.Domain.Season>(Game1.currentSeason, ignoreCase: true);
         return new GameDate(Game1.dayOfMonth, season, Game1.year);
     }
 
-    private GameLocation? ResolveManagedBatchLocation(string locationName)
+    internal GameLocation? ResolveManagedBatchLocation(string locationName)
     {
         if (string.Equals(locationName, "Farm", StringComparison.Ordinal))
             return Game1.getFarm();
@@ -899,7 +899,13 @@ internal sealed partial class ShiftOrchestrator
         return Game1.getLocationFromName(locationName);
     }
 
-    private bool IsCurrentManagedBatchSeasonAgnostic() =>
+    internal static string LocationKey(GameLocation location) =>
+        location.NameOrUniqueName ?? location.Name;
+
+    internal static bool SameLocation(GameLocation left, GameLocation right) =>
+        string.Equals(LocationKey(left), LocationKey(right), StringComparison.OrdinalIgnoreCase);
+
+    internal bool IsCurrentManagedBatchSeasonAgnostic() =>
         !string.Equals(Session.ManagedBatchLocationName, "Farm", StringComparison.Ordinal)
         || Session.ManagedAssignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
 

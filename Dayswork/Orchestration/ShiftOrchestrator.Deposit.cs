@@ -496,7 +496,7 @@ internal sealed partial class ShiftOrchestrator
         _currentTrip = null;
     }
 
-    private static bool TrySelectChestDepositStandTile(
+    internal static bool TrySelectChestDepositStandTile(
         TileCoord chestTile,
         GameLocation location,
         FarmhandNpc worker,
@@ -510,7 +510,7 @@ internal sealed partial class ShiftOrchestrator
             out standTile);
     }
 
-    private static IEnumerable<TileCoord> DepositStandTilesAround(TileCoord tile)
+    internal static IEnumerable<TileCoord> DepositStandTilesAround(TileCoord tile)
     {
         yield return new TileCoord(tile.X, tile.Y - 1);
         yield return new TileCoord(tile.X + 1, tile.Y);
