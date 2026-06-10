@@ -222,14 +222,7 @@ internal sealed partial class ShiftOrchestrator
         }
     }
 
-    private int FacingTowardDestination()
-    {
-        if (_currentTrip is null || Session.Worker is null)
-            return Session.Worker?.FacingDirection ?? 2;
-        return FacingToward(Session.Worker.TilePoint, _currentTrip.Tile, Session.Worker.FacingDirection);
-    }
-
-    private static int FacingToward(Point from, TileCoord to, int fallback)
+    internal static int FacingToward(Point from, TileCoord to, int fallback)
     {
         var dx = to.X - from.X;
         var dy = to.Y - from.Y;

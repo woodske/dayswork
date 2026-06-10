@@ -87,10 +87,11 @@ internal sealed class ShiftSession
     // ── Cross-location travel ────────────────────────────────────────────────
     public TravelPurpose TravelPurpose;
 
-    // ── Managed shopping ─────────────────────────────────────────────────────
-    // Assigned by StartShift immediately after the session is constructed (the coordinator
-    // needs the session reference, so it can't be a constructor parameter here).
+    // ── Managed shopping / deposit trips ─────────────────────────────────────
+    // Assigned by StartShift immediately after the session is constructed (both need the
+    // session reference, so they can't be constructor parameters here).
     public ManagedShoppingCoordinator Shopping = null!;
+    public DepositTripRunner Deposits = null!;
 
     // ── Managed-crop batch state ─────────────────────────────────────────────
     public readonly Queue<TileAction> ManagedActions = new();

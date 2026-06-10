@@ -241,7 +241,7 @@ internal sealed partial class ShiftOrchestrator
     private void LogExpansionRouteFailure(ExpansionRouteFailure failure) =>
         ModEntry.ModMonitor.Log(ExpansionCompatService.FormatRouteFailure(failure), LogLevel.Warn);
 
-    private void WarpExpansionWorkerToFarm()
+    internal void WarpExpansionWorkerToFarm()
     {
         if (Session.Worker is null)
             return;

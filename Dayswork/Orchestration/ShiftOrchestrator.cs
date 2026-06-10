@@ -65,19 +65,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private ShiftSession Session =>
         _session ?? throw new InvalidOperationException("No active shift session.");
 
-    // Multi-trip deposit loop state: the ordered remaining trips and the in-flight one.
-    private readonly Queue<DepositTrip> _depositTrips = new();
-    private DepositTrip? _currentTrip;
-
-    // Per-stack paced execution within the in-flight trip. Each stack is one beat gated by
-    // _toolAnimator.IsSwinging (duration == WorkerActionAnimationMs), so the deposit cadence
-    // tracks the same config knob as task actions.
-    private int           _currentTripStackIndex;
-    private bool          _currentTripExecutionStarted;
-    private Chest?        _currentTripChest;
-    private GameLocation? _currentTripLocation;
-    private bool          _currentTripChestAnimated;   // we triggered the open-lid animation
-
     public ShiftOrchestrator(
         ToolLevelReader toolReader,
         ConfigSnapshot config,
@@ -214,9 +201,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     public void ResetForSessionBoundary(SessionResetBoundary boundary)
     {
-        var hadRuntimeState = _session is not null ||
-                              _depositTrips.Count > 0 ||
-                              _currentTrip is not null;
+        var hadRuntimeState = _session is not null;
 
         if (hadRuntimeState)
         {
@@ -319,6 +304,13 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             _shopStockReader,
             _purchaseAffordability,
             _shopPurchaseService);
+        _session.Deposits = new DepositTripRunner(
+            _session,
+            this,
+            _nav,
+            _toolAnimator,
+            _chestResolver,
+            _buildingNavigator);
 
         Game1.addHUDMessage(new HUDMessage(
             I18nHelper.Get("notify.shift_started", new { price = contract.TermsSnapshot.Pricing.TotalPrice }),
@@ -757,7 +749,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                 break;
             case IntentDepositInShippingBin:
             case IntentDepositAtChest:
-                HandleDeposit(farm);
+                Session.Deposits.HandleDepositTick(farm);
                 break;
             case IntentExitFarm:
                 HandleExit(farm);
@@ -788,7 +780,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         // shipping-bin output goes straight to the bin, while all other undelivered output uses
         // automatic overflow. This must all happen BEFORE the session is discarded.
         _session.Shopping.SettleCarriedItems(showHud: false);
-        AppendUndeliveredToOverflow();
+        _session.Deposits.AppendUndeliveredToOverflow();
 
         ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
         DispatchShiftOverflow();
@@ -824,7 +816,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         }
     }
 
-    private static ShiftIntent ToDepositIntent(DepositTrip trip) =>
+    internal static ShiftIntent ToDepositIntent(DepositTrip trip) =>
         trip.Destination is ChestDestination cd
             ? new IntentDepositAtChest(cd.Ref)
             : new IntentDepositInShippingBin();
@@ -877,7 +869,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             .ToList();
     }
 
-    private static DestinationKey ResolveAssignedDestination(
+    internal static DestinationKey ResolveAssignedDestination(
         TaskKind task,
         IReadOnlyDictionary<TaskKind, DestinationKey> assignments) =>
         assignments.TryGetValue(task, out var destination) && destination is not null
@@ -901,13 +893,6 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         _toolAnimator.SetWorker(null);
         CancelActiveTravel();
-        _depositTrips.Clear();
-        _currentTrip = null;
-        _currentTripExecutionStarted = false;
-        _currentTripStackIndex = 0;
-        _currentTripChest = null;
-        _currentTripLocation = null;
-        _currentTripChestAnimated = false;
         _nav.Clear();
     }
 

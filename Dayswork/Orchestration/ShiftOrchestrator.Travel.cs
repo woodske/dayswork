@@ -94,10 +94,10 @@ internal sealed partial class ShiftOrchestrator
                 ResumeManagedBatchAfterShopping();
                 break;
             case TravelPurpose.DepositEntry:
-                CompleteDepositEntryTravel();
+                Session.Deposits.OnDepositEntryTravelArrived();
                 break;
             case TravelPurpose.DepositExit:
-                FinalizeAndAdvanceTrip(Game1.getFarm());
+                Session.Deposits.FinalizeAndAdvanceTrip(Game1.getFarm());
                 break;
             case TravelPurpose.ShoppingStep:
                 Session.Shopping.OnTravelArrived();
@@ -114,9 +114,7 @@ internal sealed partial class ShiftOrchestrator
                 SkipCurrentBatchAfterEntryFailure();
                 break;
             case TravelPurpose.DepositEntry:
-                if (_currentTrip is not null)
-                    MarkDepositTripUndelivered(_currentTrip);
-                FinalizeAndAdvanceTrip(Game1.getFarm());
+                Session.Deposits.OnDepositEntryTravelFailed(Game1.getFarm());
                 break;
             case TravelPurpose.ShoppingStep:
                 Session.Shopping.AbortTripForNavigationFailure();
@@ -127,7 +125,7 @@ internal sealed partial class ShiftOrchestrator
     // ---- plan builders ----
 
     /// <summary>Farm → building interior: walk to the outdoor door, warp to the interior entry tile.</summary>
-    private bool TryBuildBuildingEntryPlan(
+    internal bool TryBuildBuildingEntryPlan(
         string interiorLocationName,
         TravelFailurePolicy policy,
         out TravelPlan plan)
@@ -144,7 +142,7 @@ internal sealed partial class ShiftOrchestrator
     }
 
     /// <summary>Building interior → farm: walk to the interior exit door, warp out to the farm.</summary>
-    private TravelPlan BuildBuildingExitPlan(GameLocation interior, TileCoord farmArrivalTile)
+    internal TravelPlan BuildBuildingExitPlan(GameLocation interior, TileCoord farmArrivalTile)
     {
         var exitCandidates = _buildingNavigator.ResolveInteriorExitApproachTiles(interior);
         var source = new TileCoord(Session.Worker!.TilePoint.X, Session.Worker.TilePoint.Y);
@@ -175,7 +173,7 @@ internal sealed partial class ShiftOrchestrator
     }
 
     /// <summary>Validates an expansion route and starts travel along it. False when validation fails.</summary>
-    private bool TryStartExpansionTravel(
+    internal bool TryStartExpansionTravel(
         string sourceLocationName,
         string targetLocationName,
         ExpansionRoutePurpose routePurpose,
@@ -279,19 +277,6 @@ internal sealed partial class ShiftOrchestrator
 
         Session.CurrentLocation = Game1.getFarm();
         BeginCurrentBatch();
-    }
-
-    /// <summary>The worker is in the deposit trip's chest location; walk to the chest and deposit.</summary>
-    private void CompleteDepositEntryTravel()
-    {
-        if (_currentTrip is not { Destination: ChestDestination chestDest })
-        {
-            FinalizeAndAdvanceTrip(Game1.getFarm());
-            return;
-        }
-
-        Session.Ctx.StateMachine.SetIntent(ToDepositIntent(_currentTrip));
-        StartChestDepositNavigation(_currentTrip, chestDest, Session.CurrentLocation ?? Game1.getFarm());
     }
 
     private void SkipCurrentBatchAfterEntryFailure()

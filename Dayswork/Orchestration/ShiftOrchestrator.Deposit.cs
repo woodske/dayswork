@@ -22,295 +22,7 @@ namespace Dayswork.Orchestration;
 
 internal sealed partial class ShiftOrchestrator
 {
-    private void HandleDeposit(Farm farm)
-    {
-        if (!_nav.NavigationFailed && !_nav.HasArrived)
-            return;
-
-        if (_currentTrip is null)
-        {
-            // Nothing in flight — advance to the next trip or exit.
-            FinalizeAndAdvanceTrip(farm);
-            return;
-        }
-
-        if (_nav.NavigationFailed)
-        {
-            MarkDepositTripUndelivered(_currentTrip);
-            FinalizeAndAdvanceTrip(farm);
-            return;
-        }
-
-        // First arrival at the trip's stand tile: open the chest visually (if applicable),
-        // resolve mutex/liveness, and start the first beat. The mutex/missing-chest paths
-        // already route the items to overflow inside BeginTripExecution and return false so we skip the loop.
-        if (!_currentTripExecutionStarted)
-        {
-            if (!BeginTripExecution(_currentTrip, Session.CurrentLocation ?? farm))
-            {
-                FinalizeAndAdvanceTrip(farm);
-            }
-            return;
-        }
-
-        // Pacing gate: wait for the per-stack swing beat to finish before depositing the next stack.
-        if (_toolAnimator.IsSwinging)
-            return;
-
-        if (_currentTripStackIndex < _currentTrip.Items.Count)
-        {
-            DepositCurrentTripStack();
-            _currentTripStackIndex++;
-            if (_currentTripStackIndex < _currentTrip.Items.Count)
-            {
-                // Kick off the next beat by replaying the no-tool reach animation.
-                _toolAnimator.PlaySwing(WorkerTool.None, FacingTowardDestination());
-            }
-            return;
-        }
-
-        EndTripExecution();
-
-        // If we deposited inside a building, walk to the interior door before leaving;
-        // the warp back to the farm happens once the worker reaches the door.
-        if (BeginDepositInteriorExitWalk())
-            return;
-
-        FinalizeAndAdvanceTrip(farm);
-    }
-
-    private bool BeginDepositInteriorExitWalk()
-    {
-        if (Session.Worker is null ||
-            _currentTrip is not { Destination: ChestDestination { Ref.LocationName: not "Farm" } chestDest })
-            return false;
-
-        if (_currentTrip.Destination is ChestDestination expansionChest &&
-            ModEntry.ExpansionCompat is { } compat &&
-            compat.IsExpansionDepositLocation(expansionChest.Ref.LocationName))
-        {
-            var routeSource = (Session.CurrentLocation ?? Session.Worker.currentLocation)?.NameOrUniqueName
-                              ?? expansionChest.Ref.LocationName;
-            if (TryStartExpansionTravel(
-                    routeSource,
-                    "Farm",
-                    ExpansionRoutePurpose.ReturnToFarm,
-                    TravelFailurePolicy.WarpToDestination,
-                    TravelPurpose.DepositExit))
-                return true;
-
-            WarpExpansionWorkerToFarm();
-            return false;
-        }
-
-        var interior = Session.CurrentLocation;
-        if (interior is null || interior == Game1.getFarm())
-            return false;
-
-        var farmArrival = _buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out _)
-            ? outdoorDoor
-            : Session.FarmExitTile;
-        StartTravel(BuildBuildingExitPlan(interior, farmArrival), TravelPurpose.DepositExit);
-        return true;
-    }
-
-    private void FinalizeAndAdvanceTrip(Farm farm)
-    {
-        if (_currentTrip is not null)
-            CompleteDepositTripLocation(_currentTrip);
-
-        _currentTrip = null;
-        _currentTripExecutionStarted = false;
-        _currentTripStackIndex = 0;
-        _currentTripChest = null;
-        _currentTripLocation = null;
-        _currentTripChestAnimated = false;
-
-        if (_depositTrips.Count > 0)
-        {
-            var next = _depositTrips.Dequeue();
-            _currentTrip = next;
-            Session.Ctx.StateMachine.SetIntent(ToDepositIntent(next));
-            StartDepositTrip(next);
-            return;
-        }
-
-        BeginExit(farm);
-    }
-
-    private bool BeginTripExecution(DepositTrip trip, GameLocation location)
-    {
-        _currentTripExecutionStarted = true;
-        _currentTripStackIndex = 0;
-        _currentTripChest = null;
-        _currentTripLocation = location;
-        _currentTripChestAnimated = false;
-
-        if (trip.Destination is ChestDestination chestDest)
-        {
-            var chest = _chestResolver.ResolveChest(chestDest.Ref);
-            if (chest is null)
-            {
-                // Chest moved/destroyed: everything for it goes to automatic overflow.
-                foreach (var stack in trip.Items)
-                    Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork][deposit] chest missing at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) routed to automatic overflow.",
-                    LogLevel.Trace);
-                return false;
-            }
-
-            if (chest.GetMutex().IsLocked())
-            {
-                // A farmer (player) has the chest UI open. Defer the whole trip to overflow
-                // rather than mutating items behind the player's back.
-                foreach (var stack in trip.Items)
-                    Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestBusy));
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork][deposit] chest busy at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}); {trip.Items.Count} stack(s) routed to automatic overflow.",
-                    LogLevel.Trace);
-                return false;
-            }
-
-            _currentTripChest = chest;
-
-            // Only animate / play sound if the player is in the chest's location.
-            // SDV's location.playSound is already location-scoped; the playerHere guard also
-            // skips the lid frame mutation when nobody is around to see it.
-            if (chest.Location is { } chestLoc && Game1.player.currentLocation == chestLoc)
-            {
-                chest.frameCounter.Value = 5;  // vanilla open trigger
-                chestLoc.playSound("openChest", new Vector2(chest.TileLocation.X, chest.TileLocation.Y));
-                _currentTripChestAnimated = true;
-            }
-        }
-        // (Shipping bin: per-stack Farm.shipItem handles the bin lid + sound; no trip-level open.)
-
-        // Start the first beat: a no-tool reach animation facing the destination tile.
-        _toolAnimator.PlaySwing(WorkerTool.None, FacingTowardDestination());
-        return true;
-    }
-
-    private void DepositCurrentTripStack()
-    {
-        if (_currentTrip is null || _session is null)
-            return;
-
-        var stack = _currentTrip.Items[_currentTripStackIndex];
-        var loc = _currentTripLocation;
-        var playerHere = loc is not null && Game1.player.currentLocation == loc;
-
-        if (_currentTripChest is { } chest)
-        {
-            // Re-check the mutex per stack: if the player just opened the chest UI in the
-            // middle of our deposit, abort the rest of the trip and route what remains to overflow.
-            if (chest.GetMutex().IsLocked())
-            {
-                for (var i = _currentTripStackIndex; i < _currentTrip.Items.Count; i++)
-                    Session.Ctx.Overflow.Add(new OverflowItem(_currentTrip.Items[i], OverflowReason.ChestBusy));
-                _currentTripStackIndex = _currentTrip.Items.Count;  // skip ahead to "trip complete"
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork][deposit] chest became busy mid-trip; remaining stacks routed to automatic overflow.",
-                    LogLevel.Trace);
-                return;
-            }
-
-            DepositIntoChest(chest, stack);
-            if (playerHere && chest.Location is { } chestLoc)
-                chestLoc.playSound("Ship", new Vector2(chest.TileLocation.X, chest.TileLocation.Y));
-            return;
-        }
-
-        DepositIntoShippingBin(stack, animateWhenPlayerHere: playerHere);
-    }
-
-    private static bool IsDepositErrorItem(Item item) =>
-        item is null
-        || string.IsNullOrEmpty(item.ItemId)
-        || item.QualifiedItemId == "(O)"
-        || string.Equals(item.Name, "Error Item", StringComparison.Ordinal);
-
-    private static void DepositIntoShippingBin(RoutedItemStack stack, bool animateWhenPlayerHere)
-    {
-        var farm = Game1.getFarm();
-        if (string.IsNullOrWhiteSpace(stack.QualifiedItemId))
-        {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][deposit] Error Item suppressed at shipping bin: empty QualifiedItemId stack=x{stack.Quantity} task={stack.SourceTask}; not shipped.",
-                LogLevel.Error);
-            return;
-        }
-        var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
-        if (item is null)
-            return;
-        if (IsDepositErrorItem(item))
-        {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][deposit] Error Item suppressed at shipping bin: rawId='{stack.QualifiedItemId}' resolvedQualifiedId='{item.QualifiedItemId}' name='{item.Name}' stack=x{stack.Quantity} task={stack.SourceTask}; not shipped.",
-                LogLevel.Error);
-            return;
-        }
-
-        if (animateWhenPlayerHere && Game1.player.currentLocation == farm)
-            farm.shipItem(item, Game1.player);           // vanilla lid animation + backpackIN + delayed "Ship"
-        else
-            farm.getShippingBin(Game1.player).Add(item); // silent fallback
-    }
-
-    private void EndTripExecution()
-    {
-        if (_currentTripChest is { } chest && _currentTripChestAnimated)
-        {
-            // Vanilla close trigger: the chest's per-tick update will animate the lid down
-            // and emit the "doorClose" sound on completion.
-            chest.frameCounter.Value = -1;
-        }
-    }
-
-    private void MarkDepositTripUndelivered(DepositTrip trip)
-    {
-        RouteUndeliveredTripStacks(trip, trip.Items);
-
-        ModEntry.ModMonitor.Log(
-            $"[Dayswork][deposit] could not reach deposit destination at ({trip.Tile.X},{trip.Tile.Y}); routed {trip.Items.Count} undelivered stack(s).",
-            LogLevel.Warn);
-    }
-
-    private void DepositIntoChest(Chest chest, RoutedItemStack stack)
-    {
-        if (string.IsNullOrWhiteSpace(stack.QualifiedItemId))
-        {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][deposit] Error Item suppressed at chest: empty QualifiedItemId stack=x{stack.Quantity} task={stack.SourceTask}; not deposited.",
-                LogLevel.Error);
-            return;
-        }
-        var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
-        if (item is null)
-            return;
-        if (IsDepositErrorItem(item))
-        {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][deposit] Error Item suppressed at chest: rawId='{stack.QualifiedItemId}' resolvedQualifiedId='{item.QualifiedItemId}' name='{item.Name}' stack=x{stack.Quantity} task={stack.SourceTask}; not deposited.",
-                LogLevel.Error);
-            return;
-        }
-
-        // addItem returns the remainder that did not fit (null if all fit).
-        var leftover = chest.addItem(item);
-        if (leftover is not null && leftover.Stack > 0)
-        {
-            // Chest full: route the remainder to automatic overflow.
-            Session.Ctx.Overflow.Add(new OverflowItem(
-                new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance),
-                OverflowReason.ChestFull));
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][deposit] chest full; {leftover.Stack}x {stack.QualifiedItemId} routed to automatic overflow.",
-                LogLevel.Trace);
-        }
-    }
-
-    private void BeginExit(Farm farm)
+    internal void BeginExit(Farm farm)
     {
         Session.Ctx.StateMachine.Transition(ShiftPhase.Exiting, new IntentExitFarm());
         Session.CurrentExitTile = ResolveReachableShiftExitTile(farm);
@@ -383,9 +95,6 @@ internal sealed partial class ShiftOrchestrator
             Session.WaitingForDebrisBeforeDeposit = true;
             Session.ActionPending = true;
             _toolAnimator.StopSwing();
-//             ModEntry.ModMonitor.Log(
-//                 $"[Dayswork][debris] waiting for {Session.PendingDebrisSweeps.Count} pending debris sweep(s) before deposit.",
-//                 LogLevel.Trace);
             return;
         }
 
@@ -410,90 +119,21 @@ internal sealed partial class ShiftOrchestrator
         // The buffer is now consumed into the plan; clear it so nothing is double-counted.
         Session.Ctx.Buffer.TakeAll();
 
-        _depositTrips.Clear();
-        foreach (var trip in plan.Trips)
-            _depositTrips.Enqueue(trip);
-        _currentTrip = null;
+        Session.Deposits.Load(plan.Trips);
 
         // Enter Depositing. With no walkable trips, pass straight through to Exiting.
         var stopReason = Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed;
         Session.Ctx.PendingStopReason = null;
-        if (_depositTrips.Count == 0)
+        if (!Session.Deposits.HasPending)
         {
             Session.Ctx.StateMachine.BeginWrapUp(new IntentDepositInShippingBin(), stopReason);
             BeginExit(farm);
             return;
         }
 
-        var first = _depositTrips.Dequeue();
-        _currentTrip = first;
+        var first = Session.Deposits.BeginNextTrip();
         Session.Ctx.StateMachine.BeginWrapUp(ToDepositIntent(first), stopReason);
-        StartDepositTrip(first);
-    }
-
-    private void StartDepositTrip(DepositTrip trip)
-    {
-        if (Session.Worker is null)
-            return;
-
-        var farm = Game1.getFarm();
-        if (trip.Destination is ChestDestination { Ref.LocationName: not "Farm" } chestDest)
-        {
-            if (ModEntry.ExpansionCompat is { } compat &&
-                compat.IsExpansionDepositLocation(chestDest.Ref.LocationName))
-            {
-                var source = (Session.CurrentLocation ?? farm).NameOrUniqueName;
-                if (TryStartExpansionTravel(
-                        source,
-                        chestDest.Ref.LocationName,
-                        ExpansionRoutePurpose.DepositEntry,
-                        TravelFailurePolicy.ReportFailure,
-                        TravelPurpose.DepositEntry))
-                    return;
-
-                MarkDepositTripUndelivered(trip);
-                FinalizeAndAdvanceTrip(farm);
-                return;
-            }
-
-            if (TryBuildBuildingEntryPlan(
-                    chestDest.Ref.LocationName,
-                    TravelFailurePolicy.WarpToDestination,
-                    out var plan))
-            {
-                StartTravel(plan, TravelPurpose.DepositEntry);
-                return;
-            }
-
-            foreach (var stack in trip.Items)
-                Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.ChestMissing));
-            _currentTrip = null;
-            return;
-        }
-
-        Session.CurrentLocation = farm;
-        if (trip.Destination is ChestDestination farmChest)
-        {
-            StartChestDepositNavigation(trip, farmChest, farm);
-            return;
-        }
-
-        _nav.StartNavigation(trip.Tile, farm, Session.Worker);
-    }
-
-    private void StartChestDepositNavigation(DepositTrip trip, ChestDestination chestDest, GameLocation location)
-    {
-        if (Session.Worker is null)
-            return;
-
-        if (TrySelectChestDepositStandTile(chestDest.Ref.Tile, location, Session.Worker, out var standTile))
-        {
-            _nav.StartNavigation(standTile, location, Session.Worker);
-            return;
-        }
-
-        MarkDepositTripUndelivered(trip);
-        _currentTrip = null;
+        Session.Deposits.StartTravelToTrip(first);
     }
 
     internal static bool TrySelectChestDepositStandTile(
@@ -516,27 +156,6 @@ internal sealed partial class ShiftOrchestrator
         yield return new TileCoord(tile.X + 1, tile.Y);
         yield return new TileCoord(tile.X, tile.Y + 1);
         yield return new TileCoord(tile.X - 1, tile.Y);
-    }
-
-    // Safety warp for failure paths (undelivered trip, chest unreachable): the normal success path
-    // walks out via the DepositExit travel, which leaves the worker already on the farm here.
-    private void CompleteDepositTripLocation(DepositTrip trip)
-    {
-        if (Session.Worker is null ||
-            (Session.Worker.currentLocation ?? Session.CurrentLocation) == Game1.getFarm() ||
-            trip.Destination is not ChestDestination { Ref.LocationName: not "Farm" } chestDest)
-            return;
-
-        if (ModEntry.ExpansionCompat is { } compat &&
-            compat.IsExpansionDepositLocation(chestDest.Ref.LocationName))
-            return;
-
-        if (_buildingNavigator.TryResolveDoorTile(chestDest.Ref.LocationName, out var outdoorDoor, out _))
-        {
-            var farm = Game1.getFarm();
-            _nav.WarpWorker(Session.Worker, Session.Worker.currentLocation ?? farm, farm, outdoorDoor);
-            Session.CurrentLocation = farm;
-        }
     }
 
     private void ReturnWorkerToFarmForDeposit()
@@ -603,49 +222,5 @@ internal sealed partial class ShiftOrchestrator
 
         _shiftOutcomeDispatcher.DispatchOverflowDelivery(items, categories);
         Session.Ctx.Overflow.Clear();
-    }
-
-    private void AppendUndeliveredToOverflow()
-    {
-        if (_session is null) return;
-
-        foreach (var b in Session.Ctx.Buffer.TakeAll())
-        {
-            var stack = new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance);
-            if (DepositPlanner.ResolveUndelivered(ResolveAssignedDestination(b.SourceTask, Session.Ctx.TaskDestinations))
-                == UndeliveredDepositResolution.ShippingBin)
-                DepositIntoShippingBin(stack, animateWhenPlayerHere: false);
-            else
-                Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
-        }
-
-        if (_currentTrip is not null)
-        {
-            RouteUndeliveredTripStacks(
-                _currentTrip,
-                _currentTrip.Items.Skip(Math.Clamp(_currentTripStackIndex, 0, _currentTrip.Items.Count)));
-            _currentTrip = null;
-        }
-
-        while (_depositTrips.Count > 0)
-        {
-            var trip = _depositTrips.Dequeue();
-            RouteUndeliveredTripStacks(trip, trip.Items);
-        }
-    }
-
-    private void RouteUndeliveredTripStacks(DepositTrip trip, IEnumerable<RoutedItemStack> stacks)
-    {
-        if (_session is null) return;
-
-        if (DepositPlanner.ResolveUndelivered(trip.Destination) == UndeliveredDepositResolution.ShippingBin)
-        {
-            foreach (var stack in stacks)
-                DepositIntoShippingBin(stack, animateWhenPlayerHere: false);
-            return;
-        }
-
-        foreach (var stack in stacks)
-            Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NotDelivered));
     }
 }
