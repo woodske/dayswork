@@ -177,7 +177,7 @@ internal sealed partial class ShiftOrchestrator
 
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][nav] failed task={Session.PendingTask} nav=({Session.PendingNavTile.X},{Session.PendingNavTile.Y}) task=({Session.PendingTaskTile.X},{Session.PendingTaskTile.Y}); skipping.",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
             AdvanceWorkList(location);
             return;
         }

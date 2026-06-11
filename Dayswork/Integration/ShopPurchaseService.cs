@@ -29,7 +29,7 @@ internal sealed class ShopPurchaseService
             var unitCost = ResolveUnitCost(group.Store, line);
             if (unitCost <= 0)
             {
-                _monitor?.Log($"Dayswork shopping: could not resolve live price for '{line.ItemId}' at {group.Store}.", LogLevel.Warn);
+                _monitor?.Log($"Dayswork shopping: could not resolve live price for '{line.ItemId}' at {group.Store}.", DevLog.WarnLevel);
                 return PurchaseResult.BindFailure;
             }
 
@@ -43,7 +43,7 @@ internal sealed class ShopPurchaseService
             var item = TryCreateItem(line.ItemId, maxAffordable);
             if (item is null)
             {
-                _monitor?.Log($"Dayswork shopping: could not create item '{line.ItemId}'.", LogLevel.Warn);
+                _monitor?.Log($"Dayswork shopping: could not create item '{line.ItemId}'.", DevLog.WarnLevel);
                 return PurchaseResult.BindFailure;
             }
 
@@ -76,7 +76,7 @@ internal sealed class ShopPurchaseService
             var unitCost = ResolveUnitCost(group.Store, line);
             if (unitCost <= 0)
             {
-                _monitor?.Log($"Dayswork shopping: could not resolve live price for '{line.ItemId}' at {group.Store}.", LogLevel.Warn);
+                _monitor?.Log($"Dayswork shopping: could not resolve live price for '{line.ItemId}' at {group.Store}.", DevLog.WarnLevel);
                 return PurchaseResult.BindFailure;
             }
 
@@ -90,7 +90,7 @@ internal sealed class ShopPurchaseService
             var item = TryCreateItem(line.ItemId, maxAffordable);
             if (item is null)
             {
-                _monitor?.Log($"Dayswork shopping: could not create item '{line.ItemId}'.", LogLevel.Warn);
+                _monitor?.Log($"Dayswork shopping: could not create item '{line.ItemId}'.", DevLog.WarnLevel);
                 return PurchaseResult.BindFailure;
             }
 

@@ -101,7 +101,7 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
             {
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Could not create overflow item '{s.QualifiedItemId}' x{s.Quantity}; skipped.",
-                    LogLevel.Warn);
+                    DevLog.WarnLevel);
                 continue;
             }
 

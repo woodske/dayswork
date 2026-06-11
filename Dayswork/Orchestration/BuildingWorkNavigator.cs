@@ -94,10 +94,10 @@ internal sealed class BuildingWorkNavigator
     {
         _monitor.Log(
             I18nHelper.Get("log.building.skipped", new { location = interiorLocationName }),
-            LogLevel.Warn);
+            DevLog.WarnLevel);
         _monitor.Log(
             BuildingLocationResolver.DescribeResolutionState(Game1.getFarm(), interiorLocationName),
-            LogLevel.Warn);
+            DevLog.WarnLevel);
     }
 
     public bool TryResolveInterior(string interiorLocationName, out GameLocation interior)

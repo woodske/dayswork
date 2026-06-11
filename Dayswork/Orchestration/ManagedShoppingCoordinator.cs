@@ -523,7 +523,7 @@ internal sealed class ManagedShoppingCoordinator
 
     private void AbortTrip(string reason)
     {
-        DevLog.Log($"[Dayswork][managed-crops][shopping] aborted reason={reason}.", LogLevel.Warn);
+        DevLog.Log($"[Dayswork][managed-crops][shopping] aborted reason={reason}.", DevLog.WarnLevel);
         _host.CancelActiveTravel();
         CropHudNotifier.ShoppingUnavailable();
         WarpWorkerToFarm();
@@ -700,7 +700,7 @@ internal sealed class ManagedShoppingCoordinator
             $"[Dayswork][managed-crops][shopping] store route unresolved store={store} interior={interiorName} " +
             $"preferredExteriors=[{string.Join(", ", preferredNames)}] loadedPreferred=[{string.Join(", ", loadedPreferred)}] " +
             $"ignoredNonPublicCandidates=[{string.Join(", ", ignoredCandidates)}].",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
     }
 
     private bool TryBuildRoute(
@@ -1105,7 +1105,7 @@ internal sealed class ManagedShoppingCoordinator
         DevLog.Log(
             $"[Dayswork][managed-crops][shopping] route unavailable source={LocationKey(source)} target={LocationKey(target)} " +
             $"locations=[{string.Join(", ", locationNames)}] edges=[{string.Join(", ", edges)}].",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
     }
 
     private static TileCoord ResolvePassableNearbyInLocation(TileCoord preferred, GameLocation location)

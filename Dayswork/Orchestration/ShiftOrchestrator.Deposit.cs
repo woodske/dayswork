@@ -44,7 +44,7 @@ internal sealed partial class ShiftOrchestrator
         if (_nav.NavigationFailed)
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][exit] could not path to exit tile ({Session.CurrentExitTile.X},{Session.CurrentExitTile.Y}) — removing worker in place.",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
         else
             ModEntry.ModMonitor.Log("[Dayswork][exit] worker reached farm exit — shift complete.", LogLevel.Trace);
 

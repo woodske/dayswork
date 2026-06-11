@@ -354,7 +354,7 @@ internal sealed class DepositTripRunner
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork][deposit] could not reach deposit destination at ({trip.Tile.X},{trip.Tile.Y}); routed {trip.Items.Count} undelivered stack(s).",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
     }
 
     private void DepositIntoChest(Chest chest, RoutedItemStack stack)

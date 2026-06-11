@@ -218,7 +218,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     {
         if (_session is not null)
         {
-            ModEntry.ModMonitor.Log("[Dayswork] StartShift called while a shift is already active — ignoring.", LogLevel.Warn);
+            ModEntry.ModMonitor.Log("[Dayswork] StartShift called while a shift is already active — ignoring.", DevLog.WarnLevel);
             return;
         }
 

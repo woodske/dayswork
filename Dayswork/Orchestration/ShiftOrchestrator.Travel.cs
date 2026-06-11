@@ -68,7 +68,7 @@ internal sealed partial class ShiftOrchestrator
         if (_travel.CompletedWithForcedWarp)
             DevLog.Log(
                 $"[Dayswork][travel] purpose={arrived} forced warp to destination ({_travel.FailureDetail}).",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
         CancelActiveTravel();
         OnTravelArrived(arrived);
     }
@@ -107,7 +107,7 @@ internal sealed partial class ShiftOrchestrator
 
     private void OnTravelFailed(TravelPurpose purpose, string? detail)
     {
-        DevLog.Log($"[Dayswork][travel] purpose={purpose} failed: {detail}.", LogLevel.Warn);
+        DevLog.Log($"[Dayswork][travel] purpose={purpose} failed: {detail}.", DevLog.WarnLevel);
         switch (purpose)
         {
             case TravelPurpose.WorkEntry:

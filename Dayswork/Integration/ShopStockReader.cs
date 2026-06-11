@@ -50,7 +50,7 @@ internal sealed class ShopStockReader
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"Dayswork shopping: could not read {store} stock ({ex.Message}).", LogLevel.Warn);
+            _monitor?.Log($"Dayswork shopping: could not read {store} stock ({ex.Message}).", DevLog.WarnLevel);
             isOpen = false;
             stock.Clear();
             prices.Clear();

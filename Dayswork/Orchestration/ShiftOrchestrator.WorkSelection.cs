@@ -72,7 +72,7 @@ internal sealed partial class ShiftOrchestrator
         {
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][routing] active-batch selection guard fired; skipping remaining blocked work. tile={Session.Ctx.WorkList.Count} animal={Session.AnimalWork.Count} deferredTile={Session.DeferredTileWork.Count} deferredAnimal={Session.DeferredAnimalWork.Count}.",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
             ClearRemainingActiveBatchWork();
             CompleteCurrentBatch();
             return;

@@ -46,8 +46,8 @@ public sealed class ModEntry : Mod
         I18nHelper.Init(helper);
 
         // ── Core singletons (dependency order) ──────────────────────────────
-        var logWarning  = (string msg) => this.Monitor.Log(msg, LogLevel.Warn);
-        var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, LogLevel.Warn));
+        var logWarning  = (string msg) => this.Monitor.Log(msg, DevLog.WarnLevel);
+        var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, DevLog.WarnLevel));
         _configManager = configManager;
         var config      = configManager.CurrentSnapshot;
         var configResolver = new ConfigValueResolver();

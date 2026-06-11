@@ -71,7 +71,7 @@ internal sealed partial class ShiftOrchestrator
         var activeLocation = ResolveManagedBatchLocation(batch.LocationName);
         if (activeLocation is null)
         {
-            DevLog.Log($"[Dayswork][managed-crops] skipped batch={batch.LocationName} reason=location_unavailable.", LogLevel.Warn);
+            DevLog.Log($"[Dayswork][managed-crops] skipped batch={batch.LocationName} reason=location_unavailable.", DevLog.WarnLevel);
             Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
@@ -401,7 +401,7 @@ internal sealed partial class ShiftOrchestrator
         {
             DevLog.Log(
                 $"[Dayswork][managed-crops][shopping] re-entry skipped location={Session.ManagedBatchLocationName} reason=location_unavailable.",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
             return false;
         }
 

@@ -80,7 +80,7 @@ internal sealed class AnimalTaskHandler
         var farmHay = Game1.getFarm().piecesOfHay.Value;
         if (farmHay <= 0)
         {
-            _monitor.Log(I18nHelper.Get("log.animal.no_silo", new { location = animalHouse.Name }), LogLevel.Warn);
+            _monitor.Log(I18nHelper.Get("log.animal.no_silo", new { location = animalHouse.Name }), DevLog.WarnLevel);
             return EmptyFeedWork(emptySlots);
         }
 
@@ -91,7 +91,7 @@ internal sealed class AnimalTaskHandler
         {
             _monitor.Log(
                 $"[Dayswork][feed-plan] location={animalHouse.Name} unable to discover empty trough tiles; skipping visible feed work. troughs=0 filled={filled} empty={emptySlots}",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
             return EmptyFeedWork(emptySlots);
         }
 
@@ -101,7 +101,7 @@ internal sealed class AnimalTaskHandler
         {
             _monitor.Log(
                 $"[Dayswork][feed-plan] location={animalHouse.Name} unable to discover feed hopper; skipping visible feed work. troughs={emptyTroughTiles.Count} hopper=<null>",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
             return EmptyFeedWork(emptySlots);
         }
 

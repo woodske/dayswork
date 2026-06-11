@@ -78,7 +78,7 @@ internal sealed class RecurringContractScheduler
             {
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Recurring day-start evaluation failed for contract {contract.Id.Value}: {ex.Message}",
-                    LogLevel.Warn);
+                    DevLog.WarnLevel);
             }
         }
     }

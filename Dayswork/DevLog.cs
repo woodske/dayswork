@@ -23,6 +23,13 @@ internal static class DevLog
     /// <see cref="LogLevel.Trace"/> (log file always; console only in SMAPI developer mode). Bump the
     /// default to <see cref="LogLevel.Debug"/> if you want dev logs in the console without dev mode.
     /// </summary>
+    /// <summary>
+    /// Returns <see cref="LogLevel.Debug"/> when <see cref="Enabled"/>, otherwise
+    /// <see cref="LogLevel.Warn"/>. Use this in place of a bare <c>LogLevel.Warn</c> so
+    /// always-on diagnostic warnings are demoted to debug noise while iterating.
+    /// </summary>
+    internal static LogLevel WarnLevel => Enabled ? LogLevel.Debug : LogLevel.Warn;
+
     internal static void Log(string message, LogLevel level = LogLevel.Trace)
     {
         if (Enabled)

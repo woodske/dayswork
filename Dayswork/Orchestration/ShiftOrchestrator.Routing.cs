@@ -119,13 +119,13 @@ internal sealed partial class ShiftOrchestrator
             // log a warning if navigation ultimately fails.
             ModEntry.ModMonitor.Log(
                 $"[Dayswork] Farm exit: no passable approach tile found near warp ({warp.X},{warp.Y}) → {warp.TargetName}.",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
             return new TileCoord(cx, cy);
         }
 
         ModEntry.ModMonitor.Log(
             "[Dayswork] No external farm exit warp found — using fallback tile (77, 15).",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
         return new TileCoord(77, 15);
     }
 
@@ -165,7 +165,7 @@ internal sealed partial class ShiftOrchestrator
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork] Entrance override ({preferred.X},{preferred.Y}) blocked and no passable tile found within {maxRadius} tiles — using it anyway.",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
         return preferred;
     }
 
@@ -194,7 +194,7 @@ internal sealed partial class ShiftOrchestrator
         ModEntry.ModMonitor.Log(
             $"[Dayswork][exit] configured exit tile ({Session.FarmExitTile.X},{Session.FarmExitTile.Y}) unreachable from " +
             $"({source.X},{source.Y}) and no reachable nearby tile found; using configured tile.",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
         return Session.FarmExitTile;
     }
 

@@ -101,7 +101,7 @@ internal sealed partial class ShiftOrchestrator
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork][debris] worker-created debris could not be resolved to a valid item id raw='{rawItemId}' display='{rawDisplayName}' loc={loc.Name} task={sourceTask} origin={originText} chunks={debris.Chunks.Count} debrisType={debris.debrisType.Value} chunkType={debris.chunkType.Value}.",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
     }
 
     private static bool TryGetRemovedStandardStoneDrop(StardewValley.Object obj, out string itemId, out int stack)

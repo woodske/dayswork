@@ -54,7 +54,7 @@ internal sealed class ExpansionDetector
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Dayswork] Expansion detection failed; falling back to vanilla. {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Dayswork] Expansion detection failed; falling back to vanilla. {ex.Message}", DevLog.WarnLevel);
             return _vanillaFallback;
         }
     }
