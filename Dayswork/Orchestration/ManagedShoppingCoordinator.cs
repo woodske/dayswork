@@ -743,13 +743,7 @@ internal sealed class ManagedShoppingCoordinator
 
                 locations[nextKey] = edge.Target;
 
-                // Pin the farm-side endpoint: when a hop lands back on the farm, drop the worker on
-                // the canonical FarmExitTile (the same tile they spawned at / every other return uses)
-                // instead of the warp's debris-spiral ArrivalTile. Keeps the return landing predictable
-                // and consistent day-to-day even as overnight debris shifts which nearby tiles are open.
-                var arrivalTile = ShiftOrchestrator.SameLocation(edge.Target, Game1.getFarm())
-                    ? _session.FarmExitTile
-                    : edge.ArrivalTile;
+                var arrivalTile = edge.ArrivalTile;
                 var hop = new RouteHop(
                     edge.Source,
                     edge.Target,

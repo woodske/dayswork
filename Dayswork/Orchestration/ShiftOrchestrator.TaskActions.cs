@@ -229,7 +229,7 @@ internal sealed partial class ShiftOrchestrator
 
     private static LaborBeatOutcome InvokeWater(TileCoord tile, GameLocation loc)
     {
-        if (loc.terrainFeatures.TryGetValue(new Vector2(tile.X, tile.Y), out var tf) && tf is HoeDirt dirt)
+        if (loc.terrainFeatures.TryGetValue(new Vector2(tile.X, tile.Y), out var tf) && tf is HoeDirt dirt && dirt.crop is not null)
             dirt.state.Value = HoeDirt.watered;
         return new LaborBeatOutcome(true, true);
     }
@@ -488,7 +488,7 @@ internal sealed partial class ShiftOrchestrator
         {
             TaskKind.WaterCrops =>
                 !loc.terrainFeatures.TryGetValue(tileVec, out var tf1) ||
-                tf1 is not HoeDirt d || d.state.Value == HoeDirt.watered,
+                tf1 is not HoeDirt d || d.crop is null || d.state.Value == HoeDirt.watered,
 
             TaskKind.HarvestCrops =>
                 !loc.terrainFeatures.TryGetValue(tileVec, out var tf2) ||

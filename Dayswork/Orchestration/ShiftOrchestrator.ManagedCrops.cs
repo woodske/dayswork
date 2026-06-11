@@ -671,7 +671,7 @@ internal sealed partial class ShiftOrchestrator
                 && SupplyOnHand(action.ItemId),
 
             ManagedCropActionKind.Water =>
-                dirt is not null && dirt.state.Value != HoeDirt.watered,
+                dirt is not null && dirt.crop is not null && dirt.state.Value != HoeDirt.watered,
 
             _ => false,
         };
