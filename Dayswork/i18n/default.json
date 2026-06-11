@@ -133,6 +133,7 @@
     "notify.crop_tool_skip": "Your farmhand skipped a crop action — the needed tool was missing or too weak.",
     "notify.crop_fertilizer_unavailable": "Your farmhand skipped planting a crop zone — the configured fertilizer wasn't available.",
     "notify.crop_wont_grow": "Your farmhand skipped planting {{crop}} — it can't mature before the season ends.",
+    "notify.crop_cannot_till_zones": "Your farmhand couldn't clear all tiles in crop groups {{zones}} — some tiles remain unplanted.",
     "notify.bought_item": "Bought {{count}}× {{item}}.",
     "notify.using_fallback_store": "{{store}} was closed — your farmhand shopped at the other store.",
     "notify.shopping_festival_skipped": "Your farmhand skipped shopping — there's a festival today.",

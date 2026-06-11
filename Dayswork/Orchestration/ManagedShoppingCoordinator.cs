@@ -183,8 +183,6 @@ internal sealed class ManagedShoppingCoordinator
         ShiftOrchestrator.NotifyFallbackStoreIfUsed(manifest);
 
         var walletClamped = _purchaseAffordability.ClampToWallet(manifest, Game1.player.Money);
-        if (walletClamped.Shortfall)
-            CropHudNotifier.InsufficientFunds();
 
         var groups = walletClamped.Groups
             .Where(group => StoreCanStillOpenToday(group.Store, date.Day))

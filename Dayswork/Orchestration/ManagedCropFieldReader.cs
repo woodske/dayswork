@@ -1,5 +1,6 @@
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Worker;
 using Microsoft.Xna.Framework;
 using StardewValley;
 using StardewValley.TerrainFeatures;
@@ -65,9 +66,12 @@ internal sealed class ManagedCropFieldReader
             return true;
         }
 
-        // Non-tilled tile occupied by a clearable terrain feature (grass/tree) or object
-        // (stone/twig/weeds) is debris that blocks tilling.
-        var hasBlockingFeature = location.terrainFeatures.ContainsKey(vec) || location.objects.ContainsKey(vec);
+        // Non-tilled tile occupied by a clearable terrain feature (grass/tree), object
+        // (stone/twig/weeds), or resource clump (hardwood stump, boulder) is debris.
+        // Resource clumps live in location.resourceClumps — not terrainFeatures or objects.
+        var hasBlockingFeature = location.terrainFeatures.ContainsKey(vec)
+            || location.objects.ContainsKey(vec)
+            || ObjectTargetClassifier.FindResourceClumpAt(vec, location) is not null;
         if (hasBlockingFeature)
         {
             state = new TileState(

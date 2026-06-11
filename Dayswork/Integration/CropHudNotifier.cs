@@ -12,6 +12,7 @@ namespace Dayswork.Integration;
 /// </summary>
 internal static class CropHudNotifier
 {
+    private static bool _cannotTillZonesShown;
     private static bool _toolSkipShown;
     private static bool _fertilizerUnavailableShown;
     private static bool _fallbackStoreShown;
@@ -26,6 +27,7 @@ internal static class CropHudNotifier
     /// <summary>Reset the per-shift dedup flags. Call at shift start.</summary>
     internal static void ResetForShift()
     {
+        _cannotTillZonesShown = false;
         _toolSkipShown = false;
         _fertilizerUnavailableShown = false;
         _fallbackStoreShown = false;
@@ -126,6 +128,16 @@ internal static class CropHudNotifier
             return;
         Game1.addHUDMessage(new HUDMessage(
             I18nHelper.Get("notify.crop_wont_grow", new { crop = cropName }),
+            HUDMessage.error_type));
+    }
+
+    internal static void CannotTillZones(string zoneList)
+    {
+        if (_cannotTillZonesShown)
+            return;
+        _cannotTillZonesShown = true;
+        Game1.addHUDMessage(new HUDMessage(
+            I18nHelper.Get("notify.crop_cannot_till_zones", new { zones = zoneList }),
             HUDMessage.error_type));
     }
 

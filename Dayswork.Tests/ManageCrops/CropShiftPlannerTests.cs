@@ -104,4 +104,39 @@ public sealed class CropShiftPlannerTests
         Assert.Contains(result.AllActions, action => action.Kind == ManagedCropActionKind.Till);
         Assert.Contains(result.AllActions, action => action.Kind == ManagedCropActionKind.PlantSeed);
     }
+
+    [Fact]
+    public void Plan_DebrisTile_QueuesClearDebrisThenTillBeforeNextTile()
+    {
+        // Zone (0,0)-(1,0): tile (0,0) has debris, tile (1,0) is bare untilled.
+        // Expected order: ClearDebris(0,0), Till(0,0), Till(1,0).
+        var planner = new CropShiftPlanner();
+        var crop = new CropDescriptor("crop.parsnip", "seed.parsnip", null, 4, null, null, new[] { Season.Spring });
+        var assignment = new CropZoneAssignment(
+            new Zone("Farm", new TileCoord(0, 0), new TileCoord(1, 0)),
+            CropAssignmentMode.Seasonal,
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.InputChestOnly) });
+        var field = new FieldState(
+            "Farm",
+            new GameDate(1, Season.Spring, 1),
+            false,
+            new[]
+            {
+                new TileState(new TileCoord(0, 0), false, false, HasDebris: true, false, false, false),
+                new TileState(new TileCoord(1, 0), false, false, HasDebris: false, false, false, false),
+            });
+        var inventory = new SupplyInventory(new Dictionary<string, int>());
+
+        var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
+
+        var kinds = result.SupplyIndependentActions.Select(a => (a.Tile, a.Kind)).ToList();
+        Assert.Equal(
+            new[]
+            {
+                (new TileCoord(0, 0), ManagedCropActionKind.ClearDebris),
+                (new TileCoord(0, 0), ManagedCropActionKind.Till),
+                (new TileCoord(1, 0), ManagedCropActionKind.Till),
+            },
+            kinds);
+    }
 }

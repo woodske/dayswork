@@ -30,11 +30,15 @@ internal sealed partial class ShiftOrchestrator
     // pure CropShiftPlanner (harvest → clear → till → fertilize → seed → water), executed one beat
     // at a time through the existing tick/intent loop. The queue and its state live on the session.
     //
-    // Re-plan support: the managed plan is snapshotted from the live field, so a tile that is debris
-    // at snapshot only gets a ClearDebris action this pass. Once the queue drains we re-read the field
-    // and re-plan, so newly-cleared tiles get tilled/planted on a following pass (clear -> till ->
-    // fertilize -> seed -> water across passes). Bounded by a pass cap + a no-progress signature
-    // check so un-clearable debris cannot loop forever.
+    // Per-tile sweep: ClearDebris and Till are both queued for each tile in a single planning pass.
+    // The sort order (Y → X → ActionRank) guarantees clear precedes till for the same tile.
+    // IsManagedActionApplicable guards the Till if debris still remains (multi-hit case).
+    // Multi-hit debris (e.g. tree → stump → gone) is handled by an inline retry in
+    // HandleManagedCropAction that re-applies ClearDebris in place until the tile is fully clear.
+    //
+    // Re-plan support: preserved as a safety net. Bounded by a pass cap + a no-progress signature
+    // check so un-clearable debris cannot loop forever. At batch end, zones with persistent debris
+    // (tiles that could not be cleared despite all retries and re-plans) fire a HUD warning.
     private const int MaxManagedReplans = 8;
 
     // Plan-level toggles, fixed at their default-ON behavior for now; a configurable OFF switch
@@ -314,10 +318,51 @@ internal sealed partial class ShiftOrchestrator
         CompleteManagedCropBatch();
     }
 
+    private void NotifyUntillableZones()
+    {
+        if (_session is null || Session.ManagedAssignments.Count == 0)
+            return;
+
+        var location = Session.CurrentLocation ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName) ?? Game1.getFarm();
+        var date = CurrentManagedGameDate();
+        var fieldState = _cropFieldReader.Read(
+            location,
+            date,
+            Session.ManagedAssignments,
+            IsCurrentManagedBatchSeasonAgnostic());
+
+        var blockedZoneLabels = new List<string>();
+        foreach (var assignment in Session.ManagedAssignments)
+        {
+            var choice = assignment.Mode == CropAssignmentMode.SeasonAgnostic
+                ? assignment.Choices.FirstOrDefault()
+                : assignment.Choices.FirstOrDefault(c => c.Season == fieldState.Date.Season);
+            if (choice is null)
+                continue;
+
+            if (!_viability.IsPlantingViable(fieldState, choice.Crop, choice.Crop.RequiresFertilizer))
+                continue;
+
+            var zone = assignment.Zone;
+            var hasBlockedTile = fieldState.Tiles.Any(t =>
+                t.HasDebris
+                && t.Tile.X >= zone.TopLeft.X && t.Tile.X <= zone.BottomRight.X
+                && t.Tile.Y >= zone.TopLeft.Y && t.Tile.Y <= zone.BottomRight.Y);
+
+            if (hasBlockedTile)
+                blockedZoneLabels.Add($"({zone.TopLeft.X},{zone.TopLeft.Y})-({zone.BottomRight.X},{zone.BottomRight.Y})");
+        }
+
+        if (blockedZoneLabels.Count > 0)
+            CropHudNotifier.CannotTillZones(string.Join(", ", blockedZoneLabels));
+    }
+
     internal void CompleteManagedCropBatch()
     {
         if (_session is null)
             return;
+
+        NotifyUntillableZones();
 
         var completedLocationName = Session.ManagedBatchLocationName;
         ReturnLeftoverSuppliesNoop();
@@ -500,6 +545,12 @@ internal sealed partial class ShiftOrchestrator
 
         var action = intent.Action;
 
+        // Mirror the regular CutTrees guard: don't swing again while the fall animation plays.
+        if (!Session.ActionPending
+            && action.Kind == ManagedCropActionKind.ClearDebris
+            && IsCutTreeTargetFalling(action.Tile, location))
+            return;
+
         if (!Session.ActionPending)
         {
             var debrisTool = WorkerTool.None;
@@ -547,6 +598,30 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
+        // For multi-hit ClearDebris (e.g. tree → stump → gone), retry in place so the tile is
+        // fully clear before the worker moves on. Skip while the tree is falling — the top guard
+        // will hold subsequent ticks until the animation ends, then re-enter the apply-action path.
+        if (Session.CurrentManagedAction is { Kind: ManagedCropActionKind.ClearDebris } retryAction)
+        {
+            if (IsCutTreeTargetFalling(retryAction.Tile, location))
+                return;
+
+            if (IsManagedActionApplicable(retryAction, location))
+            {
+                ResolveDebrisClearing(retryAction.Tile, location, out var retryTool, out var retryCapable);
+                if (retryCapable)
+                {
+                    var retryToolKind = ManagedCropActionMap.Tool(retryAction.Kind, retryTool);
+                    _toolAnimator.StopSwing();
+                    _toolAnimator.PlaySwing(retryToolKind, FacingToward(Session.Worker.TilePoint, retryAction.Tile, Session.Worker.FacingDirection));
+                    ApplyManagedActionGuarded(retryAction, retryTool, location);
+                    SpendStaminaForBeat(ManagedCropActionMap.EnergyKind(retryAction.Kind, retryTool));
+                    Session.ActionPending = true;
+                    return;
+                }
+            }
+        }
+
         StartNextManagedAction();
     }
 
@@ -580,6 +655,7 @@ internal sealed partial class ShiftOrchestrator
                 dirt is null
                 && !location.objects.ContainsKey(vec)
                 && tf is null
+                && ObjectTargetClassifier.FindResourceClumpAt(vec, location) is null
                 && location.doesTileHaveProperty(action.Tile.X, action.Tile.Y, "Diggable", "Back") is not null,
 
             ManagedCropActionKind.Fertilize =>
