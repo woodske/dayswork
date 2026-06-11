@@ -396,6 +396,8 @@ internal sealed class HiringFlowCoordinator
 
     private void ShowSummary(ContractDraft draft)
     {
+        var catalog = EnsureCropCatalog();
+        draft.CropPlan.EnrichDisplayNames(catalog.GetCatalog(null, greenhouse: true), catalog.GetFertilizers());
         RefreshViewModels(draft);
         Game1.activeClickableMenu = new SummaryMenu(draft, onBack: ShowHub);
     }

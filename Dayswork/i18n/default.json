@@ -223,6 +223,7 @@
     "ui.contract_list.cancel_blocked": "Cannot cancel — shift already started",
     "ui.contract_list.schedule_one_time": "One-time",
     "ui.contract_list.schedule_recurring": "Recurring",
+    "ui.contract_list.managed_crops_groups": "Managed crops: {{count}} groups",
 
     "log.festival.skipped": "Festival today — the farmhand is taking the day off.",
     "log.building.entering": "Farmhand entering {{location}}.",

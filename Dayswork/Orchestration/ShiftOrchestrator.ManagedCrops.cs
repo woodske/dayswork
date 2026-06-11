@@ -165,9 +165,7 @@ internal sealed partial class ShiftOrchestrator
                     $"choice={(assignment.Choices.FirstOrDefault()?.Crop.SeedItemId ?? "none")} requiresFert={assignment.Choices.FirstOrDefault()?.Crop.RequiresFertilizer} " +
                     $"independent={plan.SupplyIndependentActions.Count} dependent={plan.SupplyDependentActions.Count} skipPrep={skipPrep}.",
                     LogLevel.Info);
-                if (skipPrep)
-                    NotifyZoneSkipped(assignment, fieldState, supply);
-                else
+                if (!skipPrep)
                     NotifyCropNotViable(assignment, fieldState);
             }
         }
@@ -451,12 +449,45 @@ internal sealed partial class ShiftOrchestrator
             CropHudNotifier.CannotTillZones(string.Join(", ", blockedZoneLabels));
     }
 
+    // Fires zone-skip HUD messages at batch end, after any shopping trip has occurred, so we only
+    // alert the player when seeds/fertilizer were genuinely unavailable for the whole shift.
+    private void NotifySkippedZones()
+    {
+        if (_session is null || Session.ManagedAssignments.Count == 0)
+            return;
+
+        var inputChest = TryGetInputChest();
+        var supply = ReadSupply(inputChest);
+        var location = Session.CurrentLocation
+            ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName)
+            ?? Game1.getFarm();
+        var date = CurrentManagedGameDate();
+        var isFestival = Utility.isFestivalDay(date.Day, Game1.season);
+        var fieldState = _cropFieldReader.Read(
+            location, date, Session.ManagedAssignments, IsCurrentManagedBatchSeasonAgnostic());
+
+        foreach (var assignment in Session.ManagedAssignments)
+        {
+            var plan = _cropShiftPlanner.Plan(
+                assignment,
+                fieldState,
+                supply,
+                stockSnapshots: null,
+                isFestivalDay: isFestival,
+                storePreferenceOverride: ModEntry.PreferredCropStore);
+
+            if (ShouldSkipZonePrep(assignment, fieldState, supply, plan))
+                NotifyZoneSkipped(assignment, fieldState, supply);
+        }
+    }
+
     internal void CompleteManagedCropBatch()
     {
         if (_session is null)
             return;
 
         NotifyUntillableZones();
+        NotifySkippedZones();
 
         var completedLocationName = Session.ManagedBatchLocationName;
         ReturnLeftoverSuppliesNoop();
