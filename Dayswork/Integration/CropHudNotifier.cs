@@ -23,6 +23,8 @@ internal static class CropHudNotifier
     private static bool _shoppingWaitingShown;
     private static bool _shoppingReturningShown;
     private static readonly HashSet<string> _wontGrowShownCrops = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> _zoneSkippedNoSeedShownCrops = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> _zoneSkippedNoFertShownCrops = new(StringComparer.Ordinal);
 
     /// <summary>Reset the per-shift dedup flags. Call at shift start.</summary>
     internal static void ResetForShift()
@@ -38,6 +40,8 @@ internal static class CropHudNotifier
         _shoppingWaitingShown = false;
         _shoppingReturningShown = false;
         _wontGrowShownCrops.Clear();
+        _zoneSkippedNoSeedShownCrops.Clear();
+        _zoneSkippedNoFertShownCrops.Clear();
     }
 
     /// <summary>One notice per purchase line — not deduplicated.</summary>
@@ -157,5 +161,23 @@ internal static class CropHudNotifier
             return;
         _fertilizerUnavailableShown = true;
         Game1.addHUDMessage(new HUDMessage(I18nHelper.Get("notify.crop_fertilizer_unavailable"), HUDMessage.error_type));
+    }
+
+    internal static void ZoneSkippedNoSeed(string groupId, string seedName)
+    {
+        if (!_zoneSkippedNoSeedShownCrops.Add(groupId))
+            return;
+        Game1.addHUDMessage(new HUDMessage(
+            I18nHelper.Get("notify.crop_zone_skipped_no_seed", new { group = groupId, seed = seedName }),
+            HUDMessage.error_type));
+    }
+
+    internal static void ZoneSkippedNoFertilizer(string groupId, string fertilizerName)
+    {
+        if (!_zoneSkippedNoFertShownCrops.Add(groupId))
+            return;
+        Game1.addHUDMessage(new HUDMessage(
+            I18nHelper.Get("notify.crop_zone_skipped_no_fertilizer", new { group = groupId, fertilizer = fertilizerName }),
+            HUDMessage.error_type));
     }
 }

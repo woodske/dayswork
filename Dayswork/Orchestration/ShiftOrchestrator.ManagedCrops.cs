@@ -139,12 +139,22 @@ internal sealed partial class ShiftOrchestrator
                 stockSnapshots: null,
                 isFestivalDay: isFestival,
                 storePreferenceOverride: ModEntry.PreferredCropStore);
+
+            var skipPrep = ShouldSkipZonePrep(assignment, fieldState, supply, plan);
+
             foreach (var action in plan.AllActions)
             {
-                // Honor the plan-level toggles: skip debris/dead-plant clearing when disabled
-                //. A skipped debris tile is simply not tilled/planted this shift.
+                // Honor the plan-level toggles: skip debris/dead-plant clearing when disabled.
+                // A skipped debris tile is simply not tilled/planted this shift.
                 if (action.Kind == ManagedCropActionKind.ClearDebris && !ShouldClearDebrisTile(action.Tile, location))
                     continue;
+
+                // When supply is missing, skip ground-prep actions (debris clearing for fresh
+                // obstacles, tilling) but keep harvest and water for existing crops, and still
+                // clear dead crops (cleanup, not planting prep).
+                if (skipPrep && IsZonePrepAction(action, location))
+                    continue;
+
                 actions.Add(action);
             }
 
@@ -153,10 +163,12 @@ internal sealed partial class ShiftOrchestrator
                 DevLog.Log(
                     $"[Dayswork][managed-crops] zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}) " +
                     $"choice={(assignment.Choices.FirstOrDefault()?.Crop.SeedItemId ?? "none")} requiresFert={assignment.Choices.FirstOrDefault()?.Crop.RequiresFertilizer} " +
-                    $"independent={plan.SupplyIndependentActions.Count} dependent={plan.SupplyDependentActions.Count}.",
+                    $"independent={plan.SupplyIndependentActions.Count} dependent={plan.SupplyDependentActions.Count} skipPrep={skipPrep}.",
                     LogLevel.Info);
-                NotifyFertilizerUnavailable(assignment, fieldState, supply, plan);
-                NotifyCropNotViable(assignment, fieldState);
+                if (skipPrep)
+                    NotifyZoneSkipped(assignment, fieldState, supply);
+                else
+                    NotifyCropNotViable(assignment, fieldState);
             }
         }
 
@@ -191,6 +203,19 @@ internal sealed partial class ShiftOrchestrator
                 LogLevel.Info);
             CropHudNotifier.CropWontGrowInTime(cropName);
         }
+    }
+
+    private static string ResolveItemDisplayName(string itemId)
+    {
+        try
+        {
+            var qualified = ItemRegistry.QualifyItemId(itemId) ?? itemId;
+            var data = ItemRegistry.GetDataOrErrorItem(qualified);
+            if (!string.IsNullOrWhiteSpace(data.DisplayName))
+                return data.DisplayName;
+        }
+        catch { }
+        return itemId;
     }
 
     private static string ResolveCropDisplayName(CropDescriptor crop)
@@ -249,25 +274,94 @@ internal sealed partial class ShiftOrchestrator
             .Select(a => $"{a.LocationName}|{a.Tile.X}|{a.Tile.Y}|{a.Kind}|{a.ItemId}")
             .OrderBy(s => s, StringComparer.Ordinal));
 
-    private void NotifyFertilizerUnavailable(
+    /// <summary>
+    /// True when the zone has viable open tiles to plant but no supply (seed or fertilizer) is
+    /// available in the input chest. Used to skip ground-prep actions that would be wasted.
+    /// </summary>
+    private bool ShouldSkipZonePrep(
         CropZoneAssignment assignment,
         FieldState fieldState,
         SupplyInventory supply,
         ManagedCropShiftPlan plan)
     {
+        // If the planner queued at least one planting action, supply is sufficient.
+        if (plan.SupplyDependentActions.Count > 0)
+            return false;
+
         var choice = assignment.Mode == CropAssignmentMode.SeasonAgnostic
             ? assignment.Choices.FirstOrDefault()
             : assignment.Choices.FirstOrDefault(c => c.Season == fieldState.Date.Season);
+        if (choice is null)
+            return false;
 
-        if (choice is null || !choice.Crop.RequiresFertilizer)
+        // Crop-not-viable is handled separately; don't conflate the two skip reasons.
+        if (!_viability.IsPlantingViable(fieldState, choice.Crop, choice.Crop.RequiresFertilizer))
+            return false;
+
+        // No open tiles means nothing to prep regardless of supply state.
+        var zone = assignment.Zone;
+        var hasOpenTiles = fieldState.Tiles.Any(t =>
+            t.CanAcceptSeed
+            && t.Tile.X >= zone.TopLeft.X && t.Tile.X <= zone.BottomRight.X
+            && t.Tile.Y >= zone.TopLeft.Y && t.Tile.Y <= zone.BottomRight.Y);
+        if (!hasOpenTiles)
+            return false;
+
+        // Viable zone with open tiles but zero supply-dependent actions → seed or fertilizer missing.
+        return true;
+    }
+
+    /// <summary>
+    /// True for actions that prepare ground for new planting (fresh-debris clearing and tilling).
+    /// Dead-crop clearing is excluded because it's cleanup, not planting prep.
+    /// </summary>
+    private static bool IsZonePrepAction(TileAction action, GameLocation location)
+    {
+        if (action.Kind == ManagedCropActionKind.Till)
+            return true;
+
+        return action.Kind == ManagedCropActionKind.ClearDebris
+            && !IsDeadCropAtTile(action.Tile, location);
+    }
+
+    private static bool IsDeadCropAtTile(TileCoord tile, GameLocation location)
+    {
+        var vec = new Vector2(tile.X, tile.Y);
+        return location.terrainFeatures.TryGetValue(vec, out var tf)
+            && tf is HoeDirt dirt && dirt.crop is not null && dirt.crop.dead.Value;
+    }
+
+    private void NotifyZoneSkipped(
+        CropZoneAssignment assignment,
+        FieldState fieldState,
+        SupplyInventory supply)
+    {
+        var choice = assignment.Mode == CropAssignmentMode.SeasonAgnostic
+            ? assignment.Choices.FirstOrDefault()
+            : assignment.Choices.FirstOrDefault(c => c.Season == fieldState.Date.Season);
+        if (choice is null)
             return;
 
-        // The zone configures a fertilizer but none is on hand (no shopping this unit), so the
-        // atomicity gate planted nothing. Fire one notice for the zone.
-        var hasFertilizer = supply.QuantityOf(choice.Crop.FertilizerItemId!) > 0;
-        var hasSeedCandidates = plan.SupplyDependentActions.Count > 0;
-        if (!hasFertilizer && !hasSeedCandidates)
-            CropHudNotifier.FertilizerUnavailable();
+        var zone = assignment.Zone;
+        var cropName = ResolveCropDisplayName(choice.Crop);
+
+        var zoneLabel = assignment.GroupId ?? $"{zone.TopLeft.X},{zone.TopLeft.Y}";
+        if (choice.Crop.RequiresFertilizer && supply.QuantityOf(choice.Crop.FertilizerItemId!) <= 0)
+        {
+            var fertName = ResolveItemDisplayName(choice.Crop.FertilizerItemId!);
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Crop group '{zoneLabel}' skipped — {fertName} not in chest or store.",
+                DevLog.WarnLevel);
+            CropHudNotifier.ZoneSkippedNoFertilizer(zoneLabel, fertName);
+        }
+        else if (supply.QuantityOf(choice.Crop.SeedItemId) <= 0)
+        {
+            var seedName = ResolveItemDisplayName(choice.Crop.SeedItemId);
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Crop group '{zoneLabel}' skipped — {seedName} not in chest or store.",
+                DevLog.WarnLevel);
+            CropHudNotifier.ZoneSkippedNoSeed(zoneLabel, seedName);
+        }
     }
 
     private void StartNextManagedAction()

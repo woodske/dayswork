@@ -59,6 +59,14 @@ service and the SMAPI event it hangs off is visible there.
 - **Core placement.** Before adding a game-state snapshot type to Core, check the decision logic
   is complex enough to justify the reader → planner → executor round trip. A single `if` belongs
   in `Dayswork/` next to the game call.
+- **Logging.** Two mechanisms — pick the right one:
+  - **Operational logs** (errors, warnings, skip/skip-reason events the player or a bug report
+    would care about): use `ModEntry.ModMonitor.Log(message, DevLog.WarnLevel)`. Always-on;
+    `DevLog.WarnLevel` is `Debug` during dev and `Warn` in release so the same line doesn't spam
+    in dev mode but surfaces clearly in release SMAPI logs.
+  - **Dev-only diagnostic logs** (verbose field state, action counts, internal trace info): use
+    `DevLog.Log(message, level)`. Gated by `DevLog.Enabled` — silent in release builds. Never
+    use `DevLog.Log` for something the player or a support log would need to see.
 
 ## Where things live
 
