@@ -426,15 +426,13 @@ internal sealed class ManagedShoppingCoordinator
         }
 
         _outcomes.AddRange(result.Outcomes);
-        var bought = result.Outcomes.Sum(outcome => outcome.BoughtQty);
-        var spent = result.TotalSpentGold;
-        if (bought > 0)
-            CropHudNotifier.ShoppingPurchaseSummary(bought, spent);
+        if (result.Outcomes.Any(o => o.BoughtQty > 0))
+            CropHudNotifier.ShoppingPurchaseItems(result.Outcomes);
         if (result.AnyShortfall)
             CropHudNotifier.InsufficientFunds();
 
         DevLog.Log(
-            $"[Dayswork][managed-crops][shopping] store={_group.Store} bought={bought} spent={spent} goldRemaining={Game1.player.Money}.",
+            $"[Dayswork][managed-crops][shopping] store={_group.Store} bought={result.Outcomes.Sum(o => o.BoughtQty)} spent={result.TotalSpentGold} goldRemaining={Game1.player.Money}.",
             LogLevel.Info);
 
         _group = null;

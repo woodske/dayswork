@@ -100,11 +100,13 @@ internal static class CropHudNotifier
             HUDMessage.newQuest_type));
     }
 
-    internal static void ShoppingPurchaseSummary(int count, int gold)
+    internal static void ShoppingPurchaseItems(IEnumerable<PurchaseLineOutcome> outcomes)
     {
-        Game1.addHUDMessage(new HUDMessage(
-            I18nHelper.Get("notify.shopping_purchase_summary", new { count, gold }),
-            HUDMessage.newQuest_type));
+        foreach (var outcome in outcomes.Where(o => o.BoughtQty > 0))
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("notify.shopping_purchase_item",
+                    new { count = outcome.BoughtQty, item = outcome.DisplayName, gold = outcome.SpentGold }),
+                HUDMessage.newQuest_type));
     }
 
     internal static void ShoppingReturning()

@@ -19,6 +19,7 @@ internal enum TravelPurpose
     DepositExit,     // back to the farm after an interior deposit
     ShoppingStep,    // managed shopping; sub-dispatched on the shopping phase
     ManagedReentry,  // back into the managed-crop field location after shopping
+    ExitForDeposit,  // leave a building interior before beginning the deposit run
 }
 
 internal sealed partial class ShiftOrchestrator
@@ -101,6 +102,9 @@ internal sealed partial class ShiftOrchestrator
                 break;
             case TravelPurpose.ShoppingStep:
                 Session.Shopping.OnTravelArrived();
+                break;
+            case TravelPurpose.ExitForDeposit:
+                BeginDeposit();
                 break;
         }
     }

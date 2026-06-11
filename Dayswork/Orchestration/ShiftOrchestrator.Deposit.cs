@@ -86,6 +86,11 @@ internal sealed partial class ShiftOrchestrator
         // before the safety warp below repositions the worker.
         CancelActiveTravel();
 
+        // If the worker is inside a building, walk them to the door first so they always exit
+        // on foot rather than warping. BeginDeposit is called again on ExitForDeposit arrival.
+        if (TryStartExitTravelForDeposit())
+            return;
+
         var farm = Game1.getFarm();
         ReturnWorkerToFarmForDeposit();
         // Valid from Working, Stuck, Recovering (all have Depositing as a successor).
@@ -156,6 +161,45 @@ internal sealed partial class ShiftOrchestrator
         yield return new TileCoord(tile.X + 1, tile.Y);
         yield return new TileCoord(tile.X, tile.Y + 1);
         yield return new TileCoord(tile.X - 1, tile.Y);
+    }
+
+    private bool TryStartExitTravelForDeposit()
+    {
+        if (Session.Worker is null)
+            return false;
+
+        var farm = Game1.getFarm();
+        var currentLocation = Session.Worker.currentLocation ?? Session.CurrentLocation;
+        if (currentLocation is null || currentLocation == farm)
+            return false;
+
+        // Expansion greenhouse: hop home along the validated route.
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.IsExpansionDepositLocation(currentLocation.NameOrUniqueName))
+        {
+            if (compat.TryValidateRoute(
+                    farm,
+                    currentLocation.NameOrUniqueName,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    out var route,
+                    out var failure))
+            {
+                StartTravel(BuildExpansionPlan(route, TravelFailurePolicy.WarpToDestination),
+                    TravelPurpose.ExitForDeposit);
+                return true;
+            }
+            LogExpansionRouteFailure(failure);
+            return false;
+        }
+
+        // Vanilla building interior: walk to the door, warp out.
+        // If the door can't be resolved, fall through to the warp in ReturnWorkerToFarmForDeposit.
+        if (!_buildingNavigator.TryResolveDoorTile(currentLocation.NameOrUniqueName, out var outdoorDoor, out _))
+            return false;
+
+        StartTravel(BuildBuildingExitPlan(currentLocation, outdoorDoor), TravelPurpose.ExitForDeposit);
+        return true;
     }
 
     private void ReturnWorkerToFarmForDeposit()
