@@ -13,5 +13,5 @@ public sealed class SeasonCropChoiceDtoV1
     public string StorePreference { get; set; } = "";
     public bool IsLocked { get; set; }
     public string? OriginSeason { get; set; }
-    public bool AutoReplant { get; set; }
+    public bool? AutoReplant { get; set; } // obsolete — kept for safe deserialization of old saves
 }

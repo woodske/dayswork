@@ -19,8 +19,6 @@ internal sealed class SeasonSlotDraft
     public string CropDisplayName { get; set; } = string.Empty;
     public string? FertilizerItemId { get; set; }
     public string FertilizerDisplayName { get; set; } = string.Empty;
-    public bool AutoReplant { get; set; }
-
     public bool HasCrop => Crop is not null;
 }
 
@@ -184,18 +182,6 @@ internal sealed class CropGroupDraft
         slot.FertilizerDisplayName = slot.FertilizerItemId is null ? string.Empty : displayName;
     }
 
-    public void ToggleAutoReplant(Season season)
-    {
-        if (_slots.TryGetValue(season, out var slot) && slot.HasCrop)
-            slot.AutoReplant = !slot.AutoReplant;
-    }
-
-    public void ToggleYearRoundAutoReplant()
-    {
-        if (_yearRoundSlot is { HasCrop: true } slot)
-            slot.AutoReplant = !slot.AutoReplant;
-    }
-
     /// <summary>
     /// Consolidates the configured season slots into the persisted per-zone choice set, expanding
     /// and locking multi-season crops via the pure resolver. Fertilizer is folded onto each crop.
@@ -210,7 +196,7 @@ internal sealed class CropGroupDraft
             var crop = _yearRoundSlot.Crop.WithFertilizer(_yearRoundSlot.FertilizerItemId);
             return new[]
             {
-                new SeasonCropChoice(Season.Spring, crop, autoReplant: _yearRoundSlot.AutoReplant),
+                new SeasonCropChoice(Season.Spring, crop),
             };
         }
 
@@ -229,7 +215,7 @@ internal sealed class CropGroupDraft
             var crop = slot.Crop.WithFertilizer(slot.FertilizerItemId);
             template = Resolver.ApplyChoice(
                 template,
-                new SeasonCropChoice(season, crop, autoReplant: slot.AutoReplant));
+                new SeasonCropChoice(season, crop));
         }
 
         return template.Choices;
@@ -274,7 +260,6 @@ internal sealed class CropGroupDraft
             slot.CropDisplayName = choice.Crop.SeedItemId;
             slot.FertilizerItemId = choice.Crop.FertilizerItemId;
             slot.FertilizerDisplayName = choice.Crop.FertilizerItemId ?? string.Empty;
-            slot.AutoReplant = choice.AutoReplant;
         }
     }
 

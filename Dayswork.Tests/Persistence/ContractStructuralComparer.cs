@@ -79,7 +79,6 @@ internal static class ContractStructuralComparer
         && left.StorePreference == right.StorePreference
         && left.IsLocked == right.IsLocked
         && left.OriginSeason == right.OriginSeason
-        && left.AutoReplant == right.AutoReplant
         && CropDescriptorsEqual(left.Crop, right.Crop);
 
     private static bool CropDescriptorsEqual(CropDescriptor left, CropDescriptor right) =>

@@ -78,7 +78,6 @@ public static class CropPlanSerialization
             StorePreference = choice.StorePreference.ToString(),
             IsLocked = choice.IsLocked,
             OriginSeason = choice.OriginSeason?.ToString(),
-            AutoReplant = choice.AutoReplant,
         };
 
     private static SeasonCropChoice MapChoiceToDomain(SeasonCropChoiceDtoV1 dto)
@@ -99,8 +98,7 @@ public static class CropPlanSerialization
             crop,
             Enum.Parse<StorePreference>(Require(dto.StorePreference, "CropPlan choice StorePreference")),
             dto.IsLocked,
-            string.IsNullOrWhiteSpace(dto.OriginSeason) ? null : Enum.Parse<Season>(dto.OriginSeason),
-            dto.AutoReplant);
+            string.IsNullOrWhiteSpace(dto.OriginSeason) ? null : Enum.Parse<Season>(dto.OriginSeason));
     }
 
     private static ChestRefDtoV1 MapChestRefToDto(ChestRef chestRef) =>

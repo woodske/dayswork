@@ -14,7 +14,6 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
     private const int SeasonColW = 132;
     private const int CropColW = 270;
     private const int FertColW = 230;
-    private const int ReplantColW = 78;
     private const int Gap = 14;
     private const int LocationButtonW = 210;
 
@@ -108,8 +107,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
         new HStack(Gap,
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_season"), color: HeaderColor), SeasonColW),
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_crop"), color: HeaderColor), CropColW),
-            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_fertilizer"), color: HeaderColor), FertColW),
-            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_replant"), color: HeaderColor), ReplantColW));
+            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_fertilizer"), color: HeaderColor), FertColW));
 
     private ILayoutElement BuildLocationRow()
     {
@@ -155,13 +153,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
                     () => _onPickFertilizer(_group.Id, season),
                     enabled: configured,
                     fixedWidth: FertColW, height: ButtonHeight, textAlign: HAlign.Left),
-                FertColW),
-            HStack.Fixed(
-                new Checkbox(
-                    configured && _group.Slot(season).AutoReplant,
-                    _ => { _group.ToggleAutoReplant(season); Rebuild(); },
-                    enabled: configured),
-                ReplantColW));
+                FertColW));
     }
 
     private ILayoutElement BuildYearRoundRow()
@@ -184,13 +176,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
                     () => _onPickFertilizer(_group.Id, Season.Spring),
                     enabled: configured,
                     fixedWidth: FertColW, height: ButtonHeight, textAlign: HAlign.Left),
-                FertColW),
-            HStack.Fixed(
-                new Checkbox(
-                    configured && _group.YearRoundSlot.AutoReplant,
-                    _ => { _group.ToggleYearRoundAutoReplant(); Rebuild(); },
-                    enabled: configured),
-                ReplantColW));
+                FertColW));
     }
 
     private ILayoutElement BuildLockedRow(Season season)
