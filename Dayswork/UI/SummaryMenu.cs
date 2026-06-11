@@ -209,6 +209,49 @@ internal sealed class SummaryMenu : IClickableMenu
                                 .OrderBy(name => name, StringComparer.Ordinal)),
                     }));
 
+        // Managed crops
+        var assignedGroups = _draft.CropPlan.Groups.Where(g => g.HasAnyAssignment).ToList();
+        if (assignedGroups.Count == 0)
+        {
+            AddWrappedLine(I18nHelper.Get("ui.summary.managed_crops_none"));
+        }
+        else
+        {
+            foreach (var group in assignedGroups)
+            {
+                AddWrappedLine(I18nHelper.Get("ui.summary.managed_crops_group_header",
+                    new { location = group.LocationName, zoneCount = group.Zones.Count }));
+
+                if (group.IsSeasonAgnostic)
+                {
+                    var slot = group.YearRoundSlot;
+                    if (slot.HasCrop)
+                    {
+                        var key = string.IsNullOrEmpty(slot.FertilizerDisplayName)
+                            ? "ui.summary.managed_crops_year_round"
+                            : "ui.summary.managed_crops_year_round_fertilized";
+                        AddWrappedLine(I18nHelper.Get(key, new { crop = slot.CropDisplayName, fertilizer = slot.FertilizerDisplayName }));
+                    }
+                }
+                else
+                {
+                    foreach (var season in CropPlanDraft.AllSeasons)
+                    {
+                        if (group.LockState(season) == SeasonLockState.MultiSeasonLocked)
+                            continue;
+                        var slot = group.Slot(season);
+                        if (!slot.HasCrop)
+                            continue;
+
+                        var key = string.IsNullOrEmpty(slot.FertilizerDisplayName)
+                            ? "ui.summary.managed_crops_season"
+                            : "ui.summary.managed_crops_season_fertilized";
+                        AddWrappedLine(I18nHelper.Get(key, new { season = season.ToString(), crop = slot.CropDisplayName, fertilizer = slot.FertilizerDisplayName }));
+                    }
+                }
+            }
+        }
+
         // Energy tier (selected on the Energy page).
         var tierName = I18nHelper.Get($"ui.summary.tier.{TierKey(_reviewModel.Tier)}");
         AddWrappedLine($"{I18nHelper.Get("ui.summary.energy_tier_label")} {tierName}");
