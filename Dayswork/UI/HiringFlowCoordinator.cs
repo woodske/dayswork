@@ -283,7 +283,8 @@ internal sealed class HiringFlowCoordinator
         var options = new List<CropGroupLocationOption>
         {
             new("Farm", I18nHelper.Get("ui.manage_crops.location_farm")),
-            new("Greenhouse", I18nHelper.Get("ui.manage_crops.location_greenhouse")),
+            new("Greenhouse", I18nHelper.Get("ui.manage_crops.location_greenhouse"),
+                IsAvailable: Game1.getFarm().greenhouseUnlocked.Value),
         };
 
         if (ModEntry.ExpansionCompat is { } compat)
@@ -293,7 +294,10 @@ internal sealed class HiringFlowCoordinator
                 if (!descriptor.IsWorkScopeEligible)
                     continue;
 
-                options.Add(new CropGroupLocationOption(descriptor.LocationName, descriptor.DisplayName));
+                options.Add(new CropGroupLocationOption(
+                    descriptor.LocationName,
+                    descriptor.DisplayName,
+                    IsAvailable: compat.IsExpansionLocationAvailable(descriptor.LocationName)));
             }
         }
 

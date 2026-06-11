@@ -126,6 +126,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
                     ? I18nHelper.Get("ui.manage_crops.location_selected", new { name = option.DisplayName })
                     : option.DisplayName,
                 () => _onSetLocation(_group.Id, option.LocationName),
+                enabled: option.IsAvailable,
                 fixedWidth: LocationButtonW,
                 height: ButtonHeight,
                 textAlign: HAlign.Left)));

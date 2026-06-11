@@ -138,7 +138,7 @@
     "notify.using_fallback_store": "{{store}} was closed — your farmhand shopped at the other store.",
     "notify.shopping_festival_skipped": "Your farmhand skipped shopping — there's a festival today.",
     "notify.shopping_insufficient_funds": "Not enough gold — your farmhand bought what it could afford.",
-    "notify.shopping_unavailable": "Your farmhand couldn't reach a store — planting with supplies on hand.",
+    "notify.shopping_unavailable": "Your farmhand couldn't reach a store or afford to buy — planting with supplies on hand.",
     "notify.shopping_departing": "Your farmhand is going shopping for crop supplies.",
     "notify.shopping_waiting": "{{store}} isn't open yet — your farmhand is waiting outside.",
     "notify.shopping_purchase_summary": "Your farmhand bought {{count}} crop supply item(s) for {{gold}}g.",

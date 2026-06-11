@@ -1,3 +1,3 @@
 namespace Dayswork.UI;
 
-internal sealed record CropGroupLocationOption(string LocationName, string DisplayName);
+internal sealed record CropGroupLocationOption(string LocationName, string DisplayName, bool IsAvailable = true);

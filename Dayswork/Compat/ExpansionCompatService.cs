@@ -127,6 +127,18 @@ internal sealed class ExpansionCompatService
     public IReadOnlyList<ExpansionLocationDescriptor> GetExpansionLocationDescriptors() =>
         _activeProfile.GetLocationDescriptors();
 
+    /// <summary>
+    /// Returns true when the player has unlocked the given expansion location.
+    /// SVE's Grandpa's Shed Greenhouse requires event 2554906 (shed refurbishment complete,
+    /// confirmed via SVE GrandpaShedComplete token: HasSeenEvent 2554906).
+    /// </summary>
+    public bool IsExpansionLocationAvailable(string locationName)
+    {
+        if (string.Equals(locationName, SveExpansionProfile.GrandpasShedGreenhouseLocation, StringComparison.Ordinal))
+            return Game1.player.eventsSeen.Contains("2554906");
+        return true;
+    }
+
     public bool IsExpansionDepositLocation(string locationName) =>
         TryGetExpansionLocationDescriptor(locationName, out var descriptor) &&
         descriptor.IsDepositDestinationEligible;
