@@ -9,7 +9,7 @@ internal sealed class ContractDraft
     public List<Zone> OutdoorZones { get; } = new();
     public List<AnimalBuildingSelection> AnimalBuildings { get; } = new();
     public Dictionary<TaskKind, DestinationKey> Destinations { get; } = new();
-    public ContractSchedule Schedule { get; set; } = ContractSchedule.OneTime;
+    public ContractSchedule Schedule { get; set; } = ContractSchedule.Recurring;
     public ContractId? EditingId { get; set; }
     public List<GreenhouseSelection> Greenhouses { get; } = new();
     public DraftPreviewState PreviewState { get; set; } = DraftPreviewState.Empty;
@@ -24,6 +24,9 @@ internal sealed class ContractDraft
     public List<TaskCategory> CategoryPriority { get; } = new(TaskKindSets.DefaultCategoryPriority);
 
     public bool IsEditing => EditingId.HasValue;
+    public bool IsDirty { get; private set; }
+
+    public void MarkDirty() => IsDirty = true;
 
     public void CycleTier(int direction)
     {
@@ -40,6 +43,7 @@ internal sealed class ContractDraft
             return;
 
         (CategoryPriority[index], CategoryPriority[target]) = (CategoryPriority[target], CategoryPriority[index]);
+        MarkDirty();
     }
 
     /// <summary>Moves <paramref name="category"/> to an arbitrary slot (used by drag-and-drop reordering).</summary>
@@ -55,6 +59,7 @@ internal sealed class ContractDraft
 
         CategoryPriority.RemoveAt(index);
         CategoryPriority.Insert(clamped, category);
+        MarkDirty();
     }
 
     public ContractScopeSelection ScopeSelection =>

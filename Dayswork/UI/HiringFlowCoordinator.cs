@@ -91,7 +91,7 @@ internal sealed class HiringFlowCoordinator
             onRecurrence: ShowSchedule,
             onSummary: ShowSummary,
             onConfirm: ConfirmContract,
-            onCancel: CloseFlow);
+            onCancel: () => MaybeCloseFlow(draft));
     }
 
     private void ShowTaskSelection(ContractDraft draft)
@@ -139,6 +139,7 @@ internal sealed class HiringFlowCoordinator
     private void AddCropGroup(ContractDraft draft)
     {
         var group = draft.CropPlan.AddGroup();
+        draft.MarkDirty();
         ShowCropGroupEditor(draft, group.Id);
     }
 
@@ -168,6 +169,7 @@ internal sealed class HiringFlowCoordinator
     private void DeleteCropGroup(ContractDraft draft, string groupId)
     {
         draft.CropPlan.DeleteGroup(groupId);
+        draft.MarkDirty();
         RefreshPreview(draft);
     }
 
@@ -219,6 +221,7 @@ internal sealed class HiringFlowCoordinator
                     }
                 }
 
+                draft.MarkDirty();
                 ShowCropGroupEditor(draft, groupId);
             },
             onCancel: () => ShowCropGroupEditor(draft, groupId));
@@ -259,6 +262,7 @@ internal sealed class HiringFlowCoordinator
                         group.SetFertilizer(season, option.ItemId, option.DisplayName);
                 }
 
+                draft.MarkDirty();
                 ShowCropGroupEditor(draft, groupId);
             },
             onCancel: () => ShowCropGroupEditor(draft, groupId));
@@ -269,6 +273,7 @@ internal sealed class HiringFlowCoordinator
         if (draft.CropPlan.TryGetGroup(groupId, out var group))
             group.SetLocation(locationName);
 
+        draft.MarkDirty();
         RefreshPreview(draft);
         ShowCropGroupEditor(draft, groupId);
     }
@@ -315,6 +320,7 @@ internal sealed class HiringFlowCoordinator
                 if (draft.CropPlan.TryGetGroup(groupId, out var group))
                     group.OutputChest = index == 0 ? null : chests[index - 1].Ref;
 
+                draft.MarkDirty();
                 ShowCropGroupEditor(draft, groupId);
             },
             onCancel: () => ShowCropGroupEditor(draft, groupId));
@@ -338,6 +344,7 @@ internal sealed class HiringFlowCoordinator
             onComplete: (zones, _) =>
             {
                 draft.CropPlan.SetGroupZones(groupId, zones);
+                draft.MarkDirty();
                 RefreshPreview(draft);
                 ShowCropGroupEditor(draft, groupId);
             },
@@ -392,6 +399,7 @@ internal sealed class HiringFlowCoordinator
     private void SelectTier(ContractDraft draft, EnergyTier tier)
     {
         draft.Tier = tier;
+        draft.MarkDirty();
         RefreshPreview(draft);
         ShowEnergy(draft);
     }
@@ -430,6 +438,7 @@ internal sealed class HiringFlowCoordinator
                 draft.OutdoorZones.Clear();
                 draft.OutdoorZones.AddRange(zones);
                 LegacyScopeBootstrapper.TryApplySelectedBuildings(draft, buildings);
+                draft.MarkDirty();
                 RefreshPreview(draft);
                 ShowZoneAndChest(draft);
             },
@@ -441,6 +450,7 @@ internal sealed class HiringFlowCoordinator
         if (!draft.EnabledTasks.Remove(task))
             draft.EnabledTasks.Add(task);
 
+        draft.MarkDirty();
         RefreshPreview(draft);
     }
 
@@ -449,13 +459,16 @@ internal sealed class HiringFlowCoordinator
         draft.OutdoorZones.Clear();
         draft.AnimalBuildings.Clear();
         draft.Greenhouses.Clear();
+        draft.MarkDirty();
         RefreshPreview(draft);
     }
 
     private void UpdateSchedule(ContractDraft draft, ContractSchedule schedule)
     {
         draft.Schedule = schedule;
+        draft.MarkDirty();
         RefreshViewModels(draft);
+        ShowSchedule(draft);
     }
 
     private void RefreshPreview(ContractDraft draft)
@@ -559,6 +572,21 @@ internal sealed class HiringFlowCoordinator
         LegacyScopeBootstrapper.HydrateDraft(draft, contract);
         draft.CropPlan.HydrateFrom(contract.CropPlan);
         return draft;
+    }
+
+    private void MaybeCloseFlow(ContractDraft draft)
+    {
+        if (draft.IsDirty)
+            ShowConfirmDiscard(draft);
+        else
+            CloseFlow();
+    }
+
+    private void ShowConfirmDiscard(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new ConfirmDiscardMenu(
+            onGoBack: () => ShowHub(draft),
+            onCloseAnyway: CloseFlow);
     }
 
     private void CloseFlow() => Game1.activeClickableMenu = null;

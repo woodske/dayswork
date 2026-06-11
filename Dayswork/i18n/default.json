@@ -153,6 +153,11 @@
     "ui.common.none": "—",
     "ui.common.scroll_hint": "Use the mouse wheel to scroll",
 
+    "ui.confirm_discard.title": "Unsaved Changes",
+    "ui.confirm_discard.description": "You have unsaved changes to this contract. They will be lost if you close now.",
+    "ui.confirm_discard.go_back_btn": "Go Back",
+    "ui.confirm_discard.close_anyway_btn": "Close Anyway",
+
     "ui.error.cant_afford": "You can't afford this contract.",
     "ui.error.one_contract": "You already have a farmhand contract. Edit or cancel it from Manage Contracts before hiring another.",
 
