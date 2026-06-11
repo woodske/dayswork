@@ -25,10 +25,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     // Fallback shipping-bin stand tile for Standard Farm when the live building cannot be resolved.
     private static readonly TileCoord FallbackShippingBinTile = new(71, 13);
 
-    // Emote IDs — play-test TODO: confirm "?" and "!" are 8 and 2 in vanilla.
-    private const int EmoteQuestion    = 8;  // confused "?" (stuck step 1)
-    private const int EmoteExclamation = 2;  // surprised "!" (hit reaction)
-    internal const int EmoteMusic      = 16; // music note while waiting for a shop to open
+    private const int EmoteQuestion    = Emotes.Question;    // confused "?" (stuck step 1)
+    private const int EmoteExclamation = Emotes.Exclamation; // surprised "!" (hit reaction)
+    internal const int EmoteMusic      = Emotes.MusicNote;   // music note while waiting for a shop to open
 
     // Melee proximity range for hit-detection (Manhattan distance in tiles).
     private const float HitRangeTiles = 2.0f;
