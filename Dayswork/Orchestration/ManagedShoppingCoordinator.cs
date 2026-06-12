@@ -852,6 +852,10 @@ internal sealed class ManagedShoppingCoordinator
         if (tokens.Length == 0)
             return false;
 
+        // "JojaShop" is Joja's tile action (handled by GameLocation.checkAction separately from OpenShop)
+        if (string.Equals(tokens[0], "JojaShop", StringComparison.OrdinalIgnoreCase))
+            return store == Store.Joja;
+
         if (string.Equals(tokens[0], "Buy", StringComparison.OrdinalIgnoreCase))
             return store == Store.Pierre
                    && tokens.Length >= 2
