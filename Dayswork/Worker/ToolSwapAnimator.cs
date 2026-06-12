@@ -142,6 +142,7 @@ internal sealed class ToolSwapAnimator
                 break;
             case WorkerTool.WateringCan:
                 SpawnWateringCanSwing(facingDirection);
+                _worker.currentLocation.playSound("wateringCan", _worker.Tile);
                 break;
             case WorkerTool.Scythe:
                 SpawnSwipeOverlay(facingDirection);

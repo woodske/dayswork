@@ -242,6 +242,10 @@ internal sealed partial class ShiftOrchestrator
 
         var before = new HashSet<Debris>(loc.debris);
 
+        // crop.harvest() is called directly rather than via tool infrastructure, so the
+        // vanilla "harvest" sound doesn't reliably fire — emit it explicitly here.
+        loc.playSound("harvest", tileVec);
+
         // SDV 1.6: crop.harvest() adds produce directly to Game1.player (or creates debris that
         // the player magnet instantly collects). Snapshot player inventory by reference+stack so we
         // can intercept any gain and redirect it to the worker buffer instead.
