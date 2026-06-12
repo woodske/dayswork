@@ -332,8 +332,9 @@ internal sealed class ContractListMenu : IClickableMenu
             Game1.addHUDMessage(new HUDMessage(_cancelBlockedMsg, HUDMessage.error_type));
             return;
         }
-        _store.Cancel(contract.Id);
-        Refresh();
+        Game1.activeClickableMenu = new ConfirmCancelContractMenu(
+            onGoBack:  () => Game1.activeClickableMenu = this,
+            onConfirm: () => { _store.Cancel(contract.Id); Game1.activeClickableMenu = this; Refresh(); });
     }
 
     // ── Gamepad snapping ─────────────────────────────────────────────────────
