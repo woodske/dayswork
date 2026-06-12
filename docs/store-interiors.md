@@ -3,6 +3,12 @@
 Confirmed game content for the stores the farmhand visits during managed-crop shopping trips.
 Verified via `ilspycmd` decompile of `Stardew Valley.dll` (`GameLocation.checkAction`).
 
+## Purchase sound
+
+| Sound cue | Trigger |
+|---|---|
+| `"purchaseClick"` | Plays once per line item when the worker buys at the counter. Confirmed in-game. This is the same sound the player hears when buying from any vanilla shop menu. |
+
 ## JojaMart
 
 | Tile purpose | Layer | Action property | Coordinates |

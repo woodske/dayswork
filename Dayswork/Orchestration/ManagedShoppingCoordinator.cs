@@ -28,6 +28,7 @@ internal sealed class ManagedShoppingCoordinator
         WaitingForOpen,
         WalkingToEntrance,
         WalkingToCounter,
+        Purchasing,
         TravelingToFarm,
         WalkingToInputChest,
     }
@@ -80,6 +81,9 @@ internal sealed class ManagedShoppingCoordinator
     private readonly List<Item> _carriedItems = new();
     private readonly List<PurchaseLineOutcome> _outcomes = new();
     private int _waitTicks;
+    private int _purchaseLineIndex;
+    private int _purchaseFacing;
+    private readonly List<PurchaseLineOutcome> _pendingOutcomes = new();
 
     public ManagedShoppingCoordinator(
         ShiftSession session,
@@ -109,6 +113,9 @@ internal sealed class ManagedShoppingCoordinator
     /// <summary>Parked at the wait tile until the store opens; the tick loop calls <see cref="ContinueWaitTick"/>.</summary>
     public bool IsWaitingForOpen => _phase == Phase.WaitingForOpen;
 
+    /// <summary>Pacing through counter purchases one beat at a time; the tick loop calls <see cref="ContinuePurchaseTick"/>.</summary>
+    public bool IsPurchasing => _phase == Phase.Purchasing;
+
     /// <summary>Re-arms the once-per-batch shopping attempt (called when a managed batch begins).</summary>
     public void ResetState()
     {
@@ -125,6 +132,8 @@ internal sealed class ManagedShoppingCoordinator
         _group = null;
         _storeRoute = null;
         _waitTicks = 0;
+        _purchaseLineIndex = 0;
+        _pendingOutcomes.Clear();
         if (clearCarriedItems)
             _carriedItems.Clear();
         _outcomes.Clear();
@@ -417,24 +426,82 @@ internal sealed class ManagedShoppingCoordinator
             return;
         }
 
-        var result = _shopPurchaseService.BuyToCarriedItems(
-            _group,
-            Game1.player,
-            _carriedItems);
-        if (result.BindFailed)
+        _phase = Phase.Purchasing;
+        _purchaseLineIndex = 0;
+        _purchaseFacing = ResolvePurchaseFacing();
+        _toolAnimator.PlaySwing(WorkerTool.None, _purchaseFacing);
+    }
+
+    public void ContinuePurchaseTick()
+    {
+        if (_toolAnimator.IsSwinging)
+            return;
+
+        if (_group is null)
+        {
+            FinishPurchasing();
+            return;
+        }
+
+        var lines = _group.Lines;
+        while (_purchaseLineIndex < lines.Count && lines[_purchaseLineIndex].Quantity <= 0)
+            _purchaseLineIndex++;
+
+        if (_purchaseLineIndex >= lines.Count)
+        {
+            FinishPurchasing();
+            return;
+        }
+
+        var outcome = _shopPurchaseService.BuyLineToCarriedItems(
+            _group.Store, lines[_purchaseLineIndex], Game1.player, _carriedItems);
+        if (outcome is null)
         {
             AbortTrip("purchase_bind_failed");
             return;
         }
 
-        _outcomes.AddRange(result.Outcomes);
-        if (result.Outcomes.Any(o => o.BoughtQty > 0))
-            CropHudNotifier.ShoppingPurchaseItems(result.Outcomes);
-        if (result.AnyShortfall)
+        _pendingOutcomes.Add(outcome);
+
+        if (_storeRoute is { Interior: { } interior } && Game1.player.currentLocation == interior)
+            interior.playSound("purchaseClick");
+
+        _purchaseLineIndex++;
+
+        if (_purchaseLineIndex < lines.Count)
+            _toolAnimator.PlaySwing(WorkerTool.None, _purchaseFacing);
+        else
+            FinishPurchasing();
+    }
+
+    private int ResolvePurchaseFacing()
+    {
+        var worker = _session.Worker;
+        if (worker is null || _group is null || _storeRoute is not { Interior: { } interior })
+            return worker?.FacingDirection ?? 2;
+
+        var workerPt = worker.TilePoint;
+        var candidates = FindShopActionTiles(interior, _group.Store).ToList();
+        if (candidates.Count == 0)
+            return worker.FacingDirection;
+
+        var nearest = candidates.OrderBy(t => Math.Abs(t.X - workerPt.X) + Math.Abs(t.Y - workerPt.Y)).First();
+        return ShiftOrchestrator.FacingToward(workerPt, nearest, worker.FacingDirection);
+    }
+
+    private void FinishPurchasing()
+    {
+        var outcomes = _pendingOutcomes.ToList();
+        _pendingOutcomes.Clear();
+        _outcomes.AddRange(outcomes);
+
+        if (outcomes.Any(o => o.BoughtQty > 0))
+            CropHudNotifier.ShoppingPurchaseItems(outcomes);
+        if (outcomes.Any(o => o.Kind is PurchaseOutcomeKind.Partial or PurchaseOutcomeKind.Insufficient))
             CropHudNotifier.InsufficientFunds();
 
         DevLog.Log(
-            $"[Dayswork][managed-crops][shopping] store={_group.Store} bought={result.Outcomes.Sum(o => o.BoughtQty)} spent={result.TotalSpentGold} goldRemaining={Game1.player.Money}.",
+            $"[Dayswork][managed-crops][shopping] store={_group?.Store} bought={outcomes.Sum(o => o.BoughtQty)} spent={outcomes.Sum(o => o.SpentGold)} goldRemaining={Game1.player.Money}.",
             LogLevel.Info);
 
         _group = null;

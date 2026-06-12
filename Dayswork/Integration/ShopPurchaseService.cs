@@ -73,36 +73,42 @@ internal sealed class ShopPurchaseService
             if (line.Quantity <= 0)
                 continue;
 
-            var unitCost = ResolveUnitCost(group.Store, line);
-            if (unitCost <= 0)
-            {
-                _monitor?.Log($"Dayswork shopping: could not resolve live price for '{line.ItemId}' at {group.Store}.", DevLog.WarnLevel);
+            var outcome = BuyLineToCarriedItems(group.Store, line, farmer, carriedItems);
+            if (outcome is null)
                 return PurchaseResult.BindFailure;
-            }
-
-            var maxAffordable = Math.Min(line.Quantity, farmer.Money / unitCost);
-            if (maxAffordable <= 0)
-            {
-                outcomes.Add(BuildOutcome(group.Store, line, 0, unitCost, PurchaseOutcomeKind.Insufficient));
-                continue;
-            }
-
-            var item = TryCreateItem(line.ItemId, maxAffordable);
-            if (item is null)
-            {
-                _monitor?.Log($"Dayswork shopping: could not create item '{line.ItemId}'.", DevLog.WarnLevel);
-                return PurchaseResult.BindFailure;
-            }
-
-            carriedItems.Add(item);
-            farmer.Money -= maxAffordable * unitCost;
-            var kind = maxAffordable < line.Quantity
-                ? PurchaseOutcomeKind.Partial
-                : PurchaseOutcomeKind.Full;
-            outcomes.Add(BuildOutcome(group.Store, line, maxAffordable, unitCost, kind));
+            outcomes.Add(outcome);
         }
 
         return new PurchaseResult(outcomes, bindFailed: false);
+    }
+
+    /// <summary>Buys a single line item. Returns null on bind/create failure (caller should abort).</summary>
+    public PurchaseLineOutcome? BuyLineToCarriedItems(Store store, ManifestLine line, Farmer farmer, IList<Item> carriedItems)
+    {
+        var unitCost = ResolveUnitCost(store, line);
+        if (unitCost <= 0)
+        {
+            _monitor?.Log($"Dayswork shopping: could not resolve live price for '{line.ItemId}' at {store}.", DevLog.WarnLevel);
+            return null;
+        }
+
+        var maxAffordable = Math.Min(line.Quantity, farmer.Money / unitCost);
+        if (maxAffordable <= 0)
+            return BuildOutcome(store, line, 0, unitCost, PurchaseOutcomeKind.Insufficient);
+
+        var item = TryCreateItem(line.ItemId, maxAffordable);
+        if (item is null)
+        {
+            _monitor?.Log($"Dayswork shopping: could not create item '{line.ItemId}'.", DevLog.WarnLevel);
+            return null;
+        }
+
+        carriedItems.Add(item);
+        farmer.Money -= maxAffordable * unitCost;
+        var kind = maxAffordable < line.Quantity
+            ? PurchaseOutcomeKind.Partial
+            : PurchaseOutcomeKind.Full;
+        return BuildOutcome(store, line, maxAffordable, unitCost, kind);
     }
 
     private static PurchaseLineOutcome BuildOutcome(

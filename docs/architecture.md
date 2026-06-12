@@ -80,8 +80,9 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
   per-shift reset.
 - **`ManagedShoppingCoordinator`** (held by the session) — the managed-crop shopping trip: builds
   the purchase plan from the input-chest shortfall, walks the worker to Pierre's/Joja (waiting
-  out a closed store), buys at the counter, and settles purchases into the input chest. Travel
-  legs run through the shared travel primitive with `TravelPurpose.ShoppingStep`.
+  out a closed store), buys at the counter one line item per animation beat (paced by
+  `WorkerActionAnimationMs`, playing `"purchaseClick"` each beat), and settles purchases into the
+  input chest. Travel legs run through the shared travel primitive with `TravelPurpose.ShoppingStep`.
 - **`DepositTripRunner`** (held by the session) — executes the planned deposit trips
   chest-by-chest with per-stack beat pacing, re-checking the chest mutex per stack, and routes
   every failure (chest missing/busy/full, unreachable destination) to the shift overflow.

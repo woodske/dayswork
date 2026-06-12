@@ -711,6 +711,13 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
+        // Purchase beat loop: pacing through counter purchases one line per animation beat.
+        if (Session.Shopping.IsPurchasing)
+        {
+            Session.Shopping.ContinuePurchaseTick();
+            return;
+        }
+
         // An active travel owns the worker's movement until it completes or fails; its
         // completion handler restores the right intent for whatever comes next.
         if (Session.TravelPurpose != TravelPurpose.None)
