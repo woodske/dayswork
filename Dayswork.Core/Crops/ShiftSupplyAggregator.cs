@@ -35,7 +35,8 @@ public sealed class ShiftSupplyAggregator
         SupplyInventory chestInventory,
         StorePreference globalPreference,
         IReadOnlyList<ShopStockSnapshot>? liveStock,
-        bool isFestivalDay)
+        bool isFestivalDay,
+        Action<string>? debugLog = null)
     {
         if (plan is null || !plan.IsEnabled)
             return ShiftPurchaseManifest.Empty;
@@ -56,17 +57,25 @@ public sealed class ShiftSupplyAggregator
 
             var choice = ResolveChoice(assignment, field);
             if (choice is null)
+            {
+                debugLog?.Invoke($"zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}): no choice for season {field.Date.Season}");
                 continue;
+            }
 
             var crop = choice.Crop;
             var isViable = _viability.IsPlantingViable(field, crop, useFertilizer: crop.RequiresFertilizer);
             var planned = PlannedPlantableTileCounter.CountPlantable(field, assignment, choice, isViable);
             if (planned <= 0)
+            {
+                debugLog?.Invoke($"zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}): seed={crop.SeedItemId} isViable={isViable} planned=0, skipped");
                 continue;
+            }
 
             var workingInventory = new SupplyInventory(working);
             var targets = _supplyPlanner.CalculatePurchaseTargets(
                 crop, planned, workingInventory, globalPreference, liveStock);
+
+            debugLog?.Invoke($"zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}): seed={crop.SeedItemId} fert={crop.FertilizerItemId} isViable={isViable} planned={planned} targets=[{string.Join(", ", targets.Select(t => $"{t.ItemId}:{t.Quantity}"))}]");
 
             foreach (var target in targets)
             {

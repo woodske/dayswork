@@ -186,7 +186,13 @@ internal sealed class ManagedShoppingCoordinator
             supply,
             storePreference,
             stock,
-            isFestivalDay: false);
+            isFestivalDay: false,
+            debugLog: DevLog.Enabled ? msg => DevLog.Log($"[Dayswork][managed-crops][shopping] manifest-dbg: {msg}", LogLevel.Info) : null);
+
+        DevLog.Log(
+            $"[Dayswork][managed-crops][shopping] manifest resolved=[{string.Join(", ", manifest.Groups.SelectMany(g => g.Lines.Select(l => $"{l.ItemId}:{l.Quantity}@{g.Store}")))}]" +
+            $" unavailable=[{string.Join(", ", manifest.ChestSupplyOnlyItems)}]",
+            LogLevel.Info);
 
         if (!manifest.HasPurchases)
             return false;
