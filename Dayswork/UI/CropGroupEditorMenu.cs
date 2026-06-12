@@ -87,14 +87,12 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
             I18nHelper.Get("ui.manage_crops.output_label", new { name = OutputChestLabel() }),
             color: Game1.textColor));
         rows.Add(new Spacer(8));
-        rows.Add(new MenuButton(
-            I18nHelper.Get("ui.manage_crops.set_btn"),
-            () => _onPickChest(_group.Id),
-            fixedWidth: 260,
-            height: ButtonHeight));
-
-        rows.Add(new Spacer(18));
-        rows.Add(BuildDrawRow());
+        rows.Add(BuildBottomButtonRow());
+        rows.Add(new Spacer(8));
+        rows.Add(new Label(
+            I18nHelper.Get("ui.manage_crops.group_zones",
+                new { zones = _group.Zones.Count, tiles = CountTiles(_group.Zones) }),
+            color: SecondaryTextColor));
 
         return new PageShell(
             title: I18nHelper.Get("ui.manage_crops.editor_title"),
@@ -199,25 +197,17 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
             HStack.Fill(new Label(reason, color: LockedColor)));
     }
 
-    private ILayoutElement BuildDrawRow()
-    {
-        var parts = new List<HStack.Column>
-        {
-            HStack.Auto(new MenuButton(
+    private ILayoutElement BuildBottomButtonRow() =>
+        new HStack(0,
+            HStack.Fixed(new MenuButton(
+                I18nHelper.Get("ui.manage_crops.set_btn"),
+                () => _onPickChest(_group.Id), fixedWidth: 260, height: ButtonHeight), 260),
+            HStack.Fixed(new Spacer(24), 24),
+            HStack.Fixed(new MenuButton(
                 I18nHelper.Get("ui.manage_crops.draw_btn"),
                 () => _onBeginDraw(_group.Id),
                 enabled: _group.HasAnyConfiguredSeason,
-                fixedWidth: 250,
-                height: 52)),
-            HStack.Auto(new Spacer(18)),
-            HStack.Fill(new Label(
-                I18nHelper.Get("ui.manage_crops.group_zones",
-                    new { zones = _group.Zones.Count, tiles = CountTiles(_group.Zones) }),
-                color: SecondaryTextColor)),
-        };
-
-        return new HStack(0, parts.ToArray());
-    }
+                fixedWidth: 250, height: ButtonHeight), 250));
 
     private string FertilizerLabel(Season season)
     {
