@@ -36,7 +36,7 @@ public sealed class WorkScopeClassifier
         }
 
         var managedCrops = cropPlan is { IsEnabled: true }
-            ? new ManagedCropWorkScope(cropPlan.Assignments)
+            ? new ManagedCropWorkScope(cropPlan.Assignments, cropPlan.BuyFromJojaFirst)
             : null;
 
         return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks, managedCrops);

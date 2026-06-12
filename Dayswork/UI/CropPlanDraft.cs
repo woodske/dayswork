@@ -330,6 +330,8 @@ internal sealed class CropPlanDraft
     private readonly List<CropGroupDraft> _groups = new();
     private int _nextGroupNumber = 1;
 
+    public bool BuyFromJojaFirst { get; set; }
+
     public IReadOnlyList<CropGroupDraft> Groups => _groups;
 
     public bool HasAnyAssignment => _groups.Any(group => group.HasAnyAssignment);
@@ -380,13 +382,14 @@ internal sealed class CropPlanDraft
 
     /// <summary>Builds the immutable crop plan attached to the contract on confirm.</summary>
     public CropPlan BuildCropPlan() =>
-        new(_groups.SelectMany(group => group.BuildAssignments()).ToList());
+        new(_groups.SelectMany(group => group.BuildAssignments()).ToList(), BuyFromJojaFirst);
 
     /// <summary>Seeds this draft from an existing contract's crop plan for the edit flow (draft isolation).</summary>
     public void HydrateFrom(CropPlan plan)
     {
         _groups.Clear();
         _nextGroupNumber = 1;
+        BuyFromJojaFirst = plan.BuyFromJojaFirst;
 
         if (!plan.IsEnabled)
             return;

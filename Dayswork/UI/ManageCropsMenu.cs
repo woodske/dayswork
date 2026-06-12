@@ -48,6 +48,11 @@ internal sealed class ManageCropsMenu : LayoutMenu
     {
         var content = new List<ILayoutElement>
         {
+            new ToggleRow(
+                I18nHelper.Get("ui.manage_crops.buy_from_joja_first"),
+                Plan.BuyFromJojaFirst,
+                () => { Plan.BuyFromJojaFirst = !Plan.BuyFromJojaFirst; Rebuild(); }),
+            new Spacer(10),
             new MenuButton(
                 I18nHelper.Get("ui.manage_crops.add_group_btn"),
                 () => _onAddGroup(_draft),

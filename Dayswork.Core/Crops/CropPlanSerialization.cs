@@ -13,6 +13,7 @@ public static class CropPlanSerialization
 
         return new CropPlanDtoV1
         {
+            BuyFromJojaFirst = cropPlan.BuyFromJojaFirst,
             Assignments = cropPlan.Assignments
                 .OrderBy(DescribeAssignment, StringComparer.Ordinal)
                 .Select(MapAssignmentToDto)
@@ -25,7 +26,7 @@ public static class CropPlanSerialization
         if (dto is null || dto.Assignments.Count == 0)
             return CropPlan.Empty;
 
-        return new CropPlan(dto.Assignments.Select(MapAssignmentToDomain).ToList());
+        return new CropPlan(dto.Assignments.Select(MapAssignmentToDomain).ToList(), dto.BuyFromJojaFirst);
     }
 
     private static CropZoneAssignmentDtoV1 MapAssignmentToDto(CropZoneAssignment assignment) =>

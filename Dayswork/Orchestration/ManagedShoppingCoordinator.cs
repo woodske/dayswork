@@ -169,18 +169,20 @@ internal sealed class ManagedShoppingCoordinator
             _host.IsCurrentManagedBatchSeasonAgnostic());
         var supply = ShiftOrchestrator.ReadSupply(inputChest);
         var stock = _shopStockReader.ReadAll(date.Day, Game1.timeOfDay, includeClosedStock: true);
+        var storePreference = _session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
+            ? StorePreference.Joja : StorePreference.Pierre;
         var manifest = _shiftSupplyAggregator.BuildManifest(
             new CropPlan(_session.ManagedAssignments),
             fieldState,
             supply,
-            ModEntry.PreferredCropStore,
+            storePreference,
             stock,
             isFestivalDay: false);
 
         if (!manifest.HasPurchases)
             return false;
 
-        ShiftOrchestrator.NotifyFallbackStoreIfUsed(manifest);
+        ShiftOrchestrator.NotifyFallbackStoreIfUsed(manifest, storePreference);
 
         var walletClamped = _purchaseAffordability.ClampToWallet(manifest, Game1.player.Money);
 

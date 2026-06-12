@@ -138,7 +138,8 @@ internal sealed partial class ShiftOrchestrator
                 supply,
                 stockSnapshots: null,
                 isFestivalDay: isFestival,
-                storePreferenceOverride: ModEntry.PreferredCropStore);
+                storePreferenceOverride: Session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
+                    ? StorePreference.Joja : StorePreference.Pierre);
 
             var skipPrep = ShouldSkipZonePrep(assignment, fieldState, supply, plan);
 
@@ -474,7 +475,8 @@ internal sealed partial class ShiftOrchestrator
                 supply,
                 stockSnapshots: null,
                 isFestivalDay: isFestival,
-                storePreferenceOverride: ModEntry.PreferredCropStore);
+                storePreferenceOverride: Session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
+                    ? StorePreference.Joja : StorePreference.Pierre);
 
             if (ShouldSkipZonePrep(assignment, fieldState, supply, plan))
                 NotifyZoneSkipped(assignment, fieldState, supply);
@@ -636,19 +638,11 @@ internal sealed partial class ShiftOrchestrator
         StartNextManagedAction();
     }
 
-    internal static void NotifyFallbackStoreIfUsed(ShiftPurchaseManifest manifest)
+    internal static void NotifyFallbackStoreIfUsed(ShiftPurchaseManifest manifest, StorePreference preferred)
     {
-        var preferred = ModEntry.PreferredCropStore switch
-        {
-            StorePreference.Pierre => Store.Pierre,
-            StorePreference.Joja => Store.Joja,
-            _ => (Store?)null,
-        };
-        if (preferred is null)
-            return;
-
-        if (manifest.Groups.Any(group => group.Store != preferred.Value))
-            CropHudNotifier.UsingFallbackStore(preferred.Value == Store.Pierre ? "Pierre's" : "JojaMart");
+        var preferredStore = preferred == StorePreference.Joja ? Store.Joja : Store.Pierre;
+        if (manifest.Groups.Any(group => group.Store != preferredStore))
+            CropHudNotifier.UsingFallbackStore(preferredStore == Store.Pierre ? "Pierre's" : "JojaMart");
     }
 
     private bool ShouldClearDebrisTile(TileCoord tile, GameLocation location)
