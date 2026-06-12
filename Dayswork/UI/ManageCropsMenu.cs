@@ -11,11 +11,11 @@ internal sealed class ManageCropsMenu : LayoutMenu
 {
     private const int GroupColW = 96;
     private const int LocationColW = 132;
-    private const int SeasonColW = 132;
+    private const int SeasonColW = 118;
     private const int ActionButtonW = 82;
     private const int RowHeight = 88;
     private const int RowGap = 8;
-    private const int MaxVisibleRows = 4;
+    private const int MaxVisibleRows = 5;
 
     private static readonly Color SecondaryTextColor = new(96, 72, 48);
     private static readonly Color HeaderColor = new(80, 60, 40);
@@ -48,16 +48,16 @@ internal sealed class ManageCropsMenu : LayoutMenu
     {
         var content = new List<ILayoutElement>
         {
-            new ToggleRow(
-                I18nHelper.Get("ui.manage_crops.buy_from_joja_first"),
-                Plan.BuyFromJojaFirst,
-                () => { Plan.BuyFromJojaFirst = !Plan.BuyFromJojaFirst; Rebuild(); }),
-            new Spacer(10),
-            new MenuButton(
-                I18nHelper.Get("ui.manage_crops.add_group_btn"),
-                () => _onAddGroup(_draft),
-                fixedWidth: 250,
-                height: 52),
+            new HStack(16,
+                HStack.Fill(new ToggleRow(
+                    I18nHelper.Get("ui.manage_crops.buy_from_joja_first"),
+                    Plan.BuyFromJojaFirst,
+                    () => { Plan.BuyFromJojaFirst = !Plan.BuyFromJojaFirst; Rebuild(); })),
+                HStack.Auto(new MenuButton(
+                    I18nHelper.Get("ui.manage_crops.add_group_btn"),
+                    () => _onAddGroup(_draft),
+                    fixedWidth: 250,
+                    height: 52))),
             new Spacer(14),
         };
 
@@ -142,7 +142,12 @@ internal sealed class ManageCropsMenu : LayoutMenu
 
     private int GetGroupListHeight()
     {
-        var visibleRows = Math.Clamp(Plan.Groups.Count, 1, MaxVisibleRows);
+        // Overhead covers PageShell chrome (title, description, content padding, footer)
+        // plus the fixed elements above the scroll list. Generous to ensure the footer
+        // always stays on screen regardless of viewport size.
+        const int Overhead = 380;
+        var maxByHeight = Math.Max(1, (height - Overhead + RowGap) / (RowHeight + RowGap));
+        var visibleRows = Math.Clamp(Plan.Groups.Count, 1, Math.Min(MaxVisibleRows, maxByHeight));
         return visibleRows * RowHeight + Math.Max(0, visibleRows - 1) * RowGap;
     }
 
