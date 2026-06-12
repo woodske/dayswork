@@ -638,11 +638,21 @@ internal sealed partial class ShiftOrchestrator
         StartNextManagedAction();
     }
 
-    internal static void NotifyFallbackStoreIfUsed(ShiftPurchaseManifest manifest, StorePreference preferred)
+    internal static void NotifyFallbackStoreIfUsed(
+        ShiftPurchaseManifest manifest,
+        StorePreference preferred,
+        IReadOnlyList<ShopStockSnapshot> stock)
     {
         var preferredStore = preferred == StorePreference.Joja ? Store.Joja : Store.Pierre;
-        if (manifest.Groups.Any(group => group.Store != preferredStore))
-            CropHudNotifier.UsingFallbackStore(preferredStore == Store.Pierre ? "Pierre's" : "JojaMart");
+        if (!manifest.Groups.Any(group => group.Store != preferredStore))
+            return;
+
+        var displayName = preferredStore == Store.Pierre ? "Pierre's" : "JojaMart";
+        var snapshot = stock.FirstOrDefault(s => s.Store == preferredStore);
+        if (snapshot is { IsOpen: false })
+            CropHudNotifier.UsingFallbackStore(displayName);
+        else
+            CropHudNotifier.UsingPartialFallbackStore(displayName);
     }
 
     private bool ShouldClearDebrisTile(TileCoord tile, GameLocation location)

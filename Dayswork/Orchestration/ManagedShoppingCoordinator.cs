@@ -191,7 +191,7 @@ internal sealed class ManagedShoppingCoordinator
         if (!manifest.HasPurchases)
             return false;
 
-        ShiftOrchestrator.NotifyFallbackStoreIfUsed(manifest, storePreference);
+        ShiftOrchestrator.NotifyFallbackStoreIfUsed(manifest, storePreference, stock);
 
         var walletClamped = _purchaseAffordability.ClampToWallet(manifest, Game1.player.Money);
 

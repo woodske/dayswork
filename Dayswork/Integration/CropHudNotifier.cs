@@ -16,6 +16,7 @@ internal static class CropHudNotifier
     private static bool _toolSkipShown;
     private static bool _fertilizerUnavailableShown;
     private static bool _fallbackStoreShown;
+    private static bool _partialFallbackStoreShown;
     private static bool _festivalSkippedShown;
     private static bool _insufficientFundsShown;
     private static bool _shoppingUnavailableShown;
@@ -33,6 +34,7 @@ internal static class CropHudNotifier
         _toolSkipShown = false;
         _fertilizerUnavailableShown = false;
         _fallbackStoreShown = false;
+        _partialFallbackStoreShown = false;
         _festivalSkippedShown = false;
         _insufficientFundsShown = false;
         _shoppingUnavailableShown = false;
@@ -59,6 +61,16 @@ internal static class CropHudNotifier
         _fallbackStoreShown = true;
         Game1.addHUDMessage(new HUDMessage(
             I18nHelper.Get("notify.using_fallback_store", new { store = closedStoreName }),
+            HUDMessage.newQuest_type));
+    }
+
+    internal static void UsingPartialFallbackStore(string preferredStoreName)
+    {
+        if (_partialFallbackStoreShown)
+            return;
+        _partialFallbackStoreShown = true;
+        Game1.addHUDMessage(new HUDMessage(
+            I18nHelper.Get("notify.using_partial_fallback_store", new { store = preferredStoreName }),
             HUDMessage.newQuest_type));
     }
 

@@ -138,6 +138,7 @@
     "notify.crop_cannot_till_zones": "Your farmhand couldn't clear all tiles in crop groups {{zones}} — some tiles remain unplanted.",
     "notify.bought_item": "Bought {{count}}× {{item}}.",
     "notify.using_fallback_store": "{{store}} was closed — your farmhand shopped at the other store.",
+    "notify.using_partial_fallback_store": "{{store}} doesn't have everything — your farmhand will visit the other store too.",
     "notify.shopping_festival_skipped": "Your farmhand skipped shopping — there's a festival today.",
     "notify.shopping_insufficient_funds": "Not enough gold — your farmhand bought what it could afford.",
     "notify.shopping_unavailable": "Your farmhand couldn't reach a store or afford to buy — planting with supplies on hand.",
