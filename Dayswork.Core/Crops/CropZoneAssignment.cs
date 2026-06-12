@@ -7,14 +7,14 @@ public sealed record CropZoneAssignment
     public Zone Zone { get; }
     public CropAssignmentMode Mode { get; }
     public IReadOnlyList<SeasonCropChoice> Choices { get; }
-    public ChestRef? OutputChest { get; }
+    public DestinationKey? OutputDestination { get; }
     public string? GroupId { get; }
 
     public CropZoneAssignment(
         Zone zone,
         CropAssignmentMode mode,
         IReadOnlyList<SeasonCropChoice>? choices,
-        ChestRef? outputChest = null,
+        DestinationKey? outputDestination = null,
         string? groupId = null)
     {
         Zone = zone;
@@ -26,7 +26,7 @@ public sealed record CropZoneAssignment
             .ThenBy(choice => choice.Crop.SeedItemId, StringComparer.Ordinal)
             .ToList()
             .AsReadOnly();
-        OutputChest = outputChest;
+        OutputDestination = outputDestination;
         GroupId = string.IsNullOrWhiteSpace(groupId) ? null : groupId;
     }
 

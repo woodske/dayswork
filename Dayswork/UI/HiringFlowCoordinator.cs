@@ -312,7 +312,11 @@ internal sealed class HiringFlowCoordinator
     {
         var chests = _chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
 
-        var rows = new List<PickerRow> { new(I18nHelper.Get("ui.manage_crops.output_automatic"), null) };
+        var rows = new List<PickerRow>
+        {
+            new(I18nHelper.Get("ui.manage_crops.output_automatic"), null),
+            new(I18nHelper.Get("ui.zone_chest.shipping_bin_option"), null),
+        };
         rows.AddRange(chests.Select(chest => new PickerRow(chest.DisplayName, chest.GroupLabel)));
 
         Game1.activeClickableMenu = new CropListPickerMenu(
@@ -322,7 +326,12 @@ internal sealed class HiringFlowCoordinator
             onSelect: index =>
             {
                 if (draft.CropPlan.TryGetGroup(groupId, out var group))
-                    group.OutputChest = index == 0 ? null : chests[index - 1].Ref;
+                    group.OutputDestination = index switch
+                    {
+                        0 => null,
+                        1 => ShippingBinDestination.Instance,
+                        _ => new ChestDestination(chests[index - 2].Ref),
+                    };
 
                 draft.MarkDirty();
                 ShowCropGroupEditor(draft, groupId);

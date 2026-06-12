@@ -73,7 +73,7 @@
     "ui.manage_crops.draw_btn": "Draw zone(s)",
     "ui.manage_crops.clear_zones_btn": "Clear crop zones",
     "ui.manage_crops.zones_configured": "Crop zones configured: {{count}}",
-    "ui.manage_crops.output_label": "Output chest: {{name}}",
+    "ui.manage_crops.output_label": "Output destination: {{name}}",
     "ui.manage_crops.output_automatic": "Automatic (office output chest)",
     "ui.manage_crops.output_chest_at": "Chest at {{x}}, {{y}}",
     "ui.manage_crops.picker_crop_title": "Select Crop",

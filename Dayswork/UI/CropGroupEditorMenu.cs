@@ -240,13 +240,12 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
             : slot.FertilizerDisplayName;
     }
 
-    private string OutputChestLabel()
+    private string OutputChestLabel() => _group.OutputDestination switch
     {
-        var chest = _group.OutputChest;
-        return chest is null
-            ? I18nHelper.Get("ui.manage_crops.output_automatic")
-            : I18nHelper.Get("ui.manage_crops.output_chest_at", new { x = chest.Tile.X, y = chest.Tile.Y });
-    }
+        ShippingBinDestination => I18nHelper.Get("ui.zone_chest.shipping_bin_option"),
+        ChestDestination chest => I18nHelper.Get("ui.manage_crops.output_chest_at", new { x = chest.Ref.Tile.X, y = chest.Ref.Tile.Y }),
+        _ => I18nHelper.Get("ui.manage_crops.output_automatic"),
+    };
 
     private static int CountTiles(IEnumerable<Zone> zones) =>
         zones.Sum(zone =>

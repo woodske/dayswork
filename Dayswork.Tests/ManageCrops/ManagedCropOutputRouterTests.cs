@@ -14,7 +14,7 @@ public sealed class ManagedCropOutputRouterTests
         string locationName,
         TileCoord topLeft,
         TileCoord bottomRight,
-        ChestRef? outputChest = null)
+        DestinationKey? outputDestination = null)
     {
         return new CropZoneAssignment(
             new Zone(locationName, topLeft, bottomRight),
@@ -22,7 +22,7 @@ public sealed class ManagedCropOutputRouterTests
                 ? CropAssignmentMode.Seasonal
                 : CropAssignmentMode.SeasonAgnostic,
             new[] { new SeasonCropChoice(Season.Spring, Parsnip()) },
-            outputChest,
+            outputDestination,
             groupId);
     }
 
@@ -48,10 +48,10 @@ public sealed class ManagedCropOutputRouterTests
     }
 
     [Fact]
-    public void BuildDestinationMap_IncludesOnlyAssignmentsWithOutputChest()
+    public void BuildDestinationMap_IncludesOnlyAssignmentsWithOutputDestination()
     {
         var chest = new ChestRef("Farm", new TileCoord(8, 8));
-        var routed = Assignment("group-a", "Farm", new TileCoord(1, 2), new TileCoord(3, 4), chest);
+        var routed = Assignment("group-a", "Farm", new TileCoord(1, 2), new TileCoord(3, 4), new ChestDestination(chest));
         var automatic = Assignment("group-b", "Farm", new TileCoord(5, 6), new TileCoord(7, 8));
 
         var map = ManagedCropOutputRouter.BuildDestinationMap(new[] { routed, automatic });
@@ -63,6 +63,19 @@ public sealed class ManagedCropOutputRouterTests
     }
 
     [Fact]
+    public void BuildDestinationMap_ShippingBin_CreatesShippingBinDestination()
+    {
+        var routed = Assignment("group-a", "Farm", new TileCoord(1, 2), new TileCoord(3, 4), ShippingBinDestination.Instance);
+        var automatic = Assignment("group-b", "Farm", new TileCoord(5, 6), new TileCoord(7, 8));
+
+        var map = ManagedCropOutputRouter.BuildDestinationMap(new[] { routed, automatic });
+
+        var entry = Assert.Single(map);
+        Assert.Equal(ManagedCropOutputRouter.ProvenanceFor(routed), entry.Key);
+        Assert.IsType<ShippingBinDestination>(entry.Value);
+    }
+
+    [Fact]
     public void CropShiftPlanner_HarvestActionsCarryManagedCropProvenance()
     {
         var planner = new CropShiftPlanner();
@@ -71,7 +84,7 @@ public sealed class ManagedCropOutputRouterTests
             "Farm",
             new TileCoord(1, 2),
             new TileCoord(1, 2),
-            new ChestRef("Farm", new TileCoord(8, 8)));
+            new ChestDestination(new ChestRef("Farm", new TileCoord(8, 8))));
         var field = new FieldState(
             "Farm",
             new GameDate(1, Season.Spring, 1),

@@ -29,19 +29,17 @@ public static class ManagedCropOutputRouter
             return new Dictionary<OutputScopeProvenance, DestinationKey>();
 
         return assignments
-            .Where(assignment => assignment.OutputChest is not null)
+            .Where(assignment => assignment.OutputDestination is not null)
             .Select(assignment => new
             {
                 Provenance = ProvenanceFor(assignment),
-                Destination = new ChestDestination(assignment.OutputChest!)
+                Destination = assignment.OutputDestination!
             })
             .GroupBy(entry => entry.Provenance)
             .ToDictionary(
                 group => group.Key,
-                group => (DestinationKey)group
-                    .OrderBy(entry => entry.Destination.Ref.LocationName, StringComparer.Ordinal)
-                    .ThenBy(entry => entry.Destination.Ref.Tile.X)
-                    .ThenBy(entry => entry.Destination.Ref.Tile.Y)
+                group => group
+                    .OrderBy(entry => entry.Destination.ToString(), StringComparer.Ordinal)
                     .First()
                     .Destination);
     }

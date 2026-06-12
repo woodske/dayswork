@@ -43,7 +43,8 @@ public static class CropPlanSerialization
                 .ThenBy(choice => choice.IsLocked)
                 .Select(MapChoiceToDto)
                 .ToList(),
-            OutputChest = assignment.OutputChest is null ? null : MapChestRefToDto(assignment.OutputChest),
+            OutputChest = assignment.OutputDestination is ChestDestination chest ? MapChestRefToDto(chest.Ref) : null,
+            OutputShippingBin = assignment.OutputDestination is ShippingBinDestination,
             GroupId = assignment.GroupId,
         };
 
@@ -61,7 +62,9 @@ public static class CropPlanSerialization
             (dto.Choices ?? throw new JsonException("CropPlan assignment Choices was null."))
                 .Select(MapChoiceToDomain)
                 .ToList(),
-            dto.OutputChest is null ? null : MapChestRefToDomain(dto.OutputChest),
+            dto.OutputShippingBin ? ShippingBinDestination.Instance
+            : dto.OutputChest is null ? null
+            : new ChestDestination(MapChestRefToDomain(dto.OutputChest)),
             dto.GroupId);
     }
 

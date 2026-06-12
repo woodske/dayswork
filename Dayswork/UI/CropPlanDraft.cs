@@ -46,7 +46,7 @@ internal sealed class CropGroupDraft
     public string Id { get; }
     public string LocationName { get; private set; } = "Farm";
     public CropAssignmentMode Mode { get; private set; } = CropAssignmentMode.Seasonal;
-    public ChestRef? OutputChest { get; set; }
+    public DestinationKey? OutputDestination { get; set; }
     public List<Zone> Zones { get; } = new();
 
     public bool HasAnyConfiguredSeason => IsSeasonAgnostic
@@ -204,7 +204,7 @@ internal sealed class CropGroupDraft
             TemplateZone,
             CropAssignmentMode.Seasonal,
             Array.Empty<SeasonCropChoice>(),
-            OutputChest,
+            OutputDestination,
             Id);
 
         foreach (var season in CropPlanDraft.AllSeasons)
@@ -229,7 +229,7 @@ internal sealed class CropGroupDraft
 
         return Zones
             .Select(zone => new Zone(LocationName, zone.TopLeft, zone.BottomRight))
-            .Select(zone => new CropZoneAssignment(zone, Mode, choices, OutputChest, Id))
+            .Select(zone => new CropZoneAssignment(zone, Mode, choices, OutputDestination, Id))
             .ToList()
             .AsReadOnly();
     }
@@ -242,7 +242,7 @@ internal sealed class CropGroupDraft
             ? "Farm"
             : assignment.Zone.LocationName;
         Mode = assignment.Mode;
-        OutputChest = assignment.OutputChest;
+        OutputDestination = assignment.OutputDestination;
 
         foreach (var choice in assignment.Choices.Where(choice => !choice.IsLocked))
         {

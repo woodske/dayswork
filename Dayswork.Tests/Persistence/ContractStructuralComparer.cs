@@ -69,7 +69,7 @@ internal static class ContractStructuralComparer
     private static bool CropAssignmentsEqual(CropZoneAssignment left, CropZoneAssignment right) =>
         left.Zone == right.Zone
         && left.Mode == right.Mode
-        && Equals(left.OutputChest, right.OutputChest)
+        && Equals(left.OutputDestination, right.OutputDestination)
         && left.GroupId == right.GroupId
         && left.Choices.Count == right.Choices.Count
         && left.Choices.Zip(right.Choices, CropChoicesEqual).All(equal => equal);
