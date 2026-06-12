@@ -150,9 +150,10 @@ internal sealed partial class ShiftOrchestrator
                 if (action.Kind == ManagedCropActionKind.ClearDebris && !ShouldClearDebrisTile(action.Tile, location))
                     continue;
 
-                // When supply is missing, skip ground-prep actions (debris clearing for fresh
-                // obstacles, tilling) but keep harvest and water for existing crops, and still
-                // clear dead crops (cleanup, not planting prep).
+                // When supply is missing, skip fresh-obstacle clearing (debris that would need to
+                // be removed before tilling) but keep tilling, harvest, and water for existing
+                // crops, and still clear dead crops (cleanup, not planting prep). Tilling is
+                // always executed so the field is ready before the shopping trip returns.
                 if (skipPrep && IsZonePrepAction(action, location))
                     continue;
 
@@ -311,14 +312,13 @@ internal sealed partial class ShiftOrchestrator
     }
 
     /// <summary>
-    /// True for actions that prepare ground for new planting (fresh-debris clearing and tilling).
+    /// True for actions that prepare ground for new planting and can be deferred when supply is
+    /// missing. Only fresh-obstacle clearing (non-dead-crop <see cref="ManagedCropActionKind.ClearDebris"/>)
+    /// qualifies — tilling is always planned so the field is ready before the shopping trip returns.
     /// Dead-crop clearing is excluded because it's cleanup, not planting prep.
     /// </summary>
     private static bool IsZonePrepAction(TileAction action, GameLocation location)
     {
-        if (action.Kind == ManagedCropActionKind.Till)
-            return true;
-
         return action.Kind == ManagedCropActionKind.ClearDebris
             && !IsDeadCropAtTile(action.Tile, location);
     }
