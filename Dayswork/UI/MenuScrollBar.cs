@@ -1,5 +1,7 @@
+using System.Reflection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using StardewValley;
 using StardewValley.Menus;
 
 namespace Dayswork.UI;
@@ -13,7 +15,14 @@ internal static class MenuScrollBar
     private const int RunnerGap = 4;
     private const int ThumbMinHeight = 40;
 
-    private static readonly ShopMenu.ShopCachedTheme Theme = new(null);
+    // ShopCachedTheme is PC-only — no static field reference; loaded via reflection at runtime.
+    private record struct ScrollTheme(
+        Texture2D UpTex,   Rectangle UpSrc,
+        Texture2D DownTex, Rectangle DownSrc,
+        Texture2D BackTex, Rectangle BackSrc,
+        Texture2D FrontTex, Rectangle FrontSrc);
+
+    private static ScrollTheme? _theme;
 
     public const int Gap = 8;
     public const int ReservedWidth = ArrowWidth + Gap;
@@ -58,11 +67,51 @@ internal static class MenuScrollBar
         var downArrow = GetDownArrowRect(viewportRect);
         var runner = GetRunnerRect(viewportRect);
         var thumb = GetThumbRect(viewportRect, visibleCount, totalCount, scrollIndex);
+        var t = GetTheme();
 
-        DrawScaledTexture(b, Theme.ScrollUpTexture, upArrow, Theme.ScrollUpSourceRect, Color.White);
-        DrawScaledTexture(b, Theme.ScrollDownTexture, downArrow, Theme.ScrollDownSourceRect, Color.White);
-        DrawTiledVertical(b, Theme.ScrollBarBackTexture, Theme.ScrollBarBackSourceRect, runner);
-        DrawTiledVertical(b, Theme.ScrollBarFrontTexture, Theme.ScrollBarFrontSourceRect, thumb);
+        DrawScaledTexture(b, t.UpTex,    upArrow,   t.UpSrc,    Color.White);
+        DrawScaledTexture(b, t.DownTex,  downArrow, t.DownSrc,  Color.White);
+        DrawTiledVertical(b, t.BackTex,  t.BackSrc,  runner);
+        DrawTiledVertical(b, t.FrontTex, t.FrontSrc, thumb);
+    }
+
+    private static ScrollTheme GetTheme()
+    {
+        if (_theme.HasValue) return _theme.Value;
+        _theme = TryLoadViaReflection() ?? BuildCursorsTheme();
+        return _theme.Value;
+    }
+
+    private static ScrollTheme? TryLoadViaReflection()
+    {
+        var type = typeof(ShopMenu).GetNestedType("ShopCachedTheme",
+            BindingFlags.Public | BindingFlags.NonPublic);
+        if (type == null) return null;
+        try
+        {
+            var instance = Activator.CreateInstance(type, new object?[] { null });
+            Texture2D GetTex(string name) => (Texture2D)type.GetProperty(name)!.GetValue(instance)!;
+            Rectangle GetRect(string name) => (Rectangle)type.GetProperty(name)!.GetValue(instance)!;
+            var t = new ScrollTheme(
+                GetTex("ScrollUpTexture"),       GetRect("ScrollUpSourceRect"),
+                GetTex("ScrollDownTexture"),     GetRect("ScrollDownSourceRect"),
+                GetTex("ScrollBarBackTexture"),  GetRect("ScrollBarBackSourceRect"),
+                GetTex("ScrollBarFrontTexture"), GetRect("ScrollBarFrontSourceRect"));
+            return t;
+        }
+        catch { return null; }
+    }
+
+    private static ScrollTheme BuildCursorsTheme()
+    {
+        // Fallback for platforms where ShopCachedTheme is absent (Android).
+        // Rects are standard vanilla Cursors values; run on PC with DevLog.Enabled to verify.
+        var tex = Game1.mouseCursors;
+        return new ScrollTheme(
+            tex, new Rectangle(421, 459, 11, 12),
+            tex, new Rectangle(421, 472, 11, 12),
+            tex, new Rectangle(403, 383, 6,  6),
+            tex, new Rectangle(435, 463, 6, 10));
     }
 
     public static bool TryBeginDrag(
