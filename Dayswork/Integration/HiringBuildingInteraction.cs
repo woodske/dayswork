@@ -21,14 +21,18 @@ internal sealed class HiringBuildingInteraction
     {
         if (!Context.IsPlayerFree || Game1.activeClickableMenu is not null)
             return;
-        if (!e.Button.IsActionButton())
+        // Also accept MouseLeft: on Android gamepadControls=true causes IsActionButton()
+        // to reject touch taps (which fire as SButton.MouseLeft).
+        if (!e.Button.IsActionButton() && e.Button != SButton.MouseLeft)
             return;
         if (MultiplayerGuard.IsMultiplayer())
             return;
         if (Game1.currentLocation is not Farm farm)
             return;
 
-        var grab = e.Cursor.GrabTile;
+        // Use Tile (actual tap position) not GrabTile: on Android, GrabTile snaps to the
+        // nearest reachable tile, which is outside the blocked building footprint.
+        var grab = e.Cursor.Tile;
         var gx = (int)grab.X;
         var gy = (int)grab.Y;
 
