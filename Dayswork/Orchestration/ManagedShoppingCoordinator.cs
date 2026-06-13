@@ -779,6 +779,21 @@ internal sealed class ManagedShoppingCoordinator
         GameLocation target,
         out Queue<RouteHop> route)
     {
+        // Prefer routes with at least one intermediate hop. This prevents a direct
+        // farm-edge shortcut (e.g. Grandpa's Farm right edge → Town at (139,22)) from
+        // winning over the natural bus-stop path just because the worker happened to be
+        // near that edge when shopping was triggered. Fall back to a direct hop only when
+        // no intermediate route exists.
+        return TryBuildRouteCore(source, target, out route, skipDirectToTarget: true)
+            || TryBuildRouteCore(source, target, out route, skipDirectToTarget: false);
+    }
+
+    private bool TryBuildRouteCore(
+        GameLocation source,
+        GameLocation target,
+        out Queue<RouteHop> route,
+        bool skipDirectToTarget)
+    {
         route = new Queue<RouteHop>();
         if (ShiftOrchestrator.SameLocation(source, target))
             return true;
@@ -814,6 +829,11 @@ internal sealed class ManagedShoppingCoordinator
                 if (cameFrom.ContainsKey(nextKey))
                     continue;
 
+                if (skipDirectToTarget
+                    && string.Equals(key, sourceKey, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(nextKey, targetKey, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 locations[nextKey] = edge.Target;
 
                 var arrivalTile = edge.ArrivalTile;
@@ -829,7 +849,8 @@ internal sealed class ManagedShoppingCoordinator
 
         if (!cameFrom.ContainsKey(targetKey))
         {
-            LogRouteUnavailable(source, target, locations);
+            if (!skipDirectToTarget)
+                LogRouteUnavailable(source, target, locations);
             return false;
         }
 
