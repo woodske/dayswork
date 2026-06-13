@@ -94,6 +94,7 @@ Confirmed game content lives under `docs/` so it's looked up once, not re-derive
 data or a decompile, and note where you confirmed it.
 
 - `docs/farm-warps/` — farm entrance/warp + interior-door tiles, vanilla and SVE.
+- `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
 the office building/chest ids in `Dayswork/Integration/HiringBuilding.cs`, the animal-product
