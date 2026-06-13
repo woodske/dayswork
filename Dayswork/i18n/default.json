@@ -209,6 +209,7 @@
     "ui.zone_chest.building_select_hint": "Click a building to include it",
     "ui.zone_chest.session_hint": "Drag to draw a work zone     Click a building to include it",
     "ui.zone_chest.scroll_hint": "Move the cursor to a screen edge to scroll the map",
+    "ui.zone_chest.pan_btn": "Pan",
 
     "ui.schedule.title": "Schedule",
     "ui.schedule.one_time": "One-Time",

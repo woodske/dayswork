@@ -55,7 +55,12 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     // Corner toolbar buttons
     private ClickableComponent _cancelBtn = null!;
     private ClickableComponent _clearBtn  = null!;
+    private ClickableComponent _panBtn    = null!;
     private ClickableComponent _doneBtn   = null!;
+
+    // Pan mode: drag moves the viewport instead of drawing a zone.
+    private bool _isPanMode;
+    private Point _lastDragPx;
 
     public ZoneDrawMenu(
         ContractDraft draft,
@@ -137,26 +142,33 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         // Size every button to fit its label with consistent horizontal padding.
         string cancelLabel = I18nHelper.Get("ui.zone_chest.back_btn");
         string clearLabel  = I18nHelper.Get("ui.zone_chest.clear_zones_btn");
+        string panLabel    = I18nHelper.Get("ui.zone_chest.pan_btn");
         string doneLabel   = I18nHelper.Get("ui.zone_chest.done_drawing_btn");
         int bw = (int)Math.Ceiling(Math.Max(
-            Math.Max(Game1.smallFont.MeasureString(cancelLabel).X,
-                     Game1.smallFont.MeasureString(clearLabel).X),
+            Math.Max(Math.Max(Game1.smallFont.MeasureString(cancelLabel).X,
+                              Game1.smallFont.MeasureString(clearLabel).X),
+                     Game1.smallFont.MeasureString(panLabel).X),
             Game1.smallFont.MeasureString(doneLabel).X)) + 40;
 
         _cancelBtn = new ClickableComponent(
             new Rectangle(pad, by, bw, bh),
-            "Cancel", I18nHelper.Get("ui.zone_chest.back_btn"))
+            "Cancel", cancelLabel)
         { myID = 201, rightNeighborID = 202 };
 
         _clearBtn = new ClickableComponent(
             new Rectangle(pad + bw + 16, by, bw, bh),
-            "Clear", I18nHelper.Get("ui.zone_chest.clear_zones_btn"))
-        { myID = 202, leftNeighborID = 201, rightNeighborID = 200 };
+            "Clear", clearLabel)
+        { myID = 202, leftNeighborID = 201, rightNeighborID = 203 };
+
+        _panBtn = new ClickableComponent(
+            new Rectangle(w - pad - 2 * bw - 16, by, bw, bh),
+            "Pan", panLabel)
+        { myID = 203, leftNeighborID = 202, rightNeighborID = 200 };
 
         _doneBtn = new ClickableComponent(
             new Rectangle(w - pad - bw, by, bw, bh),
-            "Done", I18nHelper.Get("ui.zone_chest.done_drawing_btn"))
-        { myID = 200, leftNeighborID = 202 };
+            "Done", doneLabel)
+        { myID = 200, leftNeighborID = 203 };
     }
 
     private static void CenterViewport(GameLocation loc)
@@ -231,19 +243,37 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private bool IsOverButton(int x, int y) =>
         _cancelBtn.bounds.Contains(x, y) ||
         _clearBtn.bounds.Contains(x, y)  ||
+        _panBtn.bounds.Contains(x, y)    ||
         _doneBtn.bounds.Contains(x, y);
 
     // ── Input ────────────────────────────────────────────────────────────────
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
-        if (_doneBtn.bounds.Contains(x, y))   { DoComplete(); return; }
-        if (_cancelBtn.bounds.Contains(x, y)) { DoCancel();   return; }
-        if (_clearBtn.bounds.Contains(x, y))
+        // Button bounds are in UI-viewport space; use getMouseX(true) so hit-testing matches
+        // the same coordinate system used in update() / IsOverButton.
+        int bx = Game1.getMouseX(true);
+        int by = Game1.getMouseY(true);
+
+        if (_doneBtn.bounds.Contains(bx, by))   { DoComplete(); return; }
+        if (_cancelBtn.bounds.Contains(bx, by)) { DoCancel();   return; }
+        if (_clearBtn.bounds.Contains(bx, by))
         {
             _completedZones.Clear();
             _selectedBuildings.Clear();
             Game1.playSound("trashcan");
+            return;
+        }
+        if (_panBtn.bounds.Contains(bx, by))
+        {
+            _isPanMode = !_isPanMode;
+            Game1.playSound("smallSelect");
+            return;
+        }
+
+        if (_isPanMode)
+        {
+            _lastDragPx = new Point(x, y);
             return;
         }
 
@@ -254,12 +284,21 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
 
     public override void leftClickHeld(int x, int y)
     {
+        if (_isPanMode)
+        {
+            var current = new Point(x, y);
+            PanViewport(-(current.X - _lastDragPx.X), -(current.Y - _lastDragPx.Y));
+            _lastDragPx = current;
+            return;
+        }
+
         if (_dragStart.HasValue)
             _dragCurrent = CursorTile();
     }
 
     public override void releaseLeftClick(int x, int y)
     {
+        if (_isPanMode) return;
         if (!_dragStart.HasValue) return;
 
         var start = _dragStart.Value;
@@ -374,6 +413,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         allClickableComponents.Clear();
         allClickableComponents.Add(_cancelBtn);
         allClickableComponents.Add(_clearBtn);
+        allClickableComponents.Add(_panBtn);
         allClickableComponents.Add(_doneBtn);
     }
 
@@ -411,14 +451,15 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         int total = _completedZones.Count + _selectedBuildings.Count;
         DrawButton(b, _cancelBtn, enabled: true);
         DrawButton(b, _clearBtn,  enabled: total > 0);
+        DrawButton(b, _panBtn,    enabled: true, active: _isPanMode);
         DrawButton(b, _doneBtn,   enabled: true);
 
         drawMouse(b);
     }
 
-    private static void DrawButton(SpriteBatch b, ClickableComponent btn, bool enabled)
+    private static void DrawButton(SpriteBatch b, ClickableComponent btn, bool enabled, bool active = false)
     {
-        var tint     = enabled ? Color.White : Color.Gray;
+        var tint     = active ? Color.LightGreen : (enabled ? Color.White : Color.Gray);
         var textTint = enabled ? Game1.textColor : Color.Gray;
         drawTextureBox(b, btn.bounds.X, btn.bounds.Y, btn.bounds.Width, btn.bounds.Height, tint);
         var textSize = Game1.smallFont.MeasureString(btn.label);
