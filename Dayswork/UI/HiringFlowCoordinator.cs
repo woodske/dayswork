@@ -457,7 +457,8 @@ internal sealed class HiringFlowCoordinator
                 RefreshPreview(draft);
                 ShowZoneAndChest(draft);
             },
-            onCancel: () => ShowZoneAndChest(draft));
+            onCancel: () => ShowZoneAndChest(draft),
+            overlapTogglesSelection: true);
     }
 
     private void ToggleTask(ContractDraft draft, TaskKind task)
