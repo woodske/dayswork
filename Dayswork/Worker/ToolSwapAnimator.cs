@@ -125,6 +125,12 @@ internal sealed class ToolSwapAnimator
 
         switch (tool)
         {
+            case WorkerTool.Hoe:
+                SpawnHeavyToolSwing(facingDirection, toolSpriteSheetY: 16);
+                // makeHoeDirt is called directly (not via Hoe.DoFunction), so the vanilla
+                // "hoeHit" sound never fires — emit it here.
+                _worker.currentLocation.playSound("hoeHit", _worker.Tile);
+                break;
             case WorkerTool.Pickaxe:
                 SpawnHeavyToolSwing(facingDirection, toolSpriteSheetY: 80);
                 // The rock clear path calls Object.performToolAction directly rather than
@@ -136,6 +142,7 @@ internal sealed class ToolSwapAnimator
                 break;
             case WorkerTool.WateringCan:
                 SpawnWateringCanSwing(facingDirection);
+                _worker.currentLocation.playSound("wateringCan", _worker.Tile);
                 break;
             case WorkerTool.Scythe:
                 SpawnSwipeOverlay(facingDirection);

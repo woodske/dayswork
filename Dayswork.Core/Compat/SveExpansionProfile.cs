@@ -4,9 +4,8 @@ namespace Dayswork.Core.Compat;
 
 /// <summary>
 /// Stardew Valley Expanded compatibility profile. This type is the single home for all SVE
-/// identifiers (NFR-SVE-07). In U-SVE-01 the override tables are intentionally empty (BR-SVE-07):
-/// every lookup reports "no override", so behavior is unchanged even with SVE installed. The
-/// entrance, content, work-location, and premium-tier tables are populated by U-SVE-02..04.
+/// identifiers and override data: the entrance, route, and premium-tier tables. A lookup that
+/// reports "no override" leaves the vanilla code path unchanged even with SVE installed.
 /// </summary>
 public sealed class SveExpansionProfile : IExpansionProfile
 {
@@ -52,7 +51,7 @@ public sealed class SveExpansionProfile : IExpansionProfile
     /// Verified per-map worker-entrance overrides, keyed by <see cref="FarmMapSignature"/>.
     /// An entry is added ONLY when manual SVE playtest confirms the existing <c>Farm.warps</c>
     /// heuristic lands the worker at the wrong tile; a farm whose heuristic already works needs no
-    /// entry and falls through to the heuristic (FR-SVE-06 / BR-SVE2-04). The configured tile is a
+    /// entry and falls through to the heuristic. The configured tile is a
     /// preferred spawn point — if it is blocked at spawn time the caller searches outward for the
     /// nearest passable tile (see <c>ShiftOrchestrator.FindFarmExitTile</c>).
     /// Grandpa's Farm (140x93): worker spawns at (112,51), confirmed by playtest.
@@ -119,9 +118,9 @@ public sealed class SveExpansionProfile : IExpansionProfile
     }
 
     // SVE Premium Coop/Barn are upgrades above Deluxe (MaxOccupants 16). They have no dedicated
-    // Dayswork tier; per App Design Q4=A they map to the nearest vanilla tier (Deluxe) for
+    // Dayswork tier; they map to the nearest vanilla tier (Deluxe) for
     // scope/pricing, with no enum or save-schema change. Every other building type → null
-    // (pass-through to the vanilla tier inference). All SVE ids stay in this profile (NFR-SVE-07).
+    // (pass-through to the vanilla tier inference). All SVE ids stay in this profile.
     public AnimalBuildingTier? MapPremiumBuildingTier(string buildingType) => buildingType switch
     {
         PremiumCoopBuildingType => AnimalBuildingTier.DeluxeCoop,

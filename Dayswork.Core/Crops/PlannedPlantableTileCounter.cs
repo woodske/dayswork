@@ -3,11 +3,11 @@ namespace Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
 /// <summary>
-/// Pure helper (U-MC-06, FR-MC-12) that sizes the shift's seed/fertilizer purchase from the
+/// Pure helper that sizes the shift's seed/fertilizer purchase from the
 /// tiles the farmhand <em>plans</em> to plant this shift — independent of how many happen to be
 /// tilled by the time it shops. A fresh untilled zone has no tilled-empty tiles yet, so the
 /// purchase must be sized from all non-cropped tiles the worker intends to till and plant
-/// (plus harvest-and-replant tiles when auto-replant is on), gated by planting viability.
+/// (plus harvest-and-replant tiles for non-regrow crops), gated by planting viability.
 /// </summary>
 public static class PlannedPlantableTileCounter
 {
@@ -20,9 +20,8 @@ public static class PlannedPlantableTileCounter
         if (!isViable)
             return 0;
 
-        // A non-regrow crop's ready tile is harvested first and then replanted the same shift
-        // when auto-replant is on, so it is a planned plantable tile too.
-        var willReplant = choice.AutoReplant && choice.Crop.RegrowDays is null;
+        // Non-regrow crops are harvested and replanted the same shift, so ready tiles count too.
+        var willReplant = choice.Crop.RegrowDays is null;
 
         var count = 0;
         foreach (var tile in field.Tiles)

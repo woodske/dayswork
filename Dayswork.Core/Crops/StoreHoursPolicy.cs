@@ -1,7 +1,7 @@
 namespace Dayswork.Core.Crops;
 
 /// <summary>
-/// Pure, total store-hours policy (U-MC-06, FR-MC-15). Decides whether a store is open at a
+/// Pure, total store-hours policy. Decides whether a store is open at a
 /// given time of day and day of month, and when it opens. Stores open at 9 AM; Pierre's
 /// (SeedShop) is 9 AM–5 PM and closed on Wednesdays; JojaMart is 9 AM–11 PM daily.
 /// Time of day uses Stardew's HHMM clock convention (e.g. 900 = 9:00 AM, 1700 = 5:00 PM).

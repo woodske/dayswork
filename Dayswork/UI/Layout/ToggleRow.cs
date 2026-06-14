@@ -1,7 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
-using StardewValley.Menus;
 
 namespace Dayswork.UI.Layout;
 
@@ -46,9 +45,6 @@ internal sealed class ToggleRow : ILayoutElement
 
     public void Draw(SpriteBatch b)
     {
-        IClickableMenu.drawTextureBox(
-            b, _bounds.X, _bounds.Y, _bounds.Width, _bounds.Height, Color.White);
-
         var checkboxSrc = new Rectangle(_isChecked ? 236 : 227, 425, 9, 9);
         b.Draw(
             Game1.mouseCursors,

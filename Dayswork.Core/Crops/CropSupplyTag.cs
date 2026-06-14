@@ -2,8 +2,8 @@ namespace Dayswork.Core.Crops;
 
 /// <summary>
 /// Authoring-time tag describing how a crop's seeds can be sourced. Display-only in the
-/// Manage Crops authoring UI (U-MC-03); actual purchasing exactness is resolved at runtime
-/// (U-MC-06).
+/// Manage Crops authoring UI; actual purchasing exactness is resolved at runtime
+///.
 /// </summary>
 public enum CropSupplyTag
 {

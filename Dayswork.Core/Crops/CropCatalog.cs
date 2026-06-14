@@ -3,7 +3,7 @@ namespace Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
 /// <summary>
-/// Pure catalog logic for the Manage Crops authoring UI (U-MC-03, Q3=A). Given adapter-supplied
+/// Pure catalog logic for the Manage Crops authoring UI. Given adapter-supplied
 /// <see cref="CropCatalogSource"/> records it produces the deterministic, season-filtered,
 /// supply-tagged, sorted list of <see cref="CropCatalogEntry"/> rows the picker renders. No live
 /// game state is touched here, so the filtering / tagging / ordering is fully testable.
@@ -20,8 +20,7 @@ public static class CropCatalog
     /// </param>
     /// <param name="greenhouse">
     /// When true (greenhouse / Grandpa's Shed), no season filtering is applied — every crop is
-    /// returned (season-agnostic). U-MC-03 always passes false (Q5=A); the flag is plumbed for
-    /// U-MC-07.
+    /// returned (season-agnostic).
     /// </param>
     public static IReadOnlyList<CropCatalogEntry> Build(
         IEnumerable<CropCatalogSource> sources,

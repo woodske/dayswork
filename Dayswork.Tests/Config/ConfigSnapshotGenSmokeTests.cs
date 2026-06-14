@@ -9,7 +9,7 @@ using FsCheck.Xunit;
 public class ConfigSnapshotGenSmokeTests
 {
     [Property(Arbitrary = new[] { typeof(ConfigSnapshotGen) })]
-    public bool Generated_snapshots_satisfy_all_INV_CFG_invariants(IConfigSnapshot s)
+    public bool Generated_snapshots_satisfy_all_INV_CFG_invariants(ConfigSnapshot s)
     {
         return s.HardCapTime >= 1000
             && s.HardCapTime <= 2600

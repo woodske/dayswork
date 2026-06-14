@@ -5,7 +5,7 @@ using Xunit;
 namespace Dayswork.Tests.Orchestration;
 
 /// <summary>
-/// U-SVE-04 / TODO-07: ground animal-product detection is category-based (Egg -5, Animal Goods -18)
+/// Ground animal-product detection is category-based (Egg -5, Animal Goods -18)
 /// with a guaranteed-parity legacy-id include, so vanilla + SVE + future products are all collected.
 /// </summary>
 public sealed class AnimalProductDetectionTests

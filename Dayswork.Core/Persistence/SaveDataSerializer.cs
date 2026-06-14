@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Dayswork.Core.Persistence;
 
-public sealed class SaveDataSerializer : ISaveDataSerializer
+public sealed class SaveDataSerializer
 {
     private const int CurrentSchemaVersion = 3;
 

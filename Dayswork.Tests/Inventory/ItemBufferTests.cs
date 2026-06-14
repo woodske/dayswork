@@ -8,7 +8,7 @@ namespace Dayswork.Tests.Inventory;
 
 public sealed class ItemBufferTests
 {
-    // PBT-U10-03: Snapshot is non-destructive — same items as subsequent TakeAll, buffer still has items after.
+    // Snapshot is non-destructive — same items as subsequent TakeAll, buffer still has items after.
     [Property(MaxTest = 500, Replay = "")]
     public Property Snapshot_Is_NonDestructive()
     {
@@ -26,7 +26,7 @@ public sealed class ItemBufferTests
         });
     }
 
-    // PBT-U10-04: TakeAll preserves total quantity — sum of all added quantities equals sum of taken quantities.
+    // TakeAll preserves total quantity — sum of all added quantities equals sum of taken quantities.
     [Property(MaxTest = 500, Replay = "")]
     public Property TakeAll_Preserves_Total_Quantity()
     {

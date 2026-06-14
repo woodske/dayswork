@@ -2,7 +2,7 @@ namespace Dayswork.Core.Geometry;
 
 using Dayswork.Core.Domain;
 
-public sealed class ZoneGeometry : IZoneGeometry
+public sealed class ZoneGeometry
 {
     public IReadOnlyList<TileCoord> EnumerateTiles(Zone zone)
     {

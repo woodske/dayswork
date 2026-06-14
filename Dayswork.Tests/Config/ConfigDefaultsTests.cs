@@ -10,7 +10,7 @@ public class ConfigDefaultsTests
     [Fact]
     public void Build_returns_non_null_snapshot()
     {
-        IConfigSnapshot snapshot = ConfigDefaults.Build();
+        ConfigSnapshot snapshot = ConfigDefaults.Build();
         Assert.NotNull(snapshot);
     }
 

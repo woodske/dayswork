@@ -44,7 +44,7 @@ public sealed class ShiftPlanBuilderTests
     [Fact]
     public void MixedScopes_GroupEachBuildingsIndoorAndGrazingThenForageThenCrops()
     {
-        // TODO-09: per-building grouping — each building's interior batch is immediately followed by
+        // Per-building grouping — each building's interior batch is immediately followed by
         // that building's grazing pass. No CollectAnimalProducts here, so no FarmForage batch.
         var scopes = Scopes(
             outdoor: new OutdoorWorkScope(new[] { Zone("Farm") }, 1),

@@ -47,10 +47,37 @@ service and the SMAPI event it hangs off is visible there.
    a piece of content, **record it in `docs/` so it never has to be looked up again** (see
    "Verified game-content references"). Treat anything not yet confirmed as unknown.
 
+## Code conventions
+
+- **No ceremony.** Don't add an interface, wrapper class, or single-method "policy"/"evaluator"
+  class unless at least two implementations or call sites need it. Pure stateless logic is a
+  static method. Prefer extending an existing class over creating a new file.
+- **Testing policy.** Tests are *required* for persistence formats/migrations, pricing and money
+  math, and item-routing invariants (items are never lost) — plus a regression test when fixing a
+  bug. Per-feature ritual coverage is not required; the shift engine itself is verified by
+  in-game play-testing (see `DevLog.Enabled` + the `dayswork_*` console commands).
+- **Core placement.** Before adding a game-state snapshot type to Core, check the decision logic
+  is complex enough to justify the reader → planner → executor round trip. A single `if` belongs
+  in `Dayswork/` next to the game call.
+- **Logging.** Two mechanisms — pick the right one:
+  - **Operational logs** (errors, warnings, skip/skip-reason events the player or a bug report
+    would care about): use `ModEntry.ModMonitor.Log(message, DevLog.WarnLevel)`. Always-on;
+    `DevLog.WarnLevel` is `Debug` during dev and `Warn` in release so the same line doesn't spam
+    in dev mode but surfaces clearly in release SMAPI logs.
+  - **Dev-only diagnostic logs** (verbose field state, action counts, internal trace info): use
+    `DevLog.Log(message, level)`. Gated by `DevLog.Enabled` — silent in release builds. Never
+    use `DevLog.Log` for something the player or a support log would need to see.
+
 ## Where things live
 
-- `Dayswork/Orchestration/` — the shift engine (`ShiftOrchestrator.*` partials), day-start
-  scheduler, work scanning, animal handling, routing/navigation.
+- `Dayswork/Orchestration/` — the shift engine. `ShiftOrchestrator.*` partials drive the tick
+  loop and the state-machine transitions; **all mutable per-shift state lives on `ShiftSession`**
+  (created at shift start, discarded at shift end — a fresh session is the reset), which also
+  holds the per-shift `ManagedShoppingCoordinator` (store trips) and `DepositTripRunner`
+  (chest/bin deposit trips). Day-start scheduler, work scanning, and animal handling live
+  alongside. All cross-location movement (building doors, expansion hops, store trips) runs
+  through one primitive: `Travel.cs` (`TravelPlan` + `TravelRunner`), with the completion
+  dispatch in `ShiftOrchestrator.Travel.cs`.
 - `Dayswork/Integration/` — building definition + interaction, persistence, config/GMCM, chest and
   shop resolution.
 - `Dayswork/UI/` — the hub-and-spoke hiring menus + a small layout toolkit (`UI/Layout/`).
@@ -67,6 +94,7 @@ Confirmed game content lives under `docs/` so it's looked up once, not re-derive
 data or a decompile, and note where you confirmed it.
 
 - `docs/farm-warps/` — farm entrance/warp + interior-door tiles, vanilla and SVE.
+- `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
 the office building/chest ids in `Dayswork/Integration/HiringBuilding.cs`, the animal-product

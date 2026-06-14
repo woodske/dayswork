@@ -6,7 +6,7 @@ using FsCheck.Xunit;
 
 namespace Dayswork.Tests.Persistence;
 
-// FsCheck PBT-03 invariants for ContractStore state transitions (Pause / Resume / Cancel).
+// FsCheck invariants for ContractStore state transitions (Pause / Resume / Cancel).
 // The xUnit facts in ContractStoreTests cover the specific behaviors; these properties
 // verify the same invariants hold across the full space of randomly generated contracts.
 public sealed class ContractStoreStateTests
@@ -83,11 +83,11 @@ public sealed class ContractStoreStateTests
                 return store.Get(contract.Id).Status == ContractStatus.Cancelled;
             });
 
-    [Property(Arbitrary = new[] { typeof(U19PersistenceGen) }, MaxTest = 300)]
+    [Property(Arbitrary = new[] { typeof(PersistenceGenerators) }, MaxTest = 300)]
     public Property ReplaceTermsSnapshot_PreservesNonTermsFields() =>
         Prop.ForAll(
-            U19PersistenceGen.CurrentSchemaContract(),
-            U19PersistenceGen.TermsSnapshot(),
+            PersistenceGenerators.CurrentSchemaContract(),
+            PersistenceGenerators.TermsSnapshot(),
             (contract, replacementTerms) =>
             {
                 var store = MakeStore();

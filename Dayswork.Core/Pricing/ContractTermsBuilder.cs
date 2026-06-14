@@ -1,18 +1,19 @@
 namespace Dayswork.Core.Pricing;
 
 using Dayswork.Core.Config;
+using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 
-public sealed class ContractTermsBuilder : IContractTermsBuilder
+public sealed class ContractTermsBuilder
 {
-    private readonly IWorkScopeClassifier _scopeClassifier;
-    private readonly IWorkerEnergyProfileBuilder _energyProfileBuilder;
+    private readonly WorkScopeClassifier _scopeClassifier;
+    private readonly WorkerEnergyProfileBuilder _energyProfileBuilder;
     private readonly ConfigValueResolver _resolver;
 
     public ContractTermsBuilder(
-        IWorkScopeClassifier scopeClassifier,
-        IWorkerEnergyProfileBuilder energyProfileBuilder,
+        WorkScopeClassifier scopeClassifier,
+        WorkerEnergyProfileBuilder energyProfileBuilder,
         ConfigValueResolver resolver)
     {
         _scopeClassifier = scopeClassifier;
@@ -24,7 +25,7 @@ public sealed class ContractTermsBuilder : IContractTermsBuilder
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
         EnergyTier tier,
-        IConfigSnapshot config)
+        ConfigSnapshot config)
     {
         var preview = BuildPreview(selection, enabledTasks, tier, config);
         if (!preview.IsValid || preview.ProposedTerms is null)
@@ -37,9 +38,10 @@ public sealed class ContractTermsBuilder : IContractTermsBuilder
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
         EnergyTier tier,
-        IConfigSnapshot config)
+        ConfigSnapshot config,
+        CropPlan? cropPlan = null)
     {
-        var scopes = _scopeClassifier.Classify(selection, enabledTasks);
+        var scopes = _scopeClassifier.Classify(selection, enabledTasks, cropPlan);
         var issues = BuildValidationIssues(scopes, enabledTasks);
         if (!HasChargeableScopeTaskPair(scopes, enabledTasks))
         {
@@ -111,6 +113,7 @@ public sealed class ContractTermsBuilder : IContractTermsBuilder
         var hasOutdoorPair = scopes.OutdoorWork is not null && enabledTasks.Any(TaskKindSets.IsOutdoorService);
         var hasAnimalPair = scopes.AnimalBuildings.Count > 0 && enabledTasks.Any(TaskKindSets.IsAnimalService);
         var hasGreenhousePair = scopes.GreenhouseWork is not null && enabledTasks.Any(TaskKindSets.IsGreenhouseService);
-        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair;
+        var hasManagedCrops = scopes.ManagedCrops is not null;
+        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair || hasManagedCrops;
     }
 }

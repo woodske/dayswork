@@ -46,7 +46,7 @@ public sealed class BuildingLocationResolverTests
     }
 
     [Theory]
-    // TODO-08: two same-type Coops share Name/type ("Coop") but have distinct unique interior names.
+    // Two same-type Coops share Name/type ("Coop") but have distinct unique interior names.
     // Each unique-name selection must resolve to its own building.
     [InlineData("Coop1bc97e5f", 0)]
     [InlineData("Coopd3136445", 1)]

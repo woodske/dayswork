@@ -17,7 +17,7 @@ internal sealed class ChestResolver
     internal ChestResolver(IModHelper helper) => _helper = helper;
 
     // Returns all accessible chests on the farm and in buildings.
-    // Called once when ZoneAndChestMenu opens — never per frame (NFR-PERF-01).
+    // Called once when ZoneAndChestMenu opens — never per frame.
     internal List<ChestEntry> GetAllChests(GameLocation farm, IReadOnlyList<GreenhouseSelection>? selectedGreenhouses = null)
     {
         var result = new List<ChestEntry>();
@@ -105,7 +105,7 @@ internal sealed class ChestResolver
         return result;
     }
 
-    // Resolves a stored ChestRef to a live Chest. Returns null if the chest was moved or destroyed (FR-HIRE-08).
+    // Resolves a stored ChestRef to a live Chest. Returns null if the chest was moved or destroyed.
     internal Chest? ResolveChest(ChestRef chestRef)
     {
         var location = Game1.getLocationFromName(chestRef.LocationName);
@@ -115,7 +115,7 @@ internal sealed class ChestResolver
         return location.Objects.TryGetValue(tile, out var obj) && obj is Chest chest ? chest : null;
     }
 
-    // Generates i18n-aware display name per FR-HIRE-07.
+    // Generates i18n-aware display name.
     // Uses chest.Name if set by the player; otherwise falls back to "{building} — Chest at {x}, {y}".
     internal string GetDisplayName(Chest chest, GameLocation location, int tileX, int tileY)
     {
@@ -138,7 +138,7 @@ internal sealed class ChestResolver
             // Key the selection by the interior's UNIQUE name (distinct per building instance) so two
             // same-type buildings (two Coops/Barns) are distinct selections and each is serviced.
             // DisplayName stays the building type for premium-tier classification + friendly display.
-            // (U-SVE-04 / TODO-08)
+            //
             result.Add(new BuildingOutline(
                 indoors.NameOrUniqueName,
                 new Rectangle(building.tileX.Value, building.tileY.Value,

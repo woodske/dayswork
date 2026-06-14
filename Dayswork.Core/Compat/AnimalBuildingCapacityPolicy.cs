@@ -2,7 +2,7 @@ namespace Dayswork.Core.Compat;
 
 /// <summary>
 /// Pure derivation of an animal building's feed capacity from its real data, replacing the legacy
-/// hardcoded Deluxe=12 / Big=8 / else=4 ladder (BR-SVE-08/10, pattern P-SVE-06). Total and
+/// hardcoded Deluxe=12 / Big=8 / else=4 ladder. Total and
 /// deterministic: negative inputs are treated as zero, so it never throws.
 /// </summary>
 public sealed class AnimalBuildingCapacityPolicy

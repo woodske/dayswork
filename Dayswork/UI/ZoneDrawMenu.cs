@@ -3,6 +3,7 @@ using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Input.Touch;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
@@ -53,9 +54,28 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private bool _resultDelivered;
 
     // Corner toolbar buttons
-    private ClickableComponent _cancelBtn = null!;
-    private ClickableComponent _clearBtn  = null!;
-    private ClickableComponent _doneBtn   = null!;
+    private ClickableComponent _cancelBtn  = null!;
+    private ClickableComponent _clearBtn   = null!;
+    private ClickableComponent _zoomOutBtn = null!;
+    private ClickableComponent _zoomInBtn  = null!;
+    private ClickableComponent _panBtn     = null!;
+    private ClickableComponent _doneBtn    = null!;
+
+    // Pan mode: drag moves the viewport instead of drawing a zone.
+    private bool _isPanMode;
+    private Point _lastDragPx;
+
+    // Zoom (pan mode only). Extended range beyond the game's own slider (0.75–2.0).
+    private const float ZoomStep = 0.25f;   // per scroll notch / button press
+    private const float MinZoom  = 0.4f;    // below Options.minZoom (0.75) for a full-farm overview
+    private const float MaxZoom  = Options.maxZoom;   // 2.0
+    private float _savedZoom;                // player's zoom, restored on exit
+    // On Android, desiredBaseZoomLevel's getter returns the hardware DPI zoom regardless of what
+    // the setter writes, so the game's update loop reverts baseZoomLevel every frame. We track
+    // the intended zoom here and force baseZoomLevel directly in update() after each revert.
+    private float _effectiveZoom;
+    private bool  _pinchActive;              // two fingers currently down (Android)
+    private float _lastPinchDist;            // previous frame's finger distance
 
     public ZoneDrawMenu(
         ContractDraft draft,
@@ -116,6 +136,9 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         Game1.currentLocation = drawLocation;
         Game1.viewportFreeze  = true;
         Game1.displayHUD      = false;
+        // baseZoomLevel is always accurate (desiredBaseZoomLevel getter is hardware-derived on Android).
+        _savedZoom     = Game1.options.baseZoomLevel;
+        _effectiveZoom = _savedZoom;
         CenterViewport(drawLocation);
 
         _overlay = new ZoneDrawOverlay(this, Game1.game1.GraphicsDevice);
@@ -137,26 +160,49 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         // Size every button to fit its label with consistent horizontal padding.
         string cancelLabel = I18nHelper.Get("ui.zone_chest.back_btn");
         string clearLabel  = I18nHelper.Get("ui.zone_chest.clear_zones_btn");
+        string panLabel    = I18nHelper.Get("ui.zone_chest.pan_btn");
         string doneLabel   = I18nHelper.Get("ui.zone_chest.done_drawing_btn");
         int bw = (int)Math.Ceiling(Math.Max(
-            Math.Max(Game1.smallFont.MeasureString(cancelLabel).X,
-                     Game1.smallFont.MeasureString(clearLabel).X),
+            Math.Max(Math.Max(Game1.smallFont.MeasureString(cancelLabel).X,
+                              Game1.smallFont.MeasureString(clearLabel).X),
+                     Game1.smallFont.MeasureString(panLabel).X),
             Game1.smallFont.MeasureString(doneLabel).X)) + 40;
 
         _cancelBtn = new ClickableComponent(
             new Rectangle(pad, by, bw, bh),
-            "Cancel", I18nHelper.Get("ui.zone_chest.back_btn"))
+            "Cancel", cancelLabel)
         { myID = 201, rightNeighborID = 202 };
 
         _clearBtn = new ClickableComponent(
             new Rectangle(pad + bw + 16, by, bw, bh),
-            "Clear", I18nHelper.Get("ui.zone_chest.clear_zones_btn"))
-        { myID = 202, leftNeighborID = 201, rightNeighborID = 200 };
+            "Clear", clearLabel)
+        { myID = 202, leftNeighborID = 201, rightNeighborID = 204 };
+
+        // Compact +/- zoom buttons (pan mode only), grouped just left of the Pan button.
+        int zbw = bh, zgap = 12;
+        int panX = w - pad - 2 * bw - 16;
+        int zoomInX  = panX - zgap - zbw;
+        int zoomOutX = zoomInX - zgap - zbw;
+
+        _zoomOutBtn = new ClickableComponent(
+            new Rectangle(zoomOutX, by, zbw, bh),
+            "ZoomOut", "-")
+        { myID = 204, leftNeighborID = 202, rightNeighborID = 205 };
+
+        _zoomInBtn = new ClickableComponent(
+            new Rectangle(zoomInX, by, zbw, bh),
+            "ZoomIn", "+")
+        { myID = 205, leftNeighborID = 204, rightNeighborID = 203 };
+
+        _panBtn = new ClickableComponent(
+            new Rectangle(panX, by, bw, bh),
+            "Pan", panLabel)
+        { myID = 203, leftNeighborID = 205, rightNeighborID = 200 };
 
         _doneBtn = new ClickableComponent(
             new Rectangle(w - pad - bw, by, bw, bh),
-            "Done", I18nHelper.Get("ui.zone_chest.done_drawing_btn"))
-        { myID = 200, leftNeighborID = 202 };
+            "Done", doneLabel)
+        { myID = 200, leftNeighborID = 203 };
     }
 
     private static void CenterViewport(GameLocation loc)
@@ -183,6 +229,9 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         Game1.currentLocation = _returnLocation;
         Game1.viewportFreeze  = false;
         Game1.displayHUD      = true;
+        Game1.options.desiredBaseZoomLevel = _savedZoom;
+        Game1.options.baseZoomLevel        = _savedZoom;   // direct restore for Android
+        Game1.game1.refreshWindowSettings();
 
         _helper.Events.Display.RenderedWorld -= _overlay.OnRenderedWorld;
         _overlay.Dispose();
@@ -226,14 +275,81 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             if (rs.LengthSquared() > 0.02f)
                 PanViewport((int)(rs.X * PanSpeed * 1.5f), (int)(-rs.Y * PanSpeed * 1.5f));
         }
+
+        // Android: game.update() reverts baseZoomLevel to the hardware DPI zoom each frame because
+        // desiredBaseZoomLevel's getter ignores what we write. Force our value back here, after the
+        // revert, so the draw phase sees the correct zoom. Skips the call when no zoom change is active.
+        if (Constants.TargetPlatform == GamePlatform.Android &&
+            Math.Abs(Game1.options.baseZoomLevel - _effectiveZoom) > 0.001f)
+        {
+            Game1.options.baseZoomLevel = _effectiveZoom;
+            Game1.game1.refreshWindowSettings();
+        }
+
+        UpdatePinchZoom();
     }
 
     private bool IsOverButton(int x, int y) =>
-        _cancelBtn.bounds.Contains(x, y) ||
-        _clearBtn.bounds.Contains(x, y)  ||
+        _cancelBtn.bounds.Contains(x, y)  ||
+        _clearBtn.bounds.Contains(x, y)   ||
+        _zoomOutBtn.bounds.Contains(x, y) ||
+        _zoomInBtn.bounds.Contains(x, y)  ||
+        _panBtn.bounds.Contains(x, y)     ||
         _doneBtn.bounds.Contains(x, y);
 
+    // ── Zoom ────────────────────────────────────────────────────────────────────
+    // On PC: writing desiredBaseZoomLevel works; game.update() applies it and recomputes the viewport.
+    // On Android: desiredBaseZoomLevel getter returns the hardware DPI zoom regardless of writes, so
+    // the game reverts baseZoomLevel every frame. We track _effectiveZoom separately and force
+    // baseZoomLevel directly in update() after each revert (see Android force block there).
+    private void SetZoom(float target)
+    {
+        float clamped = Math.Clamp(target, MinZoom, MaxZoom);
+        if (Math.Abs(clamped - _effectiveZoom) < 0.001f) return;
+        _effectiveZoom = clamped;
+        Game1.options.desiredBaseZoomLevel = clamped;   // effective on PC; ignored on Android
+    }
+
+    // Discrete zoom (scroll notch / button) — plays a sound when the level actually changes.
+    private void AdjustZoom(float delta)
+    {
+        float before = _effectiveZoom;
+        SetZoom(before + delta);
+        if (Math.Abs(_effectiveZoom - before) > 0.001f)
+            Game1.playSound("smallSelect");
+    }
+
+    // Two-finger pinch zoom (Android). On PC TouchPanel returns no points, so this is inert.
+    // Works in both draw and pan mode; cancels any active zone draw to prevent stray zones.
+    // Kept silent (no sound) to avoid per-frame spam while the fingers move.
+    private void UpdatePinchZoom()
+    {
+        var touches = TouchPanel.GetState();
+        if (touches.Count >= 2)
+        {
+            if (!_pinchActive)
+                _dragStart = null;   // cancel any in-progress zone draw before first pinch frame
+
+            float dist = Vector2.Distance(touches[0].Position, touches[1].Position);
+            if (_pinchActive && _lastPinchDist > 0f)
+                SetZoom(_effectiveZoom * (dist / _lastPinchDist));   // _effectiveZoom accumulates correctly across frames
+            _pinchActive   = true;
+            _lastPinchDist = dist;
+            return;
+        }
+
+        _pinchActive   = false;
+        _lastPinchDist = 0f;
+    }
+
     // ── Input ────────────────────────────────────────────────────────────────
+
+    public override void receiveScrollWheelAction(int direction)
+    {
+        // Android has no scroll wheel; gate here so nothing fires if SMAPI ever routes scroll events.
+        if (Constants.TargetPlatform == GamePlatform.Android) return;
+        AdjustZoom(direction > 0 ? ZoomStep : -ZoomStep);   // wheel up = zoom in
+    }
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
@@ -246,6 +362,21 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             Game1.playSound("trashcan");
             return;
         }
+        if (_panBtn.bounds.Contains(x, y))
+        {
+            _isPanMode = !_isPanMode;
+            Game1.playSound("smallSelect");
+            return;
+        }
+
+        if (_zoomInBtn.bounds.Contains(x, y))  { AdjustZoom(ZoomStep);  return; }
+        if (_zoomOutBtn.bounds.Contains(x, y)) { AdjustZoom(-ZoomStep); return; }
+
+        if (_isPanMode)
+        {
+            _lastDragPx = new Point(x, y);
+            return;
+        }
 
         // Anywhere on the farm: begin a drag (a single-tile click on a building toggles it on release)
         _dragStart   = CursorTile();
@@ -254,12 +385,29 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
 
     public override void leftClickHeld(int x, int y)
     {
+        if (_isPanMode)
+        {
+            // While pinching, the primary finger still fires here — don't pan; keep the anchor
+            // fresh so lifting the second finger doesn't cause a jump.
+            if (_pinchActive)
+            {
+                _lastDragPx = new Point(x, y);
+                return;
+            }
+
+            var current = new Point(x, y);
+            PanViewport(-(current.X - _lastDragPx.X), -(current.Y - _lastDragPx.Y));
+            _lastDragPx = current;
+            return;
+        }
+
         if (_dragStart.HasValue)
             _dragCurrent = CursorTile();
     }
 
     public override void releaseLeftClick(int x, int y)
     {
+        if (_isPanMode) return;
         if (!_dragStart.HasValue) return;
 
         var start = _dragStart.Value;
@@ -374,6 +522,9 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         allClickableComponents.Clear();
         allClickableComponents.Add(_cancelBtn);
         allClickableComponents.Add(_clearBtn);
+        allClickableComponents.Add(_zoomOutBtn);
+        allClickableComponents.Add(_zoomInBtn);
+        allClickableComponents.Add(_panBtn);
         allClickableComponents.Add(_doneBtn);
     }
 
@@ -408,17 +559,25 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         Utility.drawTextWithShadow(b, scroll, Game1.smallFont,
             new Vector2((w - scrollSize.X) / 2f, 24 + box.Height + 6), Color.Wheat);
 
+        string zoomHint = I18nHelper.Get("ui.zone_chest.zoom_hint");
+        var zoomHintSize = Game1.smallFont.MeasureString(zoomHint);
+        Utility.drawTextWithShadow(b, zoomHint, Game1.smallFont,
+            new Vector2((w - zoomHintSize.X) / 2f, 24 + box.Height + 6 + scrollSize.Y + 4), Color.Wheat);
+
         int total = _completedZones.Count + _selectedBuildings.Count;
-        DrawButton(b, _cancelBtn, enabled: true);
-        DrawButton(b, _clearBtn,  enabled: total > 0);
-        DrawButton(b, _doneBtn,   enabled: true);
+        DrawButton(b, _cancelBtn,  enabled: true);
+        DrawButton(b, _clearBtn,   enabled: total > 0);
+        DrawButton(b, _zoomOutBtn, enabled: true);
+        DrawButton(b, _zoomInBtn,  enabled: true);
+        DrawButton(b, _panBtn,     enabled: true, active: _isPanMode);
+        DrawButton(b, _doneBtn,    enabled: true);
 
         drawMouse(b);
     }
 
-    private static void DrawButton(SpriteBatch b, ClickableComponent btn, bool enabled)
+    private static void DrawButton(SpriteBatch b, ClickableComponent btn, bool enabled, bool active = false)
     {
-        var tint     = enabled ? Color.White : Color.Gray;
+        var tint     = active ? Color.LightGreen : (enabled ? Color.White : Color.Gray);
         var textTint = enabled ? Game1.textColor : Color.Gray;
         drawTextureBox(b, btn.bounds.X, btn.bounds.Y, btn.bounds.Width, btn.bounds.Height, tint);
         var textSize = Game1.smallFont.MeasureString(btn.label);

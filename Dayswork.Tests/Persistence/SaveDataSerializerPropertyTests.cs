@@ -11,7 +11,7 @@ public sealed class SaveDataSerializerPropertyTests
 {
     private static SaveDataSerializer CreateSerializer() => new(_ => { });
 
-    [Property(Arbitrary = new[] { typeof(U19PersistenceGen) }, MaxTest = 300)]
+    [Property(Arbitrary = new[] { typeof(PersistenceGenerators) }, MaxTest = 300)]
     public bool RoundTrip_CurrentSchemaContract_IsIdentity(Contract contract)
     {
         var serializer = CreateSerializer();
@@ -20,7 +20,7 @@ public sealed class SaveDataSerializerPropertyTests
         return deserialized.Count == 1 && ContractStructuralComparer.ContractsEqual(contract, deserialized[0]);
     }
 
-    [Property(Arbitrary = new[] { typeof(U19PersistenceGen) }, MaxTest = 300)]
+    [Property(Arbitrary = new[] { typeof(PersistenceGenerators) }, MaxTest = 300)]
     public bool Serialize_Twice_IsDeterministic(Contract contract)
     {
         var serializer = CreateSerializer();
@@ -29,7 +29,7 @@ public sealed class SaveDataSerializerPropertyTests
         return first == second;
     }
 
-    [Property(Arbitrary = new[] { typeof(U19PersistenceGen) }, MaxTest = 300)]
+    [Property(Arbitrary = new[] { typeof(PersistenceGenerators) }, MaxTest = 300)]
     public Property Serialize_ContractOrderingIsCanonical(IReadOnlyList<Contract> contracts)
     {
         if (contracts.Count == 0)
@@ -43,7 +43,7 @@ public sealed class SaveDataSerializerPropertyTests
             .Label($"contracts={string.Join("|", contracts.Select(ContractStructuralComparer.DescribeContract))}");
     }
 
-    [Property(Arbitrary = new[] { typeof(U19PersistenceGen) }, MaxTest = 300)]
+    [Property(Arbitrary = new[] { typeof(PersistenceGenerators) }, MaxTest = 300)]
     public Property MalformedV2Sibling_DoesNotPoisonValidContract(Contract contract)
     {
         var warnings = new List<string>();

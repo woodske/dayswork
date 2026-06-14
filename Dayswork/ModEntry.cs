@@ -25,20 +25,8 @@ public sealed class ModEntry : Mod
     internal static IMonitor ModMonitor { get; private set; } = null!;
     internal static HiringFlowCoordinator Coordinator { get; private set; } = null!;
     internal static ShiftOrchestrator Orchestrator { get; private set; } = null!;
-    // Expansion-compatibility seam (U-SVE-01). Vanilla-by-default; active profile resolved at GameLaunched.
+    // Expansion-compatibility seam. Vanilla-by-default; active profile resolved at GameLaunched.
     internal static ExpansionCompatService ExpansionCompat { get; private set; } = null!;
-
-    // Global Manage Crops preferred store (U-MC-06, DEV-MC-06-01). Read live from the editable config
-    // so a GMCM change applies on the next shift without restart.
-    private static ModConfigManager? _configManager;
-
-    internal static Dayswork.Core.Crops.StorePreference PreferredCropStore =>
-        _configManager?.Editable.PreferredCropStore switch
-        {
-            "Pierre" => Dayswork.Core.Crops.StorePreference.Pierre,
-            "Joja" => Dayswork.Core.Crops.StorePreference.Joja,
-            _ => Dayswork.Core.Crops.StorePreference.Either,
-        };
 
     public override void Entry(IModHelper helper)
     {
@@ -46,9 +34,8 @@ public sealed class ModEntry : Mod
         I18nHelper.Init(helper);
 
         // ── Core singletons (dependency order) ──────────────────────────────
-        var logWarning  = (string msg) => this.Monitor.Log(msg, LogLevel.Warn);
-        var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, LogLevel.Warn));
-        _configManager = configManager;
+        var logWarning  = (string msg) => this.Monitor.Log(msg, DevLog.WarnLevel);
+        var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, DevLog.WarnLevel));
         var config      = configManager.CurrentSnapshot;
         var configResolver = new ConfigValueResolver();
         var workScopeClassifier = new WorkScopeClassifier();
@@ -71,12 +58,12 @@ public sealed class ModEntry : Mod
         var toolReader      = new ToolLevelReader();
         var toolAnimator    = new ToolSwapAnimator();
         var movementDriver  = new WorkerMovementDriver();
-        var workAreaScanner = new WorkAreaScanner(new CapabilityEvaluator());
+        var workAreaScanner = new WorkAreaScanner();
         var indoorScanner   = new IndoorWorkScanner(workAreaScanner);
         var animalHandler   = new AnimalTaskHandler(this.Monitor);
-        var buildingNavigator = new BuildingWorkNavigator(this.Monitor, movementDriver);
+        var buildingNavigator = new BuildingWorkNavigator(this.Monitor);
         var depositPlanner  = new DepositPlanner();
-        // U-25 WS2: missed/overflow items are deposited into the hiring building's static chest and
+        // Missed/overflow items are deposited into the hiring building's static chest and
         // notices are shown as HUD messages — no Mail Framework Mod, no mailbox delivery.
         var shiftOutcomeDispatcher = new ShiftOutcomeDispatcher();
         var orchestrator    = new ShiftOrchestrator(
@@ -99,10 +86,9 @@ public sealed class ModEntry : Mod
             store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, shiftOutcomeDispatcher);
         var gmcmRegistrar = new GMCMRegistrar(helper, this.ModManifest, configManager);
 
-        // ── Expansion compatibility (U-SVE-01) ───────────────────────────────
+        // ── Expansion compatibility ───────────────────────────────
         // Vanilla-by-default seam; the active profile is resolved at GameLaunched (after all mods
-        // load) and assigned below. Consumers are wired in U-SVE-02..04 — this unit only detects,
-        // so behavior is unchanged for vanilla and (with empty SVE tables) for SVE too.
+        // load) and assigned below.
         var vanillaProfile    = new VanillaExpansionProfile();
         var sveProfile        = new SveExpansionProfile();
         var expansionSelector = new ExpansionProfileSelector(new IExpansionProfile[] { sveProfile, vanillaProfile });
@@ -122,8 +108,8 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.SaveLoaded   += cabinChestService.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
         // Stop and settle any in-flight shift (sleep-stop + overflow delivery) BEFORE contracts
-        // persist and before the day rolls over — handler order is authoritative (Pattern S /
-        // REL-U15-02). U-21 BR-END-03 / BR-SLEEP-02 removed refund settlement from this path.
+        // persist and before the day rolls over — handler order is authoritative. Refund
+        // settlement is not part of this path.
         helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;
         helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
@@ -154,13 +140,13 @@ public sealed class ModEntry : Mod
     private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
     {
         // Redirect the placeholder NPC portrait to Marnie's existing texture.
-        // Custom farmhand art is post-v1 (FR-NPC-01).
+        // Custom farmhand art is post-v1.
         if (e.NameWithoutLocale.IsEquivalentTo($"Portraits/{FarmhandNpc.InternalName}"))
             e.LoadFrom(
                 () => Game1.content.Load<Texture2D>(FarmhandNpc.PlaceholderPortraitPath),
                 AssetLoadPriority.Medium);
 
-        // The hiring building's texture + Data/Buildings entry (U-25 WS2).
+        // The hiring building's texture + Data/Buildings entry.
         HiringBuilding.OnAssetRequested(e, this.Helper);
     }
 

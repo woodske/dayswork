@@ -1,41 +1,25 @@
 # Dayswork.Tests
 
-Test project for Dayswork — pure-Core xUnit + FsCheck property-based tests.
+xUnit + FsCheck test project for Dayswork.
 
-## Project purpose
+## What it covers
 
-This project tests `Dayswork.Core` only. It **cannot** reference `Dayswork` (the SMAPI mod project).
-This is enforced at compile time: the `ProjectReference` in `Dayswork.Tests.csproj` points only to
-`Dayswork.Core.csproj`. Any accidental SMAPI coupling is caught as a build error before it reaches CI.
+The suite mostly targets the pure logic in `Dayswork.Core` (pricing, energy, the shift state
+machine, deposit planning, persistence/migration, routing selection), plus the game-free parts of
+the `Dayswork` mod assembly (UI layout toolkit, view-model builders, player-state snapshot
+guards). Because the project references `Dayswork`, building it requires a local Stardew Valley
+install (resolved by `Pathoschild.Stardew.ModBuildConfig`), the same as building the mod itself.
 
 ## Test framework
 
-- **xUnit 2.6.2** — standard unit and integration tests
-- **FsCheck.Xunit 2.16.5** — property-based testing (PBT-09 recommendation for C#/.NET)
+- **xUnit 2.6.2** — standard unit tests
+- **FsCheck.Xunit 2.16.5** — property-based tests
 
-## Where tests live
+## Layout
 
-Test files mirror the `Dayswork.Core/` directory layout:
-
-| Test directory | Tests Core directory |
-|---|---|
-| `Dayswork.Tests/Config/` | `Dayswork.Core/Config/` |
-| `Dayswork.Tests/Pricing/` | `Dayswork.Core/Pricing/` |
-| `Dayswork.Tests/Zones/` | `Dayswork.Core/Zones/` |
-| `Dayswork.Tests/Workers/` | `Dayswork.Core/Workers/` |
-| `Dayswork.Tests/Smoke/` | Framework smoke tests (this unit) |
-
-## Generators (PBT-07)
-
-All FsCheck generators live in `Dayswork.Tests/Generators/`. Foundation units add domain-specific
-generators here as they are built:
-
-| Generator | Added by | Generates |
-|---|---|---|
-| *(empty placeholder)* | U-02 | Establishes the namespace |
-| `ConfigSnapshotGen` | U-03 | `ConfigSnapshot` arbitrary |
-| `ZoneGen`, `TileCoordGen` | U-04 | `Zone`, `TileCoord` arbitraries |
-| `ContractGen` | U-06 | `HireContract` arbitrary |
+Test folders mirror the source layout by behavior (`Pricing/`, `Energy/`, `Inventory/`, `Shifts/`,
+`Scheduling/`, `Routing/`, `Persistence/`, `Geometry/`, `Compat/`, `Config/`, `UI/`, …). Shared
+FsCheck generators live in `Generators/` (anchored by `DaysworkGenerators`).
 
 Reference generators in tests via:
 
@@ -48,12 +32,11 @@ public bool MyProperty(Zone z) { ... }
 Arb.Register<DaysworkGenerators>();
 ```
 
-## Seed logging (PBT-08)
+## Seed logging
 
 FsCheck.Xunit's `[Property]` attribute prints the seed and shrunk minimal failing input on failure
 **automatically** — no custom plumbing required.
 
-Example failure output:
 ```
 Falsifiable, after 23 tests (1 shrink) (StdGen (123456789,987654321)):
 Original: <some complex input>
@@ -67,22 +50,11 @@ To replay a known failure:
 public bool MyProperty(int x) { ... }
 ```
 
-The `Smoke/SeedLoggingDemoTests.cs` file contains a disabled example that demonstrates this
-behavior. Remove the `Skip` attribute and run `dotnet test` to see the seed + shrunk-input output.
+`Smoke/SeedLoggingDemoTests.cs` contains a disabled example — remove its `Skip` attribute to see
+the output.
 
-## Running tests locally
-
-```shell
-dotnet test Dayswork.sln
-```
-
-Or to run only this project:
+## Running tests
 
 ```shell
 dotnet test Dayswork.Tests/Dayswork.Tests.csproj
 ```
-
-## CI (PBT-09)
-
-Build-and-Test wiring is deferred to U-16. The existing test output already includes seed values
-(FsCheck.Xunit default behavior), so the only CI requirement is to capture stdout.

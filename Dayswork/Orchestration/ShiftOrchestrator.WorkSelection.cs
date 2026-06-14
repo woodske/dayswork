@@ -35,62 +35,62 @@ internal sealed partial class ShiftOrchestrator
 
     private void QueueBatchWork(WorkBatch batch, GameLocation location)
     {
-        _ctx!.WorkList.Clear();
+        Session.Ctx.WorkList.Clear();
         foreach (var item in batch.TileWork)
-            _ctx.WorkList.Enqueue(item);
+            Session.Ctx.WorkList.Enqueue(item);
 
-        _animalWork.Clear();
+        Session.AnimalWork.Clear();
         foreach (var item in batch.AnimalWork)
-            _animalWork.Enqueue(item);
+            Session.AnimalWork.Enqueue(item);
 
-        _deferredTileWork.Clear();
-        _deferredAnimalWork.Clear();
-        _currentTileWork = null;
-        _currentAnimalWork = null;
-        _activeBatchSelectionAttempts = 0;
-        _activeBatchMaxSelectionAttempts = Math.Max(4, (batch.TileWork.Count + batch.AnimalWork.Count + 1) * 4);
-        _currentLocation = location;
+        Session.DeferredTileWork.Clear();
+        Session.DeferredAnimalWork.Clear();
+        Session.CurrentTileWork = null;
+        Session.CurrentAnimalWork = null;
+        Session.BatchSelectionAttempts = 0;
+        Session.MaxBatchSelectionAttempts = Math.Max(4, (batch.TileWork.Count + batch.AnimalWork.Count + 1) * 4);
+        Session.CurrentLocation = location;
     }
 
     private void StartNextAnimalOrTileOrAdvance()
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
-        _stuck.Reset();
-        _actionPending = false;
+        Session.Stuck.Reset();
+        Session.ActionPending = false;
 
         if (ShouldWrapUpBeforeNextUnit())
         {
-            QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }
 
-        PruneStaleActiveWork(_currentLocation ?? Game1.getFarm());
+        PruneStaleActiveWork(Session.CurrentLocation ?? Game1.getFarm());
 
-        if (_activeBatchSelectionAttempts++ > _activeBatchMaxSelectionAttempts)
+        if (Session.BatchSelectionAttempts++ > Session.MaxBatchSelectionAttempts)
         {
             ModEntry.ModMonitor.Log(
-                $"[Dayswork][routing] active-batch selection guard fired; skipping remaining blocked work. tile={_ctx.WorkList.Count} animal={_animalWork.Count} deferredTile={_deferredTileWork.Count} deferredAnimal={_deferredAnimalWork.Count}.",
-                LogLevel.Warn);
+                $"[Dayswork][routing] active-batch selection guard fired; skipping remaining blocked work. tile={Session.Ctx.WorkList.Count} animal={Session.AnimalWork.Count} deferredTile={Session.DeferredTileWork.Count} deferredAnimal={Session.DeferredAnimalWork.Count}.",
+                DevLog.WarnLevel);
             ClearRemainingActiveBatchWork();
             CompleteCurrentBatch();
             return;
         }
 
-        if (TrySelectNextActiveWork(_currentLocation ?? Game1.getFarm(), out var candidate, out var selectedRoute))
+        if (TrySelectNextActiveWork(Session.CurrentLocation ?? Game1.getFarm(), out var candidate, out var selectedRoute))
         {
             DispatchSelectedActiveWork(candidate, selectedRoute.InteractionTile);
             return;
         }
 
-        if (_ctx.WorkList.Count > 0 ||
-            _animalWork.Count > 0 ||
-            _deferredTileWork.Count > 0 ||
-            _deferredAnimalWork.Count > 0)
+        if (Session.Ctx.WorkList.Count > 0 ||
+            Session.AnimalWork.Count > 0 ||
+            Session.DeferredTileWork.Count > 0 ||
+            Session.DeferredAnimalWork.Count > 0)
         {
             ModEntry.ModMonitor.Log(
-                $"[Dayswork][routing] no reachable active-batch work remains; skipping blocked work. tile={_ctx.WorkList.Count} animal={_animalWork.Count} deferredTile={_deferredTileWork.Count} deferredAnimal={_deferredAnimalWork.Count}.",
+                $"[Dayswork][routing] no reachable active-batch work remains; skipping blocked work. tile={Session.Ctx.WorkList.Count} animal={Session.AnimalWork.Count} deferredTile={Session.DeferredTileWork.Count} deferredAnimal={Session.DeferredAnimalWork.Count}.",
                 LogLevel.Trace);
             ClearRemainingActiveBatchWork();
         }
@@ -107,28 +107,28 @@ internal sealed partial class ShiftOrchestrator
 
     private bool TryRescanFarmForageBeforeBatchComplete()
     {
-        if (_ctx is null) return false;
-        if (_ctx.CurrentBatchIndex >= _ctx.Batches.Count) return false;
+        if (_session is null) return false;
+        if (Session.Ctx.CurrentBatchIndex >= Session.Ctx.Batches.Count) return false;
 
-        var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
+        var batch = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex];
         if (batch.Kind != BatchKind.FarmForage) return false;
 
         var batchTasks = batch.Tasks.ToHashSet();
         if (!batchTasks.Contains(TaskKind.CollectAnimalProducts)) return false;
 
         // Reset the per-batch re-enqueue guard whenever we start rescanning a different batch.
-        if (_ctx.CurrentBatchIndex != _rescanBatchIndex)
+        if (Session.Ctx.CurrentBatchIndex != Session.RescanBatchIndex)
         {
-            _rescanBatchIndex = _ctx.CurrentBatchIndex;
-            _rescanEnqueuedTiles.Clear();
+            Session.RescanBatchIndex = Session.Ctx.CurrentBatchIndex;
+            Session.RescanEnqueuedTiles.Clear();
         }
 
-        var farm = _currentLocation ?? Game1.getFarm();
+        var farm = Session.CurrentLocation ?? Game1.getFarm();
         var freshTileWork = _workAreaScanner.ScanWholeLocation(
             farm,
             batchTasks,
-            _ctx.ToolSnapshot,
-            _farmExitTile,
+            Session.Ctx.ToolSnapshot,
+            Session.FarmExitTile,
             OutputScopeProvenance.AnimalBuilding(string.Empty));
         if (freshTileWork.Count == 0) return false;
 
@@ -136,12 +136,12 @@ internal sealed partial class ShiftOrchestrator
         // ClearRemainingActiveBatchWork ran above only if there was blocked work; either way,
         // anything we don't already know about is genuinely new.
         var seen = new HashSet<(TaskKind, TileCoord)>();
-        foreach (var item in _ctx.WorkList)
+        foreach (var item in Session.Ctx.WorkList)
             seen.Add((item.Task, item.TaskTile));
-        foreach (var item in _deferredTileWork)
+        foreach (var item in Session.DeferredTileWork)
             seen.Add((item.Task, item.TaskTile));
-        if (_currentTileWork is not null)
-            seen.Add((_currentTileWork.Task, _currentTileWork.TaskTile));
+        if (Session.CurrentTileWork is not null)
+            seen.Add((Session.CurrentTileWork.Task, Session.CurrentTileWork.TaskTile));
 
         var added = 0;
         foreach (var item in freshTileWork)
@@ -149,18 +149,18 @@ internal sealed partial class ShiftOrchestrator
             // Skip tiles this batch's rescan already enqueued once — they were either unreachable or
             // not actually removable, so re-adding them would loop forever (Bug: continuous
             // "rescan picked up 1 new tile item"). Genuinely new forage at fresh tiles still flows.
-            if (!_rescanEnqueuedTiles.Contains(item.TaskTile) &&
+            if (!Session.RescanEnqueuedTiles.Contains(item.TaskTile) &&
                 seen.Add((item.Task, item.TaskTile)))
             {
-                _ctx.WorkList.Enqueue(item);
-                _rescanEnqueuedTiles.Add(item.TaskTile);
+                Session.Ctx.WorkList.Enqueue(item);
+                Session.RescanEnqueuedTiles.Add(item.TaskTile);
                 added++;
             }
         }
         if (added == 0) return false;
 
         // Reset the routing guard so it doesn't immediately fire on the items we just queued.
-        _activeBatchSelectionAttempts = 0;
+        Session.BatchSelectionAttempts = 0;
 
         DevLog.Log($"[Dayswork][farm-forage] pre-completion rescan picked up {added} new tile item(s); batch continues.");
         return true;
@@ -173,7 +173,7 @@ internal sealed partial class ShiftOrchestrator
     {
         var candidates = BuildActiveWorkCandidates(location);
         var evaluated = new List<WorkerRouteCandidate>(candidates.Count);
-        var source = new TileCoord(_farmhand!.TilePoint.X, _farmhand.TilePoint.Y);
+        var source = new TileCoord(Session.Worker!.TilePoint.X, Session.Worker.TilePoint.Y);
         var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
 
         for (var i = 0; i < candidates.Count; i++)
@@ -200,7 +200,7 @@ internal sealed partial class ShiftOrchestrator
         var candidates = new List<ActiveWorkCandidate>();
         var stableOrder = 0;
 
-        foreach (var item in _ctx!.WorkList)
+        foreach (var item in Session.Ctx.WorkList)
         {
             if (!IsTileWorkActionable(item, location))
                 continue;
@@ -214,7 +214,7 @@ internal sealed partial class ShiftOrchestrator
                 StableOrder: stableOrder++));
         }
 
-        foreach (var item in _animalWork)
+        foreach (var item in Session.AnimalWork)
         {
             var animal = _animalHandler.FindLiveAnimal(location, item.Animal);
             if (animal is null || !IsAnimalWorkActionable(item, animal))
@@ -262,7 +262,7 @@ internal sealed partial class ShiftOrchestrator
         routeCandidate = new WorkerRouteCandidate(
             CandidateId: candidateId,
             Task: candidate.Task,
-            PriorityRank: _priorityOrderer.Rank(candidate.Task),
+            PriorityRank: Session.PriorityOrderer.Rank(candidate.Task),
             StableOrder: candidate.StableOrder,
             InteractionTile: bestTile.Value,
             Reachable: true,
@@ -272,17 +272,17 @@ internal sealed partial class ShiftOrchestrator
 
     private void DispatchSelectedActiveWork(ActiveWorkCandidate candidate, TileCoord navTile)
     {
-        var location = _currentLocation ?? Game1.getFarm();
+        var location = Session.CurrentLocation ?? Game1.getFarm();
         if (candidate.TileWork is { } tileWork)
         {
-            RemoveFirstQueued(_ctx!.WorkList, tileWork);
+            RemoveFirstQueued(Session.Ctx.WorkList, tileWork);
             StartNextTileWork(tileWork with { NavTile = navTile });
             return;
         }
 
         if (candidate.AnimalWork is { } animalWork)
         {
-            RemoveFirstQueued(_animalWork, animalWork);
+            RemoveFirstQueued(Session.AnimalWork, animalWork);
             StartAnimalWork(animalWork, navTile, location);
         }
     }
@@ -296,22 +296,22 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        _currentAnimalWork = next;
-        _currentTileWork = null;
-        _pendingTask = next.Task;
-        _pendingNavTile = navTile;
-        _pendingTaskTile = _animalHandler.CurrentTile(animal);
-        _pendingOutputProvenance = next.Provenance;
+        Session.CurrentAnimalWork = next;
+        Session.CurrentTileWork = null;
+        Session.PendingTask = next.Task;
+        Session.PendingNavTile = navTile;
+        Session.PendingTaskTile = _animalHandler.CurrentTile(animal);
+        Session.PendingOutputProvenance = next.Provenance;
         _toolAnimator.StopSwing();
-        _toolAnimator.OnTaskChanged(_pendingTask, next.Task);
+        _toolAnimator.OnTaskChanged(Session.PendingTask, next.Task);
         EnsureWorkingIntent(new IntentMoveToTile(navTile));
-        _nav.StartNavigation(navTile, location, _farmhand!);
+        _nav.StartNavigation(navTile, location, Session.Worker!);
     }
 
     private void PruneStaleActiveWork(GameLocation location)
     {
-        RemoveWhere(_ctx!.WorkList, item => IsTileWorkStale(item, location));
-        RemoveWhere(_animalWork, item =>
+        RemoveWhere(Session.Ctx.WorkList, item => IsTileWorkStale(item, location));
+        RemoveWhere(Session.AnimalWork, item =>
         {
             var animal = _animalHandler.FindLiveAnimal(location, item.Animal);
             return animal is null || !IsAnimalWorkActionable(item, animal);
@@ -326,13 +326,13 @@ internal sealed partial class ShiftOrchestrator
         if (item.Task != TaskKind.FeedAnimals)
             return true;
 
-        if (_currentFeedPlan is null)
+        if (Session.CurrentFeedPlan is null)
             return false;
 
-        if (item.TaskTile == _currentFeedPlan.HopperTile)
-            return _hayInHand <= 0;
+        if (item.TaskTile == Session.CurrentFeedPlan.HopperTile)
+            return Session.HayInHand <= 0;
 
-        return _hayInHand > 0 && IsEmptyTrough(item.TaskTile, location);
+        return Session.HayInHand > 0 && IsEmptyTrough(item.TaskTile, location);
     }
 
     private bool IsTileWorkStale(WorkItem item, GameLocation location)
@@ -340,13 +340,13 @@ internal sealed partial class ShiftOrchestrator
         if (item.Task != TaskKind.FeedAnimals)
             return IsTaskComplete(item.TaskTile, item.Task, location);
 
-        if (_currentFeedPlan is null)
+        if (Session.CurrentFeedPlan is null)
             return true;
 
-        if (item.TaskTile == _currentFeedPlan.HopperTile)
-            return _hayInHand > 0;
+        if (item.TaskTile == Session.CurrentFeedPlan.HopperTile)
+            return Session.HayInHand > 0;
 
-        if (_hayInHand <= 0)
+        if (Session.HayInHand <= 0)
             return false;
 
         return !IsEmptyTrough(item.TaskTile, location);
@@ -369,24 +369,24 @@ internal sealed partial class ShiftOrchestrator
 
     private void RecordActiveBatchProgress()
     {
-        foreach (var item in _deferredTileWork)
-            _ctx!.WorkList.Enqueue(item);
-        foreach (var item in _deferredAnimalWork)
-            _animalWork.Enqueue(item);
+        foreach (var item in Session.DeferredTileWork)
+            Session.Ctx.WorkList.Enqueue(item);
+        foreach (var item in Session.DeferredAnimalWork)
+            Session.AnimalWork.Enqueue(item);
 
-        _deferredTileWork.Clear();
-        _deferredAnimalWork.Clear();
-        _activeBatchSelectionAttempts = 0;
+        Session.DeferredTileWork.Clear();
+        Session.DeferredAnimalWork.Clear();
+        Session.BatchSelectionAttempts = 0;
     }
 
     private void ClearRemainingActiveBatchWork()
     {
-        _ctx!.WorkList.Clear();
-        _animalWork.Clear();
-        _deferredTileWork.Clear();
-        _deferredAnimalWork.Clear();
-        _currentTileWork = null;
-        _currentAnimalWork = null;
+        Session.Ctx.WorkList.Clear();
+        Session.AnimalWork.Clear();
+        Session.DeferredTileWork.Clear();
+        Session.DeferredAnimalWork.Clear();
+        Session.CurrentTileWork = null;
+        Session.CurrentAnimalWork = null;
     }
 
     private static bool RemoveFirstQueued<T>(Queue<T> queue, T value)
@@ -421,10 +421,10 @@ internal sealed partial class ShiftOrchestrator
 
     private void StartNextAnimalWork()
     {
-        while (_animalWork.Count > 0)
+        while (Session.AnimalWork.Count > 0)
         {
-            var next = _animalWork.Dequeue();
-            var location = _currentLocation ?? Game1.getFarm();
+            var next = Session.AnimalWork.Dequeue();
+            var location = Session.CurrentLocation ?? Game1.getFarm();
             var animal = _animalHandler.FindLiveAnimal(location, next.Animal);
             if (animal is null)
                 continue;
@@ -439,15 +439,15 @@ internal sealed partial class ShiftOrchestrator
             if (navTile is null)
                 continue;
 
-            _currentAnimalWork = next;
-            _pendingTask = next.Task;
-            _pendingNavTile = navTile.Value;
-            _pendingTaskTile = _animalHandler.CurrentTile(animal);
-            _pendingOutputProvenance = next.Provenance;
+            Session.CurrentAnimalWork = next;
+            Session.PendingTask = next.Task;
+            Session.PendingNavTile = navTile.Value;
+            Session.PendingTaskTile = _animalHandler.CurrentTile(animal);
+            Session.PendingOutputProvenance = next.Provenance;
             _toolAnimator.StopSwing();
-            _toolAnimator.OnTaskChanged(_pendingTask, next.Task);
+            _toolAnimator.OnTaskChanged(Session.PendingTask, next.Task);
             EnsureWorkingIntent(new IntentMoveToTile(navTile.Value));
-            _nav.StartNavigation(navTile.Value, location, _farmhand!);
+            _nav.StartNavigation(navTile.Value, location, Session.Worker!);
             return;
         }
 
@@ -456,16 +456,16 @@ internal sealed partial class ShiftOrchestrator
 
     private void StartNextTileWork(WorkItem next)
     {
-        var previousTask = _pendingTask;
-        _pendingTask = next.Task;
-        _pendingNavTile = next.NavTile;
-        _pendingTaskTile = next.TaskTile;
-        _pendingOutputProvenance = next.Provenance ?? OutputScopeProvenance.Unknown;
-        _currentTileWork = next;
-        _currentAnimalWork = null;
+        var previousTask = Session.PendingTask;
+        Session.PendingTask = next.Task;
+        Session.PendingNavTile = next.NavTile;
+        Session.PendingTaskTile = next.TaskTile;
+        Session.PendingOutputProvenance = next.Provenance ?? OutputScopeProvenance.Unknown;
+        Session.CurrentTileWork = next;
+        Session.CurrentAnimalWork = null;
         _toolAnimator.StopSwing();
         _toolAnimator.OnTaskChanged(previousTask, next.Task);
         EnsureWorkingIntent(new IntentMoveToTile(next.NavTile));
-        _nav.StartNavigation(next.NavTile, _currentLocation ?? Game1.getFarm(), _farmhand!);
+        _nav.StartNavigation(next.NavTile, Session.CurrentLocation ?? Game1.getFarm(), Session.Worker!);
     }
 }

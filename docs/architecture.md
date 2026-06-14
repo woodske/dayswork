@@ -20,7 +20,11 @@ and uses **zero Harmony patches** — everything is driven by SMAPI events.
   having no `ModBuildConfig` package reference). Holds capabilities, pricing, energy, the shift
   state machine, the work-batch planner, inventory/deposit planning, and persistence DTOs.
   Anything testable without the game lives here.
-- **`Dayswork.Tests/`** — xUnit tests, mostly against Core.
+- **`Dayswork.Tests/`** — xUnit + FsCheck tests covering Core *and* the game-free parts of
+  `Dayswork` (UI layout toolkit, view-model builders, player-state snapshot guards). Building it
+  requires a local Stardew install, same as the mod. Testing policy lives in `AGENTS.md` ("Code
+  conventions"): persistence formats, pricing/money, and item-routing invariants must be tested;
+  per-feature ritual coverage is not required.
 - **`docs/`** — reference docs (this file; `farm-warps/` documents per-farm entrance/warp tiles
   for vanilla + SVE).
 
@@ -66,9 +70,30 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 
 ### Orchestration (`Dayswork/Orchestration/`) — the shift loop
 - **`ShiftOrchestrator`** (partial across `.cs`, `.WorkSelection`, `.TaskActions`, `.Movement`,
-  `.Routing`, `.Deposit`, `.Debris`, `.ManagedCrops`, `.ManagedCropShopping`) — the engine.
-  Owns the `ShiftContext`, the work batches, the per-tick intent dispatch, energy spend, deposits,
-  stuck recovery, and overflow settlement.
+  `.Routing`, `.Travel`, `.Deposit`, `.Debris`, `.ManagedCrops`) — the engine: per-tick intent
+  dispatch, work-batch selection, energy spend, stuck recovery, and the state-machine
+  transitions. The orchestrator itself holds only long-lived services plus one nullable
+  `ShiftSession` reference.
+- **`ShiftSession`** — all mutable per-shift state in one object (the Core `ShiftContext`, the
+  worker NPC, current location, action/batch/travel/managed-crop state). Created by `StartShift`
+  once spawn succeeds and discarded when the shift ends — constructing a fresh session IS the
+  per-shift reset.
+- **`ManagedShoppingCoordinator`** (held by the session) — the managed-crop shopping trip: builds
+  the purchase plan from the input-chest shortfall, walks the worker to Pierre's/Joja (waiting
+  out a closed store), buys at the counter one line item per animation beat (paced by
+  `WorkerActionAnimationMs`, playing `"purchaseClick"` each beat), and settles purchases into the
+  input chest. Travel legs run through the shared travel primitive with `TravelPurpose.ShoppingStep`.
+- **`DepositTripRunner`** (held by the session) — executes the planned deposit trips
+  chest-by-chest with per-stack beat pacing, re-checking the chest mutex per stack, and routes
+  every failure (chest missing/busy/full, unreachable destination) to the shift overflow.
+- **`Travel.cs` (`TravelPlan`/`TravelLeg`/`TravelRunner`)** — the single cross-location mover.
+  A plan is an ordered list of legs (walk to a tile, then optionally warp through to another
+  location); the runner drives it tick-by-tick. Building doors, SVE expansion hops, store entries,
+  and deposit-building trips are all just plans; `ShiftOrchestrator.Travel.cs` holds the
+  `TravelPurpose` dispatch (what to do when a travel arrives or fails) and the plan builders.
+  Each plan carries a failure policy: `ReportFailure` (caller decides: skip batch, mark trip
+  undelivered, abort shopping) or `WarpToDestination` (never strand the worker — warp straight to
+  the destination and continue).
 - **`RecurringContractScheduler`** — `DayStarted` hook: for each contract due today, handles
   festival skips, recurring-terms refresh + affordability, charges the player, and calls
   `StartShift`.
@@ -77,11 +102,11 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 - **`SessionResetHandler`** — clears in-memory worker runtime on `SaveLoaded` / `ReturnedToTitle`.
 - **`WorkAreaScanner`** — scans zones/whole locations into `WorkItem`s, applying tool-capability
   skip rules and computing navigation stand-tiles. **`AnimalTaskHandler`** enumerates animals and
-  performs feed/pet/collect. **`BuildingWorkNavigator`** / **`CrossLocationRouteNavigator`** handle
-  interior door crossings and expansion-location routes.
+  performs feed/pet/collect. **`BuildingWorkNavigator`** resolves building door / interior entry /
+  exit-approach tiles (a pure resolver — it never moves the worker).
 
 ### Core (`Dayswork.Core/`)
-- **Capabilities** — `CapabilityMatrix`/`CapabilityEvaluator`: the tool-level skip table.
+- **Capabilities** — `CapabilityMatrix`: the static tool-level skip table.
 - **Pricing/Energy** — `ContractTermsBuilder` (validates scope×task pairs, prices the tier,
   builds the energy profile); `WorkerEnergyLedger` spends energy per beat.
 - **Shifts** — `ShiftStateMachine`, `ShiftPlanBuilder` (orders the day's batches),
@@ -212,7 +237,7 @@ is ever added — none is planned, so don't grow this further without that trigg
 dropped as a goal, collapse it to the nullable-field form. **SVE stays a soft/optional dependency**
 (runtime-detected, never in `manifest.json`).
 
-Speculative seams built for never-shipped "U-SVE-04" units (`TryClassifyContentOverride`,
+Speculative seams built for never-shipped expansion features (`TryClassifyContentOverride`,
 `FarmMapModIds`, `IsExpansionWorkLocation`, and the `ContentDescriptor`/`WorkClassification` types)
 were pruned — they had zero real consumers; live "is this an expansion location" checks go through
 `TryGetExpansionLocationDescriptor` / `IsExpansionDepositLocation`.

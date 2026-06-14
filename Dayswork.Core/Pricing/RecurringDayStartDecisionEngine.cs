@@ -5,20 +5,20 @@ using Dayswork.Core.Domain;
 
 public sealed class RecurringDayStartDecisionEngine
 {
-    private readonly IContractTermsBuilder _termsBuilder;
+    private readonly ContractTermsBuilder _termsBuilder;
 
-    public RecurringDayStartDecisionEngine(IContractTermsBuilder termsBuilder)
+    public RecurringDayStartDecisionEngine(ContractTermsBuilder termsBuilder)
     {
         _termsBuilder = termsBuilder;
     }
 
     public RecurringDayStartOutcome Evaluate(
         Contract contract,
-        IConfigSnapshot config,
+        ConfigSnapshot config,
         bool festivalToday,
         int availableGold)
     {
-        var preview = _termsBuilder.BuildPreview(contract.ScopeSelection, contract.EnabledTasks, contract.Tier, config);
+        var preview = _termsBuilder.BuildPreview(contract.ScopeSelection, contract.EnabledTasks, contract.Tier, config, contract.CropPlan);
         if (!preview.IsValid || preview.ProposedTerms is null)
         {
             return new RecurringDayStartOutcome(

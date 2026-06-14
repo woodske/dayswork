@@ -1,5 +1,6 @@
 using Dayswork.Core.Crops;
 using Dayswork.Core.Capabilities;
+using Dayswork.Core.Compat;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
@@ -25,81 +26,82 @@ internal sealed partial class ShiftOrchestrator
     private readonly ShiftSupplyAggregator _shiftSupplyAggregator = new();
     private readonly PurchaseAffordabilityCalculator _purchaseAffordability = new();
 
-    // Managed-crop batch execution state. A single ordered queue of per-tile beats produced by the
+    // Managed-crop batch execution: a single ordered queue of per-tile beats produced by the
     // pure CropShiftPlanner (harvest → clear → till → fertilize → seed → water), executed one beat
-    // at a time through the existing tick/intent loop.
-    private readonly Queue<TileAction> _managedActions = new();
-    private TileAction? _currentManagedAction;
-    private bool _managedActive;
-
-    // Re-plan support: the managed plan is snapshotted from the live field, so a tile that is debris
-    // at snapshot only gets a ClearDebris action this pass. Once the queue drains we re-read the field
-    // and re-plan, so newly-cleared tiles get tilled/planted on a following pass (clear -> till ->
-    // fertilize -> seed -> water across passes). Bounded by a pass cap + a no-progress signature
-    // check so un-clearable debris cannot loop forever.
+    // at a time through the existing tick/intent loop. The queue and its state live on the session.
+    //
+    // Per-tile sweep: ClearDebris and Till are both queued for each tile in a single planning pass.
+    // The sort order (Y → X → ActionRank) guarantees clear precedes till for the same tile.
+    // IsManagedActionApplicable guards the Till if debris still remains (multi-hit case).
+    // Multi-hit debris (e.g. tree → stump → gone) is handled by an inline retry in
+    // HandleManagedCropAction that re-applies ClearDebris in place until the tile is fully clear.
+    //
+    // Re-plan support: preserved as a safety net. Bounded by a pass cap + a no-progress signature
+    // check so un-clearable debris cannot loop forever. At batch end, zones with persistent debris
+    // (tiles that could not be cleared despite all retries and re-plans) fire a HUD warning.
     private const int MaxManagedReplans = 8;
-    private List<Dayswork.Core.Crops.CropZoneAssignment> _managedAssignments = new();
-    private int _managedReplanCount;
-    private string _lastManagedSignature = string.Empty;
-    private string _managedBatchLocationName = "Farm";
 
-    // Plan-level toggles (FR-MC-26/27). DEV-MC-05-01: honored at their default-ON behavior this
-    // unit; the configurable OFF switch (GMCM/per-plan) is deferred to a follow-up.
+    // Plan-level toggles, fixed at their default-ON behavior for now; a configurable OFF switch
+    // (GMCM/per-plan) is deferred to a follow-up.
     private const bool _clearDebrisBeforeTilling = true;
     private const bool _clearDeadPlants = true;
 
     private void ResetManagedCropState()
     {
-        _managedActions.Clear();
-        _currentManagedAction = null;
-        _managedActive = false;
-        _managedAssignments = new();
-        _managedReplanCount = 0;
-        _lastManagedSignature = string.Empty;
-        _managedBatchLocationName = "Farm";
-        ResetManagedShoppingState();
+        if (_session is { } s)
+        {
+            s.ManagedActions.Clear();
+            s.CurrentManagedAction = null;
+            s.ManagedActive = false;
+            s.ManagedAssignments = new();
+            s.ManagedReplanCount = 0;
+            s.LastManagedSignature = string.Empty;
+            s.ManagedBatchLocationName = "Farm";
+        }
+
+        _session?.Shopping.ResetState();
     }
 
     private static bool IsManagedCropBatch(WorkBatch batch) => batch.Kind == BatchKind.ManagedCrops;
 
     private void BeginManagedCropBatch(WorkBatch batch)
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
         ResetManagedCropState();
 
-        _managedBatchLocationName = batch.LocationName;
+        Session.ManagedBatchLocationName = batch.LocationName;
         var activeLocation = ResolveManagedBatchLocation(batch.LocationName);
         if (activeLocation is null)
         {
-            DevLog.Log($"[Dayswork][managed-crops] skipped batch={batch.LocationName} reason=location_unavailable.", LogLevel.Warn);
-            _ctx.CurrentBatchIndex++;
+            DevLog.Log($"[Dayswork][managed-crops] skipped batch={batch.LocationName} reason=location_unavailable.", DevLog.WarnLevel);
+            Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
         }
 
-        _currentLocation = activeLocation;
+        Session.CurrentLocation = activeLocation;
 
-        _managedAssignments = (_ctx.WorkScopes.ManagedCrops?.Assignments ?? Array.Empty<CropZoneAssignment>())
+        Session.ManagedAssignments = (Session.Ctx.WorkScopes.ManagedCrops?.Assignments ?? Array.Empty<CropZoneAssignment>())
             .Where(assignment => string.Equals(assignment.Zone.LocationName, batch.LocationName, StringComparison.Ordinal))
             .ToList();
 
-        if (_managedAssignments.Count == 0)
+        if (Session.ManagedAssignments.Count == 0)
         {
-            _ctx.CurrentBatchIndex++;
+            Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
         }
 
         var actions = BuildManagedActions(logDetail: true);
         foreach (var action in actions)
-            _managedActions.Enqueue(action);
-        _lastManagedSignature = Signature(actions);
+            Session.ManagedActions.Enqueue(action);
+        Session.LastManagedSignature = Signature(actions);
 
-        DevLog.Log($"[Dayswork][managed-crops] batch={batch.LocationName} zones={_managedAssignments.Count} actions={_managedActions.Count}.", LogLevel.Info);
+        DevLog.Log($"[Dayswork][managed-crops] batch={batch.LocationName} zones={Session.ManagedAssignments.Count} actions={Session.ManagedActions.Count}.", LogLevel.Info);
 
-        _managedActive = true;
+        Session.ManagedActive = true;
         StartNextManagedAction();
     }
 
@@ -110,7 +112,7 @@ internal sealed partial class ShiftOrchestrator
     /// </summary>
     private List<TileAction> BuildManagedActions(bool logDetail)
     {
-        var location = _currentLocation ?? ResolveManagedBatchLocation(_managedBatchLocationName) ?? Game1.getFarm();
+        var location = Session.CurrentLocation ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName) ?? Game1.getFarm();
         var date = CurrentManagedGameDate();
         var isFestival = Utility.isFestivalDay(date.Day, Game1.season);
         var inputChest = TryGetInputChest();
@@ -118,7 +120,7 @@ internal sealed partial class ShiftOrchestrator
         var fieldState = _cropFieldReader.Read(
             location,
             date,
-            _managedAssignments,
+            Session.ManagedAssignments,
             IsCurrentManagedBatchSeasonAgnostic());
 
         if (logDetail)
@@ -128,7 +130,7 @@ internal sealed partial class ShiftOrchestrator
                 LogLevel.Info);
 
         var actions = new List<TileAction>();
-        foreach (var assignment in _managedAssignments)
+        foreach (var assignment in Session.ManagedAssignments)
         {
             var plan = _cropShiftPlanner.Plan(
                 assignment,
@@ -136,13 +138,25 @@ internal sealed partial class ShiftOrchestrator
                 supply,
                 stockSnapshots: null,
                 isFestivalDay: isFestival,
-                storePreferenceOverride: ModEntry.PreferredCropStore);
+                storePreferenceOverride: Session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
+                    ? StorePreference.Joja : StorePreference.Pierre);
+
+            var skipPrep = ShouldSkipZonePrep(assignment, fieldState, supply, plan);
+
             foreach (var action in plan.AllActions)
             {
-                // Honor the plan-level toggles: skip debris/dead-plant clearing when disabled
-                // (FR-MC-26/27). A skipped debris tile is simply not tilled/planted this shift.
+                // Honor the plan-level toggles: skip debris/dead-plant clearing when disabled.
+                // A skipped debris tile is simply not tilled/planted this shift.
                 if (action.Kind == ManagedCropActionKind.ClearDebris && !ShouldClearDebrisTile(action.Tile, location))
                     continue;
+
+                // When supply is missing, skip fresh-obstacle clearing (debris that would need to
+                // be removed before tilling) but keep tilling, harvest, and water for existing
+                // crops, and still clear dead crops (cleanup, not planting prep). Tilling is
+                // always executed so the field is ready before the shopping trip returns.
+                if (skipPrep && IsZonePrepAction(action, location))
+                    continue;
+
                 actions.Add(action);
             }
 
@@ -151,10 +165,10 @@ internal sealed partial class ShiftOrchestrator
                 DevLog.Log(
                     $"[Dayswork][managed-crops] zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}) " +
                     $"choice={(assignment.Choices.FirstOrDefault()?.Crop.SeedItemId ?? "none")} requiresFert={assignment.Choices.FirstOrDefault()?.Crop.RequiresFertilizer} " +
-                    $"independent={plan.SupplyIndependentActions.Count} dependent={plan.SupplyDependentActions.Count}.",
+                    $"independent={plan.SupplyIndependentActions.Count} dependent={plan.SupplyDependentActions.Count} skipPrep={skipPrep}.",
                     LogLevel.Info);
-                NotifyFertilizerUnavailable(assignment, fieldState, supply, plan);
-                NotifyCropNotViable(assignment, fieldState);
+                if (!skipPrep)
+                    NotifyCropNotViable(assignment, fieldState);
             }
         }
 
@@ -191,6 +205,19 @@ internal sealed partial class ShiftOrchestrator
         }
     }
 
+    private static string ResolveItemDisplayName(string itemId)
+    {
+        try
+        {
+            var qualified = ItemRegistry.QualifyItemId(itemId) ?? itemId;
+            var data = ItemRegistry.GetDataOrErrorItem(qualified);
+            if (!string.IsNullOrWhiteSpace(data.DisplayName))
+                return data.DisplayName;
+        }
+        catch { }
+        return itemId;
+    }
+
     private static string ResolveCropDisplayName(CropDescriptor crop)
     {
         // Prefer the harvested crop's display name (e.g. "Cucumber"); fall back to the seed, then id.
@@ -222,7 +249,7 @@ internal sealed partial class ShiftOrchestrator
     /// </summary>
     private bool TryReplanManagedBatch()
     {
-        if (_ctx is null || _managedReplanCount >= MaxManagedReplans)
+        if (_session is null || Session.ManagedReplanCount >= MaxManagedReplans)
             return false;
 
         var actions = BuildManagedActions(logDetail: false);
@@ -230,15 +257,15 @@ internal sealed partial class ShiftOrchestrator
             return false;
 
         var signature = Signature(actions);
-        if (signature == _lastManagedSignature)
+        if (signature == Session.LastManagedSignature)
             return false;
 
-        _lastManagedSignature = signature;
-        _managedReplanCount++;
+        Session.LastManagedSignature = signature;
+        Session.ManagedReplanCount++;
         foreach (var action in actions)
-            _managedActions.Enqueue(action);
+            Session.ManagedActions.Enqueue(action);
 
-        DevLog.Log($"[Dayswork][managed-crops] re-plan pass={_managedReplanCount} actions={actions.Count}.", LogLevel.Info);
+        DevLog.Log($"[Dayswork][managed-crops] re-plan pass={Session.ManagedReplanCount} actions={actions.Count}.", LogLevel.Info);
         return true;
     }
 
@@ -247,58 +274,126 @@ internal sealed partial class ShiftOrchestrator
             .Select(a => $"{a.LocationName}|{a.Tile.X}|{a.Tile.Y}|{a.Kind}|{a.ItemId}")
             .OrderBy(s => s, StringComparer.Ordinal));
 
-    private void NotifyFertilizerUnavailable(
+    /// <summary>
+    /// True when the zone has viable open tiles to plant but no supply (seed or fertilizer) is
+    /// available in the input chest. Used to skip ground-prep actions that would be wasted.
+    /// </summary>
+    private bool ShouldSkipZonePrep(
         CropZoneAssignment assignment,
         FieldState fieldState,
         SupplyInventory supply,
         ManagedCropShiftPlan plan)
     {
+        // If the planner queued at least one planting action, supply is sufficient.
+        if (plan.SupplyDependentActions.Count > 0)
+            return false;
+
         var choice = assignment.Mode == CropAssignmentMode.SeasonAgnostic
             ? assignment.Choices.FirstOrDefault()
             : assignment.Choices.FirstOrDefault(c => c.Season == fieldState.Date.Season);
+        if (choice is null)
+            return false;
 
-        if (choice is null || !choice.Crop.RequiresFertilizer)
+        // Crop-not-viable is handled separately; don't conflate the two skip reasons.
+        if (!_viability.IsPlantingViable(fieldState, choice.Crop, choice.Crop.RequiresFertilizer))
+            return false;
+
+        // No open tiles means nothing to prep regardless of supply state.
+        var zone = assignment.Zone;
+        var hasOpenTiles = fieldState.Tiles.Any(t =>
+            t.CanAcceptSeed
+            && t.Tile.X >= zone.TopLeft.X && t.Tile.X <= zone.BottomRight.X
+            && t.Tile.Y >= zone.TopLeft.Y && t.Tile.Y <= zone.BottomRight.Y);
+        if (!hasOpenTiles)
+            return false;
+
+        // Viable zone with open tiles but zero supply-dependent actions → seed or fertilizer missing.
+        return true;
+    }
+
+    /// <summary>
+    /// True for actions that prepare ground for new planting and can be deferred when supply is
+    /// missing. Only fresh-obstacle clearing (non-dead-crop <see cref="ManagedCropActionKind.ClearDebris"/>)
+    /// qualifies — tilling is always planned so the field is ready before the shopping trip returns.
+    /// Dead-crop clearing is excluded because it's cleanup, not planting prep.
+    /// </summary>
+    private static bool IsZonePrepAction(TileAction action, GameLocation location)
+    {
+        return action.Kind == ManagedCropActionKind.ClearDebris
+            && !IsDeadCropAtTile(action.Tile, location);
+    }
+
+    private static bool IsDeadCropAtTile(TileCoord tile, GameLocation location)
+    {
+        var vec = new Vector2(tile.X, tile.Y);
+        return location.terrainFeatures.TryGetValue(vec, out var tf)
+            && tf is HoeDirt dirt && dirt.crop is not null && dirt.crop.dead.Value;
+    }
+
+    private void NotifyZoneSkipped(
+        CropZoneAssignment assignment,
+        FieldState fieldState,
+        SupplyInventory supply)
+    {
+        var choice = assignment.Mode == CropAssignmentMode.SeasonAgnostic
+            ? assignment.Choices.FirstOrDefault()
+            : assignment.Choices.FirstOrDefault(c => c.Season == fieldState.Date.Season);
+        if (choice is null)
             return;
 
-        // The zone configures a fertilizer but none is on hand (no shopping this unit), so the
-        // atomicity gate planted nothing. Fire one notice for the zone (FR-MC-22).
-        var hasFertilizer = supply.QuantityOf(choice.Crop.FertilizerItemId!) > 0;
-        var hasSeedCandidates = plan.SupplyDependentActions.Count > 0;
-        if (!hasFertilizer && !hasSeedCandidates)
-            CropHudNotifier.FertilizerUnavailable();
+        var zone = assignment.Zone;
+        var cropName = ResolveCropDisplayName(choice.Crop);
+
+        var zoneLabel = assignment.GroupId ?? $"{zone.TopLeft.X},{zone.TopLeft.Y}";
+        if (choice.Crop.RequiresFertilizer && supply.QuantityOf(choice.Crop.FertilizerItemId!) <= 0)
+        {
+            var fertName = ResolveItemDisplayName(choice.Crop.FertilizerItemId!);
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Crop group '{zoneLabel}' skipped — {fertName} not in chest or store.",
+                DevLog.WarnLevel);
+            CropHudNotifier.ZoneSkippedNoFertilizer(zoneLabel, fertName);
+        }
+        else if (supply.QuantityOf(choice.Crop.SeedItemId) <= 0)
+        {
+            var seedName = ResolveItemDisplayName(choice.Crop.SeedItemId);
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Crop group '{zoneLabel}' skipped — {seedName} not in chest or store.",
+                DevLog.WarnLevel);
+            CropHudNotifier.ZoneSkippedNoSeed(zoneLabel, seedName);
+        }
     }
 
     private void StartNextManagedAction()
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
-        _stuck.Reset();
-        _actionPending = false;
+        Session.Stuck.Reset();
+        Session.ActionPending = false;
 
         if (ShouldWrapUpBeforeNextUnit())
         {
-            if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: true))
+            if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: true))
                 return;
 
-            QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }
 
-        var location = _currentLocation ?? ResolveManagedBatchLocation(_managedBatchLocationName) ?? Game1.getFarm();
+        var location = Session.CurrentLocation ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName) ?? Game1.getFarm();
 
-        while (_managedActions.Count > 0)
+        while (Session.ManagedActions.Count > 0)
         {
-            var action = _managedActions.Dequeue();
+            var action = Session.ManagedActions.Dequeue();
             if (!IsManagedActionApplicable(action, location))
                 continue;
 
-            _currentManagedAction = action;
+            Session.CurrentManagedAction = action;
             var navTile = ResolveManagedNavTile(action, location);
-            _pendingNavTile = navTile;
-            _pendingTaskTile = action.Tile;
+            Session.PendingNavTile = navTile;
+            Session.PendingTaskTile = action.Tile;
             EnsureWorkingIntent(new IntentMoveToTile(navTile));
-            _nav.StartNavigation(navTile, location, _farmhand);
+            _nav.StartNavigation(navTile, location, Session.Worker);
             return;
         }
 
@@ -310,39 +405,254 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: false))
+        if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: false))
             return;
 
         CompleteManagedCropBatch();
     }
 
-    private void CompleteManagedCropBatch()
+    private void NotifyUntillableZones()
     {
-        if (_ctx is null)
+        if (_session is null || Session.ManagedAssignments.Count == 0)
             return;
 
-        var completedLocationName = _managedBatchLocationName;
-        var completedLocation = _currentLocation;
+        var location = Session.CurrentLocation ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName) ?? Game1.getFarm();
+        var date = CurrentManagedGameDate();
+        var fieldState = _cropFieldReader.Read(
+            location,
+            date,
+            Session.ManagedAssignments,
+            IsCurrentManagedBatchSeasonAgnostic());
+
+        var blockedZoneLabels = new List<string>();
+        foreach (var assignment in Session.ManagedAssignments)
+        {
+            var choice = assignment.Mode == CropAssignmentMode.SeasonAgnostic
+                ? assignment.Choices.FirstOrDefault()
+                : assignment.Choices.FirstOrDefault(c => c.Season == fieldState.Date.Season);
+            if (choice is null)
+                continue;
+
+            if (!_viability.IsPlantingViable(fieldState, choice.Crop, choice.Crop.RequiresFertilizer))
+                continue;
+
+            var zone = assignment.Zone;
+            var hasBlockedTile = fieldState.Tiles.Any(t =>
+                t.HasDebris
+                && t.Tile.X >= zone.TopLeft.X && t.Tile.X <= zone.BottomRight.X
+                && t.Tile.Y >= zone.TopLeft.Y && t.Tile.Y <= zone.BottomRight.Y);
+
+            if (hasBlockedTile)
+                blockedZoneLabels.Add($"({zone.TopLeft.X},{zone.TopLeft.Y})-({zone.BottomRight.X},{zone.BottomRight.Y})");
+        }
+
+        if (blockedZoneLabels.Count > 0)
+            CropHudNotifier.CannotTillZones(string.Join(", ", blockedZoneLabels));
+    }
+
+    // Fires zone-skip HUD messages at batch end, after any shopping trip has occurred, so we only
+    // alert the player when seeds/fertilizer were genuinely unavailable for the whole shift.
+    private void NotifySkippedZones()
+    {
+        if (_session is null || Session.ManagedAssignments.Count == 0)
+            return;
+
+        var inputChest = TryGetInputChest();
+        var supply = ReadSupply(inputChest);
+        var location = Session.CurrentLocation
+            ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName)
+            ?? Game1.getFarm();
+        var date = CurrentManagedGameDate();
+        var isFestival = Utility.isFestivalDay(date.Day, Game1.season);
+        var fieldState = _cropFieldReader.Read(
+            location, date, Session.ManagedAssignments, IsCurrentManagedBatchSeasonAgnostic());
+
+        foreach (var assignment in Session.ManagedAssignments)
+        {
+            var plan = _cropShiftPlanner.Plan(
+                assignment,
+                fieldState,
+                supply,
+                stockSnapshots: null,
+                isFestivalDay: isFestival,
+                storePreferenceOverride: Session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
+                    ? StorePreference.Joja : StorePreference.Pierre);
+
+            if (ShouldSkipZonePrep(assignment, fieldState, supply, plan))
+                NotifyZoneSkipped(assignment, fieldState, supply);
+        }
+    }
+
+    internal void CompleteManagedCropBatch()
+    {
+        if (_session is null)
+            return;
+
+        NotifyUntillableZones();
+        NotifySkippedZones();
+
+        var completedLocationName = Session.ManagedBatchLocationName;
         ReturnLeftoverSuppliesNoop();
         ResetManagedCropState();
-        _ctx.CurrentBatchIndex++;
-        ReturnManagedWorkerToFarmIfNeeded(completedLocationName, completedLocation);
+
+        // Walk out of a non-farm work location through its door, like every other batch exit.
+        if (TryStartManagedBatchExitTravel(completedLocationName))
+            return;
+
+        Session.Ctx.CurrentBatchIndex++;
         BeginCurrentBatch();
     }
 
-    private static void NotifyFallbackStoreIfUsed(ShiftPurchaseManifest manifest)
+    /// <summary>
+    /// Starts the walk-to-door exit back to the farm after a managed batch in a non-farm location.
+    /// Returns false when the worker is already on the farm (or the location can't be resolved) and
+    /// the caller should advance to the next batch synchronously.
+    /// </summary>
+    private bool TryStartManagedBatchExitTravel(string locationName)
     {
-        var preferred = ModEntry.PreferredCropStore switch
+        if (_session is null || Session.Worker is null)
+            return false;
+
+        var farm = Game1.getFarm();
+        if (string.Equals(locationName, "Farm", StringComparison.Ordinal))
         {
-            StorePreference.Pierre => Store.Pierre,
-            StorePreference.Joja => Store.Joja,
-            _ => (Store?)null,
-        };
-        if (preferred is null)
+            Session.CurrentLocation = farm;
+            return false;
+        }
+
+        var current = Session.Worker.currentLocation ?? Session.CurrentLocation;
+        if (current is null || current == farm)
+        {
+            Session.CurrentLocation = farm;
+            return false;
+        }
+
+        // Expansion greenhouse: hop home along the validated route.
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryGetExpansionLocationDescriptor(locationName, out var descriptor) &&
+            descriptor.Role == ExpansionLocationRole.GreenhouseWork)
+        {
+            Session.Ctx.CurrentBatchIndex++;
+            if (!TryStartExpansionTravel(
+                    current.NameOrUniqueName,
+                    "Farm",
+                    ExpansionRoutePurpose.ReturnToFarm,
+                    TravelFailurePolicy.WarpToDestination,
+                    TravelPurpose.WorkExit))
+            {
+                WarpExpansionWorkerToFarm();
+                BeginCurrentBatch();
+            }
+
+            return true;
+        }
+
+        // Vanilla building interior: walk to the interior door, warp out at the outdoor door.
+        var farmArrival = _buildingNavigator.TryResolveDoorTile(locationName, out var outdoorDoor, out _)
+            ? outdoorDoor
+            : Session.FarmExitTile;
+        Session.Ctx.CurrentBatchIndex++;
+        StartTravel(BuildBuildingExitPlan(current, farmArrival), TravelPurpose.WorkExit);
+        return true;
+    }
+
+    /// <summary>
+    /// Walks the worker back into the managed batch's building after a shopping trip, then resumes
+    /// planting via the ManagedReentry travel completion. Returns false when re-entry is impossible
+    /// and the caller should complete the batch instead.
+    /// </summary>
+    internal bool TryStartManagedReentryTravel()
+    {
+        if (Session.Worker is null)
+            return false;
+
+        var farm = Game1.getFarm();
+        var current = Session.Worker.currentLocation ?? Session.CurrentLocation ?? farm;
+        var target = ResolveManagedBatchLocation(Session.ManagedBatchLocationName);
+        if (target is null)
+        {
+            DevLog.Log(
+                $"[Dayswork][managed-crops][shopping] re-entry skipped location={Session.ManagedBatchLocationName} reason=location_unavailable.",
+                DevLog.WarnLevel);
+            return false;
+        }
+
+        if (SameLocation(current, target))
+        {
+            Session.CurrentLocation = target;
+            ResumeManagedBatchAfterShopping();
+            return true;
+        }
+
+        // Expansion greenhouse: hop back in along the validated route.
+        if (ModEntry.ExpansionCompat is { } compat &&
+            compat.TryGetExpansionLocationDescriptor(Session.ManagedBatchLocationName, out var descriptor) &&
+            descriptor.Role == ExpansionLocationRole.GreenhouseWork)
+        {
+            if (compat.TryValidateRoute(
+                    farm,
+                    current.NameOrUniqueName,
+                    Session.ManagedBatchLocationName,
+                    ExpansionRoutePurpose.WorkEntry,
+                    out var route,
+                    out var failure))
+            {
+                StartTravel(
+                    BuildExpansionPlan(route, TravelFailurePolicy.WarpToDestination),
+                    TravelPurpose.ManagedReentry);
+                return true;
+            }
+
+            LogExpansionRouteFailure(failure);
+            return false;
+        }
+
+        // Vanilla building: walk to its outdoor door, warp inside.
+        if (TryBuildBuildingEntryPlan(
+                Session.ManagedBatchLocationName,
+                TravelFailurePolicy.WarpToDestination,
+                out var plan))
+        {
+            StartTravel(plan, TravelPurpose.ManagedReentry);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Re-plan and resume planting once the worker is back in the managed batch's location.</summary>
+    internal void ResumeManagedBatchAfterShopping()
+    {
+        Session.ManagedReplanCount = 0;
+        var actions = BuildManagedActions(logDetail: true);
+        foreach (var action in actions)
+            Session.ManagedActions.Enqueue(action);
+        Session.LastManagedSignature = Signature(actions);
+
+        if (Session.ManagedActions.Count == 0)
+        {
+            CompleteManagedCropBatch();
+            return;
+        }
+
+        StartNextManagedAction();
+    }
+
+    internal static void NotifyFallbackStoreIfUsed(
+        ShiftPurchaseManifest manifest,
+        StorePreference preferred,
+        IReadOnlyList<ShopStockSnapshot> stock)
+    {
+        var preferredStore = preferred == StorePreference.Joja ? Store.Joja : Store.Pierre;
+        if (!manifest.Groups.Any(group => group.Store != preferredStore))
             return;
 
-        if (manifest.Groups.Any(group => group.Store != preferred.Value))
-            CropHudNotifier.UsingFallbackStore(preferred.Value == Store.Pierre ? "Pierre's" : "JojaMart");
+        var displayName = preferredStore == Store.Pierre ? "Pierre's" : "JojaMart";
+        var snapshot = stock.FirstOrDefault(s => s.Store == preferredStore);
+        if (snapshot is { IsOpen: false })
+            CropHudNotifier.UsingFallbackStore(displayName);
+        else
+            CropHudNotifier.UsingPartialFallbackStore(displayName);
     }
 
     private bool ShouldClearDebrisTile(TileCoord tile, GameLocation location)
@@ -359,12 +669,18 @@ internal sealed partial class ShiftOrchestrator
 
     private void HandleManagedCropAction(IntentPerformManagedCropAction intent, GameLocation location)
     {
-        if (_ctx is null || _farmhand is null)
+        if (_session is null || Session.Worker is null)
             return;
 
         var action = intent.Action;
 
-        if (!_actionPending)
+        // Mirror the regular CutTrees guard: don't swing again while the fall animation plays.
+        if (!Session.ActionPending
+            && action.Kind == ManagedCropActionKind.ClearDebris
+            && IsCutTreeTargetFalling(action.Tile, location))
+            return;
+
+        if (!Session.ActionPending)
         {
             var debrisTool = WorkerTool.None;
             if (action.Kind == ManagedCropActionKind.ClearDebris)
@@ -385,30 +701,54 @@ internal sealed partial class ShiftOrchestrator
             }
 
             _toolAnimator.StopSwing();
-            _toolAnimator.PlaySwing(tool, FacingToward(_farmhand.TilePoint, action.Tile, _farmhand.FacingDirection));
+            _toolAnimator.PlaySwing(tool, FacingToward(Session.Worker.TilePoint, action.Tile, Session.Worker.FacingDirection));
             ApplyManagedActionGuarded(action, debrisTool, location);
             SpendStaminaForBeat(ManagedCropActionMap.EnergyKind(action.Kind, debrisTool));
-            _actionPending = true;
+            Session.ActionPending = true;
             return;
         }
 
         if (_toolAnimator.IsSwinging)
             return;
 
-        _actionPending = false;
+        Session.ActionPending = false;
 
         var boundary = _boundaryClassifier.EvaluateAfterBeat(
             unitResolved: true,
-            _ctx.EnergyState,
+            Session.Ctx.EnergyState,
             HasBoundaryStopRequested());
 
         if (boundary.ShouldWrapUpAfterCurrentUnit)
         {
-            if (TryStartManagedShoppingIfNeeded(wrapAfterReturn: true))
+            if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: true))
                 return;
 
-            QueueWrapUpNow(_ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
+        }
+
+        // For multi-hit ClearDebris (e.g. tree → stump → gone), retry in place so the tile is
+        // fully clear before the worker moves on. Skip while the tree is falling — the top guard
+        // will hold subsequent ticks until the animation ends, then re-enter the apply-action path.
+        if (Session.CurrentManagedAction is { Kind: ManagedCropActionKind.ClearDebris } retryAction)
+        {
+            if (IsCutTreeTargetFalling(retryAction.Tile, location))
+                return;
+
+            if (IsManagedActionApplicable(retryAction, location))
+            {
+                ResolveDebrisClearing(retryAction.Tile, location, out var retryTool, out var retryCapable);
+                if (retryCapable)
+                {
+                    var retryToolKind = ManagedCropActionMap.Tool(retryAction.Kind, retryTool);
+                    _toolAnimator.StopSwing();
+                    _toolAnimator.PlaySwing(retryToolKind, FacingToward(Session.Worker.TilePoint, retryAction.Tile, Session.Worker.FacingDirection));
+                    ApplyManagedActionGuarded(retryAction, retryTool, location);
+                    SpendStaminaForBeat(ManagedCropActionMap.EnergyKind(retryAction.Kind, retryTool));
+                    Session.ActionPending = true;
+                    return;
+                }
+            }
         }
 
         StartNextManagedAction();
@@ -444,6 +784,7 @@ internal sealed partial class ShiftOrchestrator
                 dirt is null
                 && !location.objects.ContainsKey(vec)
                 && tf is null
+                && ObjectTargetClassifier.FindResourceClumpAt(vec, location) is null
                 && location.doesTileHaveProperty(action.Tile.X, action.Tile.Y, "Diggable", "Back") is not null,
 
             ManagedCropActionKind.Fertilize =>
@@ -459,7 +800,7 @@ internal sealed partial class ShiftOrchestrator
                 && SupplyOnHand(action.ItemId),
 
             ManagedCropActionKind.Water =>
-                dirt is not null && dirt.state.Value != HoeDirt.watered,
+                dirt is not null && dirt.crop is not null && dirt.state.Value != HoeDirt.watered,
 
             _ => false,
         };
@@ -512,7 +853,7 @@ internal sealed partial class ShiftOrchestrator
 
     private void ApplyManagedAction(TileAction action, WorkerTool debrisTool, GameLocation location)
     {
-        _pendingOutputProvenance =
+        Session.PendingOutputProvenance =
             action.Kind == ManagedCropActionKind.Harvest && action.OutputProvenance is not null
                 ? action.OutputProvenance
                 : OutputScopeProvenance.Outdoor();
@@ -521,7 +862,7 @@ internal sealed partial class ShiftOrchestrator
         switch (action.Kind)
         {
             case ManagedCropActionKind.Harvest:
-                _pendingTask = TaskKind.HarvestCrops;
+                Session.PendingTask = TaskKind.HarvestCrops;
                 InvokeHarvest(action.Tile, location);
                 break;
 
@@ -599,28 +940,28 @@ internal sealed partial class ShiftOrchestrator
         if (ObjectTargetClassifier.ClassifyAxe(vec, location) is not null
             || (location.objects.TryGetValue(vec, out var twig) && twig.Name == "Twig"))
         {
-            _pendingTask = TaskKind.CutTrees;
+            Session.PendingTask = TaskKind.CutTrees;
             InvokeCutTree(tile, location);
             return;
         }
 
         if (ObjectTargetClassifier.ClassifyPick(vec, location) is not null)
         {
-            _pendingTask = TaskKind.ClearRocks;
+            Session.PendingTask = TaskKind.ClearRocks;
             InvokeClearRock(tile, location);
             return;
         }
 
         if (location.objects.TryGetValue(vec, out var obj) && obj.IsWeeds())
         {
-            _pendingTask = TaskKind.ClearWeeds;
+            Session.PendingTask = TaskKind.ClearWeeds;
             InvokeClearWeed(tile, location);
             return;
         }
 
         if (tf is Grass)
         {
-            _pendingTask = TaskKind.ClearGrass;
+            Session.PendingTask = TaskKind.ClearGrass;
             InvokeClearGrass(tile, location);
         }
     }
@@ -640,14 +981,14 @@ internal sealed partial class ShiftOrchestrator
         if (ObjectTargetClassifier.ClassifyAxe(vec, location) is { } axeTarget)
         {
             tool = WorkerTool.Axe;
-            capable = CapabilityMatrix.CanChop(_ctx!.ToolSnapshot.AxeLevel, axeTarget);
+            capable = CapabilityMatrix.CanChop(Session.Ctx.ToolSnapshot.AxeLevel, axeTarget);
             return;
         }
 
         if (ObjectTargetClassifier.ClassifyPick(vec, location) is { } pickTarget)
         {
             tool = WorkerTool.Pickaxe;
-            capable = CapabilityMatrix.CanBreak(_ctx!.ToolSnapshot.PickaxeLevel, pickTarget);
+            capable = CapabilityMatrix.CanBreak(Session.Ctx.ToolSnapshot.PickaxeLevel, pickTarget);
             return;
         }
 
@@ -665,7 +1006,7 @@ internal sealed partial class ShiftOrchestrator
 
     // ── Input-chest supply ───────────────────────────────────────────────────
 
-    private Chest? TryGetInputChest()
+    internal Chest? TryGetInputChest()
     {
         var farm = Game1.getFarm();
         foreach (var building in farm.buildings)
@@ -679,7 +1020,7 @@ internal sealed partial class ShiftOrchestrator
         return null;
     }
 
-    private static SupplyInventory ReadSupply(Chest? chest)
+    internal static SupplyInventory ReadSupply(Chest? chest)
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         if (chest is not null)
@@ -749,13 +1090,13 @@ internal sealed partial class ShiftOrchestrator
         return id.StartsWith("(", StringComparison.Ordinal) && close >= 0 ? id[(close + 1)..] : id;
     }
 
-    private static GameDate CurrentManagedGameDate()
+    internal static GameDate CurrentManagedGameDate()
     {
         var season = Enum.Parse<Dayswork.Core.Domain.Season>(Game1.currentSeason, ignoreCase: true);
         return new GameDate(Game1.dayOfMonth, season, Game1.year);
     }
 
-    private GameLocation? ResolveManagedBatchLocation(string locationName)
+    internal GameLocation? ResolveManagedBatchLocation(string locationName)
     {
         if (string.Equals(locationName, "Farm", StringComparison.Ordinal))
             return Game1.getFarm();
@@ -763,60 +1104,14 @@ internal sealed partial class ShiftOrchestrator
         return Game1.getLocationFromName(locationName);
     }
 
-    private bool IsCurrentManagedBatchSeasonAgnostic() =>
-        !string.Equals(_managedBatchLocationName, "Farm", StringComparison.Ordinal)
-        || _managedAssignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
+    internal static string LocationKey(GameLocation location) =>
+        location.NameOrUniqueName ?? location.Name;
 
-    private void ReturnManagedWorkerToFarmIfNeeded(string locationName, GameLocation? location)
-    {
-        if (_farmhand is null || string.Equals(locationName, "Farm", StringComparison.Ordinal))
-            return;
+    internal static bool SameLocation(GameLocation left, GameLocation right) =>
+        string.Equals(LocationKey(left), LocationKey(right), StringComparison.OrdinalIgnoreCase);
 
-        var farm = Game1.getFarm();
-        var current = _farmhand.currentLocation ?? location ?? _currentLocation;
-        if (current is null || current == farm)
-        {
-            _currentLocation = farm;
-            return;
-        }
+    internal bool IsCurrentManagedBatchSeasonAgnostic() =>
+        !string.Equals(Session.ManagedBatchLocationName, "Farm", StringComparison.Ordinal)
+        || Session.ManagedAssignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
 
-        if (_buildingNavigator.TryResolveDoorTile(locationName, out var outdoorDoor, out _))
-        {
-            _buildingNavigator.ExitToFarm(_farmhand, outdoorDoor);
-            _currentLocation = farm;
-            return;
-        }
-
-        _nav.WarpWorker(_farmhand, current, farm, _farmExitTile);
-        _currentLocation = farm;
-    }
-
-    private bool RestoreManagedBatchLocationAfterShopping()
-    {
-        if (_farmhand is null || string.Equals(_managedBatchLocationName, "Farm", StringComparison.Ordinal))
-        {
-            _currentLocation = Game1.getFarm();
-            return true;
-        }
-
-        var target = ResolveManagedBatchLocation(_managedBatchLocationName);
-        if (target is null)
-        {
-            DevLog.Log(
-                $"[Dayswork][managed-crops][shopping] re-entry skipped location={_managedBatchLocationName} reason=location_unavailable.",
-                LogLevel.Warn);
-            return false;
-        }
-
-        var current = _farmhand.currentLocation ?? _currentLocation ?? Game1.getFarm();
-        if (!SameLocation(current, target))
-        {
-            var entryTile = _buildingNavigator.ResolveInteriorEntryTile(target);
-            _nav.WarpWorker(_farmhand, current, target, ResolvePassableNearbyInLocation(entryTile, target));
-        }
-
-        _currentLocation = target;
-        _nav.Clear();
-        return true;
-    }
 }

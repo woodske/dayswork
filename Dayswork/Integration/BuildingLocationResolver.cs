@@ -122,7 +122,7 @@ internal static class BuildingLocationResolver
             // requested name. The requestedName fallback in the other overload returns the *requested*
             // building's interior regardless of which building we're iterating, so the first building
             // would falsely match any unique-name request and lend its (wrong) door to every building
-            // (TODO-08 door regression: all buildings resolved to the first building's door).
+            // (regression: all buildings once resolved to the first building's door).
             TryGetInteriorForBuilding(building, out var interior);
             if (!matcher(requestedName, building, interior))
                 continue;
@@ -193,7 +193,7 @@ internal static class BuildingLocationResolver
 
     /// <summary>Pure exact-name test (interior name / interior unique name / indoors name / building
     /// type) used by both the live resolver and <see cref="SelectBuildingIndex"/>. The unique name
-    /// (distinct per building instance) lets two same-type buildings be told apart (TODO-08).</summary>
+    /// (distinct per building instance) lets two same-type buildings be told apart.</summary>
     internal static bool MatchesExactly(string requestedName, string? interiorName, string? interiorUniqueName, string? indoorsName, string buildingType) =>
         NameEquals(interiorName, requestedName) ||
         NameEquals(interiorUniqueName, requestedName) ||

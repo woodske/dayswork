@@ -8,7 +8,7 @@ using Xunit;
 
 public sealed class HiringFlowViewModelBuilderTests
 {
-    private readonly IConfigSnapshot _config = ConfigDefaults.Build();
+    private readonly ConfigSnapshot _config = ConfigDefaults.Build();
 
     [Fact]
     public void Build_NoOutdoorScopeForOutdoorTask_StaysInvalid()
@@ -20,7 +20,7 @@ public sealed class HiringFlowViewModelBuilderTests
                 Greenhouse: null),
             new HashSet<TaskKind> { TaskKind.HarvestCrops });
 
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(
+        var preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(
             draft.ScopeSelection,
             draft.EnabledTasks,
             draft.Tier,
@@ -44,7 +44,7 @@ public sealed class HiringFlowViewModelBuilderTests
                 Greenhouse: new GreenhouseSelection("Greenhouse")),
             new HashSet<TaskKind> { TaskKind.WaterCrops });
 
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(
+        var preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(
             draft.ScopeSelection,
             draft.EnabledTasks,
             draft.Tier,
@@ -71,7 +71,7 @@ public sealed class HiringFlowViewModelBuilderTests
             schedule: ContractSchedule.Recurring,
             editingId: ContractId.New());
 
-        var preview = U18BuilderFactory.CreateTermsBuilder().BuildPreview(
+        var preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(
             draft.ScopeSelection,
             draft.EnabledTasks,
             draft.Tier,

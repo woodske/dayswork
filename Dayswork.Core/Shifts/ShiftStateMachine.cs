@@ -1,6 +1,6 @@
 namespace Dayswork.Core.Shifts;
 
-public sealed class ShiftStateMachine : IShiftStateMachine
+public sealed class ShiftStateMachine
 {
     public ShiftPhase Phase { get; private set; } = ShiftPhase.WaitingForSpawn;
     public ShiftIntent? CurrentIntent { get; private set; }

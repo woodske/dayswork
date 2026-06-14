@@ -45,8 +45,7 @@ public static class ManageCropsGen
         (from season in SeasonGen()
          from crop in CropDescriptor().Generator
          from preference in StorePreferenceGen()
-         from autoReplant in Arb.Generate<bool>()
-         select new SeasonCropChoice(season, crop, preference, autoReplant: autoReplant))
+         select new SeasonCropChoice(season, crop, preference))
         .ToArbitrary();
 
     public static Arbitrary<CropDescriptor> CropDescriptor() =>

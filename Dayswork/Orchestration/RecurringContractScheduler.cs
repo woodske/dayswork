@@ -10,14 +10,13 @@ using StardewValley;
 
 namespace Dayswork.Orchestration;
 
-// M-13 RecurringContractScheduler (Pattern R / Service S-D). Promoted from the U-10 one-time stub to
-// the rebuilt fixed-price day-start lifecycle: recurring terms refresh at 6am, affordability/notice
+// The fixed-price day-start lifecycle: recurring terms refresh at 6am, affordability/notice
 // decisions from the rebuilt terms snapshot, festival no-charge skips, and same-day HUD notices.
-// Single-active-contract invariant (DEV-U15-01) is enforced at hire time, so the loop processes at
+// Single-active-contract invariant is enforced at hire time, so the loop processes at
 // most one contract per day.
 internal sealed class RecurringContractScheduler
 {
-    private readonly IContractStore _store;
+    private readonly ContractStore _store;
     private readonly ShiftOrchestrator _orchestrator;
     private readonly CalendarHandlers _calendar;
     private readonly RecurringDayStartDecisionEngine _decisionEngine;
@@ -25,7 +24,7 @@ internal sealed class RecurringContractScheduler
     private readonly IShiftOutcomeDispatcher _shiftOutcomes;
 
     public RecurringContractScheduler(
-        IContractStore store,
+        ContractStore store,
         ShiftOrchestrator orchestrator,
         CalendarHandlers calendar,
         RecurringDayStartDecisionEngine decisionEngine,
@@ -42,7 +41,7 @@ internal sealed class RecurringContractScheduler
 
     public void OnDayStarted(object? sender, DayStartedEventArgs e)
     {
-        // REL-U10-01: multiplayer guard — no-op in multiplayer sessions.
+        // Multiplayer guard — no-op in multiplayer sessions.
         if (MultiplayerGuard.IsMultiplayer())
             return;
 
@@ -79,7 +78,7 @@ internal sealed class RecurringContractScheduler
             {
                 ModEntry.ModMonitor.Log(
                     $"[Dayswork] Recurring day-start evaluation failed for contract {contract.Id.Value}: {ex.Message}",
-                    LogLevel.Warn);
+                    DevLog.WarnLevel);
             }
         }
     }
@@ -103,7 +102,7 @@ internal sealed class RecurringContractScheduler
 
     // Full per-recurring-day sequence: rebuild first, persist refreshed terms when valid, then select
     // the festival / needs-attention / cannot-afford / start-shift path from the same rebuilt terms.
-    private void StartRecurring(Contract contract, IConfigSnapshot config, bool festivalToday)
+    private void StartRecurring(Contract contract, ConfigSnapshot config, bool festivalToday)
     {
         var outcome = _decisionEngine.Evaluate(contract, config, festivalToday, Game1.player.Money);
         if (outcome.ShouldPersistTermsSnapshot && outcome.Refresh.TermsSnapshot is not null)

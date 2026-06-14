@@ -14,20 +14,20 @@ namespace Dayswork.UI;
 
 internal sealed class HiringFlowCoordinator
 {
-    private readonly IContractTermsBuilder _termsBuilder;
+    private readonly ContractTermsBuilder _termsBuilder;
     private readonly ModConfigManager _configManager;
-    private readonly IContractStore _contractStore;
+    private readonly ContractStore _contractStore;
     private readonly ChestResolver _chestResolver;
     private readonly IModHelper _helper;
 
     // Live crop/fertilizer/shop catalog adapter, rebuilt per hiring-flow session so its per-season
-    // memo is fresh (NFR-MC3-PERF-02). Created lazily when the Manage Crops page first opens.
+    // memo is fresh. Created lazily when the Manage Crops page first opens.
     private CropCatalogProvider? _cropCatalog;
 
     public HiringFlowCoordinator(
-        IContractTermsBuilder termsBuilder,
+        ContractTermsBuilder termsBuilder,
         ModConfigManager configManager,
-        IContractStore contractStore,
+        ContractStore contractStore,
         ChestResolver chestResolver,
         IModHelper helper)
     {
@@ -91,7 +91,7 @@ internal sealed class HiringFlowCoordinator
             onRecurrence: ShowSchedule,
             onSummary: ShowSummary,
             onConfirm: ConfirmContract,
-            onCancel: CloseFlow);
+            onCancel: () => MaybeCloseFlow(draft));
     }
 
     private void ShowTaskSelection(ContractDraft draft)
@@ -120,7 +120,7 @@ internal sealed class HiringFlowCoordinator
             onBack: ShowHub);
     }
 
-    // ── Manage Crops authoring (U-MC-03) ─────────────────────────────────────
+    // ── Manage Crops authoring ─────────────────────────────────────
     private void ShowManageCrops(ContractDraft draft)
     {
         var catalog = EnsureCropCatalog();
@@ -139,6 +139,7 @@ internal sealed class HiringFlowCoordinator
     private void AddCropGroup(ContractDraft draft)
     {
         var group = draft.CropPlan.AddGroup();
+        draft.MarkDirty();
         ShowCropGroupEditor(draft, group.Id);
     }
 
@@ -168,6 +169,7 @@ internal sealed class HiringFlowCoordinator
     private void DeleteCropGroup(ContractDraft draft, string groupId)
     {
         draft.CropPlan.DeleteGroup(groupId);
+        draft.MarkDirty();
         RefreshPreview(draft);
     }
 
@@ -219,6 +221,7 @@ internal sealed class HiringFlowCoordinator
                     }
                 }
 
+                draft.MarkDirty();
                 ShowCropGroupEditor(draft, groupId);
             },
             onCancel: () => ShowCropGroupEditor(draft, groupId));
@@ -259,6 +262,7 @@ internal sealed class HiringFlowCoordinator
                         group.SetFertilizer(season, option.ItemId, option.DisplayName);
                 }
 
+                draft.MarkDirty();
                 ShowCropGroupEditor(draft, groupId);
             },
             onCancel: () => ShowCropGroupEditor(draft, groupId));
@@ -269,6 +273,7 @@ internal sealed class HiringFlowCoordinator
         if (draft.CropPlan.TryGetGroup(groupId, out var group))
             group.SetLocation(locationName);
 
+        draft.MarkDirty();
         RefreshPreview(draft);
         ShowCropGroupEditor(draft, groupId);
     }
@@ -278,7 +283,8 @@ internal sealed class HiringFlowCoordinator
         var options = new List<CropGroupLocationOption>
         {
             new("Farm", I18nHelper.Get("ui.manage_crops.location_farm")),
-            new("Greenhouse", I18nHelper.Get("ui.manage_crops.location_greenhouse")),
+            new("Greenhouse", I18nHelper.Get("ui.manage_crops.location_greenhouse"),
+                IsAvailable: Game1.getFarm().greenhouseUnlocked.Value),
         };
 
         if (ModEntry.ExpansionCompat is { } compat)
@@ -288,7 +294,10 @@ internal sealed class HiringFlowCoordinator
                 if (!descriptor.IsWorkScopeEligible)
                     continue;
 
-                options.Add(new CropGroupLocationOption(descriptor.LocationName, descriptor.DisplayName));
+                options.Add(new CropGroupLocationOption(
+                    descriptor.LocationName,
+                    descriptor.DisplayName,
+                    IsAvailable: compat.IsExpansionLocationAvailable(descriptor.LocationName)));
             }
         }
 
@@ -303,7 +312,11 @@ internal sealed class HiringFlowCoordinator
     {
         var chests = _chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
 
-        var rows = new List<PickerRow> { new(I18nHelper.Get("ui.manage_crops.output_automatic"), null) };
+        var rows = new List<PickerRow>
+        {
+            new(I18nHelper.Get("ui.manage_crops.output_automatic"), null),
+            new(I18nHelper.Get("ui.zone_chest.shipping_bin_option"), null),
+        };
         rows.AddRange(chests.Select(chest => new PickerRow(chest.DisplayName, chest.GroupLabel)));
 
         Game1.activeClickableMenu = new CropListPickerMenu(
@@ -313,8 +326,14 @@ internal sealed class HiringFlowCoordinator
             onSelect: index =>
             {
                 if (draft.CropPlan.TryGetGroup(groupId, out var group))
-                    group.OutputChest = index == 0 ? null : chests[index - 1].Ref;
+                    group.OutputDestination = index switch
+                    {
+                        0 => null,
+                        1 => ShippingBinDestination.Instance,
+                        _ => new ChestDestination(chests[index - 2].Ref),
+                    };
 
+                draft.MarkDirty();
                 ShowCropGroupEditor(draft, groupId);
             },
             onCancel: () => ShowCropGroupEditor(draft, groupId));
@@ -338,6 +357,7 @@ internal sealed class HiringFlowCoordinator
             onComplete: (zones, _) =>
             {
                 draft.CropPlan.SetGroupZones(groupId, zones);
+                draft.MarkDirty();
                 RefreshPreview(draft);
                 ShowCropGroupEditor(draft, groupId);
             },
@@ -385,6 +405,8 @@ internal sealed class HiringFlowCoordinator
 
     private void ShowSummary(ContractDraft draft)
     {
+        var catalog = EnsureCropCatalog();
+        draft.CropPlan.EnrichDisplayNames(catalog.GetCatalog(null, greenhouse: true), catalog.GetFertilizers());
         RefreshViewModels(draft);
         Game1.activeClickableMenu = new SummaryMenu(draft, onBack: ShowHub);
     }
@@ -392,6 +414,7 @@ internal sealed class HiringFlowCoordinator
     private void SelectTier(ContractDraft draft, EnergyTier tier)
     {
         draft.Tier = tier;
+        draft.MarkDirty();
         RefreshPreview(draft);
         ShowEnergy(draft);
     }
@@ -407,7 +430,8 @@ internal sealed class HiringFlowCoordinator
                 draft.ScopeSelection,
                 draft.EnabledTasks,
                 tier,
-                _configManager.CurrentSnapshot);
+                _configManager.CurrentSnapshot,
+                draft.CropPlan.BuildCropPlan());
             var terms = preview.ProposedTerms;
             options.Add(new EnergyTierOption(tier, terms?.Energy.DailyCapacity, terms?.Pricing.TotalPrice));
         }
@@ -429,10 +453,12 @@ internal sealed class HiringFlowCoordinator
                 draft.OutdoorZones.Clear();
                 draft.OutdoorZones.AddRange(zones);
                 LegacyScopeBootstrapper.TryApplySelectedBuildings(draft, buildings);
+                draft.MarkDirty();
                 RefreshPreview(draft);
                 ShowZoneAndChest(draft);
             },
-            onCancel: () => ShowZoneAndChest(draft));
+            onCancel: () => ShowZoneAndChest(draft),
+            overlapTogglesSelection: true);
     }
 
     private void ToggleTask(ContractDraft draft, TaskKind task)
@@ -440,6 +466,7 @@ internal sealed class HiringFlowCoordinator
         if (!draft.EnabledTasks.Remove(task))
             draft.EnabledTasks.Add(task);
 
+        draft.MarkDirty();
         RefreshPreview(draft);
     }
 
@@ -448,13 +475,16 @@ internal sealed class HiringFlowCoordinator
         draft.OutdoorZones.Clear();
         draft.AnimalBuildings.Clear();
         draft.Greenhouses.Clear();
+        draft.MarkDirty();
         RefreshPreview(draft);
     }
 
     private void UpdateSchedule(ContractDraft draft, ContractSchedule schedule)
     {
         draft.Schedule = schedule;
+        draft.MarkDirty();
         RefreshViewModels(draft);
+        ShowSchedule(draft);
     }
 
     private void RefreshPreview(ContractDraft draft)
@@ -463,7 +493,8 @@ internal sealed class HiringFlowCoordinator
             draft.ScopeSelection,
             draft.EnabledTasks,
             draft.Tier,
-            _configManager.CurrentSnapshot);
+            _configManager.CurrentSnapshot,
+            draft.CropPlan.BuildCropPlan());
 
         draft.PreviewState = HiringFlowViewModelBuilder.Build(draft, preview);
     }
@@ -557,6 +588,21 @@ internal sealed class HiringFlowCoordinator
         LegacyScopeBootstrapper.HydrateDraft(draft, contract);
         draft.CropPlan.HydrateFrom(contract.CropPlan);
         return draft;
+    }
+
+    private void MaybeCloseFlow(ContractDraft draft)
+    {
+        if (draft.IsDirty)
+            ShowConfirmDiscard(draft);
+        else
+            CloseFlow();
+    }
+
+    private void ShowConfirmDiscard(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new ConfirmDiscardMenu(
+            onGoBack: () => ShowHub(draft),
+            onCloseAnyway: CloseFlow);
     }
 
     private void CloseFlow() => Game1.activeClickableMenu = null;

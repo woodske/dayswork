@@ -54,7 +54,7 @@ public sealed class ZoneOverlapPolicyTests
     [Fact]
     public void OverlapsAny_ReturnsFalseWhenNoProtectedZonesExist()
     {
-        // First/only crop group: nothing is protected, so the player may draw freely (BR-MC04: empty protected set).
+        // First/only crop group: nothing is protected, so the player may draw freely (empty protected set).
         var overlaps = ZoneOverlapPolicy.OverlapsAny(
             Array.Empty<Zone>(),
             new TileCoord(0, 0),
@@ -66,7 +66,7 @@ public sealed class ZoneOverlapPolicyTests
     [Fact]
     public void OverlapsAny_ReturnsTrueWhenIntersectingAnyOfSeveralProtectedZones()
     {
-        // Multiple other crop groups are protected at once; overlapping the second one still rejects (FR-MC-06 "any").
+        // Multiple other crop groups are protected at once; overlapping the second one still rejects (the "any overlap" rule).
         var protectedZones = new[]
         {
             new Zone("Farm", new TileCoord(0, 0), new TileCoord(2, 2)),

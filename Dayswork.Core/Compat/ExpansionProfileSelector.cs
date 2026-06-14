@@ -2,7 +2,7 @@ namespace Dayswork.Core.Compat;
 
 /// <summary>
 /// Deterministically selects the active expansion profile from the set of installed mod ids
-/// (pattern P-SVE-05). Profiles are evaluated in priority order; the first whose
+///. Profiles are evaluated in priority order; the first whose
 /// <see cref="IExpansionProfile.Matches"/> returns true wins. The Vanilla profile must be supplied
 /// last as the always-matching fallback, so selection is total and order-independent of input.
 /// </summary>

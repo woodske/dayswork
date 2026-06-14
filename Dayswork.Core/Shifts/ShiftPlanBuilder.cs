@@ -20,7 +20,7 @@ public sealed class ShiftPlanBuilder
             .ToList();
         if (animalTasks.Count > 0)
         {
-            // Per-building grouping (TODO-09): emit each building's interior batch immediately
+            // Per-building grouping: emit each building's interior batch immediately
             // followed by that building's own grazing pass, so the worker fully services one
             // building (indoors + its grazing animals) before moving to the next, instead of doing
             // every interior first and then a single combined outdoor pass. Farm-wide forage
@@ -59,14 +59,14 @@ public sealed class ShiftPlanBuilder
         var greenhouseTasks = Order(enabledTasks.Where(TaskKindSets.IsGreenhouseService));
         if (greenhouseTasks.Count > 0)
         {
-            // One greenhouse batch per selected greenhouse (TODO-10): a farm may expose the vanilla
+            // One greenhouse batch per selected greenhouse: a farm may expose the vanilla
             // greenhouse and an expansion greenhouse (e.g. SVE's Grandpa's Shed) at once; each is
             // serviced as its own batch so the worker visits both in a single shift.
             foreach (var greenhouse in scopes.GreenhouseWorks)
                 batches.Add(CreateSkeleton(greenhouse.LocationName, BatchKind.Greenhouse, greenhouseTasks, feedBuilding: false));
         }
 
-        // Managed crops (U-MC-07): run the authored crop plan ahead of ordinary crop work in
+        // Managed crops: run the authored crop plan ahead of ordinary crop work in
         // the same live location. Non-farm managed locations precede greenhouse batches; farm
         // managed locations remain ahead of outdoor crop/clearing passes.
         EmitManagedCropBatches(

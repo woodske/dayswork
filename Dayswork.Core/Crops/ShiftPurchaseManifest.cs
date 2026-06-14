@@ -12,9 +12,9 @@ public sealed record ManifestLine(string ItemId, int Quantity, int UnitCost, boo
 }
 
 /// <summary>
-/// The whole-shift purchase intent (U-MC-06), aggregated across every managed zone and grouped
+/// The whole-shift purchase intent, aggregated across every managed zone and grouped
 /// by store in visit order (preferred store first, then the other). Sized up front from planned
-/// plantable tiles (FR-MC-12) and resolved against live store stock + prices.
+/// plantable tiles and resolved against live store stock + prices.
 /// </summary>
 public sealed record ShiftPurchaseManifest
 {
@@ -26,7 +26,7 @@ public sealed record ShiftPurchaseManifest
 
     /// <summary>
     /// Items that were needed but no open store stocks (e.g. chest-supply-only crops). Informational
-    /// only — these never trigger a trip or a purchase notice (FR-MC-14).
+    /// only — these never trigger a trip or a purchase notice.
     /// </summary>
     public IReadOnlyList<string> ChestSupplyOnlyItems { get; }
 

@@ -11,7 +11,7 @@ public sealed class HiringFlowCoordinatorTests
     public void CreateEditDraft_HydratesSavedTierAndCategoryPriority()
     {
         var id = ContractId.New();
-        var contract = U19PersistenceGen.CreateExampleCurrentSchemaContract() with
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract() with
         {
             Id = id,
             Tier = EnergyTier.Overtime,

@@ -19,8 +19,6 @@ internal sealed class SeasonSlotDraft
     public string CropDisplayName { get; set; } = string.Empty;
     public string? FertilizerItemId { get; set; }
     public string FertilizerDisplayName { get; set; } = string.Empty;
-    public bool AutoReplant { get; set; }
-
     public bool HasCrop => Crop is not null;
 }
 
@@ -48,7 +46,7 @@ internal sealed class CropGroupDraft
     public string Id { get; }
     public string LocationName { get; private set; } = "Farm";
     public CropAssignmentMode Mode { get; private set; } = CropAssignmentMode.Seasonal;
-    public ChestRef? OutputChest { get; set; }
+    public DestinationKey? OutputDestination { get; set; }
     public List<Zone> Zones { get; } = new();
 
     public bool HasAnyConfiguredSeason => IsSeasonAgnostic
@@ -184,18 +182,6 @@ internal sealed class CropGroupDraft
         slot.FertilizerDisplayName = slot.FertilizerItemId is null ? string.Empty : displayName;
     }
 
-    public void ToggleAutoReplant(Season season)
-    {
-        if (_slots.TryGetValue(season, out var slot) && slot.HasCrop)
-            slot.AutoReplant = !slot.AutoReplant;
-    }
-
-    public void ToggleYearRoundAutoReplant()
-    {
-        if (_yearRoundSlot is { HasCrop: true } slot)
-            slot.AutoReplant = !slot.AutoReplant;
-    }
-
     /// <summary>
     /// Consolidates the configured season slots into the persisted per-zone choice set, expanding
     /// and locking multi-season crops via the pure resolver. Fertilizer is folded onto each crop.
@@ -210,7 +196,7 @@ internal sealed class CropGroupDraft
             var crop = _yearRoundSlot.Crop.WithFertilizer(_yearRoundSlot.FertilizerItemId);
             return new[]
             {
-                new SeasonCropChoice(Season.Spring, crop, autoReplant: _yearRoundSlot.AutoReplant),
+                new SeasonCropChoice(Season.Spring, crop),
             };
         }
 
@@ -218,7 +204,7 @@ internal sealed class CropGroupDraft
             TemplateZone,
             CropAssignmentMode.Seasonal,
             Array.Empty<SeasonCropChoice>(),
-            OutputChest,
+            OutputDestination,
             Id);
 
         foreach (var season in CropPlanDraft.AllSeasons)
@@ -229,7 +215,7 @@ internal sealed class CropGroupDraft
             var crop = slot.Crop.WithFertilizer(slot.FertilizerItemId);
             template = Resolver.ApplyChoice(
                 template,
-                new SeasonCropChoice(season, crop, autoReplant: slot.AutoReplant));
+                new SeasonCropChoice(season, crop));
         }
 
         return template.Choices;
@@ -243,7 +229,7 @@ internal sealed class CropGroupDraft
 
         return Zones
             .Select(zone => new Zone(LocationName, zone.TopLeft, zone.BottomRight))
-            .Select(zone => new CropZoneAssignment(zone, Mode, choices, OutputChest, Id))
+            .Select(zone => new CropZoneAssignment(zone, Mode, choices, OutputDestination, Id))
             .ToList()
             .AsReadOnly();
     }
@@ -256,7 +242,7 @@ internal sealed class CropGroupDraft
             ? "Farm"
             : assignment.Zone.LocationName;
         Mode = assignment.Mode;
-        OutputChest = assignment.OutputChest;
+        OutputDestination = assignment.OutputDestination;
 
         foreach (var choice in assignment.Choices.Where(choice => !choice.IsLocked))
         {
@@ -274,7 +260,6 @@ internal sealed class CropGroupDraft
             slot.CropDisplayName = choice.Crop.SeedItemId;
             slot.FertilizerItemId = choice.Crop.FertilizerItemId;
             slot.FertilizerDisplayName = choice.Crop.FertilizerItemId ?? string.Empty;
-            slot.AutoReplant = choice.AutoReplant;
         }
     }
 
@@ -345,6 +330,8 @@ internal sealed class CropPlanDraft
     private readonly List<CropGroupDraft> _groups = new();
     private int _nextGroupNumber = 1;
 
+    public bool BuyFromJojaFirst { get; set; }
+
     public IReadOnlyList<CropGroupDraft> Groups => _groups;
 
     public bool HasAnyAssignment => _groups.Any(group => group.HasAnyAssignment);
@@ -395,13 +382,14 @@ internal sealed class CropPlanDraft
 
     /// <summary>Builds the immutable crop plan attached to the contract on confirm.</summary>
     public CropPlan BuildCropPlan() =>
-        new(_groups.SelectMany(group => group.BuildAssignments()).ToList());
+        new(_groups.SelectMany(group => group.BuildAssignments()).ToList(), BuyFromJojaFirst);
 
     /// <summary>Seeds this draft from an existing contract's crop plan for the edit flow (draft isolation).</summary>
     public void HydrateFrom(CropPlan plan)
     {
         _groups.Clear();
         _nextGroupNumber = 1;
+        BuyFromJojaFirst = plan.BuyFromJojaFirst;
 
         if (!plan.IsEnabled)
             return;

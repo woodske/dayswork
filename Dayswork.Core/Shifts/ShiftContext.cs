@@ -26,11 +26,11 @@ public sealed class ShiftContext
     // Set when work list exhausts or 8pm fires — before Depositing begins.
     public int? ShiftEndTime { get; set; }
 
-    // Counts how many teleport-and-resume recoveries have been attempted this shift (Pattern E).
+    // Counts how many teleport-and-resume recoveries have been attempted this shift.
     // Owned by the orchestrator layer; held here so it travels with the shift context.
     public int RecoveryAttempts { get; set; }
 
-    // The single sink for everything undeliverable this shift (Pattern O / FD-Q5/Q6=A):
+    // The single sink for everything undeliverable this shift:
     // seeded with automatic-overflow items at planning, appended on chest-full/missing and on
     // sleep-stop interruption, flushed through the shift outcome dispatcher at exit or sleep.
     public List<OverflowItem> Overflow { get; } = new();

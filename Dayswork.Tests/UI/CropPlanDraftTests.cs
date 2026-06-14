@@ -85,34 +85,31 @@ public sealed class CropPlanDraftTests
     }
 
     [Fact]
-    public void BuildAssignmentChoices_FoldsFertilizerAndReplantAcrossLockedSeasons()
+    public void BuildAssignmentChoices_FoldsFertilizerAcrossLockedSeasons()
     {
         var group = new CropPlanDraft().AddGroup();
         group.TrySetCrop(Season.Summer, Corn(), "Corn", out _);
         group.SetFertilizer(Season.Summer, "fert.basic", "Basic Fertilizer");
-        group.ToggleAutoReplant(Season.Summer);
 
         var choices = group.BuildAssignmentChoices();
 
         var summer = choices.Single(choice => choice.Season == Season.Summer);
         var fall = choices.Single(choice => choice.Season == Season.Fall);
         Assert.Equal("fert.basic", summer.Crop.FertilizerItemId);
-        Assert.True(summer.AutoReplant);
         Assert.True(fall.IsLocked);
         Assert.Equal("fert.basic", fall.Crop.FertilizerItemId);
-        Assert.True(fall.AutoReplant);
     }
 
     [Fact]
-    public void BuildCropPlan_FlattensMultipleGroupsWithPerGroupOutputChest()
+    public void BuildCropPlan_FlattensMultipleGroupsWithPerGroupOutputDestination()
     {
         var draft = new CropPlanDraft();
         var first = draft.AddGroup();
         var second = draft.AddGroup();
         first.TrySetCrop(Season.Spring, Parsnip(), "Parsnip", out _);
         second.TrySetCrop(Season.Fall, Pumpkin(), "Pumpkin", out _);
-        first.OutputChest = new ChestRef("Farm", new TileCoord(3, 4));
-        second.OutputChest = new ChestRef("Farm", new TileCoord(9, 10));
+        first.OutputDestination = new ChestDestination(new ChestRef("Farm", new TileCoord(3, 4)));
+        second.OutputDestination = new ChestDestination(new ChestRef("Farm", new TileCoord(9, 10)));
         draft.SetGroupZones(first.Id, new[] { new Zone("Farm", new TileCoord(0, 0), new TileCoord(1, 1)) });
         draft.SetGroupZones(second.Id, new[] { new Zone("Farm", new TileCoord(5, 5), new TileCoord(6, 6)) });
 
@@ -122,11 +119,11 @@ public sealed class CropPlanDraftTests
         Assert.Equal(2, plan.Assignments.Count);
         Assert.Contains(plan.Assignments, assignment =>
             assignment.GroupId == first.Id
-            && assignment.OutputChest == new ChestRef("Farm", new TileCoord(3, 4))
+            && assignment.OutputDestination == new ChestDestination(new ChestRef("Farm", new TileCoord(3, 4)))
             && assignment.Choices.Single().Crop.SeedItemId == "seed.parsnip");
         Assert.Contains(plan.Assignments, assignment =>
             assignment.GroupId == second.Id
-            && assignment.OutputChest == new ChestRef("Farm", new TileCoord(9, 10))
+            && assignment.OutputDestination == new ChestDestination(new ChestRef("Farm", new TileCoord(9, 10)))
             && assignment.Choices.Single().Crop.SeedItemId == "seed.pumpkin");
     }
 
@@ -148,15 +145,14 @@ public sealed class CropPlanDraftTests
     }
 
     [Fact]
-    public void SeasonAgnosticGroup_ProjectsYearRoundChoiceWithLocationAndOutputChest()
+    public void SeasonAgnosticGroup_ProjectsYearRoundChoiceWithLocationAndOutputDestination()
     {
         var draft = new CropPlanDraft();
         var group = draft.AddGroup();
         group.SetLocation("Greenhouse");
         group.SetYearRoundCrop(Parsnip(), "Parsnip");
         group.SetYearRoundFertilizer("fert.basic", "Basic Fertilizer");
-        group.ToggleYearRoundAutoReplant();
-        group.OutputChest = new ChestRef("Greenhouse", new TileCoord(8, 8));
+        group.OutputDestination = new ChestDestination(new ChestRef("Greenhouse", new TileCoord(8, 8)));
         draft.SetGroupZones(group.Id, new[] { new Zone("Greenhouse", new TileCoord(1, 1), new TileCoord(2, 2)) });
 
         var plan = draft.BuildCropPlan();
@@ -165,11 +161,10 @@ public sealed class CropPlanDraftTests
         Assert.Equal("Greenhouse", assignment.Zone.LocationName);
         Assert.Equal(CropAssignmentMode.SeasonAgnostic, assignment.Mode);
         Assert.Equal(group.Id, assignment.GroupId);
-        Assert.Equal(new ChestRef("Greenhouse", new TileCoord(8, 8)), assignment.OutputChest);
+        Assert.Equal(new ChestDestination(new ChestRef("Greenhouse", new TileCoord(8, 8))), assignment.OutputDestination);
         var choice = Assert.Single(assignment.Choices);
         Assert.Equal("seed.parsnip", choice.Crop.SeedItemId);
         Assert.Equal("fert.basic", choice.Crop.FertilizerItemId);
-        Assert.True(choice.AutoReplant);
     }
 
     [Fact]
@@ -181,8 +176,8 @@ public sealed class CropPlanDraftTests
             new CropZoneAssignment(
                 new Zone("Greenhouse", new TileCoord(1, 1), new TileCoord(2, 2)),
                 CropAssignmentMode.SeasonAgnostic,
-                new[] { new SeasonCropChoice(Season.Spring, crop, autoReplant: true) },
-                new ChestRef("Greenhouse", new TileCoord(8, 8)),
+                new[] { new SeasonCropChoice(Season.Spring, crop) },
+                new ChestDestination(new ChestRef("Greenhouse", new TileCoord(8, 8))),
                 "group-greenhouse"),
         });
 
@@ -195,8 +190,7 @@ public sealed class CropPlanDraftTests
         Assert.True(group.YearRoundSlot.HasCrop);
         Assert.Equal("seed.parsnip", group.YearRoundSlot.Crop!.SeedItemId);
         Assert.Equal("fert.basic", group.YearRoundSlot.FertilizerItemId);
-        Assert.True(group.YearRoundSlot.AutoReplant);
-        Assert.Equal(new ChestRef("Greenhouse", new TileCoord(8, 8)), group.OutputChest);
+        Assert.Equal(new ChestDestination(new ChestRef("Greenhouse", new TileCoord(8, 8))), group.OutputDestination);
         Assert.Single(group.Zones);
     }
 
@@ -258,8 +252,7 @@ public sealed class CropPlanDraftTests
         var first = source.AddGroup();
         var second = source.AddGroup();
         first.TrySetCrop(Season.Spring, Parsnip(), "Parsnip", out _);
-        first.ToggleAutoReplant(Season.Spring);
-        first.OutputChest = new ChestRef("Farm", new TileCoord(3, 4));
+        first.OutputDestination = new ChestDestination(new ChestRef("Farm", new TileCoord(3, 4)));
         second.TrySetCrop(Season.Fall, Pumpkin(), "Pumpkin", out _);
         source.SetGroupZones(first.Id, new[]
         {
@@ -275,8 +268,7 @@ public sealed class CropPlanDraftTests
         Assert.Equal(2, hydrated.Groups.Count);
         var hydratedFirst = hydrated.GetGroup(first.Id);
         Assert.True(hydratedFirst.IsConfigured(Season.Spring));
-        Assert.True(hydratedFirst.Slot(Season.Spring).AutoReplant);
-        Assert.Equal(new ChestRef("Farm", new TileCoord(3, 4)), hydratedFirst.OutputChest);
+        Assert.Equal(new ChestDestination(new ChestRef("Farm", new TileCoord(3, 4))), hydratedFirst.OutputDestination);
         Assert.Equal(2, hydratedFirst.Zones.Count);
         Assert.Single(hydrated.GetGroup(second.Id).Zones);
     }

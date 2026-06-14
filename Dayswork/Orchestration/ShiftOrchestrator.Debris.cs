@@ -56,7 +56,7 @@ internal sealed partial class ShiftOrchestrator
                 continue;
             }
 
-            _ctx!.Buffer.Add(itemId, stack, sourceTask, provenance ?? OutputScopeProvenance.Unknown);
+            Session.Ctx.Buffer.Add(itemId, stack, sourceTask, provenance ?? OutputScopeProvenance.Unknown);
 //             ModEntry.ModMonitor.Log(
 //                 $"[Dayswork][debris] collected {stack}x {itemId} from game debris task={sourceTask} chunks={d.Chunks.Count} debrisType={d.debrisType.Value} chunkType={d.chunkType.Value}.",
 //                 LogLevel.Trace);
@@ -101,7 +101,7 @@ internal sealed partial class ShiftOrchestrator
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork][debris] worker-created debris could not be resolved to a valid item id raw='{rawItemId}' display='{rawDisplayName}' loc={loc.Name} task={sourceTask} origin={originText} chunks={debris.Chunks.Count} debrisType={debris.debrisType.Value} chunkType={debris.chunkType.Value}.",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
     }
 
     private static bool TryGetRemovedStandardStoneDrop(StardewValley.Object obj, out string itemId, out int stack)
@@ -126,7 +126,7 @@ internal sealed partial class ShiftOrchestrator
         OutputScopeProvenance provenance)
     {
         var origin = new Vector2(tileVec.X * 64f + 32f, tileVec.Y * 64f + 32f);
-        _pendingDebrisSweeps.Add(new PendingDebrisSweep(
+        Session.PendingDebrisSweeps.Add(new PendingDebrisSweep(
             loc,
             origin,
             baseline,
@@ -138,22 +138,22 @@ internal sealed partial class ShiftOrchestrator
 
     private void ProcessPendingDebrisSweeps()
     {
-        for (var i = _pendingDebrisSweeps.Count - 1; i >= 0; i--)
+        for (var i = Session.PendingDebrisSweeps.Count - 1; i >= 0; i--)
         {
-            var sweep = _pendingDebrisSweeps[i];
+            var sweep = Session.PendingDebrisSweeps[i];
             CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles, sweep.Provenance);
             sweep.TicksRemaining--;
             if (sweep.TicksRemaining <= 0)
-                _pendingDebrisSweeps.RemoveAt(i);
+                Session.PendingDebrisSweeps.RemoveAt(i);
         }
     }
 
     private void FlushPendingDebrisSweeps()
     {
-        foreach (var sweep in _pendingDebrisSweeps)
+        foreach (var sweep in Session.PendingDebrisSweeps)
             CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles, sweep.Provenance);
 
-        _pendingDebrisSweeps.Clear();
+        Session.PendingDebrisSweeps.Clear();
     }
 
     private static bool IsDebrisNear(Debris debris, Vector2 origin, int radiusTiles)

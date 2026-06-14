@@ -3,7 +3,7 @@ namespace Dayswork.Core.Pricing;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
-public sealed class WorkScopeClassifier : IWorkScopeClassifier
+public sealed class WorkScopeClassifier
 {
     public WorkScopeSet Classify(ContractScopeSelection selection, IReadOnlySet<TaskKind> enabledTasks, CropPlan? cropPlan = null)
     {
@@ -36,7 +36,7 @@ public sealed class WorkScopeClassifier : IWorkScopeClassifier
         }
 
         var managedCrops = cropPlan is { IsEnabled: true }
-            ? new ManagedCropWorkScope(cropPlan.Assignments)
+            ? new ManagedCropWorkScope(cropPlan.Assignments, cropPlan.BuyFromJojaFirst)
             : null;
 
         return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks, managedCrops);

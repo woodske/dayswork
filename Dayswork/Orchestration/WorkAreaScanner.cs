@@ -13,7 +13,7 @@ internal sealed class WorkAreaScanner
 {
     // Legacy explicit ids retained as a guaranteed-parity INCLUDE set (covers Truffle 430, whose
     // category we don't hardcode, plus the original vanilla products). Open-ended new content —
-    // vanilla or SVE — is matched by category instead (U-SVE-04 / TODO-07).
+    // vanilla or SVE — is matched by category instead.
     private static readonly HashSet<string> AnimalProductObjectIds = new(StringComparer.Ordinal)
     {
         "107", "(O)107", // Dinosaur Egg
@@ -33,7 +33,7 @@ internal sealed class WorkAreaScanner
     // Animal-product item categories that drop on the ground and should be collected. Covers
     // vanilla Egg (-5) and Animal Goods (-18: Wool/Duck Feather/Rabbit's Foot) AND SVE products that
     // share them (Goose Egg/Golden Goose Egg -5; Camel Wool -18) AND any future product. Milk (-6)
-    // is intentionally excluded — it is tool-harvested, never a ground object. (U-SVE-04 / BR-SVE4-01)
+    // is intentionally excluded — it is tool-harvested, never a ground object.
     private static readonly HashSet<int> AnimalProductCategories = new()
     {
         StardewValley.Object.EggCategory,             // -5
@@ -41,13 +41,8 @@ internal sealed class WorkAreaScanner
     };
 
     // Narrow safety valve for a verified category false positive (a ground object in an animal-product
-    // category that should NOT be auto-collected). Empty unless a real case is found. (BR-SVE4-04)
+    // category that should NOT be auto-collected). Empty unless a real case is found.
     private static readonly HashSet<string> AnimalProductExcludedIds = new(StringComparer.Ordinal);
-
-    private readonly ICapabilityEvaluator _capability;
-
-    public WorkAreaScanner(ICapabilityEvaluator capability) =>
-        _capability = capability;
 
     private static bool IsInAnyZone(int x, int y, IReadOnlyList<Zone> zones)
     {
@@ -89,7 +84,7 @@ internal sealed class WorkAreaScanner
             {
                 scannedTiles++;
 
-                // Coexistence (U-MC-05, FR-MC-28): a tile owned by a managed crop zone is serviced
+                // Coexistence: a tile owned by a managed crop zone is serviced
                 // by the managed-crop path, so the general Water/Harvest/clearing scan skips it.
                 if (excludedZones is not null && IsInAnyZone(x, y, excludedZones))
                     continue;
@@ -206,7 +201,7 @@ internal sealed class WorkAreaScanner
             {
                 var axeTarget = ObjectTargetClassifier.ClassifyAxe(tileVec, loc);
                 if (axeTarget is null) return null;
-                if (!_capability.CanChop(snapshot, axeTarget.Value))
+                if (!CapabilityMatrix.CanChop(snapshot.AxeLevel, axeTarget.Value))
                 {
                     capabilitySkipped = true;
                     skippedKind = TaskKind.CutTrees;
@@ -220,7 +215,7 @@ internal sealed class WorkAreaScanner
             ObjectTargetClassifier.ClassifyAxe(tileVec, loc) is { } clumpAxeTarget &&
             clumpAxeTarget != AxeTarget.FruitTree)
         {
-            if (!_capability.CanChop(snapshot, clumpAxeTarget))
+            if (!CapabilityMatrix.CanChop(snapshot.AxeLevel, clumpAxeTarget))
             {
                 capabilitySkipped = true;
                 skippedKind = TaskKind.CutTrees;
@@ -243,7 +238,7 @@ internal sealed class WorkAreaScanner
                 var pickTarget = ObjectTargetClassifier.ClassifyPick(tileVec, loc);
                 if (pickTarget is not null)
                 {
-                    if (!_capability.CanBreak(snapshot, pickTarget.Value))
+                    if (!CapabilityMatrix.CanBreak(snapshot.PickaxeLevel, pickTarget.Value))
                     {
                         capabilitySkipped = true;
                         skippedKind = TaskKind.ClearRocks;
@@ -262,7 +257,7 @@ internal sealed class WorkAreaScanner
             var pickTarget = ObjectTargetClassifier.ClassifyPick(tileVec, loc);
             if (pickTarget is not null)
             {
-                if (!_capability.CanBreak(snapshot, pickTarget.Value))
+                if (!CapabilityMatrix.CanBreak(snapshot.PickaxeLevel, pickTarget.Value))
                 {
                     capabilitySkipped = true;
                     skippedKind = TaskKind.ClearRocks;

@@ -6,15 +6,15 @@ using Xunit;
 namespace Dayswork.Tests.Shifts;
 
 /// <summary>
-/// PBT-U13-04/05/06  —  StuckDetector pure-Core properties.
-/// Seed + shrunk-input logging is provided by FsCheck.Xunit by default (PBT-08 / PBT-U13-07).
+/// StuckDetector pure-Core properties.
+/// Seed + shrunk-input logging is provided by FsCheck.Xunit by default.
 /// To replay a known failure: [Property(Replay = "(seed1, seed2)")].
 /// </summary>
 public sealed class StuckDetectorTests
 {
     private const int DefaultThreshold = 10;
 
-    // ── PBT-U13-04: any progress tick resets → not stuck immediately after. ──
+    // ── Any progress tick resets → not stuck immediately after. ──
     [Property(MaxTest = 1000, Replay = "")]
     public Property Progress_Tick_Resets_Accumulator()
     {
@@ -40,7 +40,7 @@ public sealed class StuckDetectorTests
         });
     }
 
-    // ── PBT-U13-05: no-progress accumulation is monotone w.r.t. threshold. ──
+    // ── No-progress accumulation is monotone w.r.t. threshold. ──
     [Property(MaxTest = 1000, Replay = "")]
     public Property NoProgress_Threshold_Monotonicity()
     {
@@ -73,7 +73,7 @@ public sealed class StuckDetectorTests
             });
     }
 
-    // ── PBT-U13-06: Reset() always returns detector to not-stuck. ────────────
+    // ── Reset() always returns detector to not-stuck. ────────────
     [Property(MaxTest = 1000, Replay = "")]
     public Property Reset_Always_Clears()
     {

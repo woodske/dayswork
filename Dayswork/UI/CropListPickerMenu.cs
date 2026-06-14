@@ -12,7 +12,7 @@ internal sealed record PickerRow(string Label, string? Tag);
 
 /// <summary>
 /// Reusable scrollable single-select list page used by the Manage Crops authoring flow for the crop,
-/// fertilizer, and output-chest pickers (Q2=B). Mouse/keyboard + gamepad; B (or Back) cancels.
+/// fertilizer, and output-chest pickers. Mouse/keyboard + gamepad; B (or Back) cancels.
 /// </summary>
 internal sealed class CropListPickerMenu : IClickableMenu
 {

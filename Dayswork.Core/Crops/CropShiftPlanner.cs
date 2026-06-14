@@ -94,7 +94,7 @@ public sealed class CropShiftPlanner
                     OutputProvenance: harvestProvenance));
             if (tile.HasDebris)
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.ClearDebris));
-            if (allowTill && !tile.HasCrop && !tile.HasDebris && !tile.IsTilled)
+            if (allowTill && !tile.HasCrop && !tile.IsTilled)
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Till, RequiresDiggable: true));
             if (tile.HasCrop && !tile.IsWatered)
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Water));

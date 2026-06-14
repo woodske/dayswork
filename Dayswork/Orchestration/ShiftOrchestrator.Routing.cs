@@ -35,9 +35,9 @@ internal sealed partial class ShiftOrchestrator
 
     private static TileCoord FindFarmExitTile(Farm farm)
     {
-        // SVE/expansion entrance override (U-SVE-02): consult the compat seam first. If it supplies
+        // SVE/expansion entrance override: consult the compat seam first. If it supplies
         // a verified per-map entrance for this farm's signature, use it; otherwise fall through to
-        // the existing warp heuristic (FR-SVE-06). The override is best-effort and never throws.
+        // the existing warp heuristic. The override is best-effort and never throws.
         if (ModEntry.ExpansionCompat is { } compat &&
             compat.TryGetFarmEntranceOverride(farm, out var overrideTile))
             return ResolvePassableNearby(new TileCoord(overrideTile.X, overrideTile.Y), farm);
@@ -119,13 +119,13 @@ internal sealed partial class ShiftOrchestrator
             // log a warning if navigation ultimately fails.
             ModEntry.ModMonitor.Log(
                 $"[Dayswork] Farm exit: no passable approach tile found near warp ({warp.X},{warp.Y}) → {warp.TargetName}.",
-                LogLevel.Warn);
+                DevLog.WarnLevel);
             return new TileCoord(cx, cy);
         }
 
         ModEntry.ModMonitor.Log(
             "[Dayswork] No external farm exit warp found — using fallback tile (77, 15).",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
         return new TileCoord(77, 15);
     }
 
@@ -165,37 +165,37 @@ internal sealed partial class ShiftOrchestrator
 
         ModEntry.ModMonitor.Log(
             $"[Dayswork] Entrance override ({preferred.X},{preferred.Y}) blocked and no passable tile found within {maxRadius} tiles — using it anyway.",
-            LogLevel.Warn);
+            DevLog.WarnLevel);
         return preferred;
     }
 
     private TileCoord ResolveReachableShiftExitTile(Farm farm)
     {
-        if (_farmhand is null)
-            return _farmExitTile;
+        if (Session.Worker is null)
+            return Session.FarmExitTile;
 
-        var source = new TileCoord(_farmhand.TilePoint.X, _farmhand.TilePoint.Y);
+        var source = new TileCoord(Session.Worker.TilePoint.X, Session.Worker.TilePoint.Y);
         var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, farm);
-        if (routeCosts.ContainsKey(_farmExitTile))
-            return _farmExitTile;
+        if (routeCosts.ContainsKey(Session.FarmExitTile))
+            return Session.FarmExitTile;
 
         if (WorkerRouteSelector.TrySelectNearestReachableTile(
-                EnumerateNearbyPassableTiles(_farmExitTile, farm, maxRadius: 16),
+                EnumerateNearbyPassableTiles(Session.FarmExitTile, farm, maxRadius: 16),
                 routeCosts,
                 out var fallback))
         {
             DevLog.Log(
-                $"[Dayswork][exit] configured exit tile ({_farmExitTile.X},{_farmExitTile.Y}) unreachable from " +
+                $"[Dayswork][exit] configured exit tile ({Session.FarmExitTile.X},{Session.FarmExitTile.Y}) unreachable from " +
                 $"({source.X},{source.Y}); using reachable nearby tile ({fallback.X},{fallback.Y}).",
                 LogLevel.Info);
             return fallback;
         }
 
         ModEntry.ModMonitor.Log(
-            $"[Dayswork][exit] configured exit tile ({_farmExitTile.X},{_farmExitTile.Y}) unreachable from " +
+            $"[Dayswork][exit] configured exit tile ({Session.FarmExitTile.X},{Session.FarmExitTile.Y}) unreachable from " +
             $"({source.X},{source.Y}) and no reachable nearby tile found; using configured tile.",
-            LogLevel.Warn);
-        return _farmExitTile;
+            DevLog.WarnLevel);
+        return Session.FarmExitTile;
     }
 
     private static IEnumerable<TileCoord> EnumerateNearbyPassableTiles(TileCoord preferred, Farm farm, int maxRadius)
@@ -238,244 +238,25 @@ internal sealed partial class ShiftOrchestrator
         compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
         descriptor.Role == ExpansionLocationRole.GreenhouseWork;
 
-    private bool TryStartExpansionRoute(
-        string sourceLocationName,
-        string targetLocationName,
-        ExpansionRoutePurpose purpose,
-        PendingExpansionRouteKind routeKind,
-        WorkBatch? batch)
-    {
-        if (_farmhand is null || ModEntry.ExpansionCompat is not { } compat)
-            return false;
-
-        var farm = Game1.getFarm();
-        if (!compat.TryValidateRoute(
-                farm,
-                sourceLocationName,
-                targetLocationName,
-                purpose,
-                out var route,
-                out var failure))
-        {
-            LogExpansionRouteFailure(failure);
-            return false;
-        }
-
-        _pendingExpansionRouteKind = routeKind;
-        _pendingExpansionRouteBatch = batch;
-        _toolAnimator.StopSwing();
-        EnsureWorkingIntent(new IntentMoveToTile(route.Hops[0].Hop.ApproachTile));
-        _expansionRouteNavigator.Start(route, _farmhand);
-        _currentLocation = route.Hops[0].Source;
-        return true;
-    }
-
-    private void HandleExpansionRouteMovement()
-    {
-        _expansionRouteNavigator.Update();
-        if (_farmhand?.currentLocation is { } location)
-            _currentLocation = location;
-
-        if (_expansionRouteNavigator.NavigationFailed)
-        {
-            FailPendingExpansionRoute(_expansionRouteNavigator.Failure);
-            return;
-        }
-
-        if (!_expansionRouteNavigator.IsComplete)
-            return;
-
-        var completedKind = _pendingExpansionRouteKind;
-        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
-        _expansionRouteNavigator.Clear();
-
-        switch (completedKind)
-        {
-            case PendingExpansionRouteKind.WorkEntry:
-                CompleteExpansionWorkEntry();
-                break;
-            case PendingExpansionRouteKind.WorkExit:
-                CompleteExpansionWorkExit();
-                break;
-            case PendingExpansionRouteKind.DepositEntry:
-                CompleteExpansionDepositEntry();
-                break;
-            case PendingExpansionRouteKind.DepositExit:
-                FinalizeAndAdvanceTrip(Game1.getFarm());
-                break;
-        }
-    }
-
-    private void CompleteExpansionWorkEntry()
-    {
-        if (_ctx is null || _farmhand is null)
-            return;
-
-        var batch = _pendingExpansionRouteBatch ?? _ctx.Batches[_ctx.CurrentBatchIndex];
-        _pendingExpansionRouteBatch = null;
-        var location = _farmhand.currentLocation ?? Game1.getLocationFromName(batch.LocationName);
-        if (location is null)
-        {
-            _ctx.CurrentBatchIndex++;
-            BeginCurrentBatch();
-            return;
-        }
-
-        _currentLocation = location;
-        if (batch.Kind == BatchKind.ManagedCrops)
-        {
-            BeginManagedCropBatch(batch);
-            return;
-        }
-
-        var batchTasks = batch.Tasks.ToHashSet();
-        var tileWork = _indoorScanner.ScanInterior(
-            location,
-            batchTasks,
-            _ctx.ToolSnapshot,
-            OutputScopeProvenance.Greenhouse(batch.LocationName));
-
-        QueueBatchWork(batch with { TileWork = tileWork, AnimalWork = Array.Empty<AnimalWorkItem>() }, location);
-        StartNextAnimalOrTileOrAdvance();
-    }
-
-    private void CompleteExpansionWorkExit()
-    {
-        _pendingExpansionRouteBatch = null;
-        _currentLocation = Game1.getFarm();
-        if (_ctx is null)
-            return;
-
-        _ctx.CurrentBatchIndex++;
-        BeginCurrentBatch();
-    }
-
-    private void CompleteExpansionDepositEntry()
-    {
-        if (_currentTrip is not { Destination: ChestDestination chestDest })
-        {
-            FinalizeAndAdvanceTrip(Game1.getFarm());
-            return;
-        }
-
-        _ctx!.StateMachine.SetIntent(ToDepositIntent(_currentTrip));
-        StartChestDepositNavigation(_currentTrip, chestDest, _currentLocation ?? Game1.getFarm());
-    }
-
-    private void FailPendingExpansionRoute(ExpansionRouteFailure? failure)
-    {
-        if (failure is not null)
-            LogExpansionRouteFailure(failure);
-
-        var failedKind = _pendingExpansionRouteKind;
-        _pendingExpansionRouteKind = PendingExpansionRouteKind.None;
-        _pendingExpansionRouteBatch = null;
-        _expansionRouteNavigator.Clear();
-
-        switch (failedKind)
-        {
-            case PendingExpansionRouteKind.WorkEntry:
-                if (_ctx is not null)
-                {
-                    _ctx.CurrentBatchIndex++;
-                    BeginCurrentBatch();
-                }
-                break;
-            case PendingExpansionRouteKind.WorkExit:
-                WarpExpansionWorkerToFarm();
-                CompleteExpansionWorkExit();
-                break;
-            case PendingExpansionRouteKind.DepositEntry:
-                if (_currentTrip is not null)
-                    MarkDepositTripUndelivered(_currentTrip);
-                FinalizeAndAdvanceTrip(Game1.getFarm());
-                break;
-            case PendingExpansionRouteKind.DepositExit:
-                WarpExpansionWorkerToFarm();
-                FinalizeAndAdvanceTrip(Game1.getFarm());
-                break;
-        }
-    }
-
     private void LogExpansionRouteFailure(ExpansionRouteFailure failure) =>
-        ModEntry.ModMonitor.Log(ExpansionCompatService.FormatRouteFailure(failure), LogLevel.Warn);
+        ModEntry.ModMonitor.Log(ExpansionCompatService.FormatRouteFailure(failure), LogLevel.Debug);
 
-    private void WarpExpansionWorkerToFarm()
+    internal void WarpExpansionWorkerToFarm()
     {
-        if (_farmhand is null)
+        if (Session.Worker is null)
             return;
 
         var farm = Game1.getFarm();
-        var from = _farmhand.currentLocation ?? _currentLocation ?? farm;
+        var from = Session.Worker.currentLocation ?? Session.CurrentLocation ?? farm;
         if (from == farm)
         {
-            _currentLocation = farm;
+            Session.CurrentLocation = farm;
             _nav.Clear();
             return;
         }
 
-        _nav.WarpWorker(_farmhand, from, farm, _farmExitTile);
-        _currentLocation = farm;
+        _nav.WarpWorker(Session.Worker, from, farm, Session.FarmExitTile);
+        Session.CurrentLocation = farm;
     }
 
-    private void CompleteBuildingEntry()
-    {
-        if (_ctx is null || _farmhand is null || _pendingBuildingInterior is null)
-            return;
-
-        var batch = _ctx.Batches[_ctx.CurrentBatchIndex];
-        var interior = _pendingBuildingInterior;
-        var entryTile = _buildingNavigator.ResolveInteriorEntryTile(interior);
-        _buildingNavigator.Enter(_farmhand, interior, entryTile);
-        _currentLocation = interior;
-        _pendingBuildingEntry = false;
-        _pendingBuildingInterior = null;
-
-        if (batch.Kind == BatchKind.ManagedCrops)
-        {
-            BeginManagedCropBatch(batch);
-            return;
-        }
-
-        IReadOnlyList<WorkItem> tileWork;
-        IReadOnlyList<AnimalWorkItem> animalWork;
-        var batchTasks = batch.Tasks.ToHashSet();
-
-        if (batch.Kind == BatchKind.AnimalBuilding)
-        {
-            tileWork = _indoorScanner.ScanInterior(
-                interior,
-                batchTasks,
-                _ctx.ToolSnapshot,
-                OutputScopeProvenance.AnimalBuilding(batch.LocationName));
-            if (batch.FeedBuilding)
-            {
-                _currentFeedPlan = _animalHandler.CreateFeedWork(interior);
-                tileWork = _currentFeedPlan.WorkItems.Concat(tileWork).ToList();
-                _hayInHand = 0;
-            }
-            else
-            {
-                _currentFeedPlan = null;
-                _hayInHand = 0;
-            }
-
-            var selectedHome = new HashSet<string>(StringComparer.Ordinal) { batch.LocationName };
-            animalWork = BuildAnimalWork(interior, selectedHome, batchTasks);
-        }
-        else
-        {
-            _currentFeedPlan = null;
-            _hayInHand = 0;
-            tileWork = _indoorScanner.ScanInterior(
-                interior,
-                batchTasks,
-                _ctx.ToolSnapshot,
-                OutputScopeProvenance.Greenhouse(batch.LocationName));
-            animalWork = Array.Empty<AnimalWorkItem>();
-        }
-
-        QueueBatchWork(batch with { TileWork = tileWork, AnimalWork = animalWork }, interior);
-        StartNextAnimalOrTileOrAdvance();
-    }
 }

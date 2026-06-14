@@ -13,6 +13,7 @@ public static class CropPlanSerialization
 
         return new CropPlanDtoV1
         {
+            BuyFromJojaFirst = cropPlan.BuyFromJojaFirst,
             Assignments = cropPlan.Assignments
                 .OrderBy(DescribeAssignment, StringComparer.Ordinal)
                 .Select(MapAssignmentToDto)
@@ -25,7 +26,7 @@ public static class CropPlanSerialization
         if (dto is null || dto.Assignments.Count == 0)
             return CropPlan.Empty;
 
-        return new CropPlan(dto.Assignments.Select(MapAssignmentToDomain).ToList());
+        return new CropPlan(dto.Assignments.Select(MapAssignmentToDomain).ToList(), dto.BuyFromJojaFirst);
     }
 
     private static CropZoneAssignmentDtoV1 MapAssignmentToDto(CropZoneAssignment assignment) =>
@@ -42,7 +43,8 @@ public static class CropPlanSerialization
                 .ThenBy(choice => choice.IsLocked)
                 .Select(MapChoiceToDto)
                 .ToList(),
-            OutputChest = assignment.OutputChest is null ? null : MapChestRefToDto(assignment.OutputChest),
+            OutputChest = assignment.OutputDestination is ChestDestination chest ? MapChestRefToDto(chest.Ref) : null,
+            OutputShippingBin = assignment.OutputDestination is ShippingBinDestination,
             GroupId = assignment.GroupId,
         };
 
@@ -60,7 +62,9 @@ public static class CropPlanSerialization
             (dto.Choices ?? throw new JsonException("CropPlan assignment Choices was null."))
                 .Select(MapChoiceToDomain)
                 .ToList(),
-            dto.OutputChest is null ? null : MapChestRefToDomain(dto.OutputChest),
+            dto.OutputShippingBin ? ShippingBinDestination.Instance
+            : dto.OutputChest is null ? null
+            : new ChestDestination(MapChestRefToDomain(dto.OutputChest)),
             dto.GroupId);
     }
 
@@ -78,7 +82,6 @@ public static class CropPlanSerialization
             StorePreference = choice.StorePreference.ToString(),
             IsLocked = choice.IsLocked,
             OriginSeason = choice.OriginSeason?.ToString(),
-            AutoReplant = choice.AutoReplant,
         };
 
     private static SeasonCropChoice MapChoiceToDomain(SeasonCropChoiceDtoV1 dto)
@@ -99,8 +102,7 @@ public static class CropPlanSerialization
             crop,
             Enum.Parse<StorePreference>(Require(dto.StorePreference, "CropPlan choice StorePreference")),
             dto.IsLocked,
-            string.IsNullOrWhiteSpace(dto.OriginSeason) ? null : Enum.Parse<Season>(dto.OriginSeason),
-            dto.AutoReplant);
+            string.IsNullOrWhiteSpace(dto.OriginSeason) ? null : Enum.Parse<Season>(dto.OriginSeason));
     }
 
     private static ChestRefDtoV1 MapChestRefToDto(ChestRef chestRef) =>

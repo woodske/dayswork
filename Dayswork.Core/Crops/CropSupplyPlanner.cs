@@ -35,10 +35,12 @@ public sealed class CropSupplyPlanner
             var fertilizerDeficit = Math.Max(0, targetTiles - availableFertilizer);
             var storeFertilizer = QuantityInStores(fertilizerId, stockSnapshots);
 
-            if (availableFertilizer + storeFertilizer <= 0)
+            if ((long)availableFertilizer + storeFertilizer <= 0)
                 return Array.Empty<SupplyTarget>();
 
-            var maxSeedPurchasesWithFertilizer = Math.Max(0, availableFertilizer + storeFertilizer - availableSeeds);
+            var maxSeedPurchasesWithFertilizer = (int)Math.Min(
+                (long)targetTiles,
+                Math.Max(0L, (long)availableFertilizer + storeFertilizer - availableSeeds));
             seedDeficit = Math.Min(seedDeficit, maxSeedPurchasesWithFertilizer);
 
             if (fertilizerDeficit > 0)
@@ -59,8 +61,8 @@ public sealed class CropSupplyPlanner
         inventory.QuantityOf(crop.SeedItemId) > 0
         && (!crop.RequiresFertilizer || inventory.QuantityOf(crop.FertilizerItemId!) > 0);
 
-    private static int QuantityInStores(string itemId, IReadOnlyList<ShopStockSnapshot>? stockSnapshots) =>
+    private static long QuantityInStores(string itemId, IReadOnlyList<ShopStockSnapshot>? stockSnapshots) =>
         (stockSnapshots ?? Array.Empty<ShopStockSnapshot>())
             .Where(snapshot => snapshot.IsOpen)
-            .Sum(snapshot => snapshot.QuantityOf(itemId));
+            .Sum(snapshot => (long)snapshot.QuantityOf(itemId));
 }

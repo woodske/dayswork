@@ -20,7 +20,6 @@ internal static class RuntimeConfigSnapshotMapper
             WorkerActionAnimationMs = Math.Max(1, config.WorkerActionAnimationMs),
             WorkerEntranceHoldTicks = Math.Max(0, config.WorkerEntranceHoldTicks),
             WorkOnHolidays = config.WorkOnHolidays,
-            PreferredCropStore = NormalizePreferredCropStore(config.PreferredCropStore),
             EnergyTierEnergy = NormalizePositiveDictionary(
                 config.EnergyTierEnergy,
                 defaults.EnergyTierEnergy,
@@ -68,7 +67,7 @@ internal static class RuntimeConfigSnapshotMapper
             workActionCosts);
     }
 
-    private static readonly IConfigSnapshot DefaultSnapshot = ConfigDefaults.Build();
+    private static readonly ConfigSnapshot DefaultSnapshot = ConfigDefaults.Build();
 
     private static Dictionary<string, int> NormalizeNonNegativeDictionary(
         Dictionary<string, int>? actual,
@@ -115,13 +114,6 @@ internal static class RuntimeConfigSnapshotMapper
 
         return normalized;
     }
-
-    private static string NormalizePreferredCropStore(string? value) => value switch
-    {
-        "Pierre" => "Pierre",
-        "Joja" => "Joja",
-        _ => "Either",
-    };
 
     private static string BuildFallbackCode(string propertyName, string key, int defaultValue)
     {

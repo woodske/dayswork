@@ -14,7 +14,6 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
     private const int SeasonColW = 132;
     private const int CropColW = 270;
     private const int FertColW = 230;
-    private const int ReplantColW = 78;
     private const int Gap = 14;
     private const int LocationButtonW = 210;
 
@@ -88,14 +87,12 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
             I18nHelper.Get("ui.manage_crops.output_label", new { name = OutputChestLabel() }),
             color: Game1.textColor));
         rows.Add(new Spacer(8));
-        rows.Add(new MenuButton(
-            I18nHelper.Get("ui.manage_crops.set_btn"),
-            () => _onPickChest(_group.Id),
-            fixedWidth: 260,
-            height: ButtonHeight));
-
-        rows.Add(new Spacer(18));
-        rows.Add(BuildDrawRow());
+        rows.Add(BuildBottomButtonRow());
+        rows.Add(new Spacer(8));
+        rows.Add(new Label(
+            I18nHelper.Get("ui.manage_crops.group_zones",
+                new { zones = _group.Zones.Count, tiles = CountTiles(_group.Zones) }),
+            color: SecondaryTextColor));
 
         return new PageShell(
             title: I18nHelper.Get("ui.manage_crops.editor_title"),
@@ -108,8 +105,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
         new HStack(Gap,
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_season"), color: HeaderColor), SeasonColW),
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_crop"), color: HeaderColor), CropColW),
-            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_fertilizer"), color: HeaderColor), FertColW),
-            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_replant"), color: HeaderColor), ReplantColW));
+            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_crops.header_fertilizer"), color: HeaderColor), FertColW));
 
     private ILayoutElement BuildLocationRow()
     {
@@ -126,6 +122,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
                     ? I18nHelper.Get("ui.manage_crops.location_selected", new { name = option.DisplayName })
                     : option.DisplayName,
                 () => _onSetLocation(_group.Id, option.LocationName),
+                enabled: option.IsAvailable,
                 fixedWidth: LocationButtonW,
                 height: ButtonHeight,
                 textAlign: HAlign.Left)));
@@ -154,13 +151,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
                     () => _onPickFertilizer(_group.Id, season),
                     enabled: configured,
                     fixedWidth: FertColW, height: ButtonHeight, textAlign: HAlign.Left),
-                FertColW),
-            HStack.Fixed(
-                new Checkbox(
-                    configured && _group.Slot(season).AutoReplant,
-                    _ => { _group.ToggleAutoReplant(season); Rebuild(); },
-                    enabled: configured),
-                ReplantColW));
+                FertColW));
     }
 
     private ILayoutElement BuildYearRoundRow()
@@ -183,13 +174,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
                     () => _onPickFertilizer(_group.Id, Season.Spring),
                     enabled: configured,
                     fixedWidth: FertColW, height: ButtonHeight, textAlign: HAlign.Left),
-                FertColW),
-            HStack.Fixed(
-                new Checkbox(
-                    configured && _group.YearRoundSlot.AutoReplant,
-                    _ => { _group.ToggleYearRoundAutoReplant(); Rebuild(); },
-                    enabled: configured),
-                ReplantColW));
+                FertColW));
     }
 
     private ILayoutElement BuildLockedRow(Season season)
@@ -212,25 +197,17 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
             HStack.Fill(new Label(reason, color: LockedColor)));
     }
 
-    private ILayoutElement BuildDrawRow()
-    {
-        var parts = new List<HStack.Column>
-        {
-            HStack.Auto(new MenuButton(
+    private ILayoutElement BuildBottomButtonRow() =>
+        new HStack(0,
+            HStack.Fixed(new MenuButton(
+                I18nHelper.Get("ui.manage_crops.set_btn"),
+                () => _onPickChest(_group.Id), fixedWidth: 260, height: ButtonHeight), 260),
+            HStack.Fixed(new Spacer(24), 24),
+            HStack.Fixed(new MenuButton(
                 I18nHelper.Get("ui.manage_crops.draw_btn"),
                 () => _onBeginDraw(_group.Id),
                 enabled: _group.HasAnyConfiguredSeason,
-                fixedWidth: 250,
-                height: 52)),
-            HStack.Auto(new Spacer(18)),
-            HStack.Fill(new Label(
-                I18nHelper.Get("ui.manage_crops.group_zones",
-                    new { zones = _group.Zones.Count, tiles = CountTiles(_group.Zones) }),
-                color: SecondaryTextColor)),
-        };
-
-        return new HStack(0, parts.ToArray());
-    }
+                fixedWidth: 250, height: ButtonHeight), 250));
 
     private string FertilizerLabel(Season season)
     {
@@ -253,13 +230,12 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
             : slot.FertilizerDisplayName;
     }
 
-    private string OutputChestLabel()
+    private string OutputChestLabel() => _group.OutputDestination switch
     {
-        var chest = _group.OutputChest;
-        return chest is null
-            ? I18nHelper.Get("ui.manage_crops.output_automatic")
-            : I18nHelper.Get("ui.manage_crops.output_chest_at", new { x = chest.Tile.X, y = chest.Tile.Y });
-    }
+        ShippingBinDestination => I18nHelper.Get("ui.zone_chest.shipping_bin_option"),
+        ChestDestination chest => I18nHelper.Get("ui.manage_crops.output_chest_at", new { x = chest.Ref.Tile.X, y = chest.Ref.Tile.Y }),
+        _ => I18nHelper.Get("ui.manage_crops.output_automatic"),
+    };
 
     private static int CountTiles(IEnumerable<Zone> zones) =>
         zones.Sum(zone =>

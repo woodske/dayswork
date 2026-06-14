@@ -8,10 +8,8 @@ using StardewValley.Buildings;
 namespace Dayswork.Integration;
 
 /// <summary>
-/// Handles action-clicks on the hiring building (U-25 WS2). The hire/manage flow opens only when
-/// the player clicks the drawn-in bulletin board (upper-right of the cabin); the output chest opens
-/// from its porch tile. Clicking anywhere else on the building does nothing. Single-player only
-/// (REL-U10-01).
+/// Handles action-clicks on the hiring building. Clicking anywhere on the building footprint opens
+/// the hire/manage flow, except the two porch chests which open their own UI. Single-player only.
 /// </summary>
 internal sealed class HiringBuildingInteraction
 {
@@ -23,14 +21,18 @@ internal sealed class HiringBuildingInteraction
     {
         if (!Context.IsPlayerFree || Game1.activeClickableMenu is not null)
             return;
-        if (!e.Button.IsActionButton())
+        // Also accept MouseLeft: on Android gamepadControls=true causes IsActionButton()
+        // to reject touch taps (which fire as SButton.MouseLeft).
+        if (!e.Button.IsActionButton() && e.Button != SButton.MouseLeft)
             return;
         if (MultiplayerGuard.IsMultiplayer())
             return;
         if (Game1.currentLocation is not Farm farm)
             return;
 
-        var grab = e.Cursor.GrabTile;
+        // Use Tile (actual tap position) not GrabTile: on Android, GrabTile snaps to the
+        // nearest reachable tile, which is outside the blocked building footprint.
+        var grab = e.Cursor.Tile;
         var gx = (int)grab.X;
         var gy = (int)grab.Y;
 
@@ -61,15 +63,9 @@ internal sealed class HiringBuildingInteraction
             return;
         }
 
-        // Bulletin board → hire/manage flow.
-        if (IsBulletinBoardTile(building, gx, gy))
-        {
-            _helper.Input.Suppress(e.Button);
-            ModEntry.Coordinator.OpenFromBuilding();
-            return;
-        }
-
-        // Any other part of the building is non-interactive.
+        // Any non-chest tile on the building opens the hire/manage flow.
+        _helper.Input.Suppress(e.Button);
+        ModEntry.Coordinator.OpenFromBuilding();
     }
 
     internal static Building? FindHiringBuilding(Farm farm)
@@ -96,17 +92,6 @@ internal sealed class HiringBuildingInteraction
     private static bool IsInputChestDisplayTile(Building building, int x, int y) =>
         x == building.tileX.Value + HiringBuilding.InputChestDisplayTile.X
         && y == building.tileY.Value + HiringBuilding.InputChestDisplayTile.Y;
-
-    private static bool IsBulletinBoardTile(Building building, int x, int y)
-    {
-        foreach (var tile in HiringBuilding.BulletinBoardTiles)
-        {
-            if (x == building.tileX.Value + tile.X && y == building.tileY.Value + tile.Y)
-                return true;
-        }
-
-        return false;
-    }
 
     /// <summary>True when the player stands within one tile of the building's footprint (any side).</summary>
     private static bool PlayerNextToFootprint(Building building, Point player)

@@ -40,4 +40,24 @@ public sealed class CropSupplyPlannerTests
 
         Assert.Empty(targets);
     }
+
+    [Fact]
+    public void CalculatePurchaseTargets_FertilizerUnlimitedInStore_DoesNotOverflowAndReturnsSeedTarget()
+    {
+        // Regression: int.MaxValue store stock + any chest quantity overflowed to negative, causing
+        // the early-return guard to fire and return empty targets for zones with unlimited fertilizer.
+        var planner = new CropSupplyPlanner();
+        var crop = new CropDescriptor("crop.melon", "479", "465", 8, 6, null, Array.Empty<Dayswork.Core.Domain.Season>());
+        var inventory = new SupplyInventory(new Dictionary<string, int> { ["465"] = 6 });
+        var stock = new List<ShopStockSnapshot>
+        {
+            new(Store.Pierre, isOpen: true, new Dictionary<string, int> { ["465"] = int.MaxValue }),
+        };
+
+        var targets = planner.CalculatePurchaseTargets(crop, 6, inventory, StorePreference.Pierre, stock);
+
+        Assert.Single(targets);
+        Assert.Equal("479", targets[0].ItemId);
+        Assert.Equal(6, targets[0].Quantity);
+    }
 }

@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 using Dayswork.Core.Config;
 using Dayswork.Core.Domain;
 
-public sealed class WorkerEnergyProfileBuilder : IWorkerEnergyProfileBuilder
+public sealed class WorkerEnergyProfileBuilder
 {
     private readonly ConfigValueResolver _resolver;
 
@@ -13,7 +13,7 @@ public sealed class WorkerEnergyProfileBuilder : IWorkerEnergyProfileBuilder
         _resolver = resolver;
     }
 
-    public WorkerEnergyProfile BuildProfile(IReadOnlySet<TaskKind> enabledTasks, EnergyTier tier, IConfigSnapshot config)
+    public WorkerEnergyProfile BuildProfile(IReadOnlySet<TaskKind> enabledTasks, EnergyTier tier, ConfigSnapshot config)
     {
         var actionCosts = new Dictionary<WorkActionKind, int>();
         foreach (var action in Enum.GetValues<WorkActionKind>())

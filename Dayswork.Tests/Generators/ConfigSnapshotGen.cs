@@ -1,4 +1,4 @@
-// PBT-07: centralized FsCheck arbitrary for IConfigSnapshot.
+// Centralized FsCheck arbitrary for ConfigSnapshot.
 // Generates only invariant-preserving snapshots (all INV-CFG-* satisfied by construction).
 namespace Dayswork.Tests.Generators;
 
@@ -10,7 +10,7 @@ using FsCheck;
 
 public static class ConfigSnapshotGen
 {
-    public static Arbitrary<IConfigSnapshot> Snapshot()
+    public static Arbitrary<ConfigSnapshot> Snapshot()
     {
         var tierEnergyGen = Gen.Sequence(
             Enum.GetValues<EnergyTier>().Select(tier => Gen.Choose(1, 500).Select(v => (tier, v)))
@@ -41,7 +41,7 @@ public static class ConfigSnapshotGen
             from tierEnergy in tierEnergyGen
             from tierPrice in tierPriceGen
             from actionCosts in actionCostGen
-            select (IConfigSnapshot)ConfigSnapshotFactory.Create(
+            select (ConfigSnapshot)ConfigSnapshotFactory.Create(
                 hardCap,
                 stuckInit,
                 stuckPost,

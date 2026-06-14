@@ -3,10 +3,10 @@ namespace Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 
 /// <summary>
-/// Pure shift-level supply aggregator (U-MC-06). Builds one <see cref="ShiftPurchaseManifest"/>
+/// Pure shift-level supply aggregator. Builds one <see cref="ShiftPurchaseManifest"/>
 /// for the whole shift by sizing each managed zone's purchase from its planned plantable tiles
-/// (FR-MC-12), summing demand across zones against a single shared input-chest reservoir, then
-/// resolving each item to a store with the global preference (DEV-MC-06-01) and live stock+prices.
+///, summing demand across zones against a single shared input-chest reservoir, then
+/// resolving each item to a store with the global preference and live stock+prices.
 /// </summary>
 public sealed class ShiftSupplyAggregator
 {
@@ -35,7 +35,8 @@ public sealed class ShiftSupplyAggregator
         SupplyInventory chestInventory,
         StorePreference globalPreference,
         IReadOnlyList<ShopStockSnapshot>? liveStock,
-        bool isFestivalDay)
+        bool isFestivalDay,
+        Action<string>? debugLog = null)
     {
         if (plan is null || !plan.IsEnabled)
             return ShiftPurchaseManifest.Empty;
@@ -56,17 +57,25 @@ public sealed class ShiftSupplyAggregator
 
             var choice = ResolveChoice(assignment, field);
             if (choice is null)
+            {
+                debugLog?.Invoke($"zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}): no choice for season {field.Date.Season}");
                 continue;
+            }
 
             var crop = choice.Crop;
             var isViable = _viability.IsPlantingViable(field, crop, useFertilizer: crop.RequiresFertilizer);
             var planned = PlannedPlantableTileCounter.CountPlantable(field, assignment, choice, isViable);
             if (planned <= 0)
+            {
+                debugLog?.Invoke($"zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}): seed={crop.SeedItemId} isViable={isViable} planned=0, skipped");
                 continue;
+            }
 
             var workingInventory = new SupplyInventory(working);
             var targets = _supplyPlanner.CalculatePurchaseTargets(
                 crop, planned, workingInventory, globalPreference, liveStock);
+
+            debugLog?.Invoke($"zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}): seed={crop.SeedItemId} fert={crop.FertilizerItemId} isViable={isViable} planned={planned} targets=[{string.Join(", ", targets.Select(t => $"{t.ItemId}:{t.Quantity}"))}]");
 
             foreach (var target in targets)
             {

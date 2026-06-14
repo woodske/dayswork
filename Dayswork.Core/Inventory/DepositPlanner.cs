@@ -2,9 +2,22 @@ using Dayswork.Core.Domain;
 
 namespace Dayswork.Core.Inventory;
 
-// C-11 DepositPlanner — pure, zero Stardew refs (Pattern M / MAINT-U14-01).
-public sealed class DepositPlanner : IDepositPlanner
+internal enum UndeliveredDepositResolution
 {
+    AutomaticOverflow,
+    ShippingBin,
+}
+
+// DepositPlanner — pure, zero Stardew refs.
+public sealed class DepositPlanner
+{
+    // Where an undelivered stack falls back to: shipping-bin trips still ship; everything else
+    // goes to automatic overflow (items are never lost).
+    internal static UndeliveredDepositResolution ResolveUndelivered(DestinationKey destination) =>
+        destination is ShippingBinDestination
+            ? UndeliveredDepositResolution.ShippingBin
+            : UndeliveredDepositResolution.AutomaticOverflow;
+
     public DepositPlan Plan(
         IReadOnlyList<BufferedItem> snapshot,
         IReadOnlyDictionary<TaskKind, DestinationKey> assignments,
@@ -42,7 +55,7 @@ public sealed class DepositPlanner : IDepositPlanner
                 case ShippingBinDestination:
                     AddToGroup(walkable, dest, shippingBinTile, item);
                     break;
-                default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow (FD-Q2=A / FR-OUT-04)
+                default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow
                     Accumulate(automaticOverflow, (item.QualifiedItemId, item.SourceTask, item.Provenance), item.Quantity);
                     break;
             }

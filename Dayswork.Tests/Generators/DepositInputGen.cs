@@ -4,9 +4,9 @@ using FsCheck;
 
 namespace Dayswork.Tests.Generators;
 
-// PBT-U14-05 shared generator: produces (buffer snapshot, task→destination map) pairs for
+// Shared generator: produces (buffer snapshot, task→destination map) pairs for
 // DepositPlanner properties. Composes ZoneGen.ChestRef so chests can be shared across tasks
-// (exercising consolidation) and so some tasks are left unassigned (exercising FD-Q2=A → overflow).
+// (exercising consolidation) and so some tasks are left unassigned (exercising the automatic-overflow fallback).
 public static class DepositInputGen
 {
     private static readonly TaskKind[] AllTasks = Enum.GetValues<TaskKind>();
@@ -47,7 +47,7 @@ public static class DepositInputGen
         from chestIdx in chestPool.Count == 0 ? Gen.Constant(0) : Gen.Choose(0, chestPool.Count - 1)
         select pick switch
         {
-            0      => (DestinationKey?)null,                    // absent ⇒ automatic overflow (FD-Q2=A)
+            0      => (DestinationKey?)null,                    // absent ⇒ automatic overflow
             1      => AutomaticOutputDestination.Instance,      // explicit automatic overflow
             2 or 3 => ShippingBinDestination.Instance,               // shipping bin
             _      => chestPool.Count == 0                            // chest (or bin if no chests)

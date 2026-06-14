@@ -14,7 +14,7 @@ public sealed record DepositTrip(
     TileCoord Tile,
     IReadOnlyList<RoutedItemStack> Items);
 
-// The complete routing result for a shift's buffer (Pattern M).
+// The complete routing result for a shift's buffer.
 // Conservation invariant: items across Trips[*].Items ∪ AutomaticOverflow == input snapshot.
 public sealed record DepositPlan(
     IReadOnlyList<DepositTrip> Trips,
@@ -23,10 +23,10 @@ public sealed record DepositPlan(
 // Why an item ended up in automatic overflow rather than a walked deposit.
 public enum OverflowReason
 {
-    NoChestAssigned, // task had no assignment ⇒ AutomaticOutputDestination (FD-Q2=A / FR-OUT-04)
-    ChestFull,       // assigned chest could not hold all items (FR-OUT-02)
-    ChestMissing,    // assigned chest was moved/destroyed (FR-OUT-03)
-    NotDelivered,    // player slept/saved before the deposit run finished (FD-Q5=A)
+    NoChestAssigned, // task had no assignment ⇒ AutomaticOutputDestination
+    ChestFull,       // assigned chest could not hold all items
+    ChestMissing,    // assigned chest was moved/destroyed
+    NotDelivered,    // player slept/saved before the deposit run finished
     ChestBusy,       // assigned chest was being accessed by a farmer (mutex held) when the worker arrived
 }
 

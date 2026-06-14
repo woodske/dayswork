@@ -4,7 +4,7 @@ namespace Dayswork.Core.Compat;
 
 /// <summary>
 /// Default profile representing "no expansion overrides". Every lookup returns "no override", so
-/// all consumers take their existing vanilla code paths (NFR-SVE-01 / S-21 / pattern P-SVE-04).
+/// all consumers take their existing vanilla code paths.
 /// Matches any installed-mod set, so it serves as the lowest-precedence fallback in the selector.
 /// </summary>
 public sealed class VanillaExpansionProfile : IExpansionProfile

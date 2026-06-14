@@ -8,7 +8,7 @@ using Microsoft.Xna.Framework.Graphics;
 namespace Dayswork.Integration;
 
 /// <summary>
-/// The placeable farm building that is the hiring/contract anchor (U-25 WS2). Replaces the bulletin
+/// The placeable farm building that is the hiring/contract anchor. Replaces the bulletin
 /// board as the entry point. Interaction and the static output chest are handled in C# (see
 /// HiringBuildingInteraction) rather than via Data/Buildings sub-schemas, to keep that logic under
 /// our control and reuse the existing chest pipeline.
@@ -45,14 +45,6 @@ internal static class HiringBuilding
     public static readonly Point OutputChestDisplayTile = new(3, 2);
     // Input chest on the porch, left of the door when facing the house.
     public static readonly Point InputChestDisplayTile = new(1, 2);
-
-    /// <summary>
-    /// Footprint tiles that open the hire/manage flow when action-clicked: the drawn-in bulletin
-    /// board on the upper-right wall (4,0)/(4,1), plus the porch tile directly in front of it (4,2)
-    /// so the player can click at ground level too. Clicking elsewhere on the building does nothing
-    /// (the chest tile is handled separately).
-    /// </summary>
-    public static readonly Point[] BulletinBoardTiles = { new(4, 0), new(4, 1), new(4, 2) };
 
     // ── Spritesheet geometry, shared with HiringBuildingOverlayRenderer ──────────
     // Sheet is 160x122: base (0,0,80,106), window glow (80,0,80,106), smoke row at y=106.

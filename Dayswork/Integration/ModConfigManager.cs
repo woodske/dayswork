@@ -9,7 +9,7 @@ internal sealed class ModConfigManager
     private readonly Action<string>? _logWarning;
 
     public ModConfig Editable { get; private set; }
-    public IConfigSnapshot CurrentSnapshot { get; private set; }
+    public ConfigSnapshot CurrentSnapshot { get; private set; }
 
     public ModConfigManager(IModHelper helper, Action<string>? logWarning = null)
     {

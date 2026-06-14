@@ -328,7 +328,7 @@ internal sealed class ZoneAndChestMenu : IClickableMenu
                 .OrderBy(name => name, StringComparer.Ordinal));
     }
 
-    // Selection LocationNames are unique interior names (type + a trailing GUID, TODO-08). Strip the
+    // Selection LocationNames are unique interior names (type + a trailing GUID). Strip the
     // GUID for display so the player sees "Coop"/"Barn" rather than "Coop1bc97e5f-…".
     private static string FriendlyBuildingName(string locationName)
     {

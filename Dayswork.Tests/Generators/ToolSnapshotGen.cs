@@ -5,7 +5,7 @@ namespace Dayswork.Tests.Generators;
 
 /// <summary>
 /// FsCheck generator for ToolSnapshot. Provides uniform distribution over all
-/// five ToolLevel values. Available to downstream units (U-10+) via PBT-07 obligation.
+/// five ToolLevel values.
 /// </summary>
 public static class ToolSnapshotGen
 {

@@ -7,15 +7,15 @@ using StardewValley;
 
 namespace Dayswork.Orchestration;
 
+// Resolves building door/entry/exit tiles. All actual movement (walking to a door, warping
+// through it) is the TravelRunner's job; this class never moves the worker.
 internal sealed class BuildingWorkNavigator
 {
     private readonly IMonitor _monitor;
-    private readonly WorkerMovementDriver _movement;
 
-    public BuildingWorkNavigator(IMonitor monitor, WorkerMovementDriver movement)
+    public BuildingWorkNavigator(IMonitor monitor)
     {
         _monitor = monitor;
-        _movement = movement;
     }
 
     public bool TryResolveDoorTile(
@@ -42,11 +42,6 @@ internal sealed class BuildingWorkNavigator
         return warp is null
             ? new TileCoord(0, 0)
             : new TileCoord(warp.X, warp.Y);
-    }
-
-    public TileCoord ResolveInteriorExitApproachTile(GameLocation interior)
-    {
-        return ResolveInteriorExitApproachTiles(interior).First();
     }
 
     public IReadOnlyList<TileCoord> ResolveInteriorExitApproachTiles(GameLocation interior)
@@ -95,27 +90,14 @@ internal sealed class BuildingWorkNavigator
         return bestTile;
     }
 
-    public void Enter(FarmhandNpc worker, GameLocation interior, TileCoord interiorEntryTile)
-    {
-        var from = worker.currentLocation ?? Game1.getFarm();
-        _movement.WarpWorker(worker, from, interior, interiorEntryTile);
-        _monitor.Log(I18nHelper.Get("log.building.entering", new { location = interior.Name }), LogLevel.Trace);
-    }
-
-    public void ExitToFarm(FarmhandNpc worker, TileCoord outdoorDoorTile)
-    {
-        var from = worker.currentLocation ?? Game1.getFarm();
-        _movement.WarpWorker(worker, from, Game1.getFarm(), outdoorDoorTile);
-    }
-
     public void LogSkipped(string interiorLocationName)
     {
         _monitor.Log(
             I18nHelper.Get("log.building.skipped", new { location = interiorLocationName }),
-            LogLevel.Warn);
+            DevLog.WarnLevel);
         _monitor.Log(
             BuildingLocationResolver.DescribeResolutionState(Game1.getFarm(), interiorLocationName),
-            LogLevel.Warn);
+            DevLog.WarnLevel);
     }
 
     public bool TryResolveInterior(string interiorLocationName, out GameLocation interior)

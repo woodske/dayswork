@@ -11,8 +11,8 @@ using StardewValley.Menus;
 namespace Dayswork.UI;
 
 // Contract management menu — opened from the hiring building's "Manage" action.
-// Lists Active and Paused contracts with Pause/Resume/Cancel/Edit actions (S-12).
-// All display strings are pre-computed in BuildRows(); draw() reads fields only (NFR-PERF-01).
+// Lists Active and Paused contracts with Pause/Resume/Cancel/Edit actions.
+// All display strings are pre-computed in BuildRows(); draw() reads fields only.
 internal sealed class ContractListMenu : IClickableMenu
 {
     private const int MenuWidth    = 800;
@@ -26,7 +26,7 @@ internal sealed class ContractListMenu : IClickableMenu
     private const int RowBtnHeight   = BtnHeight + 8;
     private const int BodySidePadding = 16;
 
-    private readonly IContractStore _store;
+    private readonly ContractStore _store;
 
     private List<ContractRowData> _allRows = new();
     private List<VisibleContractRow> _visibleRows = new();
@@ -52,11 +52,13 @@ internal sealed class ContractListMenu : IClickableMenu
 
     private sealed record ContractRowData(
         Contract Contract,
-        string WrappedTaskText,   // pre-wrapped to TextAreaWidth
-        int    TextHeight,        // pixel height of WrappedTaskText
-        string ScheduleLabel,
-        string StatusLabel,
-        int    RowHeight);        // computed from text height
+        string  WrappedTaskText,   // pre-wrapped to TextAreaWidth
+        int     TextHeight,        // pixel height of WrappedTaskText
+        string? ManagedCropsLine,  // null → omit; non-null → render below task text
+        int     CropLineHeight,    // 0 when ManagedCropsLine is null
+        string  ScheduleLabel,
+        string  StatusLabel,
+        int     RowHeight);        // computed from text height
 
     private sealed record VisibleContractRow(
         ContractRowData Data,
@@ -65,7 +67,7 @@ internal sealed class ContractListMenu : IClickableMenu
         ClickableComponent CancelBtn,
         ClickableComponent EditBtn);
 
-    internal ContractListMenu(IContractStore store, IModHelper helper)
+    internal ContractListMenu(ContractStore store, IModHelper helper)
         : base(0, 0, MenuWidth, ContractMenuLayout.Height)
     {
         _store = store;
@@ -128,15 +130,28 @@ internal sealed class ContractListMenu : IClickableMenu
         string wrapped    = Game1.parseText(rawTaskSummary, Game1.smallFont, textAreaWidth);
         int    textHeight = (int)Game1.smallFont.MeasureString(wrapped).Y;
 
-        // Row height: padding + wrapped text + meta line + button strip
-        int rowHeight = RowPadTop + textHeight + RowMetaHeight + RowBtnHeight + RowPadBottom;
+        string? managedCropsLine = null;
+        int cropLineHeight = 0;
+        if (contract.CropPlan.IsEnabled)
+        {
+            int groupCount = contract.CropPlan.Assignments
+                .Select(a => a.GroupId ?? $"{a.Zone.LocationName}|{a.Mode}")
+                .Distinct()
+                .Count();
+            managedCropsLine = I18nHelper.Get("ui.contract_list.managed_crops_groups",
+                new { count = groupCount });
+            cropLineHeight = (int)Game1.smallFont.MeasureString(managedCropsLine).Y + 4;
+        }
+
+        // Row height: padding + wrapped text + optional crop line + meta line + button strip
+        int rowHeight = RowPadTop + textHeight + cropLineHeight + RowMetaHeight + RowBtnHeight + RowPadBottom;
 
         string scheduleLabel = contract.Schedule == ContractSchedule.Recurring
             ? _recurringLabel : _oneTimeLabel;
 
         string statusLabel = contract.Status == ContractStatus.Paused
             ? _pausedLabel : _activeLabel;
-        return new ContractRowData(contract, wrapped, textHeight, scheduleLabel, statusLabel, rowHeight);
+        return new ContractRowData(contract, wrapped, textHeight, managedCropsLine, cropLineHeight, scheduleLabel, statusLabel, rowHeight);
     }
 
     private void BuildVisibleRows()
@@ -317,8 +332,9 @@ internal sealed class ContractListMenu : IClickableMenu
             Game1.addHUDMessage(new HUDMessage(_cancelBlockedMsg, HUDMessage.error_type));
             return;
         }
-        _store.Cancel(contract.Id);
-        Refresh();
+        Game1.activeClickableMenu = new ConfirmCancelContractMenu(
+            onGoBack:  () => Game1.activeClickableMenu = this,
+            onConfirm: () => { _store.Cancel(contract.Id); Game1.activeClickableMenu = this; Refresh(); });
     }
 
     // ── Gamepad snapping ─────────────────────────────────────────────────────
@@ -391,14 +407,21 @@ internal sealed class ContractListMenu : IClickableMenu
             new Rectangle(row.RowBounds.X, rowY, row.RowBounds.Width, 1),
             Color.LightGray * 0.5f);
 
-        // Task summary + schedule + status
+        // Task summary + optional managed-crops line + schedule + status
         Utility.drawTextWithShadow(b, row.Data.WrappedTaskText, Game1.smallFont,
             new Vector2(row.RowBounds.X + 8, rowY + RowPadTop), Game1.textColor);
+
+        if (row.Data.ManagedCropsLine != null)
+        {
+            Utility.drawTextWithShadow(b, row.Data.ManagedCropsLine, Game1.smallFont,
+                new Vector2(row.RowBounds.X + 8, rowY + RowPadTop + row.Data.TextHeight + 4),
+                Color.DimGray);
+        }
 
         Utility.drawTextWithShadow(b,
             $"{row.Data.ScheduleLabel}  {row.Data.StatusLabel}",
             Game1.smallFont,
-            new Vector2(row.RowBounds.X + 8, rowY + RowPadTop + row.Data.TextHeight + 4),
+            new Vector2(row.RowBounds.X + 8, rowY + RowPadTop + row.Data.TextHeight + row.Data.CropLineHeight + 4),
             Color.DimGray);
 
         // Action buttons

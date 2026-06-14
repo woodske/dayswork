@@ -65,9 +65,10 @@ common cause of install failures.
 
 1. Bump `Version` in `Dayswork/manifest.json`. SMAPI and Nexus compare against this value.
 2. Enable the release zip (see above).
-3. Build Release: `dotnet build Dayswork/Dayswork.csproj -c Release`
-4. Grab the zip from `Dayswork/bin/Release/Dayswork <version>.zip` (e.g. `Dayswork 0.1.0.zip`).
-5. On Nexus (Stardew Valley section): create or open the mod page → **Files** tab →
+3. Disable DevLogs `Dayswork\DevLog.cs` logging
+4. Build Release: `dotnet build Dayswork/Dayswork.csproj -c Release`
+5. Grab the zip from `Dayswork/bin/Release/Dayswork <version>.zip` (e.g. `Dayswork 0.1.0.zip`).
+6. On Nexus (Stardew Valley section): create or open the mod page → **Files** tab →
    **Add file** → upload the zip, set the version field to match the manifest, mark it as
    the Main file.
 
@@ -77,8 +78,8 @@ common cause of install failures.
   is what makes the `Nexus:<id>` update key in `manifest.json` report updates correctly.
 - The numeric mod ID in the update key comes from the Nexus page URL
   (`nexusmods.com/stardewvalley/mods/12345` → `Nexus:12345`).
-- List the dependencies on the Nexus page description with links: **MailFrameworkMod**
-  (required — SMAPI blocks loading without it) and **Generic Mod Config Menu** (optional).
+- List the dependencies on the Nexus page description with links: **Generic Mod Config Menu**
+  (optional).
 
 ## Solution structure
 
@@ -86,7 +87,7 @@ common cause of install failures.
 Dayswork.sln
 ├── Dayswork.Core/    Pure C# — no SMAPI / Stardew refs. All testable business logic lives here.
 ├── Dayswork/         SMAPI mod. References Core + SMAPI/Stardew via ModBuildConfig.
-└── Dayswork.Tests/   xUnit + FsCheck. References only Dayswork.Core.   (added in U-02)
+└── Dayswork.Tests/   xUnit + FsCheck. References Core and the mod assembly.
 ```
 
 ## License

@@ -4,7 +4,7 @@ namespace Dayswork.Core.Crops;
 /// Raw, adapter-supplied catalog record for one crop, before season filtering / tagging.
 /// The live-game adapter (<c>CropCatalogProvider</c>) maps live 1.6 crop + shop data into these
 /// records; the pure <see cref="CropCatalog"/> then filters, tags, and sorts them. Keeping this a
-/// plain record keeps all catalog decision logic deterministic and testable in Core (Q3=A).
+/// plain record keeps all catalog decision logic deterministic and testable in Core.
 /// </summary>
 public sealed record CropCatalogSource(
     CropDescriptor Crop,
