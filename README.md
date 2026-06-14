@@ -65,9 +65,10 @@ common cause of install failures.
 
 1. Bump `Version` in `Dayswork/manifest.json`. SMAPI and Nexus compare against this value.
 2. Enable the release zip (see above).
-3. Build Release: `dotnet build Dayswork/Dayswork.csproj -c Release`
-4. Grab the zip from `Dayswork/bin/Release/Dayswork <version>.zip` (e.g. `Dayswork 0.1.0.zip`).
-5. On Nexus (Stardew Valley section): create or open the mod page → **Files** tab →
+3. Disable DevLogs `Dayswork\DevLog.cs` logging
+4. Build Release: `dotnet build Dayswork/Dayswork.csproj -c Release`
+5. Grab the zip from `Dayswork/bin/Release/Dayswork <version>.zip` (e.g. `Dayswork 0.1.0.zip`).
+6. On Nexus (Stardew Valley section): create or open the mod page → **Files** tab →
    **Add file** → upload the zip, set the version field to match the manifest, mark it as
    the Main file.
 
