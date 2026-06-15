@@ -1,5 +1,6 @@
 using Dayswork.Core.Domain;
 using Dayswork.Core.Shifts;
+using Dayswork.Orchestration;
 using Xunit;
 
 namespace Dayswork.Tests.Routing;
@@ -78,6 +79,69 @@ public sealed class WorkerRoutingRegressionTests
         Assert.Null(selected);
     }
 
+    [Fact]
+    public void Shopping_return_prefers_tile_action_warp_when_route_cost_and_target_tie()
+    {
+        var mapProperty = ShoppingWarp(
+            "map",
+            routeCost: 4,
+            targetRank: 1,
+            ManagedShoppingCoordinator.WarpEdgeSourceKind.MapProperty,
+            new TileCoord(9, 22));
+        var tileAction = ShoppingWarp(
+            "action",
+            routeCost: 4,
+            targetRank: 1,
+            ManagedShoppingCoordinator.WarpEdgeSourceKind.TileAction,
+            new TileCoord(9, 22));
+
+        var selected = OrderShoppingWarps(mapProperty, tileAction).First();
+
+        Assert.Equal(tileAction, selected);
+    }
+
+    [Fact]
+    public void Shopping_return_keeps_route_cost_ahead_of_tile_action_priority()
+    {
+        var nearerMapProperty = ShoppingWarp(
+            "near-map",
+            routeCost: 2,
+            targetRank: 1,
+            ManagedShoppingCoordinator.WarpEdgeSourceKind.MapProperty,
+            new TileCoord(9, 22));
+        var fartherTileAction = ShoppingWarp(
+            "far-action",
+            routeCost: 8,
+            targetRank: 1,
+            ManagedShoppingCoordinator.WarpEdgeSourceKind.TileAction,
+            new TileCoord(9, 22));
+
+        var selected = OrderShoppingWarps(fartherTileAction, nearerMapProperty).First();
+
+        Assert.Equal(nearerMapProperty, selected);
+    }
+
+    [Fact]
+    public void Shopping_return_keeps_target_rank_ahead_of_tile_action_priority()
+    {
+        var preferredTargetMapProperty = ShoppingWarp(
+            "preferred-target",
+            routeCost: 4,
+            targetRank: 0,
+            ManagedShoppingCoordinator.WarpEdgeSourceKind.MapProperty,
+            new TileCoord(9, 22));
+        var lowerPriorityTargetAction = ShoppingWarp(
+            "lower-target-action",
+            routeCost: 4,
+            targetRank: 1,
+            ManagedShoppingCoordinator.WarpEdgeSourceKind.TileAction,
+            new TileCoord(9, 22));
+
+        var selected = OrderShoppingWarps(lowerPriorityTargetAction, preferredTargetMapProperty).First();
+
+        Assert.Equal(preferredTargetMapProperty, selected);
+    }
+
     private WorkerRouteCandidate Candidate(
         int id,
         TaskKind task,
@@ -92,4 +156,28 @@ public sealed class WorkerRoutingRegressionTests
             new TileCoord(id, stableOrder),
             reachable,
             routeCost);
+
+    private static ShoppingWarpProbe ShoppingWarp(
+        string id,
+        int routeCost,
+        int targetRank,
+        ManagedShoppingCoordinator.WarpEdgeSourceKind sourceKind,
+        TileCoord approachTile) =>
+        new(id, routeCost, targetRank, sourceKind, approachTile);
+
+    private static IReadOnlyList<ShoppingWarpProbe> OrderShoppingWarps(params ShoppingWarpProbe[] warps) =>
+        ManagedShoppingCoordinator.OrderWarpEdgesByRoutePriority(
+                warps,
+                warp => warp.RouteCost,
+                warp => warp.TargetRank,
+                warp => warp.SourceKind,
+                warp => warp.ApproachTile)
+            .ToList();
+
+    private sealed record ShoppingWarpProbe(
+        string Id,
+        int RouteCost,
+        int TargetRank,
+        ManagedShoppingCoordinator.WarpEdgeSourceKind SourceKind,
+        TileCoord ApproachTile);
 }

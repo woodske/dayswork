@@ -33,18 +33,26 @@ internal sealed class ManagedShoppingCoordinator
         WalkingToInputChest,
     }
 
+    internal enum WarpEdgeSourceKind
+    {
+        TileAction,
+        MapProperty,
+    }
+
     private sealed record RouteHop(
         GameLocation Source,
         GameLocation Target,
         TileCoord ApproachTile,
-        TileCoord ArrivalTile);
+        TileCoord ArrivalTile,
+        WarpEdgeSourceKind SourceKind);
 
     private sealed record WarpEdge(
         GameLocation Source,
         GameLocation Target,
         TileCoord ApproachTile,
         TileCoord ArrivalTile,
-        string TargetName);
+        string TargetName,
+        WarpEdgeSourceKind SourceKind);
 
     private sealed record ActionWarp(
         int X,
@@ -841,7 +849,8 @@ internal sealed class ManagedShoppingCoordinator
                     edge.Source,
                     edge.Target,
                     edge.ApproachTile,
-                    arrivalTile);
+                    arrivalTile,
+                    edge.SourceKind);
                 cameFrom[nextKey] = (key, hop);
                 queue.Enqueue(nextKey);
             }
@@ -873,16 +882,48 @@ internal sealed class ManagedShoppingCoordinator
     {
         var edges = EnumerateWarpEdges(location).ToList();
         if (_session.Worker is null || !ShiftOrchestrator.SameLocation(_session.Worker.currentLocation ?? location, location))
-            return edges.OrderBy(TargetRank).ThenBy(edge => edge.ApproachTile.Y).ThenBy(edge => edge.ApproachTile.X);
+            return OrderWarpEdgesByTargetPriority(
+                edges,
+                TargetRank,
+                edge => edge.SourceKind,
+                edge => edge.ApproachTile);
 
         var source = new TileCoord(_session.Worker.TilePoint.X, _session.Worker.TilePoint.Y);
         var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
-        return edges
-            .OrderBy(edge => routeCosts.TryGetValue(edge.ApproachTile, out var cost) ? cost : int.MaxValue)
-            .ThenBy(TargetRank)
-            .ThenBy(edge => edge.ApproachTile.Y)
-            .ThenBy(edge => edge.ApproachTile.X);
+        return OrderWarpEdgesByRoutePriority(
+            edges,
+            edge => routeCosts.TryGetValue(edge.ApproachTile, out var cost) ? cost : int.MaxValue,
+            TargetRank,
+            edge => edge.SourceKind,
+            edge => edge.ApproachTile);
     }
+
+    internal static IEnumerable<T> OrderWarpEdgesByRoutePriority<T>(
+        IEnumerable<T> edges,
+        Func<T, int> routeCost,
+        Func<T, int> targetRank,
+        Func<T, WarpEdgeSourceKind> sourceKind,
+        Func<T, TileCoord> approachTile) =>
+        edges
+            .OrderBy(routeCost)
+            .ThenBy(targetRank)
+            .ThenBy(edge => SourceKindRank(sourceKind(edge)))
+            .ThenBy(edge => approachTile(edge).Y)
+            .ThenBy(edge => approachTile(edge).X);
+
+    internal static IEnumerable<T> OrderWarpEdgesByTargetPriority<T>(
+        IEnumerable<T> edges,
+        Func<T, int> targetRank,
+        Func<T, WarpEdgeSourceKind> sourceKind,
+        Func<T, TileCoord> approachTile) =>
+        edges
+            .OrderBy(targetRank)
+            .ThenBy(edge => SourceKindRank(sourceKind(edge)))
+            .ThenBy(edge => approachTile(edge).Y)
+            .ThenBy(edge => approachTile(edge).X);
+
+    private static int SourceKindRank(WarpEdgeSourceKind sourceKind) =>
+        sourceKind == WarpEdgeSourceKind.TileAction ? 0 : 1;
 
     private TileCoord FindStoreCounterStandTile(GameLocation interior, Store store)
     {
@@ -1001,7 +1042,8 @@ internal sealed class ManagedShoppingCoordinator
                 warp.Y,
                 warp.TargetName,
                 warp.TargetX,
-                warp.TargetY);
+                warp.TargetY,
+                WarpEdgeSourceKind.MapProperty);
             if (edge is not null &&
                 seen.Add($"{edge.TargetName}|{edge.ApproachTile.X}|{edge.ApproachTile.Y}|{edge.ArrivalTile.X}|{edge.ArrivalTile.Y}"))
                 yield return edge;
@@ -1015,7 +1057,8 @@ internal sealed class ManagedShoppingCoordinator
                 actionWarp.Y,
                 actionWarp.TargetName,
                 actionWarp.TargetX,
-                actionWarp.TargetY);
+                actionWarp.TargetY,
+                WarpEdgeSourceKind.TileAction);
             if (edge is not null &&
                 seen.Add($"{edge.TargetName}|{edge.ApproachTile.X}|{edge.ApproachTile.Y}|{edge.ArrivalTile.X}|{edge.ArrivalTile.Y}"))
                 yield return edge;
@@ -1028,7 +1071,8 @@ internal sealed class ManagedShoppingCoordinator
         int y,
         string targetName,
         int targetX,
-        int targetY)
+        int targetY,
+        WarpEdgeSourceKind sourceKind)
     {
         var target = ResolveWarpTarget(targetName);
         if (target is null)
@@ -1039,7 +1083,8 @@ internal sealed class ManagedShoppingCoordinator
             target,
             ResolveWarpApproachTile(source, x, y),
             ResolvePassableNearbyInLocation(new TileCoord(targetX, targetY), target),
-            targetName);
+            targetName,
+            sourceKind);
     }
 
     private static IEnumerable<ActionWarp> EnumerateActionWarps(GameLocation location)
@@ -1129,7 +1174,7 @@ internal sealed class ManagedShoppingCoordinator
     {
         var hops = route
             .Select(hop =>
-                $"{LocationKey(hop.Source)}->{LocationKey(hop.Target)} approach=({hop.ApproachTile.X},{hop.ApproachTile.Y}) arrival=({hop.ArrivalTile.X},{hop.ArrivalTile.Y})")
+                $"{LocationKey(hop.Source)}->{LocationKey(hop.Target)} source={hop.SourceKind} approach=({hop.ApproachTile.X},{hop.ApproachTile.Y}) arrival=({hop.ArrivalTile.X},{hop.ArrivalTile.Y})")
             .ToList();
         DevLog.Log(
             $"[Dayswork][managed-crops][shopping] route selected source={LocationKey(source)} target={LocationKey(target)} " +

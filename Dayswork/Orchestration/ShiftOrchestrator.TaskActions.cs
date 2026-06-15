@@ -434,7 +434,11 @@ internal sealed partial class ShiftOrchestrator
 //                 $"[Dayswork][action] cut tree at ({tile.X},{tile.Y}) remove={removeTree} health={tree.health.Value:0.##} stump={tree.stump.Value}.",
 //                 LogLevel.Trace);
             CollectNewDebrisAtTile(before, loc, Session.PendingTask, tileVec, Session.PendingOutputProvenance);
-            if (!wasStump && !removeTree)
+            // Queue a delayed sweep when debris may appear after an animation:
+            //   !wasStump && !removeTree — tree falling (fall animation produces delayed debris)
+            //   wasStump && removeTree  — stump destroyed (stump-removal effect may produce delayed debris)
+            // The only case not needing a sweep: wasStump && !removeTree (intermediate stump hit).
+            if (!wasStump && !removeTree || wasStump && removeTree)
                 QueueDelayedDebrisSweep(loc, tileVec, before, Session.PendingTask, Session.PendingOutputProvenance);
 
             if (!wasStump && tree.stump.Value)
