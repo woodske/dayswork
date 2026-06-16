@@ -72,7 +72,10 @@ internal sealed class CropCatalogProvider
             if (descriptor is null)
                 continue;
 
-            var displayName = ResolveDisplayName(data.HarvestItemId, fallback: seedId);
+            // Wild seed crops (SpriteIndex 23) use the seed item's name ("Spring Seeds"),
+            // not the forage placeholder stored in HarvestItemId ("Wild Horseradish").
+            var displaySourceId = data.SpriteIndex == 23 ? seedId : data.HarvestItemId;
+            var displayName = ResolveDisplayName(displaySourceId, fallback: seedId);
             result.Add(new CropCatalogSource(
                 descriptor,
                 displayName,
@@ -85,7 +88,17 @@ internal sealed class CropCatalogProvider
 
     private CropDescriptor? TryMapCrop(string seedId, CropData data)
     {
-        if (string.IsNullOrWhiteSpace(seedId) || string.IsNullOrWhiteSpace(data.HarvestItemId))
+        if (string.IsNullOrWhiteSpace(seedId))
+            return null;
+
+        // Wild seed crops (Spring/Summer/Fall/Winter Seeds) are identified by SpriteIndex 23 —
+        // same as Crop.isWildSeedCrop(). Their HarvestItemId is a forage placeholder, not the real
+        // harvest (determined at runtime via replaceWithObjectOnFullGrown). Use the seed ID as
+        // CropItemId so they appear in the picker and shift log under their own name.
+        bool isWildSeed = data.SpriteIndex == 23;
+        var cropItemId = isWildSeed ? seedId : data.HarvestItemId;
+
+        if (string.IsNullOrWhiteSpace(cropItemId))
             return null;
 
         var seasons = (data.Seasons ?? new List<Season>())
@@ -102,7 +115,7 @@ internal sealed class CropCatalogProvider
         int? regrow = data.RegrowDays > 0 ? data.RegrowDays : null;
 
         return new CropDescriptor(
-            data.HarvestItemId,
+            cropItemId,
             seedId,
             fertilizerItemId: null,
             daysToFirstHarvest: daysToFirstHarvest,
