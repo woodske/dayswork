@@ -16,7 +16,7 @@ public sealed class ScopeDrivenRuntimeAlignmentTests
             new[] { new AnimalBuildingScope("Barn", AnimalBuildingTier.Barn) },
             null);
 
-        var result = _builder.BuildBatchPlan(scopes, new[] { TaskKind.PetAnimals }.ToHashSet());
+        var result = _builder.BuildBatchPlan(scopes, new[] { TaskKind.PetAnimals }.ToHashSet(), TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[] { BatchKind.AnimalBuilding, BatchKind.OutdoorAnimals },
@@ -31,7 +31,7 @@ public sealed class ScopeDrivenRuntimeAlignmentTests
             Array.Empty<AnimalBuildingScope>(),
             new GreenhouseWorkScope("Greenhouse"));
 
-        var result = _builder.BuildBatchPlan(scopes, new[] { TaskKind.HarvestCrops }.ToHashSet());
+        var result = _builder.BuildBatchPlan(scopes, new[] { TaskKind.HarvestCrops }.ToHashSet(), TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[] { BatchKind.Greenhouse, BatchKind.OutdoorCrops },

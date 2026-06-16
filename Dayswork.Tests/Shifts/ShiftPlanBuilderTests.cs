@@ -16,7 +16,7 @@ public sealed class ShiftPlanBuilderTests
     {
         var scopes = Scopes(animalBuildings: new[] { new AnimalBuildingScope("Barn", AnimalBuildingTier.Barn) });
 
-        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.FeedAnimals));
+        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.FeedAnimals), TaskKindSets.DefaultCategoryPriority);
 
         var batch = Assert.Single(result);
         Assert.Equal("Barn", batch.LocationName);
@@ -32,7 +32,7 @@ public sealed class ShiftPlanBuilderTests
     {
         var scopes = Scopes(greenhouse: new GreenhouseWorkScope("Greenhouse"));
 
-        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.HarvestCrops));
+        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.HarvestCrops), TaskKindSets.DefaultCategoryPriority);
 
         var batch = Assert.Single(result);
         Assert.Equal("Greenhouse", batch.LocationName);
@@ -57,7 +57,8 @@ public sealed class ShiftPlanBuilderTests
 
         var result = _sut.BuildBatchPlan(
             scopes,
-            Enabled(TaskKind.FeedAnimals, TaskKind.PetAnimals, TaskKind.HarvestCrops, TaskKind.ClearWeeds));
+            Enabled(TaskKind.FeedAnimals, TaskKind.PetAnimals, TaskKind.HarvestCrops, TaskKind.ClearWeeds),
+            TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[]
@@ -86,7 +87,7 @@ public sealed class ShiftPlanBuilderTests
             new AnimalBuildingScope("Coop", AnimalBuildingTier.Coop),
         });
 
-        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.FeedAnimals, TaskKind.PetAnimals));
+        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.FeedAnimals, TaskKind.PetAnimals), TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[]
@@ -113,7 +114,8 @@ public sealed class ShiftPlanBuilderTests
 
         var result = _sut.BuildBatchPlan(
             scopes,
-            Enabled(TaskKind.FeedAnimals, TaskKind.PetAnimals, TaskKind.CollectAnimalProducts));
+            Enabled(TaskKind.FeedAnimals, TaskKind.PetAnimals, TaskKind.CollectAnimalProducts),
+            TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[]
@@ -136,7 +138,7 @@ public sealed class ShiftPlanBuilderTests
         // EX-T09-3
         var scopes = Scopes(animalBuildings: new[] { new AnimalBuildingScope("Coop", AnimalBuildingTier.Coop) });
 
-        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.CollectAnimalProducts));
+        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.CollectAnimalProducts), TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[] { BatchKind.AnimalBuilding, BatchKind.OutdoorAnimals, BatchKind.FarmForage },
@@ -154,7 +156,7 @@ public sealed class ShiftPlanBuilderTests
             new AnimalBuildingScope("Coop", AnimalBuildingTier.Coop),
         });
 
-        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.FeedAnimals));
+        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.FeedAnimals), TaskKindSets.DefaultCategoryPriority);
 
         Assert.All(result, batch => Assert.Equal(BatchKind.AnimalBuilding, batch.Kind));
         Assert.Equal(new[] { "Barn", "Coop" }, result.Select(batch => batch.LocationName));
@@ -165,7 +167,7 @@ public sealed class ShiftPlanBuilderTests
     {
         var scopes = Scopes(outdoor: new OutdoorWorkScope(new[] { Zone("Farm"), Zone("Farm", 3, 3) }, 2));
 
-        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.ClearWeeds));
+        var result = _sut.BuildBatchPlan(scopes, Enabled(TaskKind.ClearWeeds), TaskKindSets.DefaultCategoryPriority);
 
         var batch = Assert.Single(result);
         Assert.Equal("Farm", batch.LocationName);
@@ -177,9 +179,39 @@ public sealed class ShiftPlanBuilderTests
     [Fact]
     public void EmptyScopes_CreatesNoBatches()
     {
-        var result = _sut.BuildBatchPlan(Scopes(), Enabled(TaskKind.FeedAnimals));
+        var result = _sut.BuildBatchPlan(Scopes(), Enabled(TaskKind.FeedAnimals), TaskKindSets.DefaultCategoryPriority);
 
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public void CropsPriorityFirst_PutsCropAndClearingBatchesBeforeAnimalBatches()
+    {
+        var cropFirstPriority = new[]
+        {
+            TaskCategory.Crops,
+            TaskCategory.AnimalCare,
+            TaskCategory.Fieldwork,
+        };
+        var scopes = Scopes(
+            outdoor: new OutdoorWorkScope(new[] { Zone("Farm") }, 1),
+            animalBuildings: new[] { new AnimalBuildingScope("Coop", AnimalBuildingTier.Coop) },
+            greenhouse: new GreenhouseWorkScope("Greenhouse"));
+
+        var result = _sut.BuildBatchPlan(
+            scopes,
+            Enabled(TaskKind.HarvestCrops, TaskKind.FeedAnimals, TaskKind.ClearWeeds),
+            cropFirstPriority);
+
+        Assert.Equal(
+            new[]
+            {
+                BatchKind.Greenhouse,
+                BatchKind.OutdoorCrops,
+                BatchKind.AnimalBuilding,
+                BatchKind.OutdoorClearing,
+            },
+            result.Select(batch => batch.Kind));
     }
 
     [Fact]
@@ -204,7 +236,7 @@ public sealed class ShiftPlanBuilderTests
     {
         return Prop.ForAll(ScopeSetGen(), EnabledTasksGen(), (scopes, enabledTasks) =>
         {
-            var result = _sut.BuildBatchPlan(scopes, enabledTasks);
+            var result = _sut.BuildBatchPlan(scopes, enabledTasks, TaskKindSets.DefaultCategoryPriority);
 
             var sortedBuildings = scopes.AnimalBuildings
                 .OrderBy(building => building.LocationName, StringComparer.Ordinal)

@@ -33,7 +33,7 @@ public sealed class ManagedCropBatchPlanTests
     [Fact]
     public void ManagedPlanOnly_EmitsSingleManagedCropsBatchForFarm()
     {
-        var result = _sut.BuildBatchPlan(Scopes(managed: FarmManagedScope()), new HashSet<TaskKind>());
+        var result = _sut.BuildBatchPlan(Scopes(managed: FarmManagedScope()), new HashSet<TaskKind>(), TaskKindSets.DefaultCategoryPriority);
 
         var batch = Assert.Single(result);
         Assert.Equal(BatchKind.ManagedCrops, batch.Kind);
@@ -47,7 +47,7 @@ public sealed class ManagedCropBatchPlanTests
         var outdoor = new OutdoorWorkScope(new[] { new Zone("Farm", new TileCoord(10, 10), new TileCoord(12, 12)) }, 1);
         var enabled = new HashSet<TaskKind> { TaskKind.HarvestCrops, TaskKind.ClearWeeds };
 
-        var result = _sut.BuildBatchPlan(Scopes(outdoor, FarmManagedScope()), enabled);
+        var result = _sut.BuildBatchPlan(Scopes(outdoor, FarmManagedScope()), enabled, TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[] { BatchKind.ManagedCrops, BatchKind.OutdoorCrops, BatchKind.OutdoorClearing },
@@ -57,7 +57,7 @@ public sealed class ManagedCropBatchPlanTests
     [Fact]
     public void EmptyManagedPlan_EmitsNoManagedCropsBatch()
     {
-        var result = _sut.BuildBatchPlan(Scopes(managed: new ManagedCropWorkScope(System.Array.Empty<CropZoneAssignment>())), new HashSet<TaskKind>());
+        var result = _sut.BuildBatchPlan(Scopes(managed: new ManagedCropWorkScope(System.Array.Empty<CropZoneAssignment>())), new HashSet<TaskKind>(), TaskKindSets.DefaultCategoryPriority);
 
         Assert.DoesNotContain(result, batch => batch.Kind == BatchKind.ManagedCrops);
     }
@@ -67,7 +67,7 @@ public sealed class ManagedCropBatchPlanTests
     {
         var managed = ManagedScope("Farm", "Greenhouse", "Custom_GrandpasShedGreenhouse", "Greenhouse");
 
-        var result = _sut.BuildBatchPlan(Scopes(managed: managed), new HashSet<TaskKind>());
+        var result = _sut.BuildBatchPlan(Scopes(managed: managed), new HashSet<TaskKind>(), TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[] { "Custom_GrandpasShedGreenhouse", "Greenhouse", "Farm" },
@@ -81,7 +81,7 @@ public sealed class ManagedCropBatchPlanTests
         var greenhouses = new[] { new GreenhouseWorkScope("Greenhouse") };
         var enabled = new HashSet<TaskKind> { TaskKind.HarvestCrops };
 
-        var result = _sut.BuildBatchPlan(Scopes(managed: managed, greenhouses: greenhouses), enabled);
+        var result = _sut.BuildBatchPlan(Scopes(managed: managed, greenhouses: greenhouses), enabled, TaskKindSets.DefaultCategoryPriority);
 
         Assert.Equal(
             new[] { BatchKind.ManagedCrops, BatchKind.Greenhouse },

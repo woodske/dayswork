@@ -356,7 +356,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         TileCoord farmExitTile,
         TaskPriorityOrderer priorityOrderer)
     {
-        var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks);
+        var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks, contract.CategoryPriority);
         var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
         var outdoorProvenance = OutputScopeProvenance.Outdoor();
 

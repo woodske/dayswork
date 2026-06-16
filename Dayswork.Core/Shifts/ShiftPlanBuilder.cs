@@ -7,51 +7,80 @@ public sealed class ShiftPlanBuilder
 {
     public IReadOnlyList<WorkBatch> BuildBatchPlan(
         WorkScopeSet scopes,
-        IReadOnlySet<TaskKind> enabledTasks)
+        IReadOnlySet<TaskKind> enabledTasks,
+        IReadOnlyList<TaskCategory> categoryPriority)
     {
         if (scopes is null) throw new ArgumentNullException(nameof(scopes));
         if (enabledTasks is null) throw new ArgumentNullException(nameof(enabledTasks));
+        if (categoryPriority is null) throw new ArgumentNullException(nameof(categoryPriority));
 
+        var animalBatches  = BuildAnimalCareBatches(scopes, enabledTasks);
+        var cropBatches    = BuildCropsBatches(scopes, enabledTasks);
+        var fieldworkBatches = BuildFieldworkBatches(scopes, enabledTasks);
+
+        var result = new List<WorkBatch>(animalBatches.Count + cropBatches.Count + fieldworkBatches.Count);
+        foreach (var category in categoryPriority.Distinct())
+        {
+            result.AddRange(category switch
+            {
+                TaskCategory.AnimalCare => animalBatches,
+                TaskCategory.Crops      => cropBatches,
+                TaskCategory.Fieldwork  => fieldworkBatches,
+                _                       => (IReadOnlyList<WorkBatch>)Array.Empty<WorkBatch>(),
+            });
+        }
+        return result;
+    }
+
+    private static List<WorkBatch> BuildAnimalCareBatches(WorkScopeSet scopes, IReadOnlySet<TaskKind> enabledTasks)
+    {
         var batches = new List<WorkBatch>();
-
         var animalTasks = Order(enabledTasks.Where(TaskKindSets.IsAnimalService));
         var outdoorAnimalTasks = animalTasks
             .Where(task => task != TaskKind.FeedAnimals)
             .ToList();
-        if (animalTasks.Count > 0)
+
+        if (animalTasks.Count == 0)
+            return batches;
+
+        // Per-building grouping: emit each building's interior batch immediately
+        // followed by that building's own grazing pass, so the worker fully services one
+        // building (indoors + its grazing animals) before moving to the next, instead of doing
+        // every interior first and then a single combined outdoor pass. Farm-wide forage
+        // (truffles) is not building-owned, so it runs once at the end as a FarmForage pass.
+        foreach (var building in scopes.AnimalBuildings
+                     .OrderBy(scope => scope.LocationName, StringComparer.Ordinal)
+                     .ThenBy(scope => scope.Tier))
         {
-            // Per-building grouping: emit each building's interior batch immediately
-            // followed by that building's own grazing pass, so the worker fully services one
-            // building (indoors + its grazing animals) before moving to the next, instead of doing
-            // every interior first and then a single combined outdoor pass. Farm-wide forage
-            // (truffles) is not building-owned, so it runs once at the end as a FarmForage pass.
-            foreach (var building in scopes.AnimalBuildings
-                         .OrderBy(scope => scope.LocationName, StringComparer.Ordinal)
-                         .ThenBy(scope => scope.Tier))
-            {
+            batches.Add(CreateSkeleton(
+                building.LocationName,
+                BatchKind.AnimalBuilding,
+                animalTasks,
+                feedBuilding: animalTasks.Contains(TaskKind.FeedAnimals)));
+
+            if (outdoorAnimalTasks.Count > 0)
                 batches.Add(CreateSkeleton(
                     building.LocationName,
-                    BatchKind.AnimalBuilding,
-                    animalTasks,
-                    feedBuilding: animalTasks.Contains(TaskKind.FeedAnimals)));
-
-                if (outdoorAnimalTasks.Count > 0)
-                    batches.Add(CreateSkeleton(
-                        building.LocationName,
-                        BatchKind.OutdoorAnimals,
-                        outdoorAnimalTasks,
-                        feedBuilding: false));
-            }
-
-            if (outdoorAnimalTasks.Contains(TaskKind.CollectAnimalProducts))
-                batches.Add(CreateSkeleton(
-                    "Farm",
-                    BatchKind.FarmForage,
-                    new[] { TaskKind.CollectAnimalProducts },
+                    BatchKind.OutdoorAnimals,
+                    outdoorAnimalTasks,
                     feedBuilding: false));
         }
 
+        if (outdoorAnimalTasks.Contains(TaskKind.CollectAnimalProducts))
+            batches.Add(CreateSkeleton(
+                "Farm",
+                BatchKind.FarmForage,
+                new[] { TaskKind.CollectAnimalProducts },
+                feedBuilding: false));
+
+        return batches;
+    }
+
+    private static List<WorkBatch> BuildCropsBatches(WorkScopeSet scopes, IReadOnlySet<TaskKind> enabledTasks)
+    {
+        var batches = new List<WorkBatch>();
         var managedCropLocations = ManagedCropLocations(scopes.ManagedCrops);
+
         EmitManagedCropBatches(
             batches,
             managedCropLocations.Where(location => !string.Equals(location, "Farm", StringComparison.Ordinal)));
@@ -68,7 +97,7 @@ public sealed class ShiftPlanBuilder
 
         // Managed crops: run the authored crop plan ahead of ordinary crop work in
         // the same live location. Non-farm managed locations precede greenhouse batches; farm
-        // managed locations remain ahead of outdoor crop/clearing passes.
+        // managed locations remain ahead of outdoor crop passes.
         EmitManagedCropBatches(
             batches,
             managedCropLocations.Where(location => string.Equals(location, "Farm", StringComparison.Ordinal)));
@@ -77,10 +106,15 @@ public sealed class ShiftPlanBuilder
         if (scopes.OutdoorWork is not null && outdoorCropTasks.Count > 0)
             batches.Add(CreateSkeleton("Farm", BatchKind.OutdoorCrops, outdoorCropTasks, feedBuilding: false));
 
+        return batches;
+    }
+
+    private static List<WorkBatch> BuildFieldworkBatches(WorkScopeSet scopes, IReadOnlySet<TaskKind> enabledTasks)
+    {
+        var batches = new List<WorkBatch>();
         var outdoorClearingTasks = Order(enabledTasks.Where(TaskKindSets.IsOutdoorClearingService));
         if (scopes.OutdoorWork is not null && outdoorClearingTasks.Count > 0)
             batches.Add(CreateSkeleton("Farm", BatchKind.OutdoorClearing, outdoorClearingTasks, feedBuilding: false));
-
         return batches;
     }
 
