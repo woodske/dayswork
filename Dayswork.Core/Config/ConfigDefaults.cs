@@ -27,7 +27,7 @@ public static class ConfigDefaults
 
         var workActionCosts = new Dictionary<WorkActionKind, int>
         {
-            [WorkActionKind.WaterTile] = 2,
+            [WorkActionKind.WaterTile] = 1,
             [WorkActionKind.HarvestCrop] = 1,
             [WorkActionKind.HarvestFruit] = 1,
             [WorkActionKind.FeedAnimal] = 1,

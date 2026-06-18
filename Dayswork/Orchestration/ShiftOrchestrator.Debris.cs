@@ -141,6 +141,7 @@ internal sealed partial class ShiftOrchestrator
         for (var i = Session.PendingDebrisSweeps.Count - 1; i >= 0; i--)
         {
             var sweep = Session.PendingDebrisSweeps[i];
+            AdvanceOffscreenTreeFall(sweep);
             CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles, sweep.Provenance);
             sweep.TicksRemaining--;
             if (sweep.TicksRemaining <= 0)
@@ -151,9 +152,36 @@ internal sealed partial class ShiftOrchestrator
     private void FlushPendingDebrisSweeps()
     {
         foreach (var sweep in Session.PendingDebrisSweeps)
+        {
+            AdvanceOffscreenTreeFall(sweep);
             CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles, sweep.Provenance);
+        }
 
         Session.PendingDebrisSweeps.Clear();
+    }
+
+    // A non-current GameLocation is ticked by GameLocation.updateEvenIfFarmerIsntHere, which does NOT
+    // tick terrainFeatures — so a worker-felled tree's fall animation freezes and never spawns its
+    // trunk debris until the player walks back onto the location (at which point the fall finishes,
+    // playing treethud and dropping wood with no worker present). Drive the fall to completion here so
+    // the debris lands in loc.debris now — silently, since localSound no-ops off-screen — and the
+    // sweep can collect it. No-op for the fruit-tree and stump-removal sweeps that share this path:
+    // their debris spawns synchronously and the tree isn't in a falling state.
+    private static void AdvanceOffscreenTreeFall(PendingDebrisSweep sweep)
+    {
+        if (sweep.Location == Game1.currentLocation) return;
+
+        var tile = new Vector2(
+            (float)Math.Round((sweep.Origin.X - 32f) / 64f),
+            (float)Math.Round((sweep.Origin.Y - 32f) / 64f));
+
+        if (!sweep.Location.terrainFeatures.TryGetValue(tile, out var tf)
+            || tf is not Tree tree || !tree.falling.Value)
+            return;
+
+        var time = Game1.currentGameTime;
+        for (var guard = 0; guard < 1000 && tree.falling.Value; guard++)
+            tree.tickUpdate(time);
     }
 
     private static bool IsDebrisNear(Debris debris, Vector2 origin, int radiusTiles)
