@@ -95,6 +95,7 @@ data or a decompile, and note where you confirmed it.
 
 - `docs/farm-warps/` — farm entrance/warp + interior-door tiles, vanilla and SVE.
 - `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
+- `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) for the planned Manage Machines feature; plan in `docs/plans/machine-management.md`.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
 the office building/chest ids in `Dayswork/Integration/HiringBuilding.cs`, the animal-product
