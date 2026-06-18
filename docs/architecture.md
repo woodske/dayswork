@@ -209,6 +209,16 @@ Skip rules confirmed in code:
   before it's removable (`CutTrees` reports "not complete" at that point); trunk debris spawns
   *after* the fall animation, so a **delayed debris sweep** catches it. Shaken fruit settles over
   several beats and uses the same delayed-sweep mechanism.
+- **Off-screen locations don't tick terrain features.** A non-current `GameLocation` is updated via
+  `GameLocation.updateEvenIfFarmerIsntHere` (characters, temp sprites, buildings, animals only);
+  `terrainFeatures`/`resourceClumps`/debris-chunk ticking happens **only** in
+  `UpdateWhenCurrentLocation`. So a worker-felled tree's fall animation *freezes* when the player is
+  elsewhere — the trunk debris (`Tree.tickUpdate` → `createRadialDebris`) never spawns until the
+  player returns (then `treethud` plays + wood drops with no worker present). Any multi-tick terrain
+  animation the worker triggers off-screen must be driven manually; tree falls are completed in
+  `ShiftOrchestrator.Debris.AdvanceOffscreenTreeFall` (pumps `tree.tickUpdate` to completion —
+  `localSound` no-ops off-screen, so it's silent). Resource clumps, stumps, and fruit drops are fine:
+  their debris spawns synchronously inside `performToolAction`/`shake`.
 - **Chest mutex:** check `chest.GetMutex().IsLocked()` before writing — if the player has the chest
   UI open, the whole deposit is rerouted to overflow rather than mutating items behind their back.
 - **`BuildingDrawLayer` has no GameStateQuery condition** in this version → conditional building
