@@ -60,13 +60,16 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 
 ### Worker (`Dayswork/Worker/`) — the NPC
 - **`FarmhandNpc`** — a custom `NPC` (placeholder Marnie sprite/portrait) added to the farm's
-  characters; draws its own stamina bar. **Must be removed before save** — its parameterless ctor
-  exists only for the XML serializer and is never expected to run.
+  characters; draws its own stamina bar. The art contract for replacing the placeholder lives in
+  `docs/farmhand-art.md`. **Must be removed before save** — its parameterless ctor exists only for
+  the XML serializer and is never expected to run.
 - **`WorkerMovementDriver`** — pathfinds with `StardewValley.Pathfinding.PathFindController`; on no
   path / impassable path, falls back to an internal BFS; else reports `NavigationFailed`. Worker
   walks pixel-by-pixel along waypoints. Also exposes static BFS route-cost maps used by routing.
 - **`ToolSwapAnimator`** — plays the per-beat tool swing; its `IsSwinging` gate paces the whole
-  shift loop. `ObjectTargetClassifier` classifies tiles into axe/pick targets + resource clumps.
+  shift loop. Farmhand body animation and tool/effect sprites stay separate, matching Stardew's
+  player-character rendering model. `ObjectTargetClassifier` classifies tiles into axe/pick targets
+  + resource clumps.
 
 ### Orchestration (`Dayswork/Orchestration/`) — the shift loop
 - **`ShiftOrchestrator`** (partial across `.cs`, `.WorkSelection`, `.TaskActions`, `.Movement`,

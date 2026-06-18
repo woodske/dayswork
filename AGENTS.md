@@ -96,6 +96,7 @@ data or a decompile, and note where you confirmed it.
 - `docs/farm-warps/` — farm entrance/warp + interior-door tiles, vanilla and SVE.
 - `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
 - `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) for the planned Manage Machines feature; plan in `docs/plans/machine-management.md`.
+- `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
 the office building/chest ids in `Dayswork/Integration/HiringBuilding.cs`, the animal-product
@@ -127,5 +128,5 @@ recurring schedule, managed crops); the full shift loop (animal care, crops, fie
 planting with auto-buy, multi-trip deposits, overflow safety, stuck recovery, 8pm cap, sleep
 settle); save/load persistence; evening office lighting/smoke; optional GMCM config; and SVE
 expansion compatibility. The farmhand uses a **placeholder** Marnie sprite/portrait (custom art is
-post-v1). Dev tooling (verbose logs + console commands like `dayswork_end_shift`) is gated behind
-`DevLog.Enabled`, off for release.
+specified in `docs/farmhand-art.md`). Dev tooling (verbose logs + console commands like
+`dayswork_end_shift`) is gated behind `DevLog.Enabled`, off for release.
