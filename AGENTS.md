@@ -14,6 +14,16 @@ See **`docs/architecture.md`** for the full subsystem map and the shift loop. St
 from **`Dayswork/ModEntry.cs`** — it's the hand-wired composition root (no DI container); every
 service and the SMAPI event it hangs off is visible there.
 
+## Local game/source paths
+
+- Stardew Valley install: `X:\Steam\steamapps\common\Stardew Valley`
+- Stardew Valley Expanded source: `C:\Users\kwood\Repos\StardewValleyExpanded`
+
+Use `docs/game-content-search.md` for the fastest way to search/parse the base game and SVE
+trees. Per hard rule 7, verify ids, tiles, qualified ids, event keys, data fields, and runtime API
+behavior against these local files, runtime data, or a decompile; then record any newly confirmed
+facts under `docs/`. Update `docs/game-content-search.md` if any new search techniques are used.
+
 ## Build / deploy
 
 - `dotnet build Dayswork/Dayswork.csproj` (or build the solution). Target is **net6.0**.
@@ -94,6 +104,8 @@ Confirmed game content lives under `docs/` so it's looked up once, not re-derive
 data or a decompile, and note where you confirmed it.
 
 - `docs/farm-warps/` — farm entrance/warp + interior-door tiles, vanilla and SVE.
+- `docs/game-content-search.md` — local Stardew/SVE paths, folder maps, and search/parsing tips for
+  base `.xnb`/DLL content, SVE Content Patcher packs, C# source, and `.tmx` maps.
 - `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
 - `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) for the planned Manage Machines feature; plan in `docs/plans/machine-management.md`.
 - `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
