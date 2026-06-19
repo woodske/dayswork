@@ -15,4 +15,7 @@ public sealed record OutputScopeProvenance(OutputScopeFamily Family, string Scop
 
     public static OutputScopeProvenance ManagedCrop(string assignmentKey) =>
         new(OutputScopeFamily.ManagedCrop, assignmentKey);
+
+    public static OutputScopeProvenance Machine(string groupId) =>
+        new(OutputScopeFamily.Machine, groupId);
 }

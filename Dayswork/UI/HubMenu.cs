@@ -31,6 +31,7 @@ internal sealed class HubMenu : LayoutMenu
         Action<ContractDraft> onTaskSelection,
         Action<ContractDraft> onWorkScope,
         Action<ContractDraft> onManageCrops,
+        Action<ContractDraft> onManageMachines,
         Action<ContractDraft> onOutput,
         Action<ContractDraft> onPriority,
         Action<ContractDraft> onEnergy,
@@ -47,6 +48,7 @@ internal sealed class HubMenu : LayoutMenu
         _items.Add(new NavItem("ui.hub.task_selection", onTaskSelection, TaskSelectionStatus));
         _items.Add(new NavItem("ui.hub.work_scope", onWorkScope, WorkScopeStatus));
         _items.Add(new NavItem("ui.hub.manage_crops", onManageCrops, ManageCropsStatus));
+        _items.Add(new NavItem("ui.hub.manage_machines", onManageMachines, ManageMachinesStatus));
         _items.Add(new NavItem("ui.hub.output_destination", onOutput, OutputStatus));
         _items.Add(new NavItem("ui.hub.task_priority", onPriority, () => HubStatus.None));
         _items.Add(new NavItem("ui.hub.energy", onEnergy, EnergyStatus));
@@ -111,6 +113,10 @@ internal sealed class HubMenu : LayoutMenu
     // Crop management is opt-in: "Ready" once at least one zone has been drawn/configured.
     private HubStatus ManageCropsStatus() =>
         _draft.CropPlan.HasAnyAssignment ? Done() : Optional();
+
+    // Machine management is opt-in: "Ready" once at least one machine has been selected.
+    private HubStatus ManageMachinesStatus() =>
+        _draft.MachinePlan.HasAnyAssignment ? Done() : Optional();
 
     // Energy/Recurrence always have a value; show the current selection as the status text.
     private HubStatus EnergyStatus() =>

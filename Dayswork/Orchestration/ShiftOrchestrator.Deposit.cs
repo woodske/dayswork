@@ -105,6 +105,9 @@ internal sealed partial class ShiftOrchestrator
 
         FlushPendingDebrisSweeps();
 
+        // Return any inputs still in the machine carry buffer (mid-reload wrap-up) before depositing.
+        SettleCarriedInputs();
+
         // Plan the deposit run from the task-tagged buffer.
         var workerTile = Session.Worker is not null
             ? new TileCoord(Session.Worker.TilePoint.X, Session.Worker.TilePoint.Y)
@@ -112,7 +115,7 @@ internal sealed partial class ShiftOrchestrator
         var plan = _depositPlanner.Plan(
             Session.Ctx.Buffer.Snapshot(),
             Session.Ctx.TaskDestinations,
-            ManagedCropOutputRouter.BuildDestinationMap(Session.Ctx.WorkScopes.ManagedCrops?.Assignments),
+            BuildOutputProvenanceMap(),
             ResolveShippingBinDepositTile(farm),
             workerTile,
             Manhattan);
@@ -254,6 +257,21 @@ internal sealed partial class ShiftOrchestrator
 
     private static bool BatchRequiresInteriorEntry(WorkBatch batch) =>
         batch.Kind is BatchKind.AnimalBuilding or BatchKind.Greenhouse;
+
+    // Merges the per-group output destinations for managed crops and machines into one
+    // provenance → destination map for the deposit planner. Machine ids never collide with crop
+    // assignment keys (different OutputScopeFamily), so a simple union is safe.
+    private IReadOnlyDictionary<OutputScopeProvenance, DestinationKey> BuildOutputProvenanceMap()
+    {
+        var map = new Dictionary<OutputScopeProvenance, DestinationKey>(
+            ManagedCropOutputRouter.BuildDestinationMap(Session.Ctx.WorkScopes.ManagedCrops?.Assignments));
+
+        foreach (var (provenance, destination) in Dayswork.Core.Machines.MachineOutputRouter.BuildDestinationMap(
+                     Session.Ctx.WorkScopes.Machines?.Groups))
+            map[provenance] = destination;
+
+        return map;
+    }
 
     private void DispatchShiftOverflow()
     {

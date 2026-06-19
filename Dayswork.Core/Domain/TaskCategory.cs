@@ -10,4 +10,5 @@ public enum TaskCategory
     AnimalCare,
     Crops,
     Fieldwork,
+    Machines,
 }

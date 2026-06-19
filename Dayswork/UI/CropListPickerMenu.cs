@@ -7,8 +7,11 @@ using StardewValley.Menus;
 
 namespace Dayswork.UI;
 
-/// <summary>A selectable picker row: a primary label plus an optional trailing tag chip.</summary>
-internal sealed record PickerRow(string Label, string? Tag);
+/// <summary>
+/// A selectable picker row: a primary label plus an optional trailing tag chip. A <c>Locked</c> row
+/// is display-only (rendered greyed, clicks ignored) — used for required-companion inputs.
+/// </summary>
+internal sealed record PickerRow(string Label, string? Tag, bool Locked = false);
 
 /// <summary>
 /// Reusable scrollable single-select list page used by the Manage Crops authoring flow for the crop,
@@ -125,6 +128,12 @@ internal sealed class CropListPickerMenu : IClickableMenu
         {
             if (!IsRowVisible(i) || !_rowComponents[i].bounds.Contains(x, y))
                 continue;
+
+            if (_rows[i].Locked)
+            {
+                Game1.playSound("cancel");
+                return;
+            }
 
             Game1.playSound("smallSelect");
             _onSelect(i);
@@ -243,7 +252,7 @@ internal sealed class CropListPickerMenu : IClickableMenu
                 _rows[i].Label,
                 Game1.smallFont,
                 new Vector2(row.bounds.X + 12, row.bounds.Y + (RowHeight - (int)Game1.smallFont.MeasureString(_rows[i].Label).Y) / 2),
-                i == _selectedIndex ? Color.DarkBlue : Game1.textColor);
+                _rows[i].Locked ? Color.Gray : (i == _selectedIndex ? Color.DarkBlue : Game1.textColor));
 
             if (_rows[i].Tag is { } tag)
             {

@@ -1,5 +1,6 @@
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Core.Machines;
 
 namespace Dayswork.Core.Shifts;
 
@@ -17,8 +18,10 @@ public sealed class ShiftPlanBuilder
         var animalBatches  = BuildAnimalCareBatches(scopes, enabledTasks);
         var cropBatches    = BuildCropsBatches(scopes, enabledTasks);
         var fieldworkBatches = BuildFieldworkBatches(scopes, enabledTasks);
+        var machineBatches = BuildMachineBatches(scopes);
 
-        var result = new List<WorkBatch>(animalBatches.Count + cropBatches.Count + fieldworkBatches.Count);
+        var result = new List<WorkBatch>(
+            animalBatches.Count + cropBatches.Count + fieldworkBatches.Count + machineBatches.Count);
         foreach (var category in categoryPriority.Distinct())
         {
             result.AddRange(category switch
@@ -26,10 +29,31 @@ public sealed class ShiftPlanBuilder
                 TaskCategory.AnimalCare => animalBatches,
                 TaskCategory.Crops      => cropBatches,
                 TaskCategory.Fieldwork  => fieldworkBatches,
+                TaskCategory.Machines   => machineBatches,
                 _                       => (IReadOnlyList<WorkBatch>)Array.Empty<WorkBatch>(),
             });
         }
         return result;
+    }
+
+    private static List<WorkBatch> BuildMachineBatches(WorkScopeSet scopes)
+    {
+        var batches = new List<WorkBatch>();
+        if (scopes.Machines is not { IsEnabled: true } machines)
+            return batches;
+
+        // Flatten all groups' machines and bucket by location: one Machines batch per location with
+        // ≥1 selected machine. Each machine's owning group/config is re-looked-up at runtime.
+        var locations = machines.AllMachines
+            .Select(machine => machine.LocationName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal);
+
+        foreach (var location in locations)
+            batches.Add(CreateSkeleton(location, BatchKind.Machines, Array.Empty<TaskKind>(), feedBuilding: false));
+
+        return batches;
     }
 
     private static List<WorkBatch> BuildAnimalCareBatches(WorkScopeSet scopes, IReadOnlySet<TaskKind> enabledTasks)

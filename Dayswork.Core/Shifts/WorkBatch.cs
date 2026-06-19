@@ -21,6 +21,11 @@ public enum BatchKind
     // per-tile from the pure CropShiftPlanner. The batch's CropZoneAssignments are carried
     // out-of-band by the runtime (not as TaskKind TileWork).
     ManagedCrops,
+
+    // Manage Machines: the contract's selected machines in this location, visited to collect
+    // finished output and reload empty machines. The machine refs/groups are carried out-of-band
+    // by the runtime (Tasks empty), like managed crops.
+    Machines,
 }
 
 public enum AnimalProductKind

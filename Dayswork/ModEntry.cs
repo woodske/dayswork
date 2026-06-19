@@ -221,5 +221,40 @@ public sealed class ModEntry : Mod
                         break;
                 }
             });
+
+        helper.ConsoleCommands.Add(
+            "dayswork_debug_machines",
+            "Lists Data/Machines objects in the player's current location with their ready-state, held output, and reload eligibility (verifies the machine reader + per-entry data in-world).",
+            (_, _) => LogMachinesInCurrentLocation());
+    }
+
+    private void LogMachinesInCurrentLocation()
+    {
+        var location = Game1.currentLocation;
+        if (location is null)
+        {
+            this.Monitor.Log("[Dayswork][machines] No current location.", LogLevel.Info);
+            return;
+        }
+
+        var reader = new Orchestration.MachineReader();
+        var count = 0;
+        foreach (var (tile, machine, data) in reader.EnumerateMachines(location))
+        {
+            count++;
+            var state = reader.Classify(machine);
+            var held = machine.heldObject.Value;
+            var reloadable = Orchestration.MachineReader.IsReloadable(data);
+            this.Monitor.Log(
+                $"[Dayswork][machines] {location.NameOrUniqueName} ({tile.X},{tile.Y}) {machine.QualifiedItemId} '{machine.Name}' " +
+                $"state={state} held={(held is null ? "none" : $"{held.QualifiedItemId} x{held.Stack}")} " +
+                $"minutesUntilReady={machine.MinutesUntilReady} reloadable={reloadable} " +
+                $"allowLoadWhenFull={data.AllowLoadWhenFull} isIncubator={data.IsIncubator}.",
+                LogLevel.Info);
+        }
+
+        this.Monitor.Log(
+            $"[Dayswork][machines] {count} machine(s) in {location.NameOrUniqueName}.",
+            LogLevel.Info);
     }
 }

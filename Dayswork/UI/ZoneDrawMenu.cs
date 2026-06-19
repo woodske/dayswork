@@ -1,4 +1,5 @@
 using Dayswork.Core.Domain;
+using Dayswork.Core.Machines;
 using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -20,8 +21,21 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
 
     private readonly List<BuildingOutline> _buildingOutlines;
     private readonly IModHelper            _helper;
-    private readonly Action<List<Zone>, List<BuildingOutline>> _onComplete;
+    private readonly Action<List<Zone>, List<BuildingOutline>>? _onComplete;
     private readonly Action                _onCancel;
+
+    // ── Machine-selection mode (Manage Machines) ─────────────────────────────
+    // When set, the session selects individual machines (1×1) across multiple locations instead of
+    // drawing task/crop zones. Selected machines render as green fills via the existing overlay;
+    // other groups' machines render protected (red). A location switcher cycles the displayed map.
+    private readonly bool _machineMode;
+    private readonly Action<List<MachineRef>>? _onMachinesComplete;
+    private readonly IReadOnlyList<MachineMapLocation> _machineLocations = Array.Empty<MachineMapLocation>();
+    private readonly string? _machineTypeFilter;   // only machines of this qualified id are selectable
+    private readonly Dictionary<string, HashSet<TileCoord>> _selectedMachines = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HashSet<TileCoord>> _protectedMachines = new(StringComparer.Ordinal);
+    private int _machineLocationIndex;
+    private ClickableComponent? _locationBtn;
 
     // Zone session state — implements IZoneDrawSource
     private readonly List<Zone>            _completedZones    = new();
@@ -34,11 +48,13 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private readonly bool _overlapToggles;
     private readonly Color _zoneFillColor;
     private readonly Color _protectedZoneFillColor;
-    private readonly string _targetLocationName;
+    private string _targetLocationName;
     private readonly List<Zone> _protectedZones = new();
 
-    IReadOnlyList<Zone>            IZoneDrawSource.CompletedZones    => _completedZones;
-    IReadOnlyList<Zone>            IZoneDrawSource.ProtectedZones    => _protectedZones;
+    IReadOnlyList<Zone>            IZoneDrawSource.CompletedZones    =>
+        _machineMode ? MachineZones(_selectedMachines) : _completedZones;
+    IReadOnlyList<Zone>            IZoneDrawSource.ProtectedZones    =>
+        _machineMode ? MachineZones(_protectedMachines) : _protectedZones;
     IReadOnlyList<BuildingOutline> IZoneDrawSource.SelectedBuildings => _selectedBuildings;
     bool       IZoneDrawSource.IsInZoneDrawMode => true;          // grid always visible during the session
     TileCoord? IZoneDrawSource.DragStart        => _dragStart;
@@ -148,6 +164,189 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         populateClickableComponentList();
     }
 
+    /// <summary>
+    /// Machine-selection session: pick individual machines (1×1) across the candidate
+    /// <paramref name="locations"/>, switching the displayed map with the location switcher.
+    /// </summary>
+    public ZoneDrawMenu(
+        IModHelper helper,
+        IReadOnlyList<MachineMapLocation> locations,
+        IReadOnlyList<MachineRef> initialSelected,
+        IReadOnlyList<MachineRef> protectedMachines,
+        Action<List<MachineRef>> onComplete,
+        Action onCancel,
+        string? machineTypeFilter = null)
+        : base(0, 0, 0, 0)
+    {
+        _machineMode        = true;
+        _machineLocations   = locations;
+        _machineTypeFilter  = machineTypeFilter;
+        _helper             = helper;
+        _onMachinesComplete = onComplete;
+        _onCancel           = onCancel;
+        _onComplete         = null;
+        _buildingOutlines   = new List<BuildingOutline>();
+        _allowBuildingSelection = false;
+        _overlapToggles     = true;
+        _zoneFillColor      = Color.LimeGreen * 0.5f;
+        _protectedZoneFillColor = Color.Red * 0.35f;
+
+        foreach (var machine in initialSelected)
+            Selected(machine.LocationName).Add(machine.Tile);
+        foreach (var machine in protectedMachines)
+            Protected(machine.LocationName).Add(machine.Tile);
+
+        // Start on the first selected machine's location, else the first candidate location.
+        _machineLocationIndex = 0;
+        if (initialSelected.Count > 0)
+        {
+            var idx = IndexOfLocation(initialSelected[0].LocationName);
+            if (idx >= 0)
+                _machineLocationIndex = idx;
+        }
+
+        _targetLocationName = _machineLocations[_machineLocationIndex].LocationName;
+        var drawLocation = ResolveDrawLocation(_targetLocationName);
+
+        _returnLocation = Game1.currentLocation;
+        Game1.currentLocation = drawLocation;
+        Game1.viewportFreeze  = true;
+        Game1.displayHUD      = false;
+        _savedZoom     = Game1.options.baseZoomLevel;
+        _effectiveZoom = _savedZoom;
+        CenterViewport(drawLocation);
+
+        _overlay = new ZoneDrawOverlay(this, Game1.game1.GraphicsDevice);
+        helper.Events.Display.RenderedWorld += _overlay.OnRenderedWorld;
+
+        BuildComponents();
+        populateClickableComponentList();
+    }
+
+    // ── Machine-mode helpers ─────────────────────────────────────────────────
+
+    private MachineMapLocation CurrentMachineLocation => _machineLocations[_machineLocationIndex];
+
+    private HashSet<TileCoord> Selected(string locationName)
+    {
+        if (!_selectedMachines.TryGetValue(locationName, out var set))
+            _selectedMachines[locationName] = set = new HashSet<TileCoord>();
+        return set;
+    }
+
+    private HashSet<TileCoord> Protected(string locationName)
+    {
+        if (!_protectedMachines.TryGetValue(locationName, out var set))
+            _protectedMachines[locationName] = set = new HashSet<TileCoord>();
+        return set;
+    }
+
+    private int IndexOfLocation(string locationName)
+    {
+        for (var i = 0; i < _machineLocations.Count; i++)
+            if (string.Equals(_machineLocations[i].LocationName, locationName, StringComparison.Ordinal))
+                return i;
+        return -1;
+    }
+
+    // Selected/protected machines for the CURRENT display location only, as 1×1 zones the overlay
+    // renders in the active viewport. (Selections for other locations persist off-screen.)
+    private IReadOnlyList<Zone> MachineZones(Dictionary<string, HashSet<TileCoord>> source) =>
+        source.TryGetValue(_targetLocationName, out var tiles) && tiles.Count > 0
+            ? tiles.Select(tile => new Zone(_targetLocationName, tile, tile)).ToList()
+            : Array.Empty<Zone>();
+
+    private string LocationButtonLabel() =>
+        I18nHelper.Get("ui.manage_machines.viewing", new { name = CurrentMachineLocation.DisplayName });
+
+    private void SwitchMachineLocation(int direction)
+    {
+        if (_machineLocations.Count <= 1)
+        {
+            Game1.playSound("cancel");
+            return;
+        }
+
+        _machineLocationIndex =
+            ((_machineLocationIndex + direction) % _machineLocations.Count + _machineLocations.Count) % _machineLocations.Count;
+        _targetLocationName = _machineLocations[_machineLocationIndex].LocationName;
+        var loc = ResolveDrawLocation(_targetLocationName);
+        Game1.currentLocation = loc;
+        CenterViewport(loc);
+        _dragStart = null;
+        Game1.playSound("smallSelect");
+    }
+
+    private void HandleMachineSelection(TileCoord topLeft, TileCoord bottomRight, bool singleTile)
+    {
+        var selected = Selected(_targetLocationName);
+        var protectedSet = Protected(_targetLocationName);
+        var candidates = CurrentMachineLocation.Candidates;
+
+        if (singleTile)
+        {
+            var tile = topLeft;
+            if (!candidates.TryGetValue(tile, out var candidateId) || !MatchesTypeFilter(candidateId))
+            {
+                Game1.playSound("cancel");
+                return;
+            }
+
+            if (protectedSet.Contains(tile))
+            {
+                Game1.addHUDMessage(new HUDMessage(
+                    I18nHelper.Get("ui.manage_machines.machine_claimed"),
+                    HUDMessage.error_type));
+                Game1.playSound("cancel");
+                return;
+            }
+
+            if (selected.Remove(tile))
+                Game1.playSound("bigDeSelect");
+            else
+            {
+                selected.Add(tile);
+                Game1.playSound("coin");
+            }
+
+            return;
+        }
+
+        // Drag rectangle: add every candidate machine of the chosen type inside it that isn't claimed.
+        var added = 0;
+        foreach (var (tile, candidateId) in candidates)
+        {
+            if (tile.X < topLeft.X || tile.X > bottomRight.X || tile.Y < topLeft.Y || tile.Y > bottomRight.Y)
+                continue;
+            if (!MatchesTypeFilter(candidateId) || protectedSet.Contains(tile) || !selected.Add(tile))
+                continue;
+            added++;
+        }
+
+        Game1.playSound(added > 0 ? "coin" : "cancel");
+    }
+
+    private bool MatchesTypeFilter(string candidateId) =>
+        _machineTypeFilter is null || string.Equals(candidateId, _machineTypeFilter, StringComparison.Ordinal);
+
+    private List<MachineRef> CollectSelectedMachines()
+    {
+        var result = new List<MachineRef>();
+        foreach (var location in _machineLocations)
+        {
+            if (!_selectedMachines.TryGetValue(location.LocationName, out var tiles))
+                continue;
+
+            foreach (var tile in tiles)
+                if (location.Candidates.TryGetValue(tile, out var id))
+                    result.Add(new MachineRef(location.LocationName, tile, id));
+        }
+
+        return result;
+    }
+
+    private int SelectedMachineCount => _selectedMachines.Values.Sum(set => set.Count);
+
     // ── Component construction ───────────────────────────────────────────────
 
     private void BuildComponents()
@@ -203,6 +402,12 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             new Rectangle(w - pad - bw, by, bw, bh),
             "Done", doneLabel)
         { myID = 200, leftNeighborID = 203 };
+
+        // Machine mode: a top-left location switcher cycles the displayed map among candidate
+        // locations (farm + interiors/greenhouse with ≥1 machine).
+        _locationBtn = _machineMode
+            ? new ClickableComponent(new Rectangle(pad, 80, 320, bh), "Location", LocationButtonLabel()) { myID = 210 }
+            : null;
     }
 
     private static void CenterViewport(GameLocation loc)
@@ -295,7 +500,8 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         _zoomOutBtn.bounds.Contains(x, y) ||
         _zoomInBtn.bounds.Contains(x, y)  ||
         _panBtn.bounds.Contains(x, y)     ||
-        _doneBtn.bounds.Contains(x, y);
+        _doneBtn.bounds.Contains(x, y)    ||
+        (_locationBtn is not null && _locationBtn.bounds.Contains(x, y));
 
     // ── Zoom ────────────────────────────────────────────────────────────────────
     // On PC: writing desiredBaseZoomLevel works; game.update() applies it and recomputes the viewport.
@@ -357,9 +563,21 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         if (_cancelBtn.bounds.Contains(x, y)) { DoCancel();   return; }
         if (_clearBtn.bounds.Contains(x, y))
         {
-            _completedZones.Clear();
-            _selectedBuildings.Clear();
+            if (_machineMode)
+            {
+                _selectedMachines.Clear();
+            }
+            else
+            {
+                _completedZones.Clear();
+                _selectedBuildings.Clear();
+            }
             Game1.playSound("trashcan");
+            return;
+        }
+        if (_machineMode && _locationBtn is not null && _locationBtn.bounds.Contains(x, y))
+        {
+            SwitchMachineLocation(1);
             return;
         }
         if (_panBtn.bounds.Contains(x, y))
@@ -418,6 +636,12 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         var bottomRight = new TileCoord(Math.Max(start.X, end.X), Math.Max(start.Y, end.Y));
 
         var singleTile = topLeft.X == bottomRight.X && topLeft.Y == bottomRight.Y;
+
+        if (_machineMode)
+        {
+            HandleMachineSelection(topLeft, bottomRight, singleTile);
+            return;
+        }
 
         if (ZoneOverlapPolicy.OverlapsAny(_protectedZones, topLeft, bottomRight))
         {
@@ -485,10 +709,19 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private void DoComplete()
     {
         _resultDelivered = true;
+
+        if (_machineMode)
+        {
+            var machines = CollectSelectedMachines();
+            exitThisMenu(false);
+            _onMachinesComplete!(machines);
+            return;
+        }
+
         var zones     = new List<Zone>(_completedZones);
         var buildings = new List<BuildingOutline>(_selectedBuildings);
         exitThisMenu(false);
-        _onComplete(zones, buildings);
+        _onComplete!(zones, buildings);
     }
 
     private void DoCancel()
@@ -526,6 +759,8 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         allClickableComponents.Add(_zoomInBtn);
         allClickableComponents.Add(_panBtn);
         allClickableComponents.Add(_doneBtn);
+        if (_locationBtn is not null)
+            allClickableComponents.Add(_locationBtn);
     }
 
     public override void setCurrentlySnappedComponentTo(int id)
@@ -547,7 +782,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         int w = Game1.uiViewport.Width;
 
         // Instruction text at top-center with a subtle backdrop for readability
-        string hint = I18nHelper.Get("ui.zone_chest.session_hint");
+        string hint = I18nHelper.Get(_machineMode ? "ui.manage_machines.draw_hint" : "ui.zone_chest.session_hint");
         var size = Game1.smallFont.MeasureString(hint);
         var box  = new Rectangle((int)((w - size.X) / 2) - 16, 24, (int)size.X + 32, (int)size.Y + 14);
         b.Draw(Game1.staminaRect, box, Color.Black * 0.55f);
@@ -564,13 +799,28 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         Utility.drawTextWithShadow(b, zoomHint, Game1.smallFont,
             new Vector2((w - zoomHintSize.X) / 2f, 24 + box.Height + 6 + scrollSize.Y + 4), Color.Wheat);
 
-        int total = _completedZones.Count + _selectedBuildings.Count;
+        int total = _machineMode
+            ? SelectedMachineCount
+            : _completedZones.Count + _selectedBuildings.Count;
         DrawButton(b, _cancelBtn,  enabled: true);
         DrawButton(b, _clearBtn,   enabled: total > 0);
         DrawButton(b, _zoomOutBtn, enabled: true);
         DrawButton(b, _zoomInBtn,  enabled: true);
         DrawButton(b, _panBtn,     enabled: true, active: _isPanMode);
         DrawButton(b, _doneBtn,    enabled: true);
+
+        if (_machineMode && _locationBtn is not null)
+        {
+            _locationBtn.label = LocationButtonLabel();
+            DrawButton(b, _locationBtn, enabled: _machineLocations.Count > 1);
+
+            var countText = I18nHelper.Get("ui.manage_machines.selected_count", new { count = total });
+            var countBox = new Rectangle(_locationBtn.bounds.X, _locationBtn.bounds.Bottom + 8,
+                (int)Game1.smallFont.MeasureString(countText).X + 24, 36);
+            b.Draw(Game1.staminaRect, countBox, Color.Black * 0.55f);
+            Utility.drawTextWithShadow(b, countText, Game1.smallFont,
+                new Vector2(countBox.X + 12, countBox.Y + 6), Color.White);
+        }
 
         drawMouse(b);
     }

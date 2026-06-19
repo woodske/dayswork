@@ -1,5 +1,6 @@
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Core.Machines;
 using Dayswork.Core.Shifts;
 using Dayswork.Worker;
 using Microsoft.Xna.Framework;
@@ -101,6 +102,25 @@ internal sealed class ShiftSession
     public int ManagedReplanCount;
     public string LastManagedSignature = string.Empty;
     public string ManagedBatchLocationName = "Farm";
+
+    // ── Machine batch state ──────────────────────────────────────────────────
+    public readonly Queue<MachineStep> MachineSteps = new();
+    public MachineStep? CurrentMachineStep;
+    public bool MachinesActive;
+    public string MachineBatchLocationName = "Farm";
+
+    // Pending reload jobs for the current batch (one per group with empty machines to load). Each is
+    // a fetch-then-load: withdraw the planned inputs from the group's chest, then load its machines.
+    public readonly Queue<MachineReloadJob> MachineReloads = new();
+    public MachineReloadJob? CurrentMachineReload;
+
+    // True while the worker is walking to the current reload job's input chest to withdraw inputs.
+    public bool MachineFetchPending;
+
+    // Physical input carry buffer for the reload fetch: qualified id → count, plus the chest the
+    // inputs were withdrawn from (so leftovers settle back there on stop). Items are never lost.
+    public readonly Dictionary<string, int> CarriedInputs = new(StringComparer.Ordinal);
+    public ChestRef? CarriedInputsChest;
 }
 
 /// <summary>A delayed debris collection pass (felled-tree trunks, shaken fruit settle late).</summary>

@@ -39,6 +39,11 @@ public static class ConfigDefaults
             [WorkActionKind.HoeSwing] = 2,
             [WorkActionKind.PlantSeed] = 1,
             [WorkActionKind.ApplyFertilizer] = 1,
+            // Machine work is priced per interaction, not per item: one charge to collect a
+            // machine's ready output, one charge to (re)load an empty machine — regardless of how
+            // many items the recipe consumes (a 5-fruit dehydrator load is one LoadMachine charge).
+            [WorkActionKind.CollectMachine] = 1,
+            [WorkActionKind.LoadMachine] = 1,
         };
 
         return ConfigSnapshotFactory.Create(

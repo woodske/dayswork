@@ -13,4 +13,5 @@ public sealed class ContractDtoV2
     public string Tier { get; set; } = "";
     public List<string> CategoryPriority { get; set; } = new();
     public CropPlanDtoV1? CropPlan { get; set; }
+    public MachineWorkScopeDtoV1? MachineWorkScope { get; set; }
 }

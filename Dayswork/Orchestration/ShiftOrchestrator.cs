@@ -379,8 +379,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                 case BatchKind.AnimalBuilding:
                 case BatchKind.Greenhouse:
                 case BatchKind.ManagedCrops:
-                    // ManagedCrops carries no TileWork; the managed-crop runner reads its zone
-                    // assignments from WorkScopeSet.ManagedCrops at batch start.
+                case BatchKind.Machines:
+                    // ManagedCrops/Machines carry no TileWork; their runners read the authored
+                    // assignments (WorkScopeSet.ManagedCrops / .Machines) at batch start.
                     batches.Add(batch);
                     break;
 
@@ -526,6 +527,42 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             }
 
             BeginManagedCropBatch(batch);
+            return;
+        }
+
+        if (IsMachineBatch(batch))
+        {
+            if (!string.Equals(batch.LocationName, "Farm", StringComparison.Ordinal))
+            {
+                if (ModEntry.ExpansionCompat is { } compat &&
+                    compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
+                    descriptor.Role == ExpansionLocationRole.GreenhouseWork)
+                {
+                    if (TryStartExpansionTravel(
+                            "Farm",
+                            batch.LocationName,
+                            ExpansionRoutePurpose.WorkEntry,
+                            TravelFailurePolicy.ReportFailure,
+                            TravelPurpose.WorkEntry))
+                        return;
+
+                    Session.Ctx.CurrentBatchIndex++;
+                    BeginCurrentBatch();
+                    return;
+                }
+
+                if (TryBuildBuildingEntryPlan(batch.LocationName, TravelFailurePolicy.ReportFailure, out var plan))
+                {
+                    StartTravel(plan, TravelPurpose.WorkEntry);
+                    return;
+                }
+
+                Session.Ctx.CurrentBatchIndex++;
+                BeginCurrentBatch();
+                return;
+            }
+
+            BeginMachineBatch(batch);
             return;
         }
 
@@ -738,6 +775,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             case IntentPerformManagedCropAction intent:
                 HandleManagedCropAction(intent, currentLocation);
                 break;
+            case IntentPerformMachineAction intent:
+                HandleMachineAction(intent, currentLocation);
+                break;
             case IntentPetAnimal intent:
                 HandlePetAnimal(intent);
                 break;
@@ -786,6 +826,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         // shipping-bin output goes straight to the bin, while all other undelivered output uses
         // automatic overflow. This must all happen BEFORE the session is discarded.
         _session.Shopping.SettleCarriedItems(showHud: false);
+        SettleCarriedInputs();
         _session.Deposits.AppendUndeliveredToOverflow();
 
         ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);

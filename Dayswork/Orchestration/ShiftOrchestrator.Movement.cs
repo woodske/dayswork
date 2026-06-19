@@ -146,6 +146,23 @@ internal sealed partial class ShiftOrchestrator
     {
         if (_nav.NavigationFailed)
         {
+            if (Session.MachinesActive)
+            {
+                if (Session.MachineFetchPending)
+                {
+                    Session.MachineFetchPending = false;
+                    AdvanceMachineReload();   // couldn't reach chest; skip this reload job
+                    return;
+                }
+
+                if (Session.CurrentMachineStep is not null)
+                {
+                    Session.CurrentMachineStep = null;
+                    StartNextMachineStep();
+                    return;
+                }
+            }
+
             if (Session.ManagedActive && Session.CurrentManagedAction is not null)
             {
                 Session.CurrentManagedAction = null;
@@ -184,6 +201,22 @@ internal sealed partial class ShiftOrchestrator
 
         if (_nav.HasArrived)
         {
+            if (Session.MachinesActive)
+            {
+                if (Session.MachineFetchPending)
+                {
+                    OnMachineFetchArrived();
+                    return;
+                }
+
+                if (Session.CurrentMachineStep is { } machineStep)
+                {
+                    Session.Ctx.StateMachine.SetIntent(new IntentPerformMachineAction(machineStep.Machine, machineStep.Kind));
+                    Session.ActionPending = false;
+                    return;
+                }
+            }
+
             if (Session.ManagedActive && Session.CurrentManagedAction is { } managedAction)
             {
                 Session.Ctx.StateMachine.SetIntent(new IntentPerformManagedCropAction(managedAction));

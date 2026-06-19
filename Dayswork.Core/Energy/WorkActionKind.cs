@@ -14,4 +14,6 @@ public enum WorkActionKind
     HoeSwing,
     PlantSeed,
     ApplyFertilizer,
+    CollectMachine,
+    LoadMachine,
 }

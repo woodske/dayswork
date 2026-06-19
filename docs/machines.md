@@ -134,6 +134,62 @@ call the API, then read back what was consumed / redirect collected output into 
   time to confirm whether a secondary input lives on the trigger (`RequiredCount`) vs.
   `AdditionalConsumedItems`. The schema supports both; the specific entry decides.
 
+## Reader implementation (Dayswork) — verified by compile
+
+`Dayswork/Orchestration/MachineReader.cs` is the live-world → pure adapter (enumerate / resolve /
+classify / build load candidates). The following API surface is **confirmed to compile against the
+installed 1.6.15 `Stardew Valley.dll` + `StardewValley.GameData.dll`** (the build links the real
+assemblies, so a wrong signature fails the build):
+
+- `Object.GetMachineData() : MachineData?` — null ⇒ not a machine.
+- `GameLocation.objects.Pairs` enumerates `KeyValuePair<Vector2, Object>`; `objects.TryGetValue(vec, out obj)`.
+- `Object.readyForHarvest.Value : bool`, `Object.heldObject.Value : Object?` (net fields, `.Value`).
+- `MachineData.AllowLoadWhenFull`, `.IsIncubator`, `.AdditionalConsumedItems` (`List<MachineItemAdditionalConsumedItems>`).
+- `MachineItemAdditionalConsumedItems.ItemId : string`, `.RequiredCount : int`.
+- `MachineDataUtility.TryGetMachineOutputRule(Object machine, MachineData data, MachineOutputTrigger trigger, Item input, Farmer who, GameLocation location, out MachineOutputRule rule, out MachineOutputTriggerRule triggerRule, out MachineOutputRule ruleIgnoringCount, out MachineOutputTriggerRule triggerIgnoringCount) : bool` — `rule`/`triggerRule` are the count-matching results; `triggerRule.RequiredCount : int` is the recipe's primary-input count.
+- `MachineOutputTrigger.ItemPlacedInMachine` (in `StardewValley.GameData.Machines`).
+- `ItemRegistry.Create(string qualifiedId, int amount, int quality = 0, bool allowNull = false) : Item?` — `allowNull: true` returns null for an invalid id (avoids the "Error Item" landmine when probing).
+
+Reader behavior decisions:
+- **Reload candidates are discovered by probing**, not hard-coded recipes. For each chest item allowed
+  by the group filter, `TryGetMachineOutputRule(ItemPlacedInMachine, …)` confirms acceptance and yields
+  `RequiredCount`; `MachineData.AdditionalConsumedItems` supplies secondary inputs (coal-style). The
+  probe item is created with a large stack so the count-matching `rule` binds and `RequiredCount` is
+  readable; the pure `MachineInputPlanner` then clamps to real supply.
+- **Collect-only falls out naturally**: input-less producers (bee houses, tappers) yield zero load
+  candidates because no item satisfies an `ItemPlacedInMachine` trigger. `AllowLoadWhenFull`
+  (crystalarium) and `IsIncubator` are excluded explicitly via `MachineReader.IsReloadable`.
+
+**Still pending live per-entry confirmation (do in the M8 in-game smoke pass):** whether the fish
+smoker models coal on the trigger vs `AdditionalConsumedItems`, the dehydrator's ×5
+`RequiredCount`, and keg/jar flavoring. The reader handles **both** placements, so it is correct
+either way; the smoke pass only needs to confirm the worker actually loads/collects these in-world.
+**Furnace specifically:** confirm its accepted ores and that coal is an `AdditionalConsumedItems`
+entry (the auto-locked companion in the input picker relies on this) — record the result here.
+
+### Enumerating a machine type's accepted inputs (UI authoring)
+
+The Manage Machines input picker shows *what the chosen machine type accepts*, derived from data, not
+from a chest's contents. `MachineReader` exposes (all probe-only):
+
+- `AcceptsInput(MachineData?)` — true when some output rule fires on `ItemPlacedInMachine` and the
+  machine is reloadable. Cheap (inspects the rules; no catalog sweep). Drives "collect-only" types
+  (bee houses, tappers) that have no input picker.
+- `EnumerateAcceptedInputs(machine, data, who, location)` — sweeps the **whole object catalog**
+  (`Game1.objectData.Keys` → `(O)<key>`), creates each with `ItemRegistry.Create(id, 999, allowNull:true)`,
+  and keeps those for which `TryGetMachineOutputRule(ItemPlacedInMachine,…)` matches. This makes the
+  game's own matcher resolve **both** `RequiredItemId` and `RequiredTags` rules to concrete items —
+  no need to reimplement context-tag matching. ~900 probes, **cached per machine type** for the
+  session. Needs a placed instance of the type (the picker opens after map selection, so one exists).
+- `EnumerateRequiredCompanions(MachineData?)` — `AdditionalConsumedItems` → the coal-style companions
+  the load engine already consumes automatically; surfaced in the picker as auto-selected/locked rows
+  (informational: "stock coal in the input chest"), not added to the `MachineInputFilter`.
+
+`Data/Machines` input rules confirmed in practice (SVE `[CP] …/code/Items/Machines.json`): concrete
+`RequiredItemId` (Galdoran Gem, Goose Egg, Camel Wool) **and** `RequiredTags` (winery keg
+`category_fruits`/`keg_wine`, butter churner `milk_item`+`quality_*`) — hence the probe approach.
+`GetMachineDataForType(qualifiedId)` reads `Data/Machines` for a type without a placed instance.
+
 ## Fish ponds (deferred phase — buildings, not machines)
 
 Fish ponds are `StardewValley.Buildings.FishPond`, **not** `Data/Machines` objects, so none of the

@@ -107,7 +107,7 @@ data or a decompile, and note where you confirmed it.
 - `docs/game-content-search.md` — local Stardew/SVE paths, folder maps, and search/parsing tips for
   base `.xnb`/DLL content, SVE Content Patcher packs, C# source, and `.tmx` maps.
 - `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
-- `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) for the planned Manage Machines feature; plan in `docs/plans/machine-management.md`.
+- `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); plan + status in `docs/plans/machine-management.md`.
 - `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
@@ -136,9 +136,13 @@ ids in `HiringBuilding.BuildData`.
 
 Builds clean and runs. Working today: build the office and hire from its bulletin board; the
 hiring flow (tasks, zone-draw work scope, output chests, energy tier, task priority, one-time vs
-recurring schedule, managed crops); the full shift loop (animal care, crops, fieldwork, managed-crop
-planting with auto-buy, multi-trip deposits, overflow safety, stuck recovery, 8pm cap, sleep
-settle); save/load persistence; evening office lighting/smoke; optional GMCM config; and SVE
-expansion compatibility. The farmhand uses a **placeholder** Marnie sprite/portrait (custom art is
-specified in `docs/farmhand-art.md`). Dev tooling (verbose logs + console commands like
-`dayswork_end_shift`) is gated behind `DevLog.Enabled`, off for release.
+recurring schedule, managed crops, **Manage Machines**); the full shift loop (animal care, crops,
+fieldwork, managed-crop planting with auto-buy, **machine collect/reload**, multi-trip deposits,
+overflow safety, stuck recovery, 8pm cap, sleep settle); save/load persistence; evening office
+lighting/smoke; optional GMCM config; and SVE expansion compatibility. **Manage Machines** (2026-06-19)
+is built and unit-tested through milestone 7 but **awaits its in-game smoke pass** (milestone 8) —
+see `docs/plans/machine-management.md` for status + v1 limitations (notably: a group's input chest
+must be in the same location as its machines, else collect-only). The farmhand uses a **placeholder**
+Marnie sprite/portrait (custom art is specified in `docs/farmhand-art.md`). Dev tooling (verbose logs
++ console commands like `dayswork_end_shift`, `dayswork_debug_machines`) is gated behind
+`DevLog.Enabled`, off for release.

@@ -7,4 +7,5 @@ public enum OutputScopeFamily
     AnimalBuilding,
     Greenhouse,
     ManagedCrop,
+    Machine,
 }

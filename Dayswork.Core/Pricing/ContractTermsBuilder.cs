@@ -4,6 +4,7 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
+using Dayswork.Core.Machines;
 
 public sealed class ContractTermsBuilder
 {
@@ -39,9 +40,10 @@ public sealed class ContractTermsBuilder
         IReadOnlySet<TaskKind> enabledTasks,
         EnergyTier tier,
         ConfigSnapshot config,
-        CropPlan? cropPlan = null)
+        CropPlan? cropPlan = null,
+        MachineWorkScope? machineScope = null)
     {
-        var scopes = _scopeClassifier.Classify(selection, enabledTasks, cropPlan);
+        var scopes = _scopeClassifier.Classify(selection, enabledTasks, cropPlan, machineScope);
         var issues = BuildValidationIssues(scopes, enabledTasks);
         if (!HasChargeableScopeTaskPair(scopes, enabledTasks))
         {
@@ -103,6 +105,14 @@ public sealed class ContractTermsBuilder
                         task)));
         }
 
+        // A reload-mode machine group with no input chest can only collect; surface it once
+        // (informational — the contract is still chargeable via the collect work).
+        if (scopes.Machines is not null
+            && scopes.Machines.Groups.Any(group => group.RequiresInput && group.InputChest is null))
+        {
+            issues.Add(new ContractValidationIssue(ContractValidationCode.MachineGroupNeedsInputChest, null));
+        }
+
         return issues;
     }
 
@@ -114,6 +124,7 @@ public sealed class ContractTermsBuilder
         var hasAnimalPair = scopes.AnimalBuildings.Count > 0 && enabledTasks.Any(TaskKindSets.IsAnimalService);
         var hasGreenhousePair = scopes.GreenhouseWork is not null && enabledTasks.Any(TaskKindSets.IsGreenhouseService);
         var hasManagedCrops = scopes.ManagedCrops is not null;
-        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair || hasManagedCrops;
+        var hasMachines = scopes.Machines is not null;
+        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair || hasManagedCrops || hasMachines;
     }
 }

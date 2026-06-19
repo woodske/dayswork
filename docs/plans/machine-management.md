@@ -1,8 +1,72 @@
 # Plan — Manage Machines
 
-**Status:** design agreed (exploratory session 2026-06-17), **not yet implemented.**
+**Status:** implemented 2026-06-19 (milestones 1–7 built, unit-tested, builds clean);
+**milestone 8 (in-game smoke pass) is pending** and must be run before release.
 **Game-content reference:** [`docs/machines.md`](../machines.md) (verified `Data/Machines`
 schema + API for SDV 1.6.15).
+
+## Group editor redesign (2026-06-19)
+
+The per-group editor was reworked into a **type-first, gated** flow (still a hub editor, not a wizard):
+
+1. **Reload-empty-machines** toggle retained (hidden/forced off for input-less types).
+2. **Pick a machine type** first (Furnace, Bee House, …) — `MachineGroup.MachineType` (qualified id);
+   a group is now **single-type**. Persisted on `MachineGroupDtoV1` (no migration — feature unreleased).
+3. **Select machines on the map**, restricted to that type (`ZoneDrawMenu` `machineTypeFilter`).
+4. **Inputs** come from the *type's* accepted-input list (data-derived via
+   `MachineReader.EnumerateAcceptedInputs`, **not** chest contents), with "Any &lt;category&gt;" bulk
+   shortcuts and **required companions (coal) shown auto-selected + locked**
+   (`MachineReader.EnumerateRequiredCompanions`; the load engine already consumes them).
+5. **Input chest** (decoupled from the filter; the farmhand skips it at runtime if the material is absent).
+6. **Output destination** (unchanged).
+
+Changing the type clears the group's machines + input filter (both are type-scoped). See
+`docs/machines.md` → "Enumerating a machine type's accepted inputs". The original chest-derived input
+flow described under "UI flow" below is superseded by the above.
+
+## Implementation status (2026-06-19)
+
+Built and unit-tested (Core/persistence/pricing covered by xUnit; the shift engine + UI are
+build-verified and await the in-game smoke pass per AGENTS.md):
+
+- **M1** `Dayswork/Orchestration/MachineReader.cs` — enumerate/resolve/classify + probe-built load
+  candidates. API verified by compiling against the live game DLLs (see `docs/machines.md` → "Reader
+  implementation").
+- **M2** `Dayswork.Core/Machines/` — `MachineRef`, `MachineInputFilter`, `MachineGroupMode`,
+  `MachineGroup`, `MachineWorkScope`, `RecipeRequirement`/`AdditionalInput`/`MachineLoadCandidate`,
+  `MachineLoadPlan`, `MachineInputPlanner`, `MachineActionKind`, `MachineOutputRouter`. Energy
+  (`WorkActionKind.CollectMachine`/`LoadMachine` = 1 each in `ConfigDefaults`) + `TaskCategory.Machines`
+  (4th in `DefaultCategoryPriority`). Planner + filter unit tests.
+- **M3** DTOs (`MachineWorkScopeDtoV1`/`MachineGroupDtoV1`/`MachineRefDtoV1`/`MachineInputFilterDtoV1`)
+  + `MachineWorkScopeSerialization`; carried on `Contract.MachineScope`. **No schema bump** — an
+  optional field on `ContractDtoV2` (the CropPlan precedent), so old v3 saves load with an empty
+  scope. Round-trip + missing→empty migration + malformed-skip tests.
+- **M4** `ContractTermsBuilder` gates chargeability on `MachineWorkScope.IsEnabled` (no surcharge —
+  energy is the cost; decided with the user). `ContractValidationCode.MachineGroupNeedsInputChest`
+  (informational). Pricing tests.
+- **M5/M6** Hub spoke → `ManageMachinesMenu` → `MachineGroupEditorMenu` (mode/input-chest/input-filter/
+  output pickers) + `MachinePlanDraft`/`MachineGroupDraft`; map selection extends `ZoneDrawMenu`
+  (click-toggle, drag-select, location switcher, cross-group exclusivity). Coordinator wiring + live
+  reprice.
+- **M7** `ShiftOrchestrator.Machines.cs` + `BatchKind.Machines` emit + session state. Group-major
+  collect → fetch → load passes; per-group output routed via `OutputScopeProvenance.Machine`;
+  carried inputs settled back to chest/overflow on stop (items never lost).
+
+**v1 limitations / open verification (do in M8):**
+- **Input chest must be in the same location as the machines.** A cross-location input chest makes
+  that group collect-only for that location (dev log) — inputs are never touched/lost. Full
+  cross-location fetch trips are a follow-up (see `ManagedShoppingCoordinator` for the pattern).
+- **Collect via `checkForAction`** credits the buffer only if the machine actually released its
+  output (duplication-safe). Confirm in-world that a fake worker `Farmer` cleanly collects (the
+  open question flagged below) — `dayswork_debug_machines` lists machine state to verify.
+- **Load via `PlaceInMachine(probe:false)`** with the carry buffer populated on a fake `Farmer`;
+  confirm fish-smoker (fish+coal) / dehydrator (×5) actually load in-world.
+- Sleep-settle of *collected machine output* still in the buffer routes by the buffer's nominal task
+  tag (provenance is honored on the normal deposit path) — same minor imperfection managed crops
+  have; items are never lost. Acceptable for v1.
+
+**Smoke pass:** enable `DevLog.Enabled`, build a machine group, run a shift, and use
+`dayswork_debug_machines` (current location) + `dayswork_end_shift` to inspect collect/reload.
 
 The farmhand learns to operate **machines** — placed objects that turn input into output over time
 (mayonnaise machine, keg, preserves jar, bee house, fish smoker, dehydrator, furnace, tapper, …).

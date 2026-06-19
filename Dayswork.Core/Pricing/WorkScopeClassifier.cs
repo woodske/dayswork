@@ -2,10 +2,15 @@ namespace Dayswork.Core.Pricing;
 
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Core.Machines;
 
 public sealed class WorkScopeClassifier
 {
-    public WorkScopeSet Classify(ContractScopeSelection selection, IReadOnlySet<TaskKind> enabledTasks, CropPlan? cropPlan = null)
+    public WorkScopeSet Classify(
+        ContractScopeSelection selection,
+        IReadOnlySet<TaskKind> enabledTasks,
+        CropPlan? cropPlan = null,
+        MachineWorkScope? machineScope = null)
     {
         OutdoorWorkScope? outdoorWork = null;
         if (selection.OutdoorZones.Count > 0 && enabledTasks.Any(TaskKindSets.IsOutdoorService))
@@ -39,7 +44,9 @@ public sealed class WorkScopeClassifier
             ? new ManagedCropWorkScope(cropPlan.Assignments, cropPlan.BuyFromJojaFirst)
             : null;
 
-        return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks, managedCrops);
+        var machines = machineScope is { IsEnabled: true } ? machineScope : null;
+
+        return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks, managedCrops, machines);
     }
 
     private static OutdoorWorkScope BuildOutdoorWorkScope(IReadOnlyList<Zone> zones)

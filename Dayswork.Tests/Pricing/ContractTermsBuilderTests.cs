@@ -3,6 +3,7 @@ namespace Dayswork.Tests.Pricing;
 using Dayswork.Core.Config;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Core.Machines;
 using Dayswork.Core.Pricing;
 using Xunit;
 
@@ -98,6 +99,85 @@ public sealed class ContractTermsBuilderTests
 
         Assert.True(preview.IsValid);
         Assert.NotNull(preview.ProposedTerms);
+    }
+
+    private static readonly ContractScopeSelection EmptySelection = new(
+        OutdoorZones: Array.Empty<Zone>(),
+        AnimalBuildings: Array.Empty<AnimalBuildingSelection>(),
+        Greenhouse: null);
+
+    private static MachineWorkScope MachineScope(MachineGroupMode mode, ChestRef? inputChest) =>
+        new(new[]
+        {
+            new MachineGroup(
+                "group-a",
+                new[] { new MachineRef("Farm", new TileCoord(4, 4), "(BC)16") },
+                MachineInputFilter.Any,
+                inputChest,
+                AutomaticOutputDestination.Instance,
+                mode),
+        });
+
+    [Fact]
+    public void BuildPreview_MachinesOnly_IsValid()
+    {
+        var preview = _builder.BuildPreview(
+            EmptySelection,
+            new HashSet<TaskKind>(),
+            EnergyTier.FullDay,
+            _config,
+            cropPlan: null,
+            machineScope: MachineScope(MachineGroupMode.CollectOnly, inputChest: null));
+
+        Assert.True(preview.IsValid);
+        Assert.NotNull(preview.ProposedTerms);
+    }
+
+    [Fact]
+    public void BuildPreview_MachinesAddNoSurcharge_PriceEqualsTierPrice()
+    {
+        var preview = _builder.BuildPreview(
+            EmptySelection,
+            new HashSet<TaskKind>(),
+            EnergyTier.FullDay,
+            _config,
+            cropPlan: null,
+            machineScope: MachineScope(MachineGroupMode.CollectAndReload, new ChestRef("Farm", new TileCoord(1, 1))));
+
+        Assert.Equal(_config.EnergyTierPrice[EnergyTier.FullDay], preview.ProposedTerms!.Pricing.TotalPrice);
+    }
+
+    [Fact]
+    public void BuildPreview_ReloadGroupWithoutInputChest_FlagsNeedsInputChestButStaysValid()
+    {
+        var preview = _builder.BuildPreview(
+            EmptySelection,
+            new HashSet<TaskKind>(),
+            EnergyTier.FullDay,
+            _config,
+            cropPlan: null,
+            machineScope: MachineScope(MachineGroupMode.CollectAndReload, inputChest: null));
+
+        Assert.True(preview.IsValid);
+        Assert.Contains(
+            preview.ValidationIssues,
+            issue => issue.Code == ContractValidationCode.MachineGroupNeedsInputChest);
+    }
+
+    [Fact]
+    public void BuildPreview_CollectOnlyGroupWithoutInputChest_NoNeedsInputChestIssue()
+    {
+        var preview = _builder.BuildPreview(
+            EmptySelection,
+            new HashSet<TaskKind>(),
+            EnergyTier.FullDay,
+            _config,
+            cropPlan: null,
+            machineScope: MachineScope(MachineGroupMode.CollectOnly, inputChest: null));
+
+        Assert.DoesNotContain(
+            preview.ValidationIssues,
+            issue => issue.Code == ContractValidationCode.MachineGroupNeedsInputChest);
     }
 
     [Fact]

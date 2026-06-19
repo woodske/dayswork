@@ -7,6 +7,7 @@ public abstract record ShiftIntent;
 public sealed record IntentMoveToTile(TileCoord Destination) : ShiftIntent;
 public sealed record IntentPerformTaskAt(TileCoord Tile, TaskKind Task) : ShiftIntent;
 public sealed record IntentPerformManagedCropAction(Crops.TileAction Action) : ShiftIntent;
+public sealed record IntentPerformMachineAction(Machines.MachineRef Machine, Machines.MachineActionKind Kind) : ShiftIntent;
 public sealed record IntentPlayEmote(int EmoteId) : ShiftIntent;
 public sealed record IntentTeleportToTile(TileCoord Destination) : ShiftIntent;
 public sealed record IntentTeleportHome : ShiftIntent;

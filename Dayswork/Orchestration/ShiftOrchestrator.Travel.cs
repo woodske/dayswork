@@ -231,6 +231,12 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
+        if (batch.Kind == BatchKind.Machines)
+        {
+            BeginMachineBatch(batch);
+            return;
+        }
+
         IReadOnlyList<WorkItem> tileWork;
         IReadOnlyList<AnimalWorkItem> animalWork;
         var batchTasks = batch.Tasks.ToHashSet();

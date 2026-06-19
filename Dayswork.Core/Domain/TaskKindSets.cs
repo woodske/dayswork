@@ -93,6 +93,7 @@ public static class TaskKindSets
         TaskCategory.AnimalCare,
         TaskCategory.Crops,
         TaskCategory.Fieldwork,
+        TaskCategory.Machines,
     };
 
     /// <summary>

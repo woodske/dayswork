@@ -1,14 +1,18 @@
 using Dayswork.Core.Config;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Core.Machines;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
 using Dayswork.Integration;
+using Dayswork.Orchestration;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
+using StardewValley.Objects;
 using Season = Dayswork.Core.Domain.Season;
+using SObject = StardewValley.Object;
 
 namespace Dayswork.UI;
 
@@ -85,6 +89,7 @@ internal sealed class HiringFlowCoordinator
             onTaskSelection: ShowTaskSelection,
             onWorkScope: ShowZoneAndChest,
             onManageCrops: ShowManageCrops,
+            onManageMachines: ShowManageMachines,
             onOutput: ShowOutputDestinations,
             onPriority: ShowTaskPriority,
             onEnergy: ShowEnergy,
@@ -378,6 +383,387 @@ internal sealed class HiringFlowCoordinator
             ? "ui.manage_crops.tag_auto_buyable"
             : "ui.manage_crops.tag_chest_only");
 
+    // ── Manage Machines authoring ─────────────────────────────────────
+    private readonly MachineReader _machineReader = new();
+
+    private void ShowManageMachines(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new ManageMachinesMenu(
+            draft,
+            onBack: ShowHub,
+            onAddGroup: AddMachineGroup,
+            onEditGroup: ShowMachineGroupEditor,
+            onDeleteGroup: DeleteMachineGroup);
+    }
+
+    private void AddMachineGroup(ContractDraft draft)
+    {
+        var group = draft.MachinePlan.AddGroup();
+        draft.MarkDirty();
+        ShowMachineGroupEditor(draft, group.Id);
+    }
+
+    private void ShowMachineGroupEditor(ContractDraft draft, string groupId)
+    {
+        if (!draft.MachinePlan.TryGetGroup(groupId, out var group))
+        {
+            ShowManageMachines(draft);
+            return;
+        }
+
+        Game1.activeClickableMenu = new MachineGroupEditorMenu(
+            draft,
+            group,
+            onBack: ShowManageMachines,
+            onPickType: id => ShowMachineTypePicker(draft, id),
+            onPickInputChest: id => ShowMachineInputChestPicker(draft, id),
+            onPickInputFilter: id => ShowMachineInputFilterPicker(draft, id),
+            onPickOutput: id => ShowMachineOutputPicker(draft, id),
+            onSelectMachines: id => BeginMachineSelection(draft, id));
+    }
+
+    private void ShowMachineTypePicker(ContractDraft draft, string groupId)
+    {
+        if (!draft.MachinePlan.TryGetGroup(groupId, out var group))
+        {
+            ShowManageMachines(draft);
+            return;
+        }
+
+        // Machines claimed by other groups don't count toward an available type's tally.
+        var claimed = draft.MachinePlan.ProtectedMachines(groupId)
+            .GroupBy(machine => machine.LocationName, StringComparer.Ordinal)
+            .ToDictionary(grouping => grouping.Key, grouping => grouping.Select(machine => machine.Tile).ToHashSet(), StringComparer.Ordinal);
+
+        var typeCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var (location, _) in EnumerateCandidateLocations())
+        {
+            claimed.TryGetValue(location.NameOrUniqueName, out var claimedTiles);
+            foreach (var (tile, machine, _) in _machineReader.EnumerateMachines(location))
+            {
+                if (claimedTiles is not null && claimedTiles.Contains(tile))
+                    continue;
+                typeCounts[machine.QualifiedItemId] = typeCounts.GetValueOrDefault(machine.QualifiedItemId) + 1;
+            }
+        }
+
+        if (typeCounts.Count == 0)
+        {
+            Game1.addHUDMessage(new HUDMessage(I18nHelper.Get("ui.manage_machines.no_machines_found"), HUDMessage.error_type));
+            ShowMachineGroupEditor(draft, groupId);
+            return;
+        }
+
+        var types = typeCounts
+            .Select(kvp => (Id: kvp.Key, Name: ItemRegistry.GetData(kvp.Key)?.DisplayName ?? kvp.Key, Count: kvp.Value))
+            .OrderBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var rows = types
+            .Select(type => new PickerRow(
+                type.Name,
+                string.Equals(type.Id, group.MachineType, StringComparison.Ordinal)
+                    ? I18nHelper.Get("ui.manage_machines.filter_active")
+                    : I18nHelper.Get("ui.manage_machines.type_count", new { count = type.Count })))
+            .ToList();
+
+        Game1.activeClickableMenu = new CropListPickerMenu(
+            I18nHelper.Get("ui.manage_machines.picker_type_title"),
+            rows,
+            selectedIndex: 0,
+            onSelect: index =>
+            {
+                if (index >= 0 && index < types.Count && draft.MachinePlan.TryGetGroup(groupId, out var target))
+                {
+                    target.SetMachineType(types[index].Id);   // clears machines + filter if the type changed
+                    draft.MarkDirty();
+                    RefreshPreview(draft);
+                }
+
+                ShowMachineGroupEditor(draft, groupId);
+            },
+            onCancel: () => ShowMachineGroupEditor(draft, groupId));
+    }
+
+    private void DeleteMachineGroup(ContractDraft draft, string groupId)
+    {
+        draft.MachinePlan.DeleteGroup(groupId);
+        draft.MarkDirty();
+        RefreshPreview(draft);
+    }
+
+    private void ShowMachineInputChestPicker(ContractDraft draft, string groupId)
+    {
+        var chests = _chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
+        var rows = new List<PickerRow> { new(I18nHelper.Get("ui.manage_machines.chest_none"), null) };
+        rows.AddRange(chests.Select(chest => new PickerRow(chest.DisplayName, chest.GroupLabel)));
+
+        Game1.activeClickableMenu = new CropListPickerMenu(
+            I18nHelper.Get("ui.manage_machines.picker_chest_title"),
+            rows,
+            selectedIndex: 0,
+            onSelect: index =>
+            {
+                if (draft.MachinePlan.TryGetGroup(groupId, out var group))
+                    group.InputChest = index == 0 ? null : chests[index - 1].Ref;
+
+                draft.MarkDirty();
+                RefreshPreview(draft);
+                ShowMachineGroupEditor(draft, groupId);
+            },
+            onCancel: () => ShowMachineGroupEditor(draft, groupId));
+    }
+
+    private void ShowMachineInputFilterPicker(ContractDraft draft, string groupId)
+    {
+        if (!draft.MachinePlan.TryGetGroup(groupId, out var group) || !group.HasType)
+        {
+            ShowMachineGroupEditor(draft, groupId);
+            return;
+        }
+
+        // Inputs are derived from what the machine type accepts, read off a live instance of it.
+        var sample = ResolveGroupMachineSample(group);
+        if (sample is null)
+        {
+            Game1.addHUDMessage(new HUDMessage(I18nHelper.Get("ui.manage_machines.inputs_unavailable"), HUDMessage.error_type));
+            ShowMachineGroupEditor(draft, groupId);
+            return;
+        }
+
+        var (machine, location) = sample.Value;
+        var data = machine.GetMachineData()!;
+        var accepted = _machineReader.EnumerateAcceptedInputs(machine, data, Game1.player, location);
+        var companions = MachineReader.EnumerateRequiredCompanions(data);
+
+        // "Any <category>" shortcuts for categories with several accepted members (e.g. a keg's fruits).
+        var categories = accepted
+            .Where(input => !string.IsNullOrWhiteSpace(input.CategoryName))
+            .GroupBy(input => input.Category)
+            .Where(grouping => grouping.Count() >= 2)
+            .Select(grouping => (Name: grouping.First().CategoryName, Ids: grouping.Select(input => input.QualifiedId).ToList()))
+            .OrderBy(category => category.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var rows = new List<PickerRow>();
+        var actions = new List<Action>();
+
+        rows.Add(new PickerRow(
+            I18nHelper.Get("ui.manage_machines.input_any"),
+            group.IsAnyInput ? I18nHelper.Get("ui.manage_machines.filter_active") : null));
+        actions.Add(() => group.ClearInputFilter());
+
+        // Required companions (coal, …): auto-included and locked — the load engine consumes them
+        // regardless of the filter, so this is informational ("stock coal in the input chest").
+        foreach (var companion in companions)
+        {
+            rows.Add(new PickerRow(
+                I18nHelper.Get("ui.manage_machines.input_required", new { name = companion.DisplayName }),
+                I18nHelper.Get("ui.manage_machines.input_required_tag"),
+                Locked: true));
+            actions.Add(() => { });
+        }
+
+        foreach (var category in categories)
+        {
+            var ids = category.Ids;
+            rows.Add(new PickerRow(
+                I18nHelper.Get("ui.manage_machines.input_any_category", new { name = category.Name }),
+                ids.All(group.AllowedInputIds.Contains) ? I18nHelper.Get("ui.manage_machines.filter_active") : null));
+            actions.Add(() =>
+            {
+                var fullySelected = ids.All(group.AllowedInputIds.Contains);
+                foreach (var id in ids)
+                {
+                    if (fullySelected)
+                        group.AllowedInputIds.Remove(id);
+                    else if (!group.AllowedInputIds.Contains(id))
+                        group.AllowedInputIds.Add(id);
+                }
+            });
+        }
+
+        foreach (var input in accepted)
+        {
+            var id = input.QualifiedId;
+            rows.Add(new PickerRow(
+                input.DisplayName,
+                group.AllowedInputIds.Contains(id) ? I18nHelper.Get("ui.manage_machines.filter_active") : null));
+            actions.Add(() => group.ToggleAllowedInput(id));
+        }
+
+        Game1.activeClickableMenu = new CropListPickerMenu(
+            I18nHelper.Get("ui.manage_machines.picker_filter_title"),
+            rows,
+            selectedIndex: 0,
+            onSelect: index =>
+            {
+                if (index >= 0 && index < actions.Count)
+                {
+                    actions[index]();
+                    draft.MarkDirty();
+                }
+
+                ShowMachineInputFilterPicker(draft, groupId);   // reopen so the player can toggle several
+            },
+            onCancel: () => ShowMachineGroupEditor(draft, groupId));
+    }
+
+    private void ShowMachineOutputPicker(ContractDraft draft, string groupId)
+    {
+        var chests = _chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
+        var rows = new List<PickerRow>
+        {
+            new(I18nHelper.Get("ui.manage_machines.output_automatic"), null),
+            new(I18nHelper.Get("ui.zone_chest.shipping_bin_option"), null),
+        };
+        rows.AddRange(chests.Select(chest => new PickerRow(chest.DisplayName, chest.GroupLabel)));
+
+        Game1.activeClickableMenu = new CropListPickerMenu(
+            I18nHelper.Get("ui.manage_machines.picker_output_title"),
+            rows,
+            selectedIndex: 0,
+            onSelect: index =>
+            {
+                if (draft.MachinePlan.TryGetGroup(groupId, out var group))
+                    group.OutputDestination = index switch
+                    {
+                        0 => null,
+                        1 => ShippingBinDestination.Instance,
+                        _ => new ChestDestination(chests[index - 2].Ref),
+                    };
+
+                draft.MarkDirty();
+                ShowMachineGroupEditor(draft, groupId);
+            },
+            onCancel: () => ShowMachineGroupEditor(draft, groupId));
+    }
+
+    private void BeginMachineSelection(ContractDraft draft, string groupId)
+    {
+        if (!draft.MachinePlan.TryGetGroup(groupId, out var group))
+        {
+            ShowManageMachines(draft);
+            return;
+        }
+
+        if (!group.HasType)
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("ui.manage_machines.choose_type_first"),
+                HUDMessage.error_type));
+            ShowMachineGroupEditor(draft, groupId);
+            return;
+        }
+
+        var locations = BuildMachineMapLocations();
+        if (locations.Count == 0)
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("ui.manage_machines.no_machines_found"),
+                HUDMessage.error_type));
+            ShowMachineGroupEditor(draft, groupId);
+            return;
+        }
+
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            _helper,
+            locations,
+            initialSelected: group.Machines,
+            protectedMachines: draft.MachinePlan.ProtectedMachines(groupId),
+            machineTypeFilter: group.MachineType,
+            onComplete: machines =>
+            {
+                draft.MachinePlan.SetGroupMachines(groupId, machines);
+                draft.MarkDirty();
+                RefreshPreview(draft);
+                ShowMachineGroupEditor(draft, groupId);
+            },
+            onCancel: () => ShowMachineGroupEditor(draft, groupId));
+    }
+
+    /// <summary>
+    /// A live, still-present machine in the group plus its location, used to read the type's accepted
+    /// inputs/companions. Null when none of the group's selected machines resolve anymore.
+    /// </summary>
+    private (SObject Machine, GameLocation Location)? ResolveGroupMachineSample(MachineGroupDraft group)
+    {
+        foreach (var machineRef in group.Machines)
+        {
+            var location = ResolveGameLocation(machineRef.LocationName);
+            if (location is null)
+                continue;
+
+            var machine = _machineReader.Resolve(location, machineRef.Tile, machineRef.ExpectedQualifiedId);
+            if (machine is not null && machine.GetMachineData() is not null)
+                return (machine, location);
+        }
+
+        return null;
+    }
+
+    private static GameLocation? ResolveGameLocation(string locationName) =>
+        EnumerateCandidateLocations()
+            .FirstOrDefault(candidate => string.Equals(candidate.Location.NameOrUniqueName, locationName, StringComparison.Ordinal))
+            .Location;
+
+    private IReadOnlyList<MachineMapLocation> BuildMachineMapLocations()
+    {
+        var result = new List<MachineMapLocation>();
+        foreach (var (location, displayName) in EnumerateCandidateLocations())
+        {
+            var candidates = _machineReader.EnumerateMachines(location)
+                .GroupBy(machine => machine.Tile)
+                .ToDictionary(group => group.Key, group => group.First().Machine.QualifiedItemId);
+            if (candidates.Count == 0)
+                continue;
+
+            result.Add(new MachineMapLocation(location.NameOrUniqueName, displayName, candidates));
+        }
+
+        return result
+            .GroupBy(location => location.LocationName, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+    }
+
+    /// <summary>
+    /// Every location the farmhand can reach that may hold machines (farm, building interiors,
+    /// greenhouse, eligible expansions), with a friendly label. Single source of truth for the map
+    /// session, the type picker, and machine-sample resolution.
+    /// </summary>
+    private static IEnumerable<(GameLocation Location, string DisplayName)> EnumerateCandidateLocations()
+    {
+        var farm = Game1.getFarm();
+        yield return (farm, I18nHelper.Get("ui.manage_machines.location_farm"));
+
+        foreach (var building in farm.buildings)
+        {
+            if (BuildingLocationResolver.TryGetInteriorForBuilding(building, out var indoors))
+                yield return (indoors, building.buildingType.Value);
+        }
+
+        if (farm.greenhouseUnlocked.Value)
+        {
+            var greenhouse = Game1.getLocationFromName("Greenhouse");
+            if (greenhouse is not null)
+                yield return (greenhouse, I18nHelper.Get("ui.manage_machines.location_greenhouse"));
+        }
+
+        if (ModEntry.ExpansionCompat is { } compat)
+        {
+            foreach (var descriptor in compat.GetExpansionLocationDescriptors())
+            {
+                if (!descriptor.IsWorkScopeEligible || !compat.IsExpansionLocationAvailable(descriptor.LocationName))
+                    continue;
+
+                var location = Game1.getLocationFromName(descriptor.LocationName);
+                if (location is not null)
+                    yield return (location, descriptor.DisplayName);
+            }
+        }
+    }
+
     private void ShowSchedule(ContractDraft draft)
     {
         Game1.activeClickableMenu = new ScheduleMenu(
@@ -431,7 +817,8 @@ internal sealed class HiringFlowCoordinator
                 draft.EnabledTasks,
                 tier,
                 _configManager.CurrentSnapshot,
-                draft.CropPlan.BuildCropPlan());
+                draft.CropPlan.BuildCropPlan(),
+                draft.MachinePlan.BuildScope());
             var terms = preview.ProposedTerms;
             options.Add(new EnergyTierOption(tier, terms?.Energy.DailyCapacity, terms?.Pricing.TotalPrice));
         }
@@ -494,7 +881,8 @@ internal sealed class HiringFlowCoordinator
             draft.EnabledTasks,
             draft.Tier,
             _configManager.CurrentSnapshot,
-            draft.CropPlan.BuildCropPlan());
+            draft.CropPlan.BuildCropPlan(),
+            draft.MachinePlan.BuildScope());
 
         draft.PreviewState = HiringFlowViewModelBuilder.Build(draft, preview);
     }
@@ -566,7 +954,8 @@ internal sealed class HiringFlowCoordinator
             TermsSnapshot: proposedTerms,
             Tier: draft.Tier,
             CategoryPriority: draft.CategoryPriority.ToList().AsReadOnly(),
-            CropPlan: draft.CropPlan.BuildCropPlan());
+            CropPlan: draft.CropPlan.BuildCropPlan(),
+            MachineScope: draft.MachinePlan.BuildScope());
     }
 
     internal static ContractDraft CreateEditDraft(ContractId existing, Contract contract)
@@ -587,6 +976,7 @@ internal sealed class HiringFlowCoordinator
 
         LegacyScopeBootstrapper.HydrateDraft(draft, contract);
         draft.CropPlan.HydrateFrom(contract.CropPlan);
+        draft.MachinePlan.HydrateFrom(contract.MachineScope);
         return draft;
     }
 
