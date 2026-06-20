@@ -1,6 +1,7 @@
 using Dayswork.Core.Capabilities;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Shifts;
+using Dayswork.Integration;
 using Dayswork.Worker;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
@@ -132,13 +133,17 @@ internal sealed class WorkAreaScanner
                     && followUpTf is HoeDirt followUpDirt
                     && followUpDirt.crop is not null
                     && followUpDirt.crop.RegrowsAfterHarvest()
-                    && followUpDirt.state.Value != HoeDirt.watered
-                    && seenWorkItems.Add((TaskKind.WaterCrops, taskTile)))
+                    && followUpDirt.state.Value != HoeDirt.watered)
                 {
-                    Increment(detectedByKind, TaskKind.WaterCrops);
-                    Increment(acceptedByKind, TaskKind.WaterCrops);
-                    rawItems.Add(new WorkItem(navTiles[0], taskTile, TaskKind.WaterCrops, location.Name, provenance, navTiles));
-//                     ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted WaterCrops (post-harvest regrow): loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
+                    if (WontRegrowBeforeSeasonEnd(followUpDirt.crop, location))
+                        CropHudNotifier.WaterSkippedSeasonEnd();
+                    else if (seenWorkItems.Add((TaskKind.WaterCrops, taskTile)))
+                    {
+                        Increment(detectedByKind, TaskKind.WaterCrops);
+                        Increment(acceptedByKind, TaskKind.WaterCrops);
+                        rawItems.Add(new WorkItem(navTiles[0], taskTile, TaskKind.WaterCrops, location.Name, provenance, navTiles));
+//                         ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted WaterCrops (post-harvest regrow): loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
+                    }
                 }
             }
         }
@@ -188,7 +193,14 @@ internal sealed class WorkAreaScanner
                     dirt.state.Value != HoeDirt.watered &&
                     !dirt.crop.dead.Value &&
                     !dirt.readyForHarvest())
+                {
+                    if (WontMatureBeforeSeasonEnd(dirt.crop, loc))
+                    {
+                        CropHudNotifier.WaterSkippedSeasonEnd();
+                        return null;
+                    }
                     return TaskKind.WaterCrops;
+                }
 
                 return null;
             }
@@ -492,6 +504,59 @@ internal sealed class WorkAreaScanner
         counts.Count == 0
             ? "none"
             : string.Join(", ", counts.OrderBy(kvp => kvp.Key).Select(kvp => $"{kvp.Key}={kvp.Value}"));
+
+    private static bool WontMatureBeforeSeasonEnd(StardewValley.Crop crop, GameLocation loc)
+    {
+        if (loc.SeedsIgnoreSeasonsHere())
+            return false;
+
+        var daysLeft = 28 - Game1.dayOfMonth;
+        var daysRemaining = CropDaysRemaining(crop);
+        if (daysRemaining <= daysLeft)
+            return false;
+
+        var nextSeason = (StardewValley.Season)(((int)Game1.season + 1) % 4);
+        var data = crop.GetData();
+        if (data?.Seasons?.Contains(nextSeason) ?? true)
+            return false;
+
+        return true;
+    }
+
+    private static bool WontRegrowBeforeSeasonEnd(StardewValley.Crop crop, GameLocation loc)
+    {
+        if (loc.SeedsIgnoreSeasonsHere())
+            return false;
+
+        var data = crop.GetData();
+        var regrowDays = data?.RegrowDays ?? -1;
+        if (regrowDays <= 0)
+            return false;
+
+        var daysLeft = 28 - Game1.dayOfMonth;
+        if (regrowDays <= daysLeft)
+            return false;
+
+        var nextSeason = (StardewValley.Season)(((int)Game1.season + 1) % 4);
+        if (data?.Seasons?.Contains(nextSeason) ?? true)
+            return false;
+
+        return true;
+    }
+
+    private static int CropDaysRemaining(StardewValley.Crop crop)
+    {
+        if (crop.fullyGrown.Value)
+            return crop.dayOfCurrentPhase.Value;
+
+        var remaining = 0;
+        var phaseDays = crop.phaseDays;
+        var phase = crop.currentPhase.Value;
+        var dayInPhase = crop.dayOfCurrentPhase.Value;
+        for (var i = phase; i < phaseDays.Count - 1; i++)
+            remaining += i == phase ? phaseDays[i] - dayInPhase : phaseDays[i];
+        return remaining;
+    }
 
     private static void LogWorkScanSummary(
         GameLocation location,

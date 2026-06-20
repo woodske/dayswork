@@ -14,6 +14,7 @@ internal static class CropHudNotifier
 {
     private static bool _cannotTillZonesShown;
     private static bool _toolSkipShown;
+    private static bool _waterSkippedSeasonEndShown;
     private static bool _fertilizerUnavailableShown;
     private static bool _fallbackStoreShown;
     private static bool _partialFallbackStoreShown;
@@ -32,6 +33,7 @@ internal static class CropHudNotifier
     {
         _cannotTillZonesShown = false;
         _toolSkipShown = false;
+        _waterSkippedSeasonEndShown = false;
         _fertilizerUnavailableShown = false;
         _fallbackStoreShown = false;
         _partialFallbackStoreShown = false;
@@ -165,6 +167,16 @@ internal static class CropHudNotifier
             return;
         _toolSkipShown = true;
         Game1.addHUDMessage(new HUDMessage(I18nHelper.Get("notify.crop_tool_skip"), HUDMessage.error_type));
+    }
+
+    internal static void WaterSkippedSeasonEnd()
+    {
+        if (_waterSkippedSeasonEndShown)
+            return;
+        _waterSkippedSeasonEndShown = true;
+        Game1.addHUDMessage(new HUDMessage(
+            I18nHelper.Get("notify.water_skipped_season_end"),
+            HUDMessage.error_type));
     }
 
     internal static void FertilizerUnavailable()

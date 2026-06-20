@@ -34,8 +34,22 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private readonly string? _machineTypeFilter;   // only machines of this qualified id are selectable
     private readonly Dictionary<string, HashSet<TileCoord>> _selectedMachines = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<TileCoord>> _protectedMachines = new(StringComparer.Ordinal);
-    private int _machineLocationIndex;
+    private int _locationIndex;   // shared by machine + chest location switchers
     private ClickableComponent? _locationBtn;
+
+    // ── Chest-selection mode (output/input chest pickers) ────────────────────
+    // When set, the session selects a SINGLE chest (1×1) across multiple locations, plus the
+    // non-chest options (Automatic / Shipping Bin / None) as on-screen buttons. The selected chest
+    // renders green via the existing overlay; the location switcher cycles maps that contain a chest.
+    private readonly bool _chestMode;
+    private readonly Action<DestinationKey?>? _onChestComplete;
+    private readonly IReadOnlyList<ChestMapLocation> _chestLocations = Array.Empty<ChestMapLocation>();
+    private readonly ChestPickerOptions _chestOptions;
+    private ChestRef? _selectedChest;
+    private ChestSpecialKind? _selectedSpecial;          // mutually exclusive with _selectedChest
+    private readonly List<(ClickableComponent Btn, ChestSpecialKind Kind)> _specialBtns = new();
+
+    private enum ChestSpecialKind { Automatic, ShippingBin, None }
 
     // Zone session state — implements IZoneDrawSource
     private readonly List<Zone>            _completedZones    = new();
@@ -52,9 +66,9 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private readonly List<Zone> _protectedZones = new();
 
     IReadOnlyList<Zone>            IZoneDrawSource.CompletedZones    =>
-        _machineMode ? MachineZones(_selectedMachines) : _completedZones;
+        _machineMode ? MachineZones(_selectedMachines) : _chestMode ? SelectedChestZones() : _completedZones;
     IReadOnlyList<Zone>            IZoneDrawSource.ProtectedZones    =>
-        _machineMode ? MachineZones(_protectedMachines) : _protectedZones;
+        _machineMode ? MachineZones(_protectedMachines) : _chestMode ? Array.Empty<Zone>() : _protectedZones;
     IReadOnlyList<BuildingOutline> IZoneDrawSource.SelectedBuildings => _selectedBuildings;
     bool       IZoneDrawSource.IsInZoneDrawMode => true;          // grid always visible during the session
     TileCoord? IZoneDrawSource.DragStart        => _dragStart;
@@ -197,15 +211,15 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             Protected(machine.LocationName).Add(machine.Tile);
 
         // Start on the first selected machine's location, else the first candidate location.
-        _machineLocationIndex = 0;
+        _locationIndex = 0;
         if (initialSelected.Count > 0)
         {
             var idx = IndexOfLocation(initialSelected[0].LocationName);
             if (idx >= 0)
-                _machineLocationIndex = idx;
+                _locationIndex = idx;
         }
 
-        _targetLocationName = _machineLocations[_machineLocationIndex].LocationName;
+        _targetLocationName = _machineLocations[_locationIndex].LocationName;
         var drawLocation = ResolveDrawLocation(_targetLocationName);
 
         _returnLocation = Game1.currentLocation;
@@ -223,9 +237,152 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         populateClickableComponentList();
     }
 
+    /// <summary>
+    /// Chest-selection session: pick a SINGLE chest across the candidate <paramref name="locations"/>
+    /// (switching the displayed map with the location switcher), plus the enabled non-chest options.
+    /// Returns the chosen <see cref="DestinationKey"/> (null = "None" / nothing chosen).
+    /// </summary>
+    public ZoneDrawMenu(
+        IModHelper helper,
+        IReadOnlyList<ChestMapLocation> locations,
+        DestinationKey? initial,
+        ChestPickerOptions options,
+        Action<DestinationKey?> onComplete,
+        Action onCancel)
+        : base(0, 0, 0, 0)
+    {
+        _chestMode        = true;
+        _chestLocations   = locations;
+        _chestOptions     = options;
+        _helper           = helper;
+        _onChestComplete  = onComplete;
+        _onCancel         = onCancel;
+        _onComplete       = null;
+        _buildingOutlines = new List<BuildingOutline>();
+        _allowBuildingSelection = false;
+        _zoneFillColor    = Color.LimeGreen * 0.5f;
+        _protectedZoneFillColor = Color.Red * 0.35f;
+
+        // Seed the selection from the current value.
+        switch (initial)
+        {
+            case ChestDestination chestDest:
+                _selectedChest = chestDest.Ref;
+                break;
+            case ShippingBinDestination:
+                _selectedSpecial = ChestSpecialKind.ShippingBin;
+                break;
+            case AutomaticOutputDestination:
+                _selectedSpecial = ChestSpecialKind.Automatic;
+                break;
+            default:
+                // null means "automatic" for output pickers, "no chest" for input pickers.
+                _selectedSpecial = options.ShowNone ? ChestSpecialKind.None
+                    : options.ShowAutomatic ? ChestSpecialKind.Automatic
+                    : null;
+                break;
+        }
+
+        // Start on the selected chest's location, else the first candidate location.
+        _locationIndex = 0;
+        if (_selectedChest is { } sel)
+        {
+            var idx = IndexOfChestLocation(sel.LocationName);
+            if (idx >= 0)
+                _locationIndex = idx;
+        }
+
+        _targetLocationName = _chestLocations.Count > 0
+            ? _chestLocations[_locationIndex].LocationName
+            : "Farm";
+        var drawLocation = ResolveDrawLocation(_targetLocationName);
+
+        _returnLocation = Game1.currentLocation;
+        Game1.currentLocation = drawLocation;
+        Game1.viewportFreeze  = true;
+        Game1.displayHUD      = false;
+        _savedZoom     = Game1.options.baseZoomLevel;
+        _effectiveZoom = _savedZoom;
+        CenterViewport(drawLocation);
+
+        _overlay = new ZoneDrawOverlay(this, Game1.game1.GraphicsDevice);
+        helper.Events.Display.RenderedWorld += _overlay.OnRenderedWorld;
+
+        BuildComponents();
+        populateClickableComponentList();
+    }
+
+    // ── Chest-mode helpers ───────────────────────────────────────────────────
+
+    private ChestMapLocation CurrentChestLocation => _chestLocations[_locationIndex];
+
+    private int IndexOfChestLocation(string locationName)
+    {
+        for (var i = 0; i < _chestLocations.Count; i++)
+            if (string.Equals(_chestLocations[i].LocationName, locationName, StringComparison.Ordinal))
+                return i;
+        return -1;
+    }
+
+    // The selected chest as a 1×1 zone the overlay renders, but only when it's on the current map.
+    private IReadOnlyList<Zone> SelectedChestZones() =>
+        _selectedChest is { } chest && string.Equals(chest.LocationName, _targetLocationName, StringComparison.Ordinal)
+            ? new List<Zone> { new Zone(_targetLocationName, chest.Tile, chest.Tile) }
+            : Array.Empty<Zone>();
+
+    private void HandleChestSelection(TileCoord tile)
+    {
+        if (_chestLocations.Count == 0)
+        {
+            Game1.playSound("cancel");
+            return;
+        }
+
+        if (!CurrentChestLocation.Candidates.TryGetValue(tile, out var chestRef))
+        {
+            Game1.playSound("cancel");
+            return;
+        }
+
+        if (_selectedChest == chestRef)
+        {
+            _selectedChest = null;          // re-click the same chest clears it
+            Game1.playSound("bigDeSelect");
+            return;
+        }
+
+        _selectedChest = chestRef;
+        _selectedSpecial = null;
+        Game1.playSound("coin");
+    }
+
+    private void SelectSpecial(ChestSpecialKind kind)
+    {
+        _selectedSpecial = kind;
+        _selectedChest = null;
+        Game1.playSound("smallSelect");
+    }
+
+    private DestinationKey? ChestResult() =>
+        _selectedChest is { } chest
+            ? new ChestDestination(chest)
+            : _selectedSpecial switch
+            {
+                ChestSpecialKind.Automatic => AutomaticOutputDestination.Instance,
+                ChestSpecialKind.ShippingBin => ShippingBinDestination.Instance,
+                _ => null,   // None or nothing chosen
+            };
+
+    private static string SpecialLabel(ChestSpecialKind kind) => kind switch
+    {
+        ChestSpecialKind.Automatic => I18nHelper.Get("ui.zone_chest.picker_automatic_output_option"),
+        ChestSpecialKind.ShippingBin => I18nHelper.Get("ui.zone_chest.shipping_bin_option"),
+        _ => I18nHelper.Get("ui.zone_chest.no_chest_option"),
+    };
+
     // ── Machine-mode helpers ─────────────────────────────────────────────────
 
-    private MachineMapLocation CurrentMachineLocation => _machineLocations[_machineLocationIndex];
+    private MachineMapLocation CurrentMachineLocation => _machineLocations[_locationIndex];
 
     private HashSet<TileCoord> Selected(string locationName)
     {
@@ -256,20 +413,26 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             ? tiles.Select(tile => new Zone(_targetLocationName, tile, tile)).ToList()
             : Array.Empty<Zone>();
 
-    private string LocationButtonLabel() =>
-        I18nHelper.Get("ui.manage_machines.viewing", new { name = CurrentMachineLocation.DisplayName });
+    private int LocationCount => _chestMode ? _chestLocations.Count : _machineLocations.Count;
 
-    private void SwitchMachineLocation(int direction)
+    private string CurrentLocationDisplayName =>
+        _chestMode ? CurrentChestLocation.DisplayName : CurrentMachineLocation.DisplayName;
+
+    private string LocationButtonLabel() =>
+        I18nHelper.Get("ui.manage_machines.viewing", new { name = CurrentLocationDisplayName });
+
+    private void SwitchLocation(int direction)
     {
-        if (_machineLocations.Count <= 1)
+        if (LocationCount <= 1)
         {
             Game1.playSound("cancel");
             return;
         }
 
-        _machineLocationIndex =
-            ((_machineLocationIndex + direction) % _machineLocations.Count + _machineLocations.Count) % _machineLocations.Count;
-        _targetLocationName = _machineLocations[_machineLocationIndex].LocationName;
+        _locationIndex = ((_locationIndex + direction) % LocationCount + LocationCount) % LocationCount;
+        _targetLocationName = _chestMode
+            ? _chestLocations[_locationIndex].LocationName
+            : _machineLocations[_locationIndex].LocationName;
         var loc = ResolveDrawLocation(_targetLocationName);
         Game1.currentLocation = loc;
         CenterViewport(loc);
@@ -403,11 +566,34 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             "Done", doneLabel)
         { myID = 200, leftNeighborID = 203 };
 
-        // Machine mode: a top-left location switcher cycles the displayed map among candidate
-        // locations (farm + interiors/greenhouse with ≥1 machine).
-        _locationBtn = _machineMode
+        // Machine/chest mode: a top-left location switcher cycles the displayed map among candidate
+        // locations (farm + interiors/greenhouse with ≥1 machine/chest). Chest mode may have no
+        // candidate locations (no selectable chests yet) — then there's nothing to switch.
+        _locationBtn = _machineMode || (_chestMode && _chestLocations.Count > 0)
             ? new ClickableComponent(new Rectangle(pad, 80, 320, bh), "Location", LocationButtonLabel()) { myID = 210 }
             : null;
+
+        // Chest mode: stack the enabled non-chest options (Automatic / Shipping Bin / None) under
+        // the location switcher as toggle buttons.
+        _specialBtns.Clear();
+        if (_chestMode)
+        {
+            var kinds = new List<ChestSpecialKind>();
+            if (_chestOptions.ShowAutomatic)   kinds.Add(ChestSpecialKind.Automatic);
+            if (_chestOptions.ShowShippingBin) kinds.Add(ChestSpecialKind.ShippingBin);
+            if (_chestOptions.ShowNone)        kinds.Add(ChestSpecialKind.None);
+
+            int sw = Math.Max(320, kinds.Count == 0 ? 0 :
+                (int)Math.Ceiling(kinds.Max(k => Game1.smallFont.MeasureString(SpecialLabel(k)).X)) + 40);
+            int sy = 80 + bh + 8;
+            for (var i = 0; i < kinds.Count; i++)
+            {
+                _specialBtns.Add((
+                    new ClickableComponent(new Rectangle(pad, sy + i * (bh + 8), sw, bh),
+                        SpecialLabel(kinds[i]), SpecialLabel(kinds[i])) { myID = 220 + i },
+                    kinds[i]));
+            }
+        }
     }
 
     private static void CenterViewport(GameLocation loc)
@@ -501,7 +687,8 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         _zoomInBtn.bounds.Contains(x, y)  ||
         _panBtn.bounds.Contains(x, y)     ||
         _doneBtn.bounds.Contains(x, y)    ||
-        (_locationBtn is not null && _locationBtn.bounds.Contains(x, y));
+        (_locationBtn is not null && _locationBtn.bounds.Contains(x, y)) ||
+        _specialBtns.Any(special => special.Btn.bounds.Contains(x, y));
 
     // ── Zoom ────────────────────────────────────────────────────────────────────
     // On PC: writing desiredBaseZoomLevel works; game.update() applies it and recomputes the viewport.
@@ -567,6 +754,11 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             {
                 _selectedMachines.Clear();
             }
+            else if (_chestMode)
+            {
+                _selectedChest = null;
+                _selectedSpecial = null;
+            }
             else
             {
                 _completedZones.Clear();
@@ -575,10 +767,19 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             Game1.playSound("trashcan");
             return;
         }
-        if (_machineMode && _locationBtn is not null && _locationBtn.bounds.Contains(x, y))
+        if ((_machineMode || _chestMode) && _locationBtn is not null && _locationBtn.bounds.Contains(x, y))
         {
-            SwitchMachineLocation(1);
+            SwitchLocation(1);
             return;
+        }
+        if (_chestMode)
+        {
+            foreach (var (btn, kind) in _specialBtns)
+            {
+                if (!btn.bounds.Contains(x, y)) continue;
+                SelectSpecial(kind);
+                return;
+            }
         }
         if (_panBtn.bounds.Contains(x, y))
         {
@@ -636,6 +837,12 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         var bottomRight = new TileCoord(Math.Max(start.X, end.X), Math.Max(start.Y, end.Y));
 
         var singleTile = topLeft.X == bottomRight.X && topLeft.Y == bottomRight.Y;
+
+        if (_chestMode)
+        {
+            HandleChestSelection(topLeft);   // single-select; drags resolve to the click's start tile
+            return;
+        }
 
         if (_machineMode)
         {
@@ -710,6 +917,14 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     {
         _resultDelivered = true;
 
+        if (_chestMode)
+        {
+            var result = ChestResult();
+            exitThisMenu(false);
+            _onChestComplete!(result);
+            return;
+        }
+
         if (_machineMode)
         {
             var machines = CollectSelectedMachines();
@@ -761,6 +976,8 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         allClickableComponents.Add(_doneBtn);
         if (_locationBtn is not null)
             allClickableComponents.Add(_locationBtn);
+        foreach (var (btn, _) in _specialBtns)
+            allClickableComponents.Add(btn);
     }
 
     public override void setCurrentlySnappedComponentTo(int id)
@@ -782,7 +999,10 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         int w = Game1.uiViewport.Width;
 
         // Instruction text at top-center with a subtle backdrop for readability
-        string hint = I18nHelper.Get(_machineMode ? "ui.manage_machines.draw_hint" : "ui.zone_chest.session_hint");
+        string hint = I18nHelper.Get(
+            _chestMode ? "ui.zone_chest.chest_session_hint"
+            : _machineMode ? "ui.manage_machines.draw_hint"
+            : "ui.zone_chest.session_hint");
         var size = Game1.smallFont.MeasureString(hint);
         var box  = new Rectangle((int)((w - size.X) / 2) - 16, 24, (int)size.X + 32, (int)size.Y + 14);
         b.Draw(Game1.staminaRect, box, Color.Black * 0.55f);
@@ -801,7 +1021,9 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
 
         int total = _machineMode
             ? SelectedMachineCount
-            : _completedZones.Count + _selectedBuildings.Count;
+            : _chestMode
+                ? (_selectedChest is not null || _selectedSpecial is not null ? 1 : 0)
+                : _completedZones.Count + _selectedBuildings.Count;
         DrawButton(b, _cancelBtn,  enabled: true);
         DrawButton(b, _clearBtn,   enabled: total > 0);
         DrawButton(b, _zoomOutBtn, enabled: true);
@@ -809,17 +1031,26 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         DrawButton(b, _panBtn,     enabled: true, active: _isPanMode);
         DrawButton(b, _doneBtn,    enabled: true);
 
-        if (_machineMode && _locationBtn is not null)
+        if ((_machineMode || _chestMode) && _locationBtn is not null)
         {
             _locationBtn.label = LocationButtonLabel();
-            DrawButton(b, _locationBtn, enabled: _machineLocations.Count > 1);
+            DrawButton(b, _locationBtn, enabled: LocationCount > 1);
+        }
 
+        if (_machineMode)
+        {
             var countText = I18nHelper.Get("ui.manage_machines.selected_count", new { count = total });
-            var countBox = new Rectangle(_locationBtn.bounds.X, _locationBtn.bounds.Bottom + 8,
+            var countBox = new Rectangle(_locationBtn!.bounds.X, _locationBtn.bounds.Bottom + 8,
                 (int)Game1.smallFont.MeasureString(countText).X + 24, 36);
             b.Draw(Game1.staminaRect, countBox, Color.Black * 0.55f);
             Utility.drawTextWithShadow(b, countText, Game1.smallFont,
                 new Vector2(countBox.X + 12, countBox.Y + 6), Color.White);
+        }
+
+        if (_chestMode)
+        {
+            foreach (var (btn, kind) in _specialBtns)
+                DrawButton(b, btn, enabled: true, active: _selectedChest is null && _selectedSpecial == kind);
         }
 
         drawMouse(b);

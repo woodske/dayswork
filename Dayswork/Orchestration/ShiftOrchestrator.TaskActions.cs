@@ -237,8 +237,22 @@ internal sealed partial class ShiftOrchestrator
     private LaborBeatOutcome InvokeHarvest(TileCoord tile, GameLocation loc)
     {
         var tileVec = new Vector2(tile.X, tile.Y);
-        if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not HoeDirt dirt || dirt.crop is null)
+        if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not HoeDirt dirt)
             return new LaborBeatOutcome(true, true);
+
+        // Wild seed forage left from a prior shift (crop already removed by replaceWithObjectOnFullGrown).
+        if (dirt.crop is null)
+        {
+            if (loc.objects.TryGetValue(tileVec, out var leftover) &&
+                ManagedCropFieldReader.IsProduceObjectOnCropTile(tileVec, loc))
+            {
+                loc.playSound("harvest", tileVec);
+                Session.Ctx.Buffer.Add(leftover.QualifiedItemId, Math.Max(1, leftover.Stack),
+                    TaskKind.HarvestCrops, Session.PendingOutputProvenance);
+                loc.removeObject(tileVec, false);
+            }
+            return new LaborBeatOutcome(true, true);
+        }
 
         var before = new HashSet<Debris>(loc.debris);
 
@@ -252,6 +266,11 @@ internal sealed partial class ShiftOrchestrator
         var inventoryBefore = Game1.player.Items
             .Where(i => i is not null)
             .ToDictionary(i => i, i => i.Stack);
+
+        // Snapshot the tile object (if any) so we can detect objects placed by harvest —
+        // wild seed crops call replaceWithObjectOnFullGrown which puts forage in loc.objects
+        // instead of the player's inventory.
+        loc.objects.TryGetValue(tileVec, out var objectBefore);
 
         dirt.crop.harvest(tile.X, tile.Y, dirt, null);
 
@@ -275,6 +294,14 @@ internal sealed partial class ShiftOrchestrator
             }
         }
 
+        // Collect any Object placed at this tile by harvest (wild seed forage path).
+        if (loc.objects.TryGetValue(tileVec, out var newObj) && !ReferenceEquals(objectBefore, newObj))
+        {
+            Session.Ctx.Buffer.Add(newObj.QualifiedItemId, Math.Max(1, newObj.Stack),
+                TaskKind.HarvestCrops, Session.PendingOutputProvenance);
+            loc.removeObject(tileVec, false);
+        }
+
         // crop.harvest() does not clean up dirt.crop — vanilla expects the caller to do it.
         // For non-regrowable crops call HoeDirt.destroyCrop (the authoritative cleanup path).
         // Regrowable crops stay on the dirt and start regrowing; HoeDirt.readyForHarvest()
@@ -282,6 +309,8 @@ internal sealed partial class ShiftOrchestrator
         // Note: watering of regrowable crops is handled by a separate WaterCrops WorkItem
         // emitted by WorkAreaScanner after the harvest item, so the worker plays a distinct
         // watering animation instead of silently flipping dirt.state here.
+        // Wild seed crops call destroyCrop internally via replaceWithObjectOnFullGrown, so
+        // dirt.crop will already be null here in that case — the guard handles it correctly.
         if (dirt.crop is not null && !dirt.crop.RegrowsAfterHarvest())
             dirt.destroyCrop(false);
 

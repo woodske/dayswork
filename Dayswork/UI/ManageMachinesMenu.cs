@@ -127,7 +127,7 @@ internal sealed class ManageMachinesMenu : LayoutMenu
             ? I18nHelper.Get("ui.manage_machines.input_any")
             : I18nHelper.Get("ui.manage_machines.input_specific", new { count = group.AllowedInputIds.Count });
         var chest = group.InputChest is { } chestRef
-            ? I18nHelper.Get("ui.manage_machines.chest_at", new { x = chestRef.Tile.X, y = chestRef.Tile.Y })
+            ? ChestResolver.DescribeChestRef(chestRef)
             : I18nHelper.Get("ui.manage_machines.chest_none");
         var output = OutputLabel(group.OutputDestination);
         return I18nHelper.Get("ui.manage_machines.detail_summary", new { type, input, chest, output });
@@ -143,7 +143,7 @@ internal sealed class ManageMachinesMenu : LayoutMenu
     internal static string OutputLabel(DestinationKey? destination) => destination switch
     {
         ShippingBinDestination => I18nHelper.Get("ui.zone_chest.shipping_bin_option"),
-        ChestDestination chest => I18nHelper.Get("ui.manage_machines.output_chest_at", new { x = chest.Ref.Tile.X, y = chest.Ref.Tile.Y }),
+        ChestDestination chest => ChestResolver.DescribeChestRef(chest.Ref),
         _ => I18nHelper.Get("ui.manage_machines.output_automatic"),
     };
 

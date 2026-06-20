@@ -67,11 +67,15 @@ public sealed class TownShoppingTests
         Assert.Equal(20, line.UnitCost);
     }
 
+    // Fertilizer (unit 20) is ordered first within the group, so under a wallet shortfall it is
+    // funded before its seed (unit 30) — a seed is never bought that can't be fertilized.
     [Theory]
-    [InlineData(100, 2, false)]
-    [InlineData(60, 1, true)]
-    [InlineData(0, 0, true)]
-    public void Affordability_examples_clamp_expected_pairs(int wallet, int expectedPairs, bool shortfall)
+    [InlineData(100, 2, 2, false)] // affords both fully
+    [InlineData(60, 2, 0, true)]   // affords all fertilizer, no seeds left
+    [InlineData(40, 2, 0, true)]   // exactly all fertilizer
+    [InlineData(20, 1, 0, true)]   // partial fertilizer only
+    [InlineData(0, 0, 0, true)]
+    public void Affordability_funds_fertilizer_before_seeds(int wallet, int expectedFert, int expectedSeed, bool shortfall)
     {
         var manifest = new ShiftPurchaseManifest(
             new[]
@@ -89,9 +93,39 @@ public sealed class TownShoppingTests
         var plan = new PurchaseAffordabilityCalculator().ClampToWallet(manifest, wallet);
         var lines = plan.Groups.SelectMany(group => group.Lines).ToList();
 
-        Assert.Equal(expectedPairs, lines.Where(line => line.ItemId == "fert.basic").Sum(line => line.Quantity));
-        Assert.Equal(expectedPairs, lines.Where(line => line.ItemId == "seed.parsnip").Sum(line => line.Quantity));
+        Assert.Equal(expectedFert, lines.Where(line => line.ItemId == "fert.basic").Sum(line => line.Quantity));
+        Assert.Equal(expectedSeed, lines.Where(line => line.ItemId == "seed.parsnip").Sum(line => line.Quantity));
         Assert.Equal(shortfall, plan.Shortfall);
+    }
+
+    // Regression: a single aggregated fertilizer line (demand summed across two fert-requiring
+    // zones) must not be clamped down to the first seed line it sits next to. Previously the clamp
+    // paired the 36-fertilizer line with the 9-seed melon line and bought only 9 fertilizer, even
+    // though the wallet could afford everything.
+    [Fact]
+    public void Aggregated_fertilizer_line_not_clamped_to_first_seed_when_affordable()
+    {
+        var manifest = new ShiftPurchaseManifest(
+            new[]
+            {
+                new StorePurchaseGroup(
+                    Store.Pierre,
+                    new[]
+                    {
+                        new ManifestLine("fert.basic", 36, 100, IsFertilizer: true),
+                        new ManifestLine("seed.melon", 9, 80, IsFertilizer: false),
+                        new ManifestLine("seed.squash", 18, 90, IsFertilizer: false),
+                    }),
+            },
+            Array.Empty<string>());
+
+        var plan = new PurchaseAffordabilityCalculator().ClampToWallet(manifest, walletGold: 100_000);
+        var lines = plan.Groups.SelectMany(group => group.Lines).ToList();
+
+        Assert.Equal(36, lines.Single(line => line.ItemId == "fert.basic").Quantity);
+        Assert.Equal(9, lines.Single(line => line.ItemId == "seed.melon").Quantity);
+        Assert.Equal(18, lines.Single(line => line.ItemId == "seed.squash").Quantity);
+        Assert.False(plan.Shortfall);
     }
 
     [Fact]

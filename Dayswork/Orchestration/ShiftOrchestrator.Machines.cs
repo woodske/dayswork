@@ -77,12 +77,15 @@ internal sealed partial class ShiftOrchestrator
         foreach (var group in groups)
             PlanMachineGroup(group, batch.LocationName, location);
 
-        DevLog.Log(
+        ModEntry.ModMonitor.Log(
             $"[Dayswork][machines] batch={batch.LocationName} groups={groups.Count} collectSteps={Session.MachineSteps.Count} reloadJobs={Session.MachineReloads.Count}.",
-            LogLevel.Info);
+            DevLog.WarnLevel);
 
         if (Session.MachineSteps.Count == 0 && Session.MachineReloads.Count == 0)
         {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][machines] batch={batch.LocationName} — no machines ready to collect or reload; skipping.",
+                DevLog.WarnLevel);
             Session.Ctx.CurrentBatchIndex++;
             BeginCurrentBatch();
             return;
@@ -101,7 +104,7 @@ internal sealed partial class ShiftOrchestrator
             .Where(machine => string.Equals(machine.LocationName, batchLocationName, StringComparison.Ordinal))
             .ToList();
 
-        var emptyReloadable = new List<(MachineRef Ref, SObject Machine, MachineData Data)>();
+        var reloadable = new List<(MachineRef Ref, SObject Machine, MachineData Data)>();
         foreach (var machineRef in groupMachinesHere)
         {
             var live = _machineReader.Resolve(location, machineRef.Tile, machineRef.ExpectedQualifiedId);
@@ -112,20 +115,34 @@ internal sealed partial class ShiftOrchestrator
             }
 
             var state = _machineReader.Classify(live);
+
+            // A machine wants reloading when its group is in reload mode and the machine type is
+            // reloadable. A ReadyToCollect machine qualifies too — it becomes Empty after its Collect
+            // step runs, so we plan its reload now (the Load step is guarded on Empty, so it only
+            // fires once the collect has emptied it).
+            var wantsReload = group.Mode == MachineGroupMode.CollectAndReload
+                && live.GetMachineData() is { } data
+                && MachineReader.IsReloadable(data);
+
             if (state == MachineReadyState.ReadyToCollect)
             {
                 Session.MachineSteps.Enqueue(new MachineStep(machineRef, MachineActionKind.Collect, group, null));
+                if (wantsReload && live.GetMachineData() is { } collectData)
+                    reloadable.Add((machineRef, live, collectData));
             }
-            else if (state == MachineReadyState.Empty
-                     && group.Mode == MachineGroupMode.CollectAndReload
-                     && live.GetMachineData() is { } data
-                     && MachineReader.IsReloadable(data))
+            else if (state == MachineReadyState.Empty && wantsReload && live.GetMachineData() is { } emptyData)
             {
-                emptyReloadable.Add((machineRef, live, data));
+                reloadable.Add((machineRef, live, emptyData));
+            }
+            else
+            {
+                DevLog.Log(
+                    $"[Dayswork][machines] skip ({machineRef.Tile.X},{machineRef.Tile.Y}) state={state} mode={group.Mode}.",
+                    LogLevel.Debug);
             }
         }
 
-        if (group.Mode != MachineGroupMode.CollectAndReload || group.InputChest is not { } chestRef || emptyReloadable.Count == 0)
+        if (group.Mode != MachineGroupMode.CollectAndReload || group.InputChest is not { } chestRef || reloadable.Count == 0)
             return;
 
         if (!string.Equals(chestRef.LocationName, location.NameOrUniqueName, StringComparison.Ordinal))
@@ -138,18 +155,30 @@ internal sealed partial class ShiftOrchestrator
         }
 
         var supply = ReadChestSupply(chestRef);
-        var probeFarmer = CreateWorkerActionFarmer(emptyReloadable[0].Ref.Tile, location);
+        var probeFarmer = CreateWorkerActionFarmer(reloadable[0].Ref.Tile, location);
         var candidates = new List<MachineLoadCandidate>();
-        foreach (var (machineRef, machine, data) in emptyReloadable)
+        foreach (var (machineRef, machine, data) in reloadable)
         {
             var candidate = _machineReader.BuildLoadCandidate(machineRef, machine, data, group.InputFilter, supply, probeFarmer, location);
             if (candidate is not null)
                 candidates.Add(candidate);
         }
 
+        if (candidates.Count == 0)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][machines] group '{group.Id}': {reloadable.Count} reloadable machine(s) but no matching inputs in chest — check the input chest contents.",
+                DevLog.WarnLevel);
+            return;
+        }
+
         var plan = MachineInputPlanner.Plan(candidates, supply);
         if (plan.HasWork)
             Session.MachineReloads.Enqueue(new MachineReloadJob(group, chestRef, plan));
+        else
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][machines] group '{group.Id}': {candidates.Count} matchable machine(s) but chest supply insufficient to fill any.",
+                DevLog.WarnLevel);
     }
 
     private void StartNextMachineStep()

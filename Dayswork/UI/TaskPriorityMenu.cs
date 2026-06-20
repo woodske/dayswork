@@ -265,6 +265,7 @@ internal sealed class TaskPriorityMenu : IClickableMenu
         TaskCategory.AnimalCare => "animal_care",
         TaskCategory.Crops => "crops",
         TaskCategory.Fieldwork => "fieldwork",
+        TaskCategory.Machines => "machines",
         _ => category.ToString(),
     };
 

@@ -230,11 +230,14 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
         var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
-        var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks, contract.CropPlan);
+        var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks, contract.CropPlan, contract.MachineScope);
 
         DevLog.Log(
             $"[Dayswork][managed-crops] StartShift cropPlan enabled={contract.CropPlan.IsEnabled} assignments={contract.CropPlan.Assignments.Count} " +
             $"managedScope={(workScopes.ManagedCrops?.Assignments.Count ?? -1)} zoneLocations=[{string.Join(", ", contract.CropPlan.Assignments.Select(a => a.Zone.LocationName))}].",
+            LogLevel.Info);
+        DevLog.Log(
+            $"[Dayswork][machines] StartShift machineScope enabled={contract.MachineScope?.IsEnabled ?? false} groups={contract.MachineScope?.Groups.Count ?? 0}.",
             LogLevel.Info);
 
         // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,

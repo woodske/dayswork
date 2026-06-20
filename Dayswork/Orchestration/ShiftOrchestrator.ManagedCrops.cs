@@ -129,19 +129,42 @@ internal sealed partial class ShiftOrchestrator
                 $"supply=[{string.Join(", ", supply.Items.Select(kvp => $"{kvp.Key}:{kvp.Value}"))}] festival={isFestival} inputChest={(inputChest is null ? "null" : "ok")}.",
                 LogLevel.Info);
 
+        // Working copy of the chest supply, decremented per assignment so two zones sharing a seed
+        // or fertilizer don't both plan against the full stock (mirrors ShiftSupplyAggregator).
+        // Without this, a short fertilizer supply lets the first zone consume it all and the second
+        // zone still plant un-fertilized seeds.
+        var working = new Dictionary<string, int>(supply.Items, StringComparer.Ordinal);
+
         var actions = new List<TileAction>();
         foreach (var assignment in Session.ManagedAssignments)
         {
+            var assignmentSupply = new SupplyInventory(working);
             var plan = _cropShiftPlanner.Plan(
                 assignment,
                 fieldState,
-                supply,
+                assignmentSupply,
                 stockSnapshots: null,
                 isFestivalDay: isFestival,
                 storePreferenceOverride: Session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
                     ? StorePreference.Joja : StorePreference.Pierre);
 
-            var skipPrep = ShouldSkipZonePrep(assignment, fieldState, supply, plan);
+            var skipPrep = ShouldSkipZonePrep(assignment, fieldState, assignmentSupply, plan);
+
+            // Consume what this zone's planting will draw so later zones see the remainder.
+            foreach (var action in plan.SupplyDependentActions)
+            {
+                if (action.ItemId is null)
+                    continue;
+                if (action.Kind != ManagedCropActionKind.PlantSeed && action.Kind != ManagedCropActionKind.Fertilize)
+                    continue;
+                if (working.TryGetValue(action.ItemId, out var have))
+                {
+                    if (have <= 1)
+                        working.Remove(action.ItemId);
+                    else
+                        working[action.ItemId] = have - 1;
+                }
+            }
 
             foreach (var action in plan.AllActions)
             {
@@ -772,7 +795,9 @@ internal sealed partial class ShiftOrchestrator
         return action.Kind switch
         {
             ManagedCropActionKind.Harvest =>
-                dirt?.crop is not null && !dirt.crop.dead.Value && dirt.readyForHarvest(),
+                (dirt?.crop is not null && !dirt.crop.dead.Value && dirt.readyForHarvest())
+                || (dirt is not null && dirt.crop is null &&
+                    ManagedCropFieldReader.IsProduceObjectOnCropTile(vec, location)),
 
             ManagedCropActionKind.ClearDebris =>
                 location.objects.ContainsKey(vec)

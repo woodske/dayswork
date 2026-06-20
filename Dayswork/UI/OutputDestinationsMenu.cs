@@ -3,6 +3,7 @@ using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
 
@@ -31,6 +32,8 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     };
 
     private readonly ContractDraft _draft;
+    private readonly ChestResolver _chestResolver;
+    private readonly IModHelper _helper;
     private readonly Action<ContractDraft> _onBack;
     private readonly List<ChestEntry> _chestList;
     private readonly TaskKind[] _enabledOutputTasks;
@@ -43,11 +46,6 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     private bool _draggingOutputScrollBar;
     private int _outputScrollDragOffset;
     private string _hoverText = string.Empty;
-    private bool _showingPicker;
-    private TaskKind _pickerTask;
-    private List<(string Label, DestinationKey Dest)> _pickerOptions = new();
-    private Rectangle _pickerPanelRect;
-    private List<ClickableComponent> _pickerRows = new();
 
     private ClickableComponent _backBtn = null!;
     private readonly List<ClickableComponent> _setOutputBtns = new();
@@ -55,10 +53,13 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     public OutputDestinationsMenu(
         ContractDraft draft,
         ChestResolver chestResolver,
+        IModHelper helper,
         Action<ContractDraft> onBack)
         : base(0, 0, ContractMenuLayout.Width, ContractMenuLayout.Height)
     {
         _draft = draft;
+        _chestResolver = chestResolver;
+        _helper = helper;
         _onBack = onBack;
 
         _chestList = chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
@@ -125,22 +126,6 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
-        if (_showingPicker)
-        {
-            foreach (var row in _pickerRows)
-            {
-                if (!row.bounds.Contains(x, y))
-                    continue;
-
-                ApplyPickerSelection(_pickerOptions[_pickerRows.IndexOf(row)].Dest);
-                Game1.playSound("smallSelect");
-                return;
-            }
-
-            _showingPicker = false;
-            return;
-        }
-
         if (MenuScrollBar.TryBeginDrag(_outputListRect, GetVisibleOutputRowCount(), _enabledOutputTasks.Length, _outputScrollIndex, x, y, out _outputScrollDragOffset))
         {
             _draggingOutputScrollBar = true;
@@ -177,7 +162,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
             if (!IsOutputRowVisible(i) || !_setOutputBtns[i].bounds.Contains(x, y))
                 continue;
 
-            OpenPicker(_enabledOutputTasks[i], _setOutputBtns[i].bounds);
+            LaunchChestPicker(_enabledOutputTasks[i]);
             Game1.playSound("smallSelect");
             return;
         }
@@ -216,11 +201,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     {
         if (b == Buttons.B)
         {
-            if (_showingPicker)
-                _showingPicker = false;
-            else
-                ApplyDefaultsAndBack();
-
+            ApplyDefaultsAndBack();
             return;
         }
 
@@ -229,7 +210,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
 
     public override void receiveScrollWheelAction(int direction)
     {
-        if (_showingPicker || direction == 0)
+        if (direction == 0)
             return;
 
         ScrollOutputs(direction > 0 ? -1 : 1);
@@ -329,59 +310,40 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         MenuScrollBar.Draw(b, _outputListRect, GetVisibleOutputRowCount(), _enabledOutputTasks.Length, _outputScrollIndex);
         DrawButton(b, _backBtn, enabled: true);
 
-        if (_showingPicker)
-            DrawPicker(b);
-
         if (!string.IsNullOrWhiteSpace(_hoverText))
             drawHoverText(b, _hoverText, Game1.smallFont);
 
         drawMouse(b);
     }
 
-    private void OpenPicker(TaskKind task, Rectangle setButtonBounds)
+    // Opens the map-based chest picker for one output task. Chests not eligible for this task
+    // (expansion deposit locations for non-greenhouse work) are filtered out before grouping.
+    private void LaunchChestPicker(TaskKind task)
     {
-        _pickerTask = task;
-        _showingPicker = true;
+        var locations = ChestMapLocation.Group(
+            _chestList.Where(entry => IsDestinationEligibleForTask(entry, task)));
+        _outputAssignments.TryGetValue(task, out var current);
 
-        _pickerOptions = new List<(string Label, DestinationKey Dest)>
-        {
-            (I18nHelper.Get("ui.zone_chest.picker_automatic_output_option"), AutomaticOutputDestination.Instance),
-        };
-
-        if (ShippingBinEligible.Contains(task))
-            _pickerOptions.Add((I18nHelper.Get("ui.zone_chest.shipping_bin_option"), ShippingBinDestination.Instance));
-
-        foreach (var entry in _chestList.Where(entry => IsDestinationEligibleForTask(entry, task)))
-            _pickerOptions.Add((entry.DisplayName, new ChestDestination(entry.Ref)));
-
-        const int rowH = 44;
-        var maxLabelW = _pickerOptions.Max(option => Game1.smallFont.MeasureString(option.Label).X);
-        var panelW = Math.Min((int)Math.Ceiling(maxLabelW) + 32, width - 16);
-        var panelH = _pickerOptions.Count * rowH + 16;
-        var panelX = Math.Max(xPositionOnScreen + 8, setButtonBounds.X - panelW - 8);
-        var panelY = Math.Max(yPositionOnScreen + 8, setButtonBounds.Y - panelH / 2);
-        panelY = Math.Max(yPositionOnScreen + 8, Math.Min(panelY, yPositionOnScreen + height - panelH - 8));
-
-        _pickerPanelRect = new Rectangle(panelX, panelY, panelW, panelH);
-        _pickerRows = new List<ClickableComponent>();
-
-        for (var i = 0; i < _pickerOptions.Count; i++)
-        {
-            _pickerRows.Add(new ClickableComponent(
-                new Rectangle(panelX + 8, panelY + 8 + i * rowH, panelW - 16, rowH - 4),
-                i.ToString(),
-                _pickerOptions[i].Label)
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            _helper,
+            locations,
+            initial: current,
+            options: new ChestPickerOptions(
+                ShowAutomatic: true,
+                ShowShippingBin: ShippingBinEligible.Contains(task),
+                ShowNone: false),
+            onComplete: destination =>
             {
-                myID = 600 + i,
-            });
-        }
+                ApplyPickerSelection(task, destination ?? AutomaticOutputDestination.Instance);
+                Game1.activeClickableMenu = this;
+            },
+            onCancel: () => Game1.activeClickableMenu = this);
     }
 
-    private void ApplyPickerSelection(DestinationKey destination)
+    private void ApplyPickerSelection(TaskKind task, DestinationKey destination)
     {
-        _outputAssignments[_pickerTask] = destination;
-        _draft.Destinations[_pickerTask] = destination;
-        _showingPicker = false;
+        _outputAssignments[task] = destination;
+        _draft.Destinations[task] = destination;
     }
 
     // Returning to the hub locks in a default (cabin chest) for any output task left unset, matching
@@ -397,35 +359,6 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         _onBack(_draft);
     }
 
-    private void DrawPicker(SpriteBatch b)
-    {
-        drawTextureBox(
-            b,
-            _pickerPanelRect.X - 4,
-            _pickerPanelRect.Y - 4,
-            _pickerPanelRect.Width + 8,
-            _pickerPanelRect.Height + 8,
-            Color.White);
-
-        for (var i = 0; i < _pickerRows.Count; i++)
-        {
-            var row = _pickerRows[i];
-            var destination = _pickerOptions[i].Dest;
-
-            var selected = _outputAssignments.TryGetValue(_pickerTask, out var current)
-                           && EqualityComparer<DestinationKey>.Default.Equals(current, destination);
-            if (selected)
-                b.Draw(Game1.staminaRect, row.bounds, Color.LightBlue * 0.5f);
-
-            Utility.drawTextWithShadow(
-                b,
-                row.label,
-                Game1.smallFont,
-                new Vector2(row.bounds.X + 6, row.bounds.Y + (row.bounds.Height - (int)Game1.smallFont.MeasureString("A").Y) / 2),
-                selected ? Color.DarkBlue : Game1.textColor);
-        }
-    }
-
     private int GetVisibleOutputRowCount() => Math.Max(1, _outputListRect.Height / OutputRowHeight);
 
     private bool IsOutputRowVisible(int index) =>
@@ -439,7 +372,6 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
             return;
 
         _outputScrollIndex = next;
-        _showingPicker = false;
         BuildComponents();
         populateClickableComponentList();
     }

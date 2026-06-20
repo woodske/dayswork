@@ -105,6 +105,31 @@ internal sealed class ChestResolver
         return result;
     }
 
+    // Groups all accessible chests into one map-view location each (only locations with ≥1 chest),
+    // for the map-based chest picker. DisplayName/GroupLabel come from GetAllChests.
+    internal List<ChestMapLocation> BuildChestMapLocations(GameLocation farm, IReadOnlyList<GreenhouseSelection>? selectedGreenhouses = null) =>
+        ChestMapLocation.Group(GetAllChests(farm, selectedGreenhouses));
+
+    // Human-readable label for a stored ChestRef, used by summary screens. Resolves the live chest
+    // for its name/building; if the chest was moved or destroyed, falls back to coordinates.
+    internal static string DescribeChestRef(ChestRef chestRef)
+    {
+        var location = Game1.getLocationFromName(chestRef.LocationName);
+        if (location is not null
+            && location.Objects.TryGetValue(new Vector2(chestRef.Tile.X, chestRef.Tile.Y), out var obj)
+            && obj is Chest chest)
+        {
+            if (!string.IsNullOrWhiteSpace(chest.Name) && chest.Name != "Chest")
+                return chest.Name;
+
+            return I18nHelper.Get("ui.zone_chest.chest_fallback_name",
+                new { buildingName = location.Name, x = chestRef.Tile.X, y = chestRef.Tile.Y });
+        }
+
+        return I18nHelper.Get("ui.zone_chest.chest_missing",
+            new { x = chestRef.Tile.X, y = chestRef.Tile.Y });
+    }
+
     // Resolves a stored ChestRef to a live Chest. Returns null if the chest was moved or destroyed.
     internal Chest? ResolveChest(ChestRef chestRef)
     {

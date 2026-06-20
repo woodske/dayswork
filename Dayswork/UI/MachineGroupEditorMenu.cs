@@ -165,7 +165,7 @@ internal sealed class MachineGroupEditorMenu : LayoutMenu
 
     private string InputChestLabel() =>
         _group.InputChest is { } chestRef
-            ? I18nHelper.Get("ui.manage_machines.chest_at", new { x = chestRef.Tile.X, y = chestRef.Tile.Y })
+            ? ChestResolver.DescribeChestRef(chestRef)
             : I18nHelper.Get("ui.manage_machines.chest_none");
 
     private string InputFilterLabel() =>

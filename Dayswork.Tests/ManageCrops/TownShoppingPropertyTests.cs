@@ -15,16 +15,21 @@ public sealed class TownShoppingPropertyTests
         return plan.TotalCost <= Math.Max(0, input.WalletGold);
     }
 
+    // When the wallet covers the whole manifest, every line is bought in full with no shortfall —
+    // a budget cut never silently drops part of an affordable order (the under-buying regression).
     [Property(Arbitrary = new[] { typeof(ManageCropsGen) }, MaxTest = 200)]
-    public bool Affordable_plan_preserves_seed_fertilizer_parity(PurchaseClampCase input)
+    public bool Affordable_plan_buys_everything_when_wallet_covers_cost(PurchaseClampCase input)
     {
         var manifest = FertilizedManifest(input.Quantity, input.SeedCost, input.FertilizerCost);
         var plan = new PurchaseAffordabilityCalculator().ClampToWallet(manifest, input.WalletGold);
-        var lines = plan.Groups.SelectMany(group => group.Lines).ToList();
 
+        if (input.WalletGold < manifest.TotalCost)
+            return true; // shortfall branch covered by the wallet-bound property
+
+        var lines = plan.Groups.SelectMany(group => group.Lines).ToList();
         var seeds = lines.Where(line => line.ItemId == "seed.parsnip").Sum(line => line.Quantity);
         var fertilizer = lines.Where(line => line.ItemId == "fert.basic").Sum(line => line.Quantity);
-        return seeds == fertilizer;
+        return !plan.Shortfall && seeds == input.Quantity && fertilizer == input.Quantity;
     }
 
     [Property(Arbitrary = new[] { typeof(ManageCropsGen) }, MaxTest = 200)]

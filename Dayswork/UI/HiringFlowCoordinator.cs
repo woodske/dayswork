@@ -122,6 +122,7 @@ internal sealed class HiringFlowCoordinator
         Game1.activeClickableMenu = new OutputDestinationsMenu(
             draft,
             _chestResolver,
+            _helper,
             onBack: ShowHub);
     }
 
@@ -315,28 +316,19 @@ internal sealed class HiringFlowCoordinator
 
     private void ShowCropOutputChestPicker(ContractDraft draft, string groupId)
     {
-        var chests = _chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
+        var locations = _chestResolver.BuildChestMapLocations(Game1.getFarm(), draft.Greenhouses);
+        draft.CropPlan.TryGetGroup(groupId, out var current);
 
-        var rows = new List<PickerRow>
-        {
-            new(I18nHelper.Get("ui.manage_crops.output_automatic"), null),
-            new(I18nHelper.Get("ui.zone_chest.shipping_bin_option"), null),
-        };
-        rows.AddRange(chests.Select(chest => new PickerRow(chest.DisplayName, chest.GroupLabel)));
-
-        Game1.activeClickableMenu = new CropListPickerMenu(
-            I18nHelper.Get("ui.manage_crops.picker_chest_title"),
-            rows,
-            selectedIndex: 0,
-            onSelect: index =>
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            _helper,
+            locations,
+            initial: current?.OutputDestination,
+            options: new ChestPickerOptions(ShowAutomatic: true, ShowShippingBin: true, ShowNone: false),
+            onComplete: destination =>
             {
                 if (draft.CropPlan.TryGetGroup(groupId, out var group))
-                    group.OutputDestination = index switch
-                    {
-                        0 => null,
-                        1 => ShippingBinDestination.Instance,
-                        _ => new ChestDestination(chests[index - 2].Ref),
-                    };
+                    // Crop groups treat "automatic" as a null destination.
+                    group.OutputDestination = destination is AutomaticOutputDestination ? null : destination;
 
                 draft.MarkDirty();
                 ShowCropGroupEditor(draft, groupId);
@@ -494,18 +486,18 @@ internal sealed class HiringFlowCoordinator
 
     private void ShowMachineInputChestPicker(ContractDraft draft, string groupId)
     {
-        var chests = _chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
-        var rows = new List<PickerRow> { new(I18nHelper.Get("ui.manage_machines.chest_none"), null) };
-        rows.AddRange(chests.Select(chest => new PickerRow(chest.DisplayName, chest.GroupLabel)));
+        var locations = _chestResolver.BuildChestMapLocations(Game1.getFarm(), draft.Greenhouses);
+        draft.MachinePlan.TryGetGroup(groupId, out var current);
 
-        Game1.activeClickableMenu = new CropListPickerMenu(
-            I18nHelper.Get("ui.manage_machines.picker_chest_title"),
-            rows,
-            selectedIndex: 0,
-            onSelect: index =>
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            _helper,
+            locations,
+            initial: current?.InputChest is { } chestRef ? new ChestDestination(chestRef) : null,
+            options: new ChestPickerOptions(ShowAutomatic: false, ShowShippingBin: false, ShowNone: true),
+            onComplete: destination =>
             {
                 if (draft.MachinePlan.TryGetGroup(groupId, out var group))
-                    group.InputChest = index == 0 ? null : chests[index - 1].Ref;
+                    group.InputChest = destination is ChestDestination chest ? chest.Ref : null;
 
                 draft.MarkDirty();
                 RefreshPreview(draft);
@@ -611,27 +603,19 @@ internal sealed class HiringFlowCoordinator
 
     private void ShowMachineOutputPicker(ContractDraft draft, string groupId)
     {
-        var chests = _chestResolver.GetAllChests(Game1.getFarm(), draft.Greenhouses);
-        var rows = new List<PickerRow>
-        {
-            new(I18nHelper.Get("ui.manage_machines.output_automatic"), null),
-            new(I18nHelper.Get("ui.zone_chest.shipping_bin_option"), null),
-        };
-        rows.AddRange(chests.Select(chest => new PickerRow(chest.DisplayName, chest.GroupLabel)));
+        var locations = _chestResolver.BuildChestMapLocations(Game1.getFarm(), draft.Greenhouses);
+        draft.MachinePlan.TryGetGroup(groupId, out var current);
 
-        Game1.activeClickableMenu = new CropListPickerMenu(
-            I18nHelper.Get("ui.manage_machines.picker_output_title"),
-            rows,
-            selectedIndex: 0,
-            onSelect: index =>
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            _helper,
+            locations,
+            initial: current?.OutputDestination,
+            options: new ChestPickerOptions(ShowAutomatic: true, ShowShippingBin: true, ShowNone: false),
+            onComplete: destination =>
             {
                 if (draft.MachinePlan.TryGetGroup(groupId, out var group))
-                    group.OutputDestination = index switch
-                    {
-                        0 => null,
-                        1 => ShippingBinDestination.Instance,
-                        _ => new ChestDestination(chests[index - 2].Ref),
-                    };
+                    // Machine groups treat "automatic" as a null destination.
+                    group.OutputDestination = destination is AutomaticOutputDestination ? null : destination;
 
                 draft.MarkDirty();
                 ShowMachineGroupEditor(draft, groupId);

@@ -313,6 +313,7 @@ internal sealed class SummaryMenu : IClickableMenu
         TaskCategory.AnimalCare => "animal_care",
         TaskCategory.Crops => "crops",
         TaskCategory.Fieldwork => "fieldwork",
+        TaskCategory.Machines => "machines",
         _ => category.ToString(),
     };
 

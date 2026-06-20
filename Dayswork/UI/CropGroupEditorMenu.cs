@@ -233,7 +233,7 @@ internal sealed class CropGroupEditorMenu : LayoutMenu
     private string OutputChestLabel() => _group.OutputDestination switch
     {
         ShippingBinDestination => I18nHelper.Get("ui.zone_chest.shipping_bin_option"),
-        ChestDestination chest => I18nHelper.Get("ui.manage_crops.output_chest_at", new { x = chest.Ref.Tile.X, y = chest.Ref.Tile.Y }),
+        ChestDestination chest => ChestResolver.DescribeChestRef(chest.Ref),
         _ => I18nHelper.Get("ui.manage_crops.output_automatic"),
     };
 

@@ -46,6 +46,22 @@ ilspycmd -t StardewValley.Object "X:\Steam\steamapps\common\Stardew Valley\Stard
 ilspycmd -t StardewValley.GameData.Machines.MachineData "X:\Steam\steamapps\common\Stardew Valley\StardewValley.GameData.dll"
 ```
 
+For focused API-behavior checks, decompile one type and filter the output with `Select-String`:
+
+```powershell
+ilspycmd -t StardewValley.Farm "X:\Steam\steamapps\common\Stardew Valley\Stardew Valley.dll" |
+  Select-String -Pattern "getShippingBin|shipItem" -Context 4,12
+ilspycmd -t StardewValley.Game1 "X:\Steam\steamapps\common\Stardew Valley\Stardew Valley.dll" |
+  Select-String -Pattern "IsMasterGame|MasterPlayer|getOnlineFarmers" -Context 4,12
+ilspycmd -t StardewValley.GameLocation "X:\Steam\steamapps\common\Stardew Valley\Stardew Valley.dll" |
+  Select-String -Pattern "characters|addCharacter" -Context 4,12
+```
+
+This was used for the multiplayer readiness analysis to confirm host/client authority signals,
+shipping-bin ownership, and NPC synchronization behavior. Pair decompile checks with the SMAPI XML
+docs (`StardewModdingAPI.xml`) for `Context.IsMultiplayer`, `Context.IsMainPlayer`, multiplayer
+events, `Helper.Multiplayer.SendMessage<T>`, and main-player-only save-data behavior.
+
 ## SVE Structure
 
 Important roots under `C:\Users\kwood\Repos\StardewValleyExpanded`:

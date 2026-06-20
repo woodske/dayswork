@@ -45,6 +45,22 @@ internal sealed class ManagedCropFieldReader
         return new FieldState(locationName, date, isSeasonAgnosticLocation, tiles);
     }
 
+    /// <summary>
+    /// True when <paramref name="tileVec"/> holds a non-debris Object that should be collected as
+    /// produce (e.g. forage left by a wild-seed crop's replaceWithObjectOnFullGrown). Excludes big
+    /// craftables, weeds, twigs, and rocks/ores.
+    /// </summary>
+    internal static bool IsProduceObjectOnCropTile(Vector2 tileVec, GameLocation loc)
+    {
+        if (!loc.objects.TryGetValue(tileVec, out var obj))
+            return false;
+        if (obj.bigCraftable.Value) return false;
+        if (obj.IsWeeds()) return false;
+        if (obj.Name == "Twig") return false;
+        if (ObjectTargetClassifier.ClassifyPick(tileVec, loc) is not null) return false;
+        return true;
+    }
+
     private static bool TryReadTile(GameLocation location, TileCoord coord, out TileState state)
     {
         var vec = new Vector2(coord.X, coord.Y);
@@ -55,10 +71,13 @@ internal sealed class ManagedCropFieldReader
             var crop = dirt.crop;
             var isDead = crop is not null && crop.dead.Value;
             var hasLiveCrop = crop is not null && !isDead;
+            // Wild seed auto-harvest places forage in loc.objects and removes dirt.crop.
+            // Treat it as a harvestable crop so the planner queues Harvest, not PlantSeed.
+            var hasWildSeedForage = !hasLiveCrop && !isDead && IsProduceObjectOnCropTile(vec, location);
             state = new TileState(
                 Tile: coord,
-                ReadyToHarvest: hasLiveCrop && dirt.readyForHarvest(),
-                HasCrop: hasLiveCrop,
+                ReadyToHarvest: (hasLiveCrop && dirt.readyForHarvest()) || hasWildSeedForage,
+                HasCrop: hasLiveCrop || hasWildSeedForage,
                 HasDebris: isDead,                                  // dead crop is cleared as debris
                 IsTilled: true,
                 HasFertilizer: !string.IsNullOrEmpty(dirt.fertilizer.Value) && dirt.fertilizer.Value != "0",
