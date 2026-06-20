@@ -22,7 +22,7 @@ internal sealed class CropCatalogProvider
 
     // Fertilizers that do not apply to HoeDirt crops and must not appear in the crop fertilizer list.
     // Tree Fertilizer (O)805 only affects wild/fruit trees.
-    private static readonly HashSet<string> ExcludedFertilizerIds = new(StringComparer.Ordinal) { "805" };
+    private static readonly HashSet<string> ExcludedFertilizerIds = new(StringComparer.Ordinal) { GameItemIds.TreeFertilizer };
 
     private readonly IMonitor? _monitor;
 
@@ -134,7 +134,7 @@ internal sealed class CropCatalogProvider
         {
             foreach (var (objectId, data) in Game1.objectData)
             {
-                if (data.Category != FertilizerCategory || ExcludedFertilizerIds.Contains(StripQualifier(objectId)))
+                if (data.Category != FertilizerCategory || ExcludedFertilizerIds.Contains($"(O){objectId}"))
                     continue;
 
                 var stocked = IsStocked(pierre, objectId) || IsStocked(joja, objectId);

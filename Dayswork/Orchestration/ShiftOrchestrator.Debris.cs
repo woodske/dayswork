@@ -106,9 +106,9 @@ internal sealed partial class ShiftOrchestrator
 
     private static bool TryGetRemovedStandardStoneDrop(StardewValley.Object obj, out string itemId, out int stack)
     {
-        if (obj.QualifiedItemId == "(O)390" || obj.ItemId == "390" || obj.Name == "Stone")
+        if (obj.QualifiedItemId == GameItemIds.Stone || obj.Name == "Stone")
         {
-            itemId = "(O)390";
+            itemId = GameItemIds.Stone;
             stack = 1;
             return true;
         }

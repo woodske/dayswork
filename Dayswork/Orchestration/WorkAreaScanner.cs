@@ -219,6 +219,7 @@ internal sealed class WorkAreaScanner
                     skippedKind = TaskKind.CutTrees;
                     return null;
                 }
+                if (ObjectTargetClassifier.HasTapper(tileVec, loc)) return null;
                 return TaskKind.CutTrees;
             }
         }

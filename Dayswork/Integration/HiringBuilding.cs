@@ -92,8 +92,8 @@ internal static class HiringBuilding
         BuildCost = 1000,
         BuildMaterials = new List<BuildingMaterial>
         {
-            new() { ItemId = "(O)388", Amount = 25 }, // Wood
-            new() { ItemId = "(O)390", Amount = 25 }, // Stone
+            new() { ItemId = GameItemIds.Wood,  Amount = 25 },
+            new() { ItemId = GameItemIds.Stone, Amount = 25 },
         },
         BuildDays = 1,
         Size = new Point(TilesWide, TilesHigh),

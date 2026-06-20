@@ -37,6 +37,14 @@ internal static class ObjectTargetClassifier
             : null;
     }
 
+    /// <summary>
+    /// Returns true if a tapper (Tapper or Heavy Tapper, or any mod item with the
+    /// <c>tapper_item</c> context tag) is placed on the tree at <paramref name="tileVec"/>.
+    /// Trees with a tapper should be skipped during CutTrees so the tapper is not destroyed.
+    /// </summary>
+    public static bool HasTapper(Vector2 tileVec, GameLocation loc) =>
+        loc.objects.TryGetValue(tileVec, out var obj) && obj.IsTapper();
+
     public static ResourceClump? FindResourceClumpAt(Vector2 tileVec, GameLocation loc)
     {
         foreach (var clump in loc.resourceClumps)

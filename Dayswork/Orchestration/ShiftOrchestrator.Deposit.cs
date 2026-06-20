@@ -132,6 +132,8 @@ internal sealed partial class ShiftOrchestrator
         // Enter Depositing. With no walkable trips, pass straight through to Exiting.
         var stopReason = Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed;
         Session.Ctx.PendingStopReason = null;
+        if (stopReason == ShiftStopReason.Exhausted)
+            Game1.addHUDMessage(new HUDMessage(I18nHelper.Get("notify.farmhand_exhausted"), HUDMessage.newQuest_type));
         if (!Session.Deposits.HasPending)
         {
             Session.Ctx.StateMachine.BeginWrapUp(new IntentDepositInShippingBin(), stopReason);
