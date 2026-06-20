@@ -8,6 +8,7 @@ using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Objects;
+using SObject = StardewValley.Object;
 
 namespace Dayswork.Orchestration;
 
@@ -331,6 +332,8 @@ internal sealed class DepositTripRunner
                 LogLevel.Error);
             return;
         }
+        if (item is SObject shipObj && stack.Quality > 0)
+            shipObj.Quality = stack.Quality;
 
         if (animateWhenPlayerHere && Game1.player.currentLocation == farm)
             farm.shipItem(item, Game1.player);           // vanilla lid animation + backpackIN + delayed "Ship"
@@ -376,6 +379,8 @@ internal sealed class DepositTripRunner
                 LogLevel.Error);
             return;
         }
+        if (item is SObject chestObj && stack.Quality > 0)
+            chestObj.Quality = stack.Quality;
 
         // addItem returns the remainder that did not fit (null if all fit).
         var leftover = chest.addItem(item);
@@ -383,7 +388,7 @@ internal sealed class DepositTripRunner
         {
             // Chest full: route the remainder to automatic overflow.
             _session.Ctx.Overflow.Add(new OverflowItem(
-                new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance),
+                new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance, stack.Quality),
                 OverflowReason.ChestFull));
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][deposit] chest full; {leftover.Stack}x {stack.QualifiedItemId} routed to automatic overflow.",
@@ -486,7 +491,7 @@ internal sealed class DepositTripRunner
     {
         foreach (var b in _session.Ctx.Buffer.TakeAll())
         {
-            var stack = new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance);
+            var stack = new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance, b.Quality);
             if (DepositPlanner.ResolveUndelivered(ShiftOrchestrator.ResolveAssignedDestination(b.SourceTask, _session.Ctx.TaskDestinations))
                 == UndeliveredDepositResolution.ShippingBin)
                 DepositIntoShippingBin(stack, animateWhenPlayerHere: false);

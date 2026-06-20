@@ -9,4 +9,5 @@ public sealed record BufferedItem(
     string QualifiedItemId,
     int Quantity,
     TaskKind SourceTask,
-    OutputScopeProvenance Provenance);
+    OutputScopeProvenance Provenance,
+    int Quality = 0);

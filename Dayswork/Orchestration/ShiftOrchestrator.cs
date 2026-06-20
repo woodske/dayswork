@@ -922,13 +922,16 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     private static IReadOnlyList<ItemStack> ConsolidateOverflow(IEnumerable<OverflowItem> overflow)
     {
-        var totals = new Dictionary<string, int>();
+        var totals = new Dictionary<(string Id, int Quality), int>();
         foreach (var o in overflow)
-            totals[o.Stack.QualifiedItemId] =
-                totals.TryGetValue(o.Stack.QualifiedItemId, out var e) ? e + o.Stack.Quantity : o.Stack.Quantity;
+        {
+            var key = (o.Stack.QualifiedItemId, o.Stack.Quality);
+            totals[key] = totals.TryGetValue(key, out var e) ? e + o.Stack.Quantity : o.Stack.Quantity;
+        }
         return totals
-            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-            .Select(kv => new ItemStack(kv.Key, kv.Value))
+            .OrderBy(kv => kv.Key.Id, StringComparer.Ordinal)
+            .ThenBy(kv => kv.Key.Quality)
+            .Select(kv => new ItemStack(kv.Key.Id, kv.Value, kv.Key.Quality))
             .ToList();
     }
 

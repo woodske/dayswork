@@ -8,11 +8,11 @@ public sealed class ItemBuffer
 
     public bool IsEmpty => _items.Count == 0;
 
-    public void Add(string itemId, int quantity, TaskKind sourceTask, OutputScopeProvenance? provenance = null)
+    public void Add(string itemId, int quantity, TaskKind sourceTask, OutputScopeProvenance? provenance = null, int quality = 0)
     {
         if (string.IsNullOrEmpty(itemId)) throw new ArgumentException("itemId must be non-empty.", nameof(itemId));
         if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity), "quantity must be positive.");
-        _items.Add(new BufferedItem(itemId, quantity, sourceTask, provenance ?? OutputScopeProvenance.Unknown));
+        _items.Add(new BufferedItem(itemId, quantity, sourceTask, provenance ?? OutputScopeProvenance.Unknown, quality));
     }
 
     public IReadOnlyList<BufferedItem> TakeAll()

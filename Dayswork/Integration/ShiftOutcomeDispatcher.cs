@@ -5,6 +5,7 @@ using Dayswork.Core.Inventory;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Objects;
+using SObject = StardewValley.Object;
 
 namespace Dayswork.Integration;
 
@@ -104,6 +105,8 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
                     DevLog.WarnLevel);
                 continue;
             }
+            if (item is SObject sObj && s.Quality > 0)
+                sObj.Quality = s.Quality;
 
             result.Add(item);
         }

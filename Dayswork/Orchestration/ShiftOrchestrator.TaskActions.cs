@@ -14,6 +14,7 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Buildings;
 using StardewValley.Objects;
+using SObject = StardewValley.Object;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 
@@ -248,7 +249,8 @@ internal sealed partial class ShiftOrchestrator
             {
                 loc.playSound("harvest", tileVec);
                 Session.Ctx.Buffer.Add(leftover.QualifiedItemId, Math.Max(1, leftover.Stack),
-                    TaskKind.HarvestCrops, Session.PendingOutputProvenance);
+                    TaskKind.HarvestCrops, Session.PendingOutputProvenance,
+                    quality: (leftover as SObject)?.Quality ?? 0);
                 loc.removeObject(tileVec, false);
             }
             return new LaborBeatOutcome(true, true);
@@ -280,14 +282,16 @@ internal sealed partial class ShiftOrchestrator
             if (!inventoryBefore.TryGetValue(item, out var oldStack))
             {
                 // Brand-new slot added by harvest — take the whole stack.
-                Session.Ctx.Buffer.Add(item.QualifiedItemId, item.Stack, TaskKind.HarvestCrops, Session.PendingOutputProvenance);
+                Session.Ctx.Buffer.Add(item.QualifiedItemId, item.Stack, TaskKind.HarvestCrops,
+                    Session.PendingOutputProvenance, quality: (item as SObject)?.Quality ?? 0);
                 Game1.player.removeItemFromInventory(item);
             }
             else if (item.Stack > oldStack)
             {
                 // Existing slot grew (stacked onto items the player already had).
                 var gain = item.Stack - oldStack;
-                Session.Ctx.Buffer.Add(item.QualifiedItemId, gain, TaskKind.HarvestCrops, Session.PendingOutputProvenance);
+                Session.Ctx.Buffer.Add(item.QualifiedItemId, gain, TaskKind.HarvestCrops,
+                    Session.PendingOutputProvenance, quality: (item as SObject)?.Quality ?? 0);
                 item.Stack -= gain;
                 if (item.Stack <= 0)
                     Game1.player.removeItemFromInventory(item);
@@ -298,7 +302,8 @@ internal sealed partial class ShiftOrchestrator
         if (loc.objects.TryGetValue(tileVec, out var newObj) && !ReferenceEquals(objectBefore, newObj))
         {
             Session.Ctx.Buffer.Add(newObj.QualifiedItemId, Math.Max(1, newObj.Stack),
-                TaskKind.HarvestCrops, Session.PendingOutputProvenance);
+                TaskKind.HarvestCrops, Session.PendingOutputProvenance,
+                quality: (newObj as SObject)?.Quality ?? 0);
             loc.removeObject(tileVec, false);
         }
 
@@ -342,7 +347,8 @@ internal sealed partial class ShiftOrchestrator
             !WorkAreaScanner.IsAnimalProductForageObject(obj))
             return new LaborBeatOutcome(true, true);
 
-        Session.Ctx.Buffer.Add(obj.QualifiedItemId, Math.Max(1, obj.Stack), TaskKind.CollectAnimalProducts, Session.PendingOutputProvenance);
+        Session.Ctx.Buffer.Add(obj.QualifiedItemId, Math.Max(1, obj.Stack), TaskKind.CollectAnimalProducts,
+            Session.PendingOutputProvenance, quality: (obj as SObject)?.Quality ?? 0);
         loc.removeObject(tileVec, false);
         return new LaborBeatOutcome(true, true);
     }

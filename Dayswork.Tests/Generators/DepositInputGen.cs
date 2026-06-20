@@ -22,18 +22,22 @@ public static class DepositInputGen
     // Small id pool so identical ids recur and consolidation (summing) actually happens.
     private static readonly string[] ItemIds = { "(O)388", "(O)390", "(O)709", "(O)378", "(O)24" };
 
+    private static readonly int[] Qualities = { 0, 1, 2, 4 };
+
     public static Gen<BufferedItem> BufferedItem() =>
         from id in Gen.Elements(ItemIds)
         from qty in Gen.Choose(1, 999)
         from task in Gen.Elements(AllTasks)
-        select new BufferedItem(id, qty, task, OutputScopeProvenance.Unknown);
+        from quality in Gen.Elements(Qualities)
+        select new BufferedItem(id, qty, task, OutputScopeProvenance.Unknown, quality);
 
     public static Gen<BufferedItem> BufferedItemWithProvenance() =>
         from id in Gen.Elements(ItemIds)
         from qty in Gen.Choose(1, 999)
         from task in Gen.Elements(AllTasks)
         from provenance in Gen.Elements(Provenances)
-        select new BufferedItem(id, qty, task, provenance);
+        from quality in Gen.Elements(Qualities)
+        select new BufferedItem(id, qty, task, provenance, quality);
 
     public static Gen<IReadOnlyList<BufferedItem>> BufferedItems() =>
         Gen.ListOf(BufferedItem()).Select(l => (IReadOnlyList<BufferedItem>)l.ToList());

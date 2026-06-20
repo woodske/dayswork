@@ -211,7 +211,8 @@ internal sealed class AnimalTaskHandler
         if (item is SObject obj)
             obj.Quality = Math.Max(0, animal.produceQuality.Value);
 
-        buffer.Add(item.QualifiedItemId, Math.Max(1, item.Stack), TaskKind.CollectAnimalProducts, provenance);
+        buffer.Add(item.QualifiedItemId, Math.Max(1, item.Stack), TaskKind.CollectAnimalProducts, provenance,
+            quality: (item as SObject)?.Quality ?? 0);
         animal.HandleStatsOnProduceCollected(item, (uint)Math.Max(1, item.Stack));
         animal.currentProduce.Value = string.Empty;
         animal.daysSinceLastLay.Value = 0;

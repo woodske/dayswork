@@ -19,18 +19,22 @@ public sealed class DepositPlannerTests
         TaskKind task, IReadOnlyDictionary<TaskKind, DestinationKey> assignments) =>
         assignments.TryGetValue(task, out var d) && d is not null ? d : AutomaticOutputDestination.Instance;
 
-    private static Dictionary<string, int> Totals(IEnumerable<(string id, int qty)> items)
+    private static Dictionary<(string Id, int Quality), int> Totals(IEnumerable<(string id, int quality, int qty)> items)
     {
-        var map = new Dictionary<string, int>();
-        foreach (var (id, qty) in items)
-            map[id] = map.TryGetValue(id, out var e) ? e + qty : qty;
+        var map = new Dictionary<(string, int), int>();
+        foreach (var (id, quality, qty) in items)
+        {
+            var key = (id, quality);
+            map[key] = map.TryGetValue(key, out var e) ? e + qty : qty;
+        }
         return map;
     }
 
-    private static BufferedItem Buffered(string itemId, int quantity, TaskKind task, OutputScopeProvenance? provenance = null) =>
-        new(itemId, quantity, task, provenance ?? OutputScopeProvenance.Unknown);
+    private static BufferedItem Buffered(string itemId, int quantity, TaskKind task, OutputScopeProvenance? provenance = null, int quality = 0) =>
+        new(itemId, quantity, task, provenance ?? OutputScopeProvenance.Unknown, quality);
 
-    // Conservation — every buffered item appears exactly once across trips ∪ automatic overflow.
+    // Conservation — every buffered item appears exactly once across trips ∪ automatic overflow,
+    // keyed by (itemId, quality) so different-quality stacks are tracked separately.
     [Property(MaxTest = 1000, Replay = "")]
     public Property Conservation_Holds()
     {
@@ -39,10 +43,10 @@ public sealed class DepositPlannerTests
             var (snapshot, assignments) = input;
             var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
 
-            var inTotals = Totals(snapshot.Select(b => (b.QualifiedItemId, b.Quantity)));
+            var inTotals = Totals(snapshot.Select(b => (b.QualifiedItemId, b.Quality, b.Quantity)));
             var outTotals = Totals(
                 plan.Trips.SelectMany(t => t.Items).Concat(plan.AutomaticOverflow)
-                    .Select(s => (s.QualifiedItemId, s.Quantity)));
+                    .Select(s => (s.QualifiedItemId, s.Quality, s.Quantity)));
 
             bool equal = inTotals.Count == outTotals.Count
                          && inTotals.All(kv => outTotals.TryGetValue(kv.Key, out var v) && v == kv.Value);
@@ -66,10 +70,10 @@ public sealed class DepositPlannerTests
                 Start,
                 Manhattan);
 
-            var inTotals = Totals(snapshot.Select(b => (b.QualifiedItemId, b.Quantity)));
+            var inTotals = Totals(snapshot.Select(b => (b.QualifiedItemId, b.Quality, b.Quantity)));
             var outTotals = Totals(
                 plan.Trips.SelectMany(t => t.Items).Concat(plan.AutomaticOverflow)
-                    .Select(s => (s.QualifiedItemId, s.Quantity)));
+                    .Select(s => (s.QualifiedItemId, s.Quality, s.Quantity)));
 
             return (inTotals.Count == outTotals.Count
                     && inTotals.All(kv => outTotals.TryGetValue(kv.Key, out var v) && v == kv.Value))
@@ -323,5 +327,31 @@ public sealed class DepositPlannerTests
         Assert.Equal(
             UndeliveredDepositResolution.AutomaticOverflow,
             DepositPlanner.ResolveUndelivered(chest));
+    }
+
+    // Regression: items of the same kind but different quality must not be merged.
+    // Before the fix, BufferedItem had no Quality field and the planner's grouping key omitted
+    // quality — a gold parsnip and a regular parsnip targeting the same chest were summed into
+    // one stack and both came out regular quality at deposit time.
+    [Fact]
+    public void DifferentQuality_Items_Are_Not_Merged_Into_Single_Stack()
+    {
+        var chest = new ChestRef("Farm", new TileCoord(4, 4));
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)24", 5, TaskKind.HarvestCrops, quality: 0),  // regular
+            Buffered("(O)24", 3, TaskKind.HarvestCrops, quality: 2),  // gold
+        };
+        var assignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.HarvestCrops] = new ChestDestination(chest),
+        };
+
+        var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
+
+        var trip = Assert.Single(plan.Trips);
+        Assert.Equal(2, trip.Items.Count);
+        Assert.Contains(trip.Items, s => s.Quality == 0 && s.Quantity == 5);
+        Assert.Contains(trip.Items, s => s.Quality == 2 && s.Quantity == 3);
     }
 }
