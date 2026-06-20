@@ -161,6 +161,7 @@ public sealed class SaveDataSerializer
             CategoryPriority = contract.CategoryPriority.Select(category => category.ToString()).ToList(),
             CropPlan = CropPlanSerialization.MapDomainToDto(contract.CropPlan),
             MachineWorkScope = MachineWorkScopeSerialization.MapDomainToDto(contract.MachineScope),
+            Preferences = new ContractPreferencesDtoV1 { AvoidBlueGrass = contract.Preferences.AvoidBlueGrass },
         };
 
     private static Contract MapDtoV2ToDomain(ContractDtoV2 dto)
@@ -185,6 +186,9 @@ public sealed class SaveDataSerializer
         var categoryPriority = MapCategoryPriority(dto.CategoryPriority);
         var cropPlan = CropPlanSerialization.MapDtoToDomain(dto.CropPlan);
         var machineScope = MachineWorkScopeSerialization.MapDtoToDomain(dto.MachineWorkScope);
+        var preferences = dto.Preferences is { AvoidBlueGrass: { } avoidBlueGrass }
+            ? new ContractPreferences(AvoidBlueGrass: avoidBlueGrass)
+            : ContractPreferences.Legacy;
 
         return new Contract(
             Id: id,
@@ -198,7 +202,8 @@ public sealed class SaveDataSerializer
             Tier: tier,
             CategoryPriority: categoryPriority,
             CropPlan: cropPlan,
-            MachineScope: machineScope);
+            MachineScope: machineScope,
+            Preferences: preferences);
     }
 
     // Player category priority. Parse the saved order, dropping unknown/duplicate entries, then

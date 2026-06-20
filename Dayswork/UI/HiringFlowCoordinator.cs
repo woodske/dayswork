@@ -92,11 +92,17 @@ internal sealed class HiringFlowCoordinator
             onManageMachines: ShowManageMachines,
             onOutput: ShowOutputDestinations,
             onPriority: ShowTaskPriority,
+            onPreferences: ShowPreferences,
             onEnergy: ShowEnergy,
             onRecurrence: ShowSchedule,
             onSummary: ShowSummary,
             onConfirm: ConfirmContract,
             onCancel: () => MaybeCloseFlow(draft));
+    }
+
+    private void ShowPreferences(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new PreferencesMenu(draft, onBack: ShowHub);
     }
 
     private void ShowTaskSelection(ContractDraft draft)
@@ -939,7 +945,8 @@ internal sealed class HiringFlowCoordinator
             Tier: draft.Tier,
             CategoryPriority: draft.CategoryPriority.ToList().AsReadOnly(),
             CropPlan: draft.CropPlan.BuildCropPlan(),
-            MachineScope: draft.MachinePlan.BuildScope());
+            MachineScope: draft.MachinePlan.BuildScope(),
+            Preferences: draft.Preferences);
     }
 
     internal static ContractDraft CreateEditDraft(ContractId existing, Contract contract)
@@ -961,6 +968,7 @@ internal sealed class HiringFlowCoordinator
         LegacyScopeBootstrapper.HydrateDraft(draft, contract);
         draft.CropPlan.HydrateFrom(contract.CropPlan);
         draft.MachinePlan.HydrateFrom(contract.MachineScope);
+        draft.Preferences = contract.Preferences;
         return draft;
     }
 

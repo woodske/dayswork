@@ -11,6 +11,7 @@ public sealed class ShiftContext
     public IReadOnlySet<TaskKind> EnabledTasks { get; }
     public IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations { get; }
     public ContractTermsSnapshot ContractTerms { get; }
+    public ContractPreferences Preferences { get; }
     public WorkerEnergyState EnergyState { get; set; }
     public WorkerPacingProfile PacingProfile { get; }
     public ToolSnapshot ToolSnapshot { get; }
@@ -42,6 +43,7 @@ public sealed class ShiftContext
         IReadOnlySet<TaskKind> enabledTasks,
         IReadOnlyDictionary<TaskKind, DestinationKey> taskDestinations,
         ContractTermsSnapshot contractTerms,
+        ContractPreferences preferences,
         WorkerEnergyState energyState,
         WorkerPacingProfile pacingProfile,
         ToolSnapshot toolSnapshot,
@@ -55,6 +57,7 @@ public sealed class ShiftContext
         EnabledTasks     = enabledTasks;
         TaskDestinations = taskDestinations;
         ContractTerms    = contractTerms;
+        Preferences      = preferences;
         EnergyState      = energyState;
         PacingProfile    = pacingProfile;
         ToolSnapshot     = toolSnapshot;

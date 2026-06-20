@@ -63,6 +63,7 @@ internal sealed class WorkAreaScanner
         IReadOnlySet<TaskKind> enabled,
         ToolSnapshot snapshot,
         TileCoord origin,
+        ContractPreferences preferences,
         OutputScopeProvenance? provenance = null,
         IReadOnlyList<Zone>? excludedZones = null)
     {
@@ -93,7 +94,7 @@ internal sealed class WorkAreaScanner
                 var tileVec = new Vector2(x, y);
                 var taskTile = new TileCoord(x, y);
 
-                var task = DetectTask(tileVec, location, enabled, snapshot,
+                var task = DetectTask(tileVec, location, enabled, snapshot, preferences,
                     out bool capabilitySkipped, out TaskKind? skippedKind);
 
                 if (capabilitySkipped && skippedKind.HasValue)
@@ -159,6 +160,7 @@ internal sealed class WorkAreaScanner
         IReadOnlySet<TaskKind> enabled,
         ToolSnapshot snapshot,
         TileCoord origin,
+        ContractPreferences preferences,
         OutputScopeProvenance? provenance = null)
     {
         var layer = location.Map.Layers[0];
@@ -167,7 +169,7 @@ internal sealed class WorkAreaScanner
             new TileCoord(0, 0),
             new TileCoord(Math.Max(0, layer.LayerWidth - 1), Math.Max(0, layer.LayerHeight - 1)));
 
-        return ScanZones(location, new[] { wholeLocation }, enabled, snapshot, origin, provenance);
+        return ScanZones(location, new[] { wholeLocation }, enabled, snapshot, origin, preferences, provenance);
     }
 
     public TaskKind? DetectTask(
@@ -175,6 +177,7 @@ internal sealed class WorkAreaScanner
         GameLocation loc,
         IReadOnlySet<TaskKind> enabled,
         ToolSnapshot snapshot,
+        ContractPreferences preferences,
         out bool capabilitySkipped,
         out TaskKind? skippedKind)
     {
@@ -281,8 +284,9 @@ internal sealed class WorkAreaScanner
         }
 
         if (loc.terrainFeatures.TryGetValue(tileVec, out var grassFeature) &&
-            grassFeature is Grass &&
-            enabled.Contains(TaskKind.ClearGrass))
+            grassFeature is Grass grass &&
+            enabled.Contains(TaskKind.ClearGrass) &&
+            !(preferences.AvoidBlueGrass && grass.grassType.Value == Grass.blueGrass))
             return TaskKind.ClearGrass;
 
         return null;

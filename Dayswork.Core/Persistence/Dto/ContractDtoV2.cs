@@ -14,4 +14,5 @@ public sealed class ContractDtoV2
     public List<string> CategoryPriority { get; set; } = new();
     public CropPlanDtoV1? CropPlan { get; set; }
     public MachineWorkScopeDtoV1? MachineWorkScope { get; set; }
+    public ContractPreferencesDtoV1? Preferences { get; set; }
 }

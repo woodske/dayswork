@@ -129,6 +129,7 @@ internal sealed partial class ShiftOrchestrator
             batchTasks,
             Session.Ctx.ToolSnapshot,
             Session.FarmExitTile,
+            Session.Ctx.Preferences,
             OutputScopeProvenance.AnimalBuilding(string.Empty));
         if (freshTileWork.Count == 0) return false;
 

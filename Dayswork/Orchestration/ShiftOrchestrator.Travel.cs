@@ -247,6 +247,7 @@ internal sealed partial class ShiftOrchestrator
                 location,
                 batchTasks,
                 Session.Ctx.ToolSnapshot,
+                Session.Ctx.Preferences,
                 OutputScopeProvenance.AnimalBuilding(batch.LocationName));
             if (batch.FeedBuilding)
             {
@@ -271,6 +272,7 @@ internal sealed partial class ShiftOrchestrator
                 location,
                 batchTasks,
                 Session.Ctx.ToolSnapshot,
+                Session.Ctx.Preferences,
                 OutputScopeProvenance.Greenhouse(batch.LocationName));
             animalWork = Array.Empty<AnimalWorkItem>();
         }

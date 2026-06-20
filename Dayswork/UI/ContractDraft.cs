@@ -23,6 +23,9 @@ internal sealed class ContractDraft
     /// <summary>Purchased energy tier (sets the worker's daily capacity and the contract price).</summary>
     public EnergyTier Tier { get; set; } = EnergyTier.FullDay;
 
+    /// <summary>Farmhand behavior preferences set by the player.</summary>
+    public ContractPreferences Preferences { get; set; } = ContractPreferences.Default;
+
     /// <summary>Player-ordered work categories (highest priority first). Seeded with the default order.</summary>
     public List<TaskCategory> CategoryPriority { get; } = new(TaskKindSets.DefaultCategoryPriority);
 

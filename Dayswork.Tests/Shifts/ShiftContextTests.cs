@@ -21,6 +21,7 @@ public sealed class ShiftContextTests
             new HashSet<TaskKind>(),
             new Dictionary<TaskKind, DestinationKey>(),
             contractTerms: terms,
+            preferences: ContractPreferences.Default,
             energyState: energy,
             pacingProfile: pacing,
             toolSnapshot: new ToolSnapshot(ToolLevel.Basic, ToolLevel.Basic, ToolLevel.Basic),

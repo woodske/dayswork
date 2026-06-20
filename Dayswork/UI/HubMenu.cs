@@ -34,6 +34,7 @@ internal sealed class HubMenu : LayoutMenu
         Action<ContractDraft> onManageMachines,
         Action<ContractDraft> onOutput,
         Action<ContractDraft> onPriority,
+        Action<ContractDraft> onPreferences,
         Action<ContractDraft> onEnergy,
         Action<ContractDraft> onRecurrence,
         Action<ContractDraft> onSummary,
@@ -51,6 +52,7 @@ internal sealed class HubMenu : LayoutMenu
         _items.Add(new NavItem("ui.hub.manage_machines", onManageMachines, ManageMachinesStatus));
         _items.Add(new NavItem("ui.hub.output_destination", onOutput, OutputStatus));
         _items.Add(new NavItem("ui.hub.task_priority", onPriority, () => HubStatus.None));
+        _items.Add(new NavItem("ui.hub.preferences", onPreferences, () => HubStatus.None));
         _items.Add(new NavItem("ui.hub.energy", onEnergy, EnergyStatus));
         _items.Add(new NavItem("ui.hub.recurrence", onRecurrence, RecurrenceStatus));
         _items.Add(new NavItem("ui.hub.summary", onSummary, () => HubStatus.None));

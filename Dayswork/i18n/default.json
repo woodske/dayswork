@@ -29,6 +29,7 @@
     "ui.hub.manage_machines": "Manage Machines",
     "ui.hub.output_destination": "Output Destination",
     "ui.hub.task_priority": "Task Priority",
+    "ui.hub.preferences": "Preferences",
     "ui.hub.energy": "Energy",
     "ui.hub.recurrence": "Recurrence",
     "ui.hub.summary": "Summary",
@@ -279,6 +280,9 @@
     "ui.schedule.recurring_description": "Worker comes each morning automatically",
     "ui.schedule.confirm_btn": "Next",
     "ui.schedule.back_btn": "Back",
+
+    "ui.preferences.title": "Preferences",
+    "ui.preferences.avoid_blue_grass": "Avoid Blue Grass",
 
     "ui.contract_list.title": "Active Contracts",
     "ui.contract_list.no_contracts": "No active contracts",

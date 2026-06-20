@@ -15,6 +15,7 @@ internal sealed class IndoorWorkScanner
         GameLocation interior,
         IReadOnlySet<TaskKind> enabled,
         ToolSnapshot snapshot,
+        ContractPreferences preferences,
         OutputScopeProvenance? provenance = null)
     {
         return _workAreaScanner.ScanWholeLocation(
@@ -22,6 +23,7 @@ internal sealed class IndoorWorkScanner
             enabled,
             snapshot,
             new TileCoord(0, 0),
+            preferences,
             provenance);
     }
 }

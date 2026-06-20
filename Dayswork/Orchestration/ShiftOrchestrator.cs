@@ -277,6 +277,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             enabledTasks:     contract.EnabledTasks,
             taskDestinations: contract.TaskDestinations,
             contractTerms:    contractTerms,
+            preferences:      contract.Preferences,
             energyState:      energyState,
             pacingProfile:    pacingProfile,
             toolSnapshot:     snapshot,
@@ -408,6 +409,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                         batch.Tasks.ToHashSet(),
                         snapshot,
                         farmExitTile,
+                        contract.Preferences,
                         OutputScopeProvenance.AnimalBuilding(string.Empty));
                     batches.Add(batch with { TileWork = tileWork, AnimalWork = Array.Empty<AnimalWorkItem>() });
                     break;
@@ -425,6 +427,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                             batchTasks,
                             snapshot,
                             farmExitTile,
+                            contract.Preferences,
                             outdoorProvenance,
                             ManagedZonesForLocation(batch.LocationName));
                     batches.Add(batch with { TileWork = tileWork });
@@ -637,6 +640,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                 batchTasks,
                 Session.Ctx.ToolSnapshot,
                 Session.FarmExitTile,
+                Session.Ctx.Preferences,
                 OutputScopeProvenance.AnimalBuilding(string.Empty))
             : (IReadOnlyList<WorkItem>)Array.Empty<WorkItem>();
 
