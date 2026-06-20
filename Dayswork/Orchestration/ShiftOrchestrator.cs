@@ -495,6 +495,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         if (Session.Ctx.CurrentBatchIndex >= Session.Ctx.Batches.Count)
         {
+            if (TryEnterIdleLoop())
+                return;
             QueueWrapUpNow(ShiftStopReason.Completed);
             return;
         }
@@ -735,8 +737,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var phase = Session.Ctx.StateMachine.Phase;
 
         // Progress sampling + stuck detection.
-        // Only meaningful while actively working.
-        if (phase == ShiftPhase.Working && !Session.Shopping.IsInProgress)
+        // Only meaningful while actively working — not while parked at the office door idle-waiting.
+        if (phase == ShiftPhase.Working && !Session.Shopping.IsInProgress && !Session.IdleWaiting)
         {
             SampleProgress(currentLocation);
             // Re-read phase — SampleProgress may have triggered a transition.
@@ -759,6 +761,13 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         if (Session.Shopping.IsPurchasing)
         {
             Session.Shopping.ContinuePurchaseTick();
+            return;
+        }
+
+        // Idle wait loop: parked at the office door polling for ready machines (no travel active).
+        if (Session.IdleWaiting)
+        {
+            ContinueIdleWaitTick();
             return;
         }
 

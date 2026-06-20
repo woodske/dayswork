@@ -161,7 +161,11 @@ public sealed class SaveDataSerializer
             CategoryPriority = contract.CategoryPriority.Select(category => category.ToString()).ToList(),
             CropPlan = CropPlanSerialization.MapDomainToDto(contract.CropPlan),
             MachineWorkScope = MachineWorkScopeSerialization.MapDomainToDto(contract.MachineScope),
-            Preferences = new ContractPreferencesDtoV1 { AvoidBlueGrass = contract.Preferences.AvoidBlueGrass },
+            Preferences = new ContractPreferencesDtoV1
+            {
+                AvoidBlueGrass = contract.Preferences.AvoidBlueGrass,
+                IdleTask = contract.Preferences.IdleTask.ToString(),
+            },
         };
 
     private static Contract MapDtoV2ToDomain(ContractDtoV2 dto)
@@ -186,9 +190,18 @@ public sealed class SaveDataSerializer
         var categoryPriority = MapCategoryPriority(dto.CategoryPriority);
         var cropPlan = CropPlanSerialization.MapDtoToDomain(dto.CropPlan);
         var machineScope = MachineWorkScopeSerialization.MapDtoToDomain(dto.MachineWorkScope);
-        var preferences = dto.Preferences is { AvoidBlueGrass: { } avoidBlueGrass }
-            ? new ContractPreferences(AvoidBlueGrass: avoidBlueGrass)
-            : ContractPreferences.Legacy;
+        ContractPreferences preferences;
+        if (dto.Preferences is { AvoidBlueGrass: { } avoidBlueGrass })
+        {
+            var idleTask = Enum.TryParse<IdleTaskKind>(dto.Preferences.IdleTask, ignoreCase: true, out var parsedIdleTask)
+                ? parsedIdleTask
+                : IdleTaskKind.None;
+            preferences = new ContractPreferences(AvoidBlueGrass: avoidBlueGrass, IdleTask: idleTask);
+        }
+        else
+        {
+            preferences = ContractPreferences.Legacy;
+        }
 
         return new Contract(
             Id: id,

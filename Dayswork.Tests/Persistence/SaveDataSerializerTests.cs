@@ -265,6 +265,50 @@ public sealed class SaveDataSerializerTests
         Assert.Contains("Skipping schema v3 contract", _warnings[0]);
     }
 
+    [Theory]
+    [InlineData(IdleTaskKind.None)]
+    [InlineData(IdleTaskKind.ManageMachines)]
+    public void Deserialize_IdleTaskPreference_RoundTrips(IdleTaskKind idleTask)
+    {
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract()
+            with { Preferences = new ContractPreferences(AvoidBlueGrass: true, IdleTask: idleTask) };
+
+        var result = _serializer.Deserialize(_serializer.Serialize(new[] { contract }, "0.2.0"));
+
+        var hydrated = Assert.Single(result);
+        Assert.Equal(idleTask, hydrated.Preferences.IdleTask);
+        Assert.True(hydrated.Preferences.AvoidBlueGrass);
+    }
+
+    [Fact]
+    public void Deserialize_MissingPreferences_DefaultsToLegacyIdleNone()
+    {
+        // Migration: a contract authored before the idle-task preference has no IdleTask field
+        // (and may have no Preferences object at all); it must default to None.
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
+        var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
+        ((JObject)payload["Contracts"]!.Single()!).Remove("Preferences");
+
+        var result = _serializer.Deserialize(payload.ToString(Formatting.None));
+
+        var hydrated = Assert.Single(result);
+        Assert.Equal(IdleTaskKind.None, hydrated.Preferences.IdleTask);
+    }
+
+    [Fact]
+    public void Deserialize_UnknownIdleTask_DefaultsToNone()
+    {
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract()
+            with { Preferences = new ContractPreferences(AvoidBlueGrass: true, IdleTask: IdleTaskKind.ManageMachines) };
+        var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
+        ((JObject)payload["Contracts"]!.Single()!["Preferences"]!)["IdleTask"] = "NotARealTask";
+
+        var result = _serializer.Deserialize(payload.ToString(Formatting.None));
+
+        var hydrated = Assert.Single(result);
+        Assert.Equal(IdleTaskKind.None, hydrated.Preferences.IdleTask);
+    }
+
     private static Contract ContractWithMachineScope()
     {
         var scope = new MachineWorkScope(new[]

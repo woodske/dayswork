@@ -205,6 +205,7 @@
     "notify.shopping_purchase_item": "Your farmhand bought {{count}} {{item}}(s) for {{gold}}g.",
     "notify.shopping_returning": "Your farmhand is returning to the farm with crop supplies.",
     "notify.shopping_deposited": "Your farmhand put {{count}} bought item(s) in the input chest.",
+    "notify.idle_waiting": "Your farmhand is waiting for {{count}} task(s) to finish.",
     "ui.summary.payment_timing_one_time": "The fixed contract price is charged now.",
     "ui.summary.payment_timing_recurring": "This fixed daily price starts on the next eligible contract day.",
     "ui.summary.payment_timing_recurring_edit": "The revised fixed daily price applies on the next eligible contract day.",
@@ -283,6 +284,10 @@
 
     "ui.preferences.title": "Preferences",
     "ui.preferences.avoid_blue_grass": "Avoid Blue Grass",
+    "ui.preferences.idle_task_label": "When work is done",
+    "ui.preferences.idle_task_description": "Repeats until energy runs out.",
+    "ui.preferences.idle_task.none": "None",
+    "ui.preferences.idle_task.manage_machines": "Manage machines",
 
     "ui.contract_list.title": "Active Contracts",
     "ui.contract_list.no_contracts": "No active contracts",

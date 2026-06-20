@@ -103,6 +103,14 @@ internal sealed class ShiftSession
     public string LastManagedSignature = string.Empty;
     public string ManagedBatchLocationName = "Farm";
 
+    // ── Idle loop (post-work "repeat a task until cap/exhaustion") ────────────
+    // True only while parked at the office door polling for ready machines (no travel, no action).
+    public bool IdleWaiting;
+    // Throttled-tick counter while parked, drives the periodic music-note re-emote.
+    public int IdleWaitTicks;
+    // Direction the worker faces while waiting (away from the office door); re-applied each emote.
+    public int IdleWaitFacing = 2;
+
     // ── Machine batch state ──────────────────────────────────────────────────
     public readonly Queue<MachineStep> MachineSteps = new();
     public MachineStep? CurrentMachineStep;

@@ -36,6 +36,17 @@ public sealed class ShiftPlanBuilder
         return result;
     }
 
+    /// <summary>
+    /// Just the machine batches (one per location with selected machines), in the same order the
+    /// full plan would place them. Used by the idle loop to re-run machine work after first-round
+    /// work is finished.
+    /// </summary>
+    public IReadOnlyList<WorkBatch> BuildMachineBatchPlan(WorkScopeSet scopes)
+    {
+        if (scopes is null) throw new ArgumentNullException(nameof(scopes));
+        return BuildMachineBatches(scopes);
+    }
+
     private static List<WorkBatch> BuildMachineBatches(WorkScopeSet scopes)
     {
         var batches = new List<WorkBatch>();

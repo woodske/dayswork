@@ -24,6 +24,9 @@ internal static class CropHudNotifier
     private static bool _shoppingDepartureShown;
     private static bool _shoppingWaitingShown;
     private static bool _shoppingReturningShown;
+    // Last "waiting for N tasks" count surfaced this shift; -1 = none yet. Re-announced only when
+    // the count changes, so the repeating idle loop doesn't spam an unchanged message every round.
+    private static int _idleWaitingLastCount = -1;
     private static readonly HashSet<string> _wontGrowShownCrops = new(StringComparer.Ordinal);
     private static readonly HashSet<string> _zoneSkippedNoSeedShownCrops = new(StringComparer.Ordinal);
     private static readonly HashSet<string> _zoneSkippedNoFertShownCrops = new(StringComparer.Ordinal);
@@ -43,6 +46,7 @@ internal static class CropHudNotifier
         _shoppingDepartureShown = false;
         _shoppingWaitingShown = false;
         _shoppingReturningShown = false;
+        _idleWaitingLastCount = -1;
         _wontGrowShownCrops.Clear();
         _zoneSkippedNoSeedShownCrops.Clear();
         _zoneSkippedNoFertShownCrops.Clear();
@@ -125,6 +129,20 @@ internal static class CropHudNotifier
                 I18nHelper.Get("notify.shopping_purchase_item",
                     new { count = outcome.BoughtQty, item = outcome.DisplayName, gold = outcome.SpentGold }),
                 HUDMessage.newQuest_type));
+    }
+
+    /// <summary>
+    /// "Waiting for N tasks to finish" while the idle loop parks at the office door. Re-announced
+    /// only when the busy-machine count changes, so a long wait doesn't repeat itself every round.
+    /// </summary>
+    internal static void IdleWaitingForMachines(int count)
+    {
+        if (count == _idleWaitingLastCount)
+            return;
+        _idleWaitingLastCount = count;
+        Game1.addHUDMessage(new HUDMessage(
+            I18nHelper.Get("notify.idle_waiting", new { count }),
+            HUDMessage.newQuest_type));
     }
 
     internal static void ShoppingReturning()

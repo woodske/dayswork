@@ -16,8 +16,18 @@ public sealed class ShiftContext
     public WorkerPacingProfile PacingProfile { get; }
     public ToolSnapshot ToolSnapshot { get; }
     public ShiftStateMachine StateMachine { get; } = new();
-    public IReadOnlyList<WorkBatch> Batches { get; }
+    public IReadOnlyList<WorkBatch> Batches { get; private set; }
     public int CurrentBatchIndex { get; set; }
+
+    /// <summary>
+    /// Swap in a fresh batch plan and rewind to its start. Used by the idle loop to re-run a
+    /// machine-only pass after the first round of work is done; the original plan is spent by then.
+    /// </summary>
+    public void ResetBatches(IReadOnlyList<WorkBatch> batches)
+    {
+        Batches = batches ?? Array.Empty<WorkBatch>();
+        CurrentBatchIndex = 0;
+    }
     public Queue<WorkItem> WorkList { get; }
     public ItemBuffer Buffer { get; } = new();
 

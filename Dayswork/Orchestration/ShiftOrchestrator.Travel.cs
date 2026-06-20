@@ -20,6 +20,7 @@ internal enum TravelPurpose
     ShoppingStep,    // managed shopping; sub-dispatched on the shopping phase
     ManagedReentry,  // back into the managed-crop field location after shopping
     ExitForDeposit,  // leave a building interior before beginning the deposit run
+    IdleReturn,      // back to the office door to park between idle-loop machine rounds
 }
 
 internal sealed partial class ShiftOrchestrator
@@ -106,6 +107,9 @@ internal sealed partial class ShiftOrchestrator
             case TravelPurpose.ExitForDeposit:
                 BeginDeposit();
                 break;
+            case TravelPurpose.IdleReturn:
+                OnIdleReturnArrived();
+                break;
         }
     }
 
@@ -116,6 +120,10 @@ internal sealed partial class ShiftOrchestrator
         {
             case TravelPurpose.WorkEntry:
                 SkipCurrentBatchAfterEntryFailure();
+                break;
+            case TravelPurpose.IdleReturn:
+                // Couldn't reach the door; park wherever we are and poll from there.
+                OnIdleReturnArrived();
                 break;
             case TravelPurpose.DepositEntry:
                 Session.Deposits.OnDepositEntryTravelFailed(Game1.getFarm());
