@@ -109,6 +109,7 @@ data or a decompile, and note where you confirmed it.
 - `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
 - `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); plan + status in `docs/plans/machine-management.md`.
 - `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
+- `docs/fences-and-gates.md` — `StardewValley.Fence` gate API (`isGate`, `gatePosition` 0/88, `health > 1f`, `isPassable`, `toggleGate`, `updateWhenCurrentLocation` auto-close rule) backing the worker's open-gates-while-pathing logic in `Dayswork/Worker/WorkerMovementDriver.cs`.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
 the office building/chest ids in `Dayswork/Integration/HiringBuilding.cs`, the animal-product

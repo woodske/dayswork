@@ -66,6 +66,8 @@ internal sealed class WorkerMovementDriver
             return;
         }
 
+        OpenGatesAlongRoute(controller.pathToEndPoint, location);
+
         foreach (var point in controller.pathToEndPoint)
             _waypoints.Enqueue(ToPixel(point));
 
@@ -235,9 +237,26 @@ internal sealed class WorkerMovementDriver
                 isFarmer: false, damagesFarmer: 0, glider: false,
                 character: null, pathfinding: true,
                 ignoreCharacterRequirement: true))
-            return false;
+            // A closed fence gate blocks isCollidingPosition, but the worker can open it
+            // (see OpenGatesAlongRoute), so route through it as if passable.
+            return HasOpenableGate(tile, location);
 
         return true;
+    }
+
+    private static bool HasOpenableGate(Point tile, GameLocation location) =>
+        location.objects.TryGetValue(new Vector2(tile.X, tile.Y), out var obj)
+        && obj is Fence fence && fence.isGate.Value && fence.health.Value > 1f;
+
+    private static void OpenGatesAlongRoute(IEnumerable<Point> tiles, GameLocation location)
+    {
+        foreach (var tile in tiles)
+        {
+            if (location.objects.TryGetValue(new Vector2(tile.X, tile.Y), out var obj)
+                && obj is Fence fence && fence.isGate.Value
+                && fence.health.Value > 1f && fence.gatePosition.Value < 88)
+                fence.toggleGate(open: true);
+        }
     }
 
     private bool TryEnqueueFallbackRoute(TileCoord destination, GameLocation location, FarmhandNpc worker)
@@ -247,6 +266,8 @@ internal sealed class WorkerMovementDriver
 
         if (!TryFindRoute(start, end, location, out var route))
             return false;
+
+        OpenGatesAlongRoute(route, location);
 
         foreach (var tile in route)
             _waypoints.Enqueue(ToPixel(tile));

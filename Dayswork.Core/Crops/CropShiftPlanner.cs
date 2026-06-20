@@ -55,12 +55,16 @@ public sealed class CropShiftPlanner
             ? zoneTiles.Where(tile => tile.CanAcceptSeed).ToList()
             : new List<TileState>();
 
+        var preFertilizedCount = choice.Crop.RequiresFertilizer
+            ? candidates.Count(tile => tile.HasFertilizer)
+            : 0;
         var supplyTargets = _supplyPlanner.CalculatePurchaseTargets(
             choice.Crop,
             candidates.Count,
             inventory,
             storePreferenceOverride ?? choice.StorePreference,
-            stockSnapshots);
+            stockSnapshots,
+            preFertilizedCount);
         var purchases = _storeResolver.ResolvePurchaseLines(supplyTargets, isFestivalDay, stockSnapshots);
         var projectedInventory = ProjectInventory(inventory, purchases);
         var supplyDependent = BuildSupplyDependentActions(fieldState.LocationName, candidates, choice.Crop, projectedInventory);
@@ -120,10 +124,11 @@ public sealed class CropShiftPlanner
             if (remainingSeeds <= 0)
                 break;
 
-            if (crop.RequiresFertilizer && remainingFertilizer <= 0)
-                break;
+            var tileNeedsFertilizer = crop.RequiresFertilizer && !tile.HasFertilizer;
+            if (tileNeedsFertilizer && remainingFertilizer <= 0)
+                continue; // tile needs fertilizing but inventory is spent; a later pre-fertilized tile may still be plantable
 
-            if (crop.RequiresFertilizer)
+            if (tileNeedsFertilizer)
             {
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Fertilize, crop.FertilizerItemId));
                 remainingFertilizer--;

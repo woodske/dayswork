@@ -71,11 +71,15 @@ public sealed class ShiftSupplyAggregator
                 continue;
             }
 
+            var preFertilized = crop.RequiresFertilizer
+                ? PlannedPlantableTileCounter.CountPreFertilized(field, assignment, choice)
+                : 0;
+
             var workingInventory = new SupplyInventory(working);
             var targets = _supplyPlanner.CalculatePurchaseTargets(
-                crop, planned, workingInventory, globalPreference, liveStock);
+                crop, planned, workingInventory, globalPreference, liveStock, preFertilized);
 
-            debugLog?.Invoke($"zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}): seed={crop.SeedItemId} fert={crop.FertilizerItemId} isViable={isViable} planned={planned} targets=[{string.Join(", ", targets.Select(t => $"{t.ItemId}:{t.Quantity}"))}]");
+            debugLog?.Invoke($"zone ({assignment.Zone.TopLeft.X},{assignment.Zone.TopLeft.Y})-({assignment.Zone.BottomRight.X},{assignment.Zone.BottomRight.Y}): seed={crop.SeedItemId} fert={crop.FertilizerItemId} isViable={isViable} planned={planned} preFertilized={preFertilized} targets=[{string.Join(", ", targets.Select(t => $"{t.ItemId}:{t.Quantity}"))}]");
 
             foreach (var target in targets)
             {
@@ -89,7 +93,7 @@ public sealed class ShiftSupplyAggregator
             // Consume what this zone will draw from the shared chest so later zones see the remainder.
             ConsumeFromWorking(working, crop.SeedItemId, planned);
             if (crop.RequiresFertilizer)
-                ConsumeFromWorking(working, crop.FertilizerItemId!, planned);
+                ConsumeFromWorking(working, crop.FertilizerItemId!, Math.Max(0, planned - preFertilized));
         }
 
         if (aggregated.Count == 0)

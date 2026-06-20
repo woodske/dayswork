@@ -2,7 +2,7 @@ namespace Dayswork.Core.Crops;
 
 public sealed class CropSupplyPlanner
 {
-    public int CompletableTiles(CropDescriptor crop, int viableTileCount, SupplyInventory inventory)
+    public int CompletableTiles(CropDescriptor crop, int viableTileCount, SupplyInventory inventory, int preFertilizedTileCount = 0)
     {
         var cappedTiles = Math.Max(0, viableTileCount);
         var availableSeeds = inventory.QuantityOf(crop.SeedItemId);
@@ -10,7 +10,13 @@ public sealed class CropSupplyPlanner
             return Math.Min(cappedTiles, availableSeeds);
 
         var availableFertilizer = inventory.QuantityOf(crop.FertilizerItemId!);
-        return Math.Min(cappedTiles, Math.Min(availableSeeds, availableFertilizer));
+        // Pre-fertilized tiles consume only a seed; remaining tiles need seed + fertilizer.
+        var preFertilized = Math.Min(preFertilizedTileCount, cappedTiles);
+        var fromPreFertilized = Math.Min(preFertilized, availableSeeds);
+        var seedsLeft = availableSeeds - fromPreFertilized;
+        var unfertilizedTiles = cappedTiles - preFertilized;
+        var fromUnfertilized = Math.Min(unfertilizedTiles, Math.Min(seedsLeft, availableFertilizer));
+        return fromPreFertilized + fromUnfertilized;
     }
 
     public IReadOnlyList<SupplyTarget> CalculatePurchaseTargets(
@@ -18,7 +24,8 @@ public sealed class CropSupplyPlanner
         int viableTileCount,
         SupplyInventory inventory,
         StorePreference storePreference,
-        IReadOnlyList<ShopStockSnapshot>? stockSnapshots = null)
+        IReadOnlyList<ShopStockSnapshot>? stockSnapshots = null,
+        int preFertilizedTileCount = 0)
     {
         if (storePreference == StorePreference.InputChestOnly)
             return Array.Empty<SupplyTarget>();
@@ -30,17 +37,19 @@ public sealed class CropSupplyPlanner
 
         if (crop.RequiresFertilizer)
         {
+            var unfertilizedTiles = Math.Max(0, targetTiles - preFertilizedTileCount);
             var fertilizerId = crop.FertilizerItemId!;
             var availableFertilizer = inventory.QuantityOf(fertilizerId);
-            var fertilizerDeficit = Math.Max(0, targetTiles - availableFertilizer);
+            var fertilizerDeficit = Math.Max(0, unfertilizedTiles - availableFertilizer);
             var storeFertilizer = QuantityInStores(fertilizerId, stockSnapshots);
 
-            if ((long)availableFertilizer + storeFertilizer <= 0)
+            // Bail only when there is genuinely no fertilizer capacity for tiles that need it.
+            if (unfertilizedTiles > 0 && (long)availableFertilizer + storeFertilizer <= 0)
                 return Array.Empty<SupplyTarget>();
 
             var maxSeedPurchasesWithFertilizer = (int)Math.Min(
                 (long)targetTiles,
-                Math.Max(0L, (long)availableFertilizer + storeFertilizer - availableSeeds));
+                Math.Max(0L, (long)preFertilizedTileCount + availableFertilizer + storeFertilizer - availableSeeds));
             seedDeficit = Math.Min(seedDeficit, maxSeedPurchasesWithFertilizer);
 
             if (fertilizerDeficit > 0)

@@ -38,6 +38,32 @@ public static class PlannedPlantableTileCounter
         return count;
     }
 
+    /// <summary>
+    /// Returns the count of tiles in the zone that are already fertilized and will be planted
+    /// this shift (empty tiles or harvest-and-replant tiles). Used to avoid purchasing fertilizer
+    /// for ground that is already prepared.
+    /// </summary>
+    public static int CountPreFertilized(
+        FieldState field,
+        CropZoneAssignment assignment,
+        SeasonCropChoice choice)
+    {
+        var willReplant = choice.Crop.RegrowDays is null;
+        var count = 0;
+        foreach (var tile in field.Tiles)
+        {
+            if (!Contains(assignment.Zone, tile.Tile))
+                continue;
+
+            if (!tile.HasCrop && tile.HasFertilizer)
+                count++;
+            else if (tile.ReadyToHarvest && willReplant && tile.HasFertilizer)
+                count++;
+        }
+
+        return count;
+    }
+
     private static bool Contains(Zone zone, TileCoord tile) =>
         tile.X >= zone.TopLeft.X
         && tile.X <= zone.BottomRight.X
