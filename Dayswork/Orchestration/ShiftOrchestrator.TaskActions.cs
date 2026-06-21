@@ -218,6 +218,7 @@ internal sealed partial class ShiftOrchestrator
             TaskKind.WaterCrops => InvokeWater(tile, location),
             TaskKind.HarvestCrops => InvokeHarvest(tile, location),
             TaskKind.CollectFruit => InvokeCollectFruit(tile, location),
+            TaskKind.HarvestCave => InvokeHarvestCave(tile, location),
             TaskKind.CollectAnimalProducts => InvokeCollectAnimalProduct(tile, location),
             TaskKind.FeedAnimals => InvokeFeedAnimal(tile, location),
             TaskKind.ClearWeeds => InvokeClearWeed(tile, location),
@@ -337,6 +338,39 @@ internal sealed partial class ShiftOrchestrator
         // Queue a delayed sweep (same mechanism trees use for falling wood) to catch it.
         if (hadFruit)
             QueueDelayedDebrisSweep(loc, tileVec, before, Session.PendingTask, Session.PendingOutputProvenance);
+        return new LaborBeatOutcome(true, true);
+    }
+
+    private LaborBeatOutcome InvokeHarvestCave(TileCoord tile, GameLocation loc)
+    {
+        var tileVec = new Vector2(tile.X, tile.Y);
+        if (!loc.objects.TryGetValue(tileVec, out var obj))
+            return new LaborBeatOutcome(true, true);
+
+        // Bat cave: loose spawned fruit — remove from location and buffer directly.
+        if (obj.IsSpawnedObject)
+        {
+            loc.playSound("harvest", tileVec);
+            Session.Ctx.Buffer.Add(obj.QualifiedItemId, Math.Max(1, obj.Stack), TaskKind.HarvestCave,
+                Session.PendingOutputProvenance, quality: (obj as SObject)?.Quality ?? 0);
+            loc.removeObject(tileVec, false);
+            return new LaborBeatOutcome(true, true);
+        }
+
+        // Mushroom cave: ready mushroom box — harvest heldObject and reset machine state.
+        if (obj.bigCraftable.Value && obj.readyForHarvest.Value && obj.heldObject.Value is { } mushroom &&
+            string.Equals(obj.QualifiedItemId, "(BC)128", StringComparison.Ordinal))
+        {
+            loc.playSound("coin", tileVec);
+            Session.Ctx.Buffer.Add(mushroom.QualifiedItemId, Math.Max(1, mushroom.Stack), TaskKind.HarvestCave,
+                Session.PendingOutputProvenance, quality: (mushroom as SObject)?.Quality ?? 0);
+            obj.heldObject.Value = null;
+            obj.readyForHarvest.Value = false;
+            obj.showNextIndex.Value = false;
+            obj.ResetParentSheetIndex();
+            return new LaborBeatOutcome(true, true);
+        }
+
         return new LaborBeatOutcome(true, true);
     }
 
@@ -546,6 +580,10 @@ internal sealed partial class ShiftOrchestrator
             TaskKind.CollectAnimalProducts =>
                 !loc.objects.TryGetValue(tileVec, out var product) ||
                 !WorkAreaScanner.IsAnimalProductForageObject(product),
+
+            TaskKind.HarvestCave =>
+                !loc.objects.TryGetValue(tileVec, out var caveItem) ||
+                !WorkAreaScanner.IsCaveHarvestReady(caveItem),
 
             TaskKind.FeedAnimals => true,
 

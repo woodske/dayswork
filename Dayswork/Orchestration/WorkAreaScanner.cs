@@ -243,6 +243,11 @@ internal sealed class WorkAreaScanner
 
         if (loc.objects.TryGetValue(tileVec, out var obj))
         {
+            if (enabled.Contains(TaskKind.HarvestCave) &&
+                string.Equals(loc.Name, "FarmCave", StringComparison.Ordinal) &&
+                IsCaveHarvestReady(obj))
+                return TaskKind.HarvestCave;
+
             if (enabled.Contains(TaskKind.CollectAnimalProducts) && IsAnimalProductForageObject(obj))
                 return TaskKind.CollectAnimalProducts;
 
@@ -311,6 +316,17 @@ internal sealed class WorkAreaScanner
                (!bigCraftable && AnimalProductCategories.Contains(category));
     }
 
+    /// <summary>
+    /// True when an object in FarmCave is ready to harvest. Mirrors FarmCave.UpdateReadyFlag():
+    /// bat-cave fruit (IsSpawnedObject) or a ready mushroom box (BC)128 with heldObject.
+    /// </summary>
+    public static bool IsCaveHarvestReady(StardewValley.Object obj) =>
+        obj.IsSpawnedObject
+        || (obj.bigCraftable.Value
+            && obj.readyForHarvest.Value
+            && obj.heldObject.Value is not null
+            && string.Equals(obj.QualifiedItemId, "(BC)128", StringComparison.Ordinal));
+
     public static bool IsTrellisCrop(Vector2 tileVec, GameLocation loc)
     {
         if (!loc.terrainFeatures.TryGetValue(tileVec, out var tf) || tf is not HoeDirt dirt)
@@ -353,6 +369,7 @@ internal sealed class WorkAreaScanner
 
     public static bool RequiresAdjacentNavigation(TaskKind task) =>
         task is TaskKind.CollectFruit
+             or TaskKind.HarvestCave
              or TaskKind.CollectAnimalProducts
              or TaskKind.CutTrees
              or TaskKind.ClearRocks

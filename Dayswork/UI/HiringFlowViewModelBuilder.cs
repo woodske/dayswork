@@ -57,6 +57,9 @@ internal static class HiringFlowViewModelBuilder
     // otherwise it reports which scope is missing.
     private static ServiceContributionState DetermineMissingScopeState(ContractDraft draft, TaskKind task)
     {
+        if (TaskKindSets.IsCaveService(task))
+            return ServiceContributionState.Charged;
+
         if (TaskKindSets.IsAnimalService(task))
             return draft.AnimalBuildings.Count > 0
                 ? ServiceContributionState.Charged

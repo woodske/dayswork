@@ -8,4 +8,5 @@ public enum OutputScopeFamily
     Greenhouse,
     ManagedCrop,
     Machine,
+    Cave,
 }

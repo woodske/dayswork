@@ -245,6 +245,14 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
+        if (batch.Kind == BatchKind.FarmCave)
+        {
+            // TileWork was pre-scanned at shift start; queue it and begin working.
+            QueueBatchWork(batch, location);
+            StartNextAnimalOrTileOrAdvance();
+            return;
+        }
+
         IReadOnlyList<WorkItem> tileWork;
         IReadOnlyList<AnimalWorkItem> animalWork;
         var batchTasks = batch.Tasks.ToHashSet();

@@ -161,6 +161,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             TaskKind.WaterCrops => WorkActionKind.WaterTile,
             TaskKind.HarvestCrops => WorkActionKind.HarvestCrop,
             TaskKind.CollectFruit => WorkActionKind.HarvestFruit,
+            TaskKind.HarvestCave => WorkActionKind.HarvestFruit,
             TaskKind.FeedAnimals => WorkActionKind.FeedAnimal,
             TaskKind.PetAnimals => WorkActionKind.PetAnimal,
             TaskKind.CollectAnimalProducts => WorkActionKind.CollectAnimalProduct,
@@ -246,7 +247,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var batches = BuildInitialBatches(contract, workScopes, farm, snapshot, farmExitTile, priorityOrderer);
 
         if (batches.Count == 0 ||
-            batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing or BatchKind.FarmForage &&
+            batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing or BatchKind.FarmForage or BatchKind.FarmCave &&
                                  batch.TileWork.Count == 0 &&
                                  batch.AnimalWork.Count == 0 &&
                                  !batch.FeedBuilding))
@@ -434,6 +435,22 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                     break;
                 }
 
+                case BatchKind.FarmCave:
+                {
+                    var farmCave = Game1.getLocationFromName("FarmCave");
+                    var tileWork = farmCave is not null
+                        ? _workAreaScanner.ScanWholeLocation(
+                            farmCave,
+                            batch.Tasks.ToHashSet(),
+                            snapshot,
+                            farmExitTile,
+                            contract.Preferences,
+                            OutputScopeProvenance.Cave())
+                        : (IReadOnlyList<WorkItem>)Array.Empty<WorkItem>();
+                    batches.Add(batch with { TileWork = tileWork });
+                    break;
+                }
+
                 default:
                     throw new ArgumentOutOfRangeException(nameof(batch.Kind), batch.Kind, null);
             }
@@ -589,6 +606,28 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
+        if (batch.Kind == BatchKind.FarmCave)
+        {
+            if (batch.TileWork.Count == 0)
+            {
+                Session.Ctx.CurrentBatchIndex++;
+                BeginCurrentBatch();
+                return;
+            }
+
+            var farmCave = Game1.getLocationFromName("FarmCave");
+            if (farmCave is null || !TryBuildCaveEntryPlan(Game1.getFarm(), farmCave, out var cavePlan))
+            {
+                ModEntry.ModMonitor.Log("[Dayswork] FarmCave warp not found — skipping cave batch.", DevLog.WarnLevel);
+                Session.Ctx.CurrentBatchIndex++;
+                BeginCurrentBatch();
+                return;
+            }
+
+            StartTravel(cavePlan, TravelPurpose.WorkEntry);
+            return;
+        }
+
         if (BatchRequiresInteriorEntry(batch))
         {
             if (TryBuildBuildingEntryPlan(batch.LocationName, TravelFailurePolicy.ReportFailure, out var plan))
@@ -656,6 +695,21 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
 
         var batch = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex];
+        if (batch.Kind == BatchKind.FarmCave)
+        {
+            Session.Ctx.CurrentBatchIndex++;
+            if (Session.CurrentLocation is { } cave &&
+                string.Equals(cave.Name, "FarmCave", StringComparison.Ordinal) &&
+                TryBuildCaveExitPlan(cave, Game1.getFarm(), out var caveExitPlan))
+            {
+                StartTravel(caveExitPlan, TravelPurpose.WorkExit);
+                return;
+            }
+
+            BeginCurrentBatch();
+            return;
+        }
+
         if (IsExpansionGreenhouseBatch(batch))
         {
             var currentName = (Session.CurrentLocation ?? Session.Worker.currentLocation)?.NameOrUniqueName

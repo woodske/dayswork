@@ -26,6 +26,10 @@ public enum BatchKind
     // finished output and reload empty machines. The machine refs/groups are carried out-of-band
     // by the runtime (Tasks empty), like managed crops.
     Machines,
+
+    // Harvest Cave: visit the FarmCave location and collect bat fruit or mushroom-box output.
+    // No scope selection; the cave is always a single static location.
+    FarmCave,
 }
 
 public enum AnimalProductKind

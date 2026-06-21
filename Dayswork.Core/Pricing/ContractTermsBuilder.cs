@@ -125,6 +125,7 @@ public sealed class ContractTermsBuilder
         var hasGreenhousePair = scopes.GreenhouseWork is not null && enabledTasks.Any(TaskKindSets.IsGreenhouseService);
         var hasManagedCrops = scopes.ManagedCrops is not null;
         var hasMachines = scopes.Machines is not null;
-        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair || hasManagedCrops || hasMachines;
+        var hasCave = enabledTasks.Contains(TaskKind.HarvestCave);
+        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair || hasManagedCrops || hasMachines || hasCave;
     }
 }

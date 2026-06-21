@@ -18,6 +18,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     {
         TaskKind.HarvestCrops,
         TaskKind.CollectFruit,
+        TaskKind.HarvestCave,
         TaskKind.CollectAnimalProducts,
         TaskKind.CutTrees,
         TaskKind.ClearRocks,
@@ -28,6 +29,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
     {
         TaskKind.HarvestCrops,
         TaskKind.CollectFruit,
+        TaskKind.HarvestCave,
         TaskKind.CollectAnimalProducts,
     };
 

@@ -42,6 +42,8 @@ public static class TaskKindSets
         TaskKind.CollectFruit,
     };
 
+    public static bool IsCaveService(TaskKind kind) => kind == TaskKind.HarvestCave;
+
     public static bool IsOutdoorService(TaskKind kind) => kind switch
     {
         TaskKind.WaterCrops => true,
@@ -108,6 +110,7 @@ public static class TaskKindSets
         TaskKind.WaterCrops => TaskCategory.Crops,
         TaskKind.HarvestCrops => TaskCategory.Crops,
         TaskKind.CollectFruit => TaskCategory.Crops,
+        TaskKind.HarvestCave => TaskCategory.Crops,
         TaskKind.CutTrees => TaskCategory.Fieldwork,
         TaskKind.ClearRocks => TaskCategory.Fieldwork,
         TaskKind.ClearWeeds => TaskCategory.Fieldwork,

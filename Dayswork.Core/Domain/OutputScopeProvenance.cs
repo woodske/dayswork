@@ -18,4 +18,7 @@ public sealed record OutputScopeProvenance(OutputScopeFamily Family, string Scop
 
     public static OutputScopeProvenance Machine(string groupId) =>
         new(OutputScopeFamily.Machine, groupId);
+
+    public static OutputScopeProvenance Cave() =>
+        new(OutputScopeFamily.Cave, "FarmCave");
 }

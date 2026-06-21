@@ -17,6 +17,8 @@ internal sealed class TaskSelectionMenu : IClickableMenu
     private readonly Action<ContractDraft> _onBack;
 
     private readonly List<ClickableComponent> _toggleRows = new();
+    // Tasks visible in this session; excludes locked tasks (e.g. HarvestCave before cave unlock).
+    private TaskKind[] _availableTasks = Array.Empty<TaskKind>();
     private Rectangle _taskListRect;
     private int _taskScrollIndex;
     private int _maxTaskScrollIndex;
@@ -48,18 +50,22 @@ internal sealed class TaskSelectionMenu : IClickableMenu
     {
         _toggleRows.Clear();
 
+        _availableTasks = TaskPresentation.TaskOrder
+            .Where(task => task != TaskKind.HarvestCave || Game1.MasterPlayer.caveChoice.Value != 0)
+            .ToArray();
+
         var rowX = xPositionOnScreen + 48;
         var rowW = width - 96 - MenuScrollBar.ReservedWidth;
         var startY = yPositionOnScreen + 75;
         var btnY = yPositionOnScreen + height - 70;
         _taskListRect = new Rectangle(rowX, startY, rowW, btnY - startY - 20);
-        _maxTaskScrollIndex = Math.Max(0, TaskPresentation.TaskOrder.Length - GetVisibleTaskRowCount());
+        _maxTaskScrollIndex = Math.Max(0, _availableTasks.Length - GetVisibleTaskRowCount());
         _taskScrollIndex = Math.Clamp(_taskScrollIndex, 0, _maxTaskScrollIndex);
         startY -= _taskScrollIndex * RowHeight;
 
-        for (var i = 0; i < TaskPresentation.TaskOrder.Length; i++)
+        for (var i = 0; i < _availableTasks.Length; i++)
         {
-            var task = TaskPresentation.TaskOrder[i];
+            var task = _availableTasks[i];
             _toggleRows.Add(new ClickableComponent(
                 new Rectangle(rowX, startY + i * RowHeight, rowW, RowHeight - 4),
                 name: task.ToString(),
@@ -67,7 +73,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
             {
                 myID = 100 + i,
                 upNeighborID = i > 0 ? 99 + i : -1,
-                downNeighborID = i < TaskPresentation.TaskOrder.Length - 1 ? 101 + i : 901,
+                downNeighborID = i < _availableTasks.Length - 1 ? 101 + i : 901,
             });
         }
 
@@ -76,36 +82,36 @@ internal sealed class TaskSelectionMenu : IClickableMenu
             "Back", I18nHelper.Get("ui.common.back_btn"))
         {
             myID = 901,
-            upNeighborID = 109,
+            upNeighborID = _availableTasks.Length > 0 ? 100 + _availableTasks.Length - 1 : -1,
         };
     }
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
-        if (MenuScrollBar.TryBeginDrag(_taskListRect, GetVisibleTaskRowCount(), TaskPresentation.TaskOrder.Length, _taskScrollIndex, x, y, out _taskScrollDragOffset))
+        if (MenuScrollBar.TryBeginDrag(_taskListRect, GetVisibleTaskRowCount(), _availableTasks.Length, _taskScrollIndex, x, y, out _taskScrollDragOffset))
         {
             _draggingTaskScrollBar = true;
             return;
         }
 
-        if (MenuScrollBar.UpArrowContains(_taskListRect, TaskPresentation.TaskOrder.Length, GetVisibleTaskRowCount(), x, y))
+        if (MenuScrollBar.UpArrowContains(_taskListRect, _availableTasks.Length, GetVisibleTaskRowCount(), x, y))
         {
             ScrollTasks(-1);
             return;
         }
 
-        if (MenuScrollBar.DownArrowContains(_taskListRect, TaskPresentation.TaskOrder.Length, GetVisibleTaskRowCount(), x, y))
+        if (MenuScrollBar.DownArrowContains(_taskListRect, _availableTasks.Length, GetVisibleTaskRowCount(), x, y))
         {
             ScrollTasks(1);
             return;
         }
 
-        if (MenuScrollBar.TrackContains(_taskListRect, GetVisibleTaskRowCount(), TaskPresentation.TaskOrder.Length, x, y))
+        if (MenuScrollBar.TrackContains(_taskListRect, GetVisibleTaskRowCount(), _availableTasks.Length, x, y))
         {
             _taskScrollIndex = MenuScrollBar.GetTrackClickScrollIndex(
                 _taskListRect,
                 GetVisibleTaskRowCount(),
-                TaskPresentation.TaskOrder.Length,
+                _availableTasks.Length,
                 _taskScrollIndex,
                 y);
             BuildComponents();
@@ -135,7 +141,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
         var next = MenuScrollBar.GetDragScrollIndex(
             _taskListRect,
             GetVisibleTaskRowCount(),
-            TaskPresentation.TaskOrder.Length,
+            _availableTasks.Length,
             _taskScrollDragOffset,
             y);
 
@@ -182,7 +188,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
 
     public override void setCurrentlySnappedComponentTo(int id)
     {
-        if (id is >= 100 and < 100 + 10)
+        if (id is >= 100 && id < 100 + _availableTasks.Length)
         {
             var taskIndex = id - 100;
             EnsureTaskVisible(taskIndex);
@@ -202,7 +208,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
             if (!IsTaskRowVisible(row) || !row.bounds.Contains(x, y))
                 continue;
 
-            var task = TaskPresentation.TaskOrder[i];
+            var task = _availableTasks[i];
             _hoverText = GetRowStateText(task);
             break;
         }
@@ -225,7 +231,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
             if (!IsTaskRowVisible(row))
                 continue;
 
-            var enabled = _draft.EnabledTasks.Contains(TaskPresentation.TaskOrder[i]);
+            var enabled = _draft.EnabledTasks.Contains(_availableTasks[i]);
 
             drawTextureBox(b, row.bounds.X, row.bounds.Y, row.bounds.Width, row.bounds.Height, Color.White);
 
@@ -243,7 +249,7 @@ internal sealed class TaskSelectionMenu : IClickableMenu
                 Game1.textColor);
         }
 
-        MenuScrollBar.Draw(b, _taskListRect, GetVisibleTaskRowCount(), TaskPresentation.TaskOrder.Length, _taskScrollIndex);
+        MenuScrollBar.Draw(b, _taskListRect, GetVisibleTaskRowCount(), _availableTasks.Length, _taskScrollIndex);
 
         DrawButton(b, _backBtn, enabled: true);
 

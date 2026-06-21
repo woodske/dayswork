@@ -141,6 +141,10 @@ public sealed class ShiftPlanBuilder
         if (scopes.OutdoorWork is not null && outdoorCropTasks.Count > 0)
             batches.Add(CreateSkeleton("Farm", BatchKind.OutdoorCrops, outdoorCropTasks, feedBuilding: false));
 
+        if (enabledTasks.Contains(TaskKind.HarvestCave))
+            batches.Add(CreateSkeleton("FarmCave", BatchKind.FarmCave,
+                new[] { TaskKind.HarvestCave }, feedBuilding: false));
+
         return batches;
     }
 

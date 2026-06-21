@@ -232,6 +232,91 @@ internal sealed partial class ShiftOrchestrator
         }
     }
 
+    private static bool TryBuildCaveEntryPlan(Farm farm, GameLocation farmCave, out TravelPlan plan)
+    {
+        plan = null!;
+
+        // Find the warp on the farm that leads into FarmCave.
+        var warp = farm.warps.FirstOrDefault(
+            w => string.Equals(w.TargetName, "FarmCave", StringComparison.OrdinalIgnoreCase));
+        if (warp is null)
+            return false;
+
+        // Walk to a passable tile near the warp on the farm, then warp through.
+        var approachTile = ResolveCaveWarpApproach(warp.X, warp.Y, farm);
+        var arrivalTile = new TileCoord(warp.TargetX, warp.TargetY);
+
+        plan = new TravelPlan(
+            new[] { new TravelLeg(farm, approachTile, farmCave, arrivalTile) },
+            TravelFailurePolicy.ReportFailure);
+        return true;
+    }
+
+    private static bool TryBuildCaveExitPlan(GameLocation farmCave, Farm farm, out TravelPlan plan)
+    {
+        plan = null!;
+
+        // Find the warp in FarmCave that leads back to the farm.
+        var warp = farmCave.warps.FirstOrDefault(
+            w => string.Equals(w.TargetName, "Farm", StringComparison.OrdinalIgnoreCase));
+        if (warp is null)
+            return false;
+
+        var approachTile = ResolveCaveWarpApproach(warp.X, warp.Y, farmCave);
+
+        // Anchor the farm arrival to the farm's own warp-to-FarmCave tile — the same tile
+        // the farmhand approached during entry, which is proven passable. The FarmCave exit
+        // warp's TargetX/Y lands one tile away and may be blocked by fences or decorations.
+        var farmEntryWarp = farm.warps.FirstOrDefault(
+            w => string.Equals(w.TargetName, "FarmCave", StringComparison.OrdinalIgnoreCase));
+        var arrivalTile = farmEntryWarp is not null
+            ? ResolveCaveWarpApproach(farmEntryWarp.X, farmEntryWarp.Y, farm)
+            : ResolveCaveWarpApproach(warp.TargetX, warp.TargetY, farm);
+
+        plan = new TravelPlan(
+            new[] { new TravelLeg(farmCave, approachTile, farm, arrivalTile) },
+            TravelFailurePolicy.WarpToDestination);
+        return true;
+    }
+
+    // Find a passable approach tile near a warp tile within a location.
+    // Tries the warp tile itself, then its four cardinal neighbours.
+    private static TileCoord ResolveCaveWarpApproach(int warpX, int warpY, GameLocation loc)
+    {
+        var mapLayer = loc.Map.Layers[0];
+        int w = mapLayer.LayerWidth, h = mapLayer.LayerHeight;
+
+        bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < w && y < h;
+        bool Passable(int x, int y) =>
+            InBounds(x, y) &&
+            WorkerMovementDriver.IsTilePassableForWorker(new Point(x, y), loc);
+
+        var cx = Math.Clamp(warpX, 0, w - 1);
+        var cy = Math.Clamp(warpY, 0, h - 1);
+
+        // The tile one step inside the map from the warp edge is the natural approach.
+        if (warpX >= w)   cx = w - 1;
+        if (warpX < 0)    cx = 0;
+        if (warpY >= h)   cy = h - 1;
+        if (warpY < 0)    cy = 0;
+
+        if (Passable(cx, cy)) return new TileCoord(cx, cy);
+
+        // Check four cardinal neighbours.
+        foreach (var (dx, dy) in new[] { (0,-1), (0,1), (-1,0), (1,0) })
+        {
+            var nx = cx + dx;
+            var ny = cy + dy;
+            if (Passable(nx, ny)) return new TileCoord(nx, ny);
+        }
+
+        // Fall back to the clamped tile even if it's impassable — navigation will recover.
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork] Cave warp approach: no passable tile near ({warpX},{warpY}) in {loc.Name} — using ({cx},{cy}).",
+            DevLog.WarnLevel);
+        return new TileCoord(cx, cy);
+    }
+
     private bool IsExpansionGreenhouseBatch(WorkBatch batch) =>
         batch.Kind == BatchKind.Greenhouse &&
         ModEntry.ExpansionCompat is { } compat &&

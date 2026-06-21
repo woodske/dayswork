@@ -5,6 +5,7 @@ public enum TaskKind
     WaterCrops,
     HarvestCrops,
     CollectFruit,
+    HarvestCave,
     FeedAnimals,
     PetAnimals,
     CollectAnimalProducts,
