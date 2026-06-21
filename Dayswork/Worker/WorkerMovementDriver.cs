@@ -173,6 +173,7 @@ internal sealed class WorkerMovementDriver
 
             _worker.Position = target;
             _waypoints.Dequeue();
+            TryCloseGate(target);
         }
 
         HasArrived = true;
@@ -200,6 +201,7 @@ internal sealed class WorkerMovementDriver
         {
             _worker.Position = target;
             _waypoints.Dequeue();
+            TryCloseGate(target);
         }
     }
 
@@ -242,6 +244,17 @@ internal sealed class WorkerMovementDriver
             return HasOpenableGate(tile, location);
 
         return true;
+    }
+
+    private void TryCloseGate(Vector2 pixelPos)
+    {
+        var location = _worker?.currentLocation;
+        if (location is null) return;
+        var tile = new Vector2(pixelPos.X / TileSize, pixelPos.Y / TileSize);
+        if (location.objects.TryGetValue(tile, out var obj)
+            && obj is Fence fence && fence.isGate.Value
+            && fence.health.Value > 1f && fence.gatePosition.Value >= 88)
+            fence.toggleGate(open: false);
     }
 
     private static bool HasOpenableGate(Point tile, GameLocation location) =>
