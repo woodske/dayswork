@@ -17,6 +17,7 @@ internal sealed class ContractListMenu : IClickableMenu
 {
     private const int MenuWidth    = 800;
     private const int BtnWidth     = 112; // text + 32px padding (16px each side for box border)
+    private const int UpgradesBtnWidth = 140;
     private const int BtnHeight    = 48;
     private const int HeaderHeight = 70;
     private const int FooterHeight = 28;
@@ -44,6 +45,7 @@ internal sealed class ContractListMenu : IClickableMenu
     private readonly string _resumeLabel;
     private readonly string _cancelLabel;
     private readonly string _editLabel;
+    private readonly string _upgradesLabel;
     private readonly string _pausedLabel;
     private readonly string _activeLabel;
     private readonly string _oneTimeLabel;
@@ -67,6 +69,8 @@ internal sealed class ContractListMenu : IClickableMenu
         ClickableComponent CancelBtn,
         ClickableComponent EditBtn);
 
+    private ClickableComponent? _upgradesBtn;
+
     internal ContractListMenu(ContractStore store, IModHelper helper)
         : base(0, 0, MenuWidth, ContractMenuLayout.Height)
     {
@@ -78,6 +82,7 @@ internal sealed class ContractListMenu : IClickableMenu
         _resumeLabel     = I18nHelper.Get("ui.contract_list.resume");
         _cancelLabel     = I18nHelper.Get("ui.contract_list.cancel");
         _editLabel       = I18nHelper.Get("ui.contract_list.edit");
+        _upgradesLabel   = I18nHelper.Get("ui.contract_list.upgrades");
         _pausedLabel     = I18nHelper.Get("ui.contract_list.paused_label");
         _activeLabel     = I18nHelper.Get("ui.contract_list.active_label");
         _oneTimeLabel    = I18nHelper.Get("ui.contract_list.schedule_one_time");
@@ -100,6 +105,15 @@ internal sealed class ContractListMenu : IClickableMenu
             yPositionOnScreen + HeaderHeight,
             width - BodySidePadding * 2 - MenuScrollBar.ReservedWidth,
             height - HeaderHeight - FooterHeight);
+
+        _upgradesBtn = new ClickableComponent(
+            new Rectangle(
+                xPositionOnScreen + width - UpgradesBtnWidth - 24,
+                yPositionOnScreen + 16,
+                UpgradesBtnWidth,
+                BtnHeight),
+            "Upgrades",
+            _upgradesLabel);
 
         var contracts = _store.List()
             .Where(c => c.Status == ContractStatus.Active || c.Status == ContractStatus.Paused)
@@ -275,6 +289,12 @@ internal sealed class ContractListMenu : IClickableMenu
                 return;
             }
         }
+
+        if (_upgradesBtn?.bounds.Contains(x, y) == true)
+        {
+            Game1.playSound("smallSelect");
+            ModEntry.Coordinator.ShowUpgradesFromManage();
+        }
     }
 
     public override void leftClickHeld(int x, int y)
@@ -343,6 +363,8 @@ internal sealed class ContractListMenu : IClickableMenu
     {
         allClickableComponents ??= new List<ClickableComponent>();
         allClickableComponents.Clear();
+        if (_upgradesBtn is not null)
+            allClickableComponents.Add(_upgradesBtn);
         foreach (var row in _visibleRows)
         {
             allClickableComponents.Add(row.PauseResumeBtn);
@@ -379,6 +401,9 @@ internal sealed class ContractListMenu : IClickableMenu
             b, _titleText, Game1.dialogueFont,
             new Vector2(xPositionOnScreen + 24, yPositionOnScreen + 16),
             Game1.textColor);
+
+        if (_upgradesBtn is not null)
+            DrawSmallButton(b, _upgradesBtn);
 
         if (_allRows.Count == 0)
         {

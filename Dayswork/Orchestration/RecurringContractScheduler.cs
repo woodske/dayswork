@@ -2,6 +2,7 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
+using Dayswork.Core.Upgrades;
 using Dayswork.Guards;
 using Dayswork.Integration;
 using StardewModdingAPI;
@@ -21,6 +22,7 @@ internal sealed class RecurringContractScheduler
     private readonly CalendarHandlers _calendar;
     private readonly RecurringDayStartDecisionEngine _decisionEngine;
     private readonly ModConfigManager _configManager;
+    private readonly FarmhandUpgradeStore _upgradeStore;
     private readonly IShiftOutcomeDispatcher _shiftOutcomes;
 
     public RecurringContractScheduler(
@@ -29,6 +31,7 @@ internal sealed class RecurringContractScheduler
         CalendarHandlers calendar,
         RecurringDayStartDecisionEngine decisionEngine,
         ModConfigManager configManager,
+        FarmhandUpgradeStore upgradeStore,
         IShiftOutcomeDispatcher shiftOutcomes)
     {
         _store = store;
@@ -36,6 +39,7 @@ internal sealed class RecurringContractScheduler
         _calendar = calendar;
         _decisionEngine = decisionEngine;
         _configManager = configManager;
+        _upgradeStore = upgradeStore;
         _shiftOutcomes = shiftOutcomes;
     }
 
@@ -47,7 +51,7 @@ internal sealed class RecurringContractScheduler
 
         var today = CurrentGameDate();
         var contractsForToday = _store.ListActiveForDate(today.Day, today.Season, today.Year);
-        var config = _configManager.CurrentSnapshot;
+        var config = FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, _upgradeStore.State);
         var holidaySkip = _calendar.IsFestivalToday() && !config.WorkOnHolidays;
 
         foreach (var contract in contractsForToday)

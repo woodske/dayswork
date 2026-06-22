@@ -32,6 +32,7 @@ internal sealed class HubMenu : LayoutMenu
         Action<ContractDraft> onWorkScope,
         Action<ContractDraft> onManageCrops,
         Action<ContractDraft> onManageMachines,
+        Action<ContractDraft> onUpgrades,
         Action<ContractDraft> onOutput,
         Action<ContractDraft> onPriority,
         Action<ContractDraft> onPreferences,
@@ -50,6 +51,7 @@ internal sealed class HubMenu : LayoutMenu
         _items.Add(new NavItem("ui.hub.work_scope", onWorkScope, WorkScopeStatus));
         _items.Add(new NavItem("ui.hub.manage_crops", onManageCrops, ManageCropsStatus));
         _items.Add(new NavItem("ui.hub.manage_machines", onManageMachines, ManageMachinesStatus));
+        _items.Add(new NavItem("ui.hub.upgrades", onUpgrades, () => HubStatus.None));
         _items.Add(new NavItem("ui.hub.output_destination", onOutput, OutputStatus));
         _items.Add(new NavItem("ui.hub.task_priority", onPriority, () => HubStatus.None));
         _items.Add(new NavItem("ui.hub.preferences", onPreferences, () => HubStatus.None));

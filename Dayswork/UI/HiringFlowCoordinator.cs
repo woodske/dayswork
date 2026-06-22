@@ -4,6 +4,7 @@ using Dayswork.Core.Domain;
 using Dayswork.Core.Machines;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
+using Dayswork.Core.Upgrades;
 using Dayswork.Integration;
 using Dayswork.Orchestration;
 using Microsoft.Xna.Framework;
@@ -21,6 +22,7 @@ internal sealed class HiringFlowCoordinator
     private readonly ContractTermsBuilder _termsBuilder;
     private readonly ModConfigManager _configManager;
     private readonly ContractStore _contractStore;
+    private readonly FarmhandUpgradeStore _upgradeStore;
     private readonly ChestResolver _chestResolver;
     private readonly IModHelper _helper;
 
@@ -32,12 +34,14 @@ internal sealed class HiringFlowCoordinator
         ContractTermsBuilder termsBuilder,
         ModConfigManager configManager,
         ContractStore contractStore,
+        FarmhandUpgradeStore upgradeStore,
         ChestResolver chestResolver,
         IModHelper helper)
     {
         _termsBuilder = termsBuilder;
         _configManager = configManager;
         _contractStore = contractStore;
+        _upgradeStore = upgradeStore;
         _chestResolver = chestResolver;
         _helper = helper;
     }
@@ -90,6 +94,7 @@ internal sealed class HiringFlowCoordinator
             onWorkScope: ShowZoneAndChest,
             onManageCrops: ShowManageCrops,
             onManageMachines: ShowManageMachines,
+            onUpgrades: ShowUpgrades,
             onOutput: ShowOutputDestinations,
             onPriority: ShowTaskPriority,
             onPreferences: ShowPreferences,
@@ -103,6 +108,80 @@ internal sealed class HiringFlowCoordinator
     private void ShowPreferences(ContractDraft draft)
     {
         Game1.activeClickableMenu = new PreferencesMenu(draft, onBack: ShowHub);
+    }
+
+    public void ShowUpgradesFromManage()
+    {
+        Game1.activeClickableMenu = new UpgradesMenu(
+            _upgradeStore.State,
+            onPurchase: PurchaseUpgradeFromManage,
+            onBack: OpenManageFlow);
+    }
+
+    private void ShowUpgrades(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new UpgradesMenu(
+            _upgradeStore.State,
+            onPurchase: kind => PurchaseUpgradeFromDraft(draft, kind),
+            onBack: () => ShowHub(draft));
+    }
+
+    private void PurchaseUpgradeFromDraft(ContractDraft draft, FarmhandUpgradeKind kind)
+    {
+        if (TryPurchaseUpgrade(kind))
+            RefreshPreview(draft);
+
+        ShowUpgrades(draft);
+    }
+
+    private void PurchaseUpgradeFromManage(FarmhandUpgradeKind kind)
+    {
+        TryPurchaseUpgrade(kind);
+        ShowUpgradesFromManage();
+    }
+
+    private bool TryPurchaseUpgrade(FarmhandUpgradeKind kind)
+    {
+        var result = FarmhandUpgradePurchaser.TryPurchase(kind, _upgradeStore.State, Game1.player.Money);
+        switch (result.Status)
+        {
+            case FarmhandUpgradePurchaseStatus.Purchased:
+                Game1.player.Money = result.RemainingGold;
+                _upgradeStore.Replace(result.State);
+                if (kind == FarmhandUpgradeKind.Energy)
+                    ApplyEnergyUpgradeToOpenContracts();
+
+                Game1.addHUDMessage(new HUDMessage(
+                    I18nHelper.Get("notify.upgrade_purchased", new { name = UpgradeDisplayName(kind) }),
+                    HUDMessage.newQuest_type));
+                return true;
+
+            case FarmhandUpgradePurchaseStatus.InsufficientFunds:
+                Game1.addHUDMessage(new HUDMessage(
+                    I18nHelper.Get("ui.upgrades.cant_afford"),
+                    HUDMessage.error_type));
+                return false;
+
+            case FarmhandUpgradePurchaseStatus.AlreadyPurchased:
+                return false;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(result.Status), result.Status, null);
+        }
+    }
+
+    private void ApplyEnergyUpgradeToOpenContracts()
+    {
+        foreach (var contract in _contractStore.List()
+                     .Where(c => c.Status is ContractStatus.Active or ContractStatus.Paused))
+        {
+            _contractStore.Update(
+                contract.Id,
+                contract with
+                {
+                    TermsSnapshot = FarmhandUpgradeEffects.AddEnergyBonus(contract.TermsSnapshot),
+                });
+        }
     }
 
     private void ShowTaskSelection(ContractDraft draft)
@@ -795,6 +874,14 @@ internal sealed class HiringFlowCoordinator
         ShowEnergy(draft);
     }
 
+    private ConfigSnapshot EffectiveConfig() =>
+        FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, _upgradeStore.State);
+
+    private static string UpgradeDisplayName(FarmhandUpgradeKind kind) =>
+        I18nHelper.Get(kind == FarmhandUpgradeKind.Speed
+            ? "ui.upgrades.speed.name"
+            : "ui.upgrades.energy.name");
+
     // Prices each energy tier against the current scope/tasks so the Energy page can show energy + cost
     // per option. Tiers with no chargeable scope yet have null terms (the card shows just the name).
     private IReadOnlyList<EnergyTierOption> BuildEnergyOptions(ContractDraft draft)
@@ -806,7 +893,7 @@ internal sealed class HiringFlowCoordinator
                 draft.ScopeSelection,
                 draft.EnabledTasks,
                 tier,
-                _configManager.CurrentSnapshot,
+                EffectiveConfig(),
                 draft.CropPlan.BuildCropPlan(),
                 draft.MachinePlan.BuildScope());
             var terms = preview.ProposedTerms;
@@ -870,7 +957,7 @@ internal sealed class HiringFlowCoordinator
             draft.ScopeSelection,
             draft.EnabledTasks,
             draft.Tier,
-            _configManager.CurrentSnapshot,
+            EffectiveConfig(),
             draft.CropPlan.BuildCropPlan(),
             draft.MachinePlan.BuildScope());
 

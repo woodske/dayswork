@@ -6,6 +6,7 @@ using Dayswork.Core.Energy;
 using Dayswork.Core.Inventory;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
+using Dayswork.Core.Upgrades;
 using Dayswork.Diagnostics;
 using Dayswork.Integration;
 using Dayswork.Orchestration;
@@ -46,15 +47,19 @@ public sealed class ModEntry : Mod
         var recurringDecisionEngine = new RecurringDayStartDecisionEngine(contractTermsBuilder);
         var store       = new ContractStore(logWarning);
         var serializer  = new SaveDataSerializer(logWarning);
+        var upgradeStore = new FarmhandUpgradeStore();
+        var upgradeSerializer = new FarmhandUpgradeSaveDataSerializer(logWarning);
 
         // ── Mod singletons ───────────────────────────────────────────────────
         var chestResolver = new ChestResolver(Helper);
         var cabinChestService = new CabinChestService();
-        Coordinator = new HiringFlowCoordinator(contractTermsBuilder, configManager, store, chestResolver, Helper);
+        Coordinator = new HiringFlowCoordinator(contractTermsBuilder, configManager, store, upgradeStore, chestResolver, Helper);
         var buildingInteraction = new HiringBuildingInteraction(helper);
         var buildingOverlay = new HiringBuildingOverlayRenderer();
         var persistAdapter  = new ContractPersistenceAdapter(
             store, serializer, helper.Data, this.ModManifest.Version.ToString());
+        var upgradePersistAdapter = new FarmhandUpgradePersistenceAdapter(
+            upgradeStore, upgradeSerializer, helper.Data);
         var toolReader      = new ToolLevelReader();
         var toolAnimator    = new ToolSwapAnimator();
         var movementDriver  = new WorkerMovementDriver();
@@ -83,7 +88,7 @@ public sealed class ModEntry : Mod
         var sessionResetHandler = new SessionResetHandler(orchestrator);
         var calendarHandlers = new CalendarHandlers(orchestrator);
         var scheduler       = new RecurringContractScheduler(
-            store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, shiftOutcomeDispatcher);
+            store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, upgradeStore, shiftOutcomeDispatcher);
         var gmcmRegistrar = new GMCMRegistrar(helper, this.ModManifest, configManager);
 
         // ── Expansion compatibility ───────────────────────────────
@@ -107,11 +112,13 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += cabinChestService.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
+        helper.Events.GameLoop.SaveLoaded   += upgradePersistAdapter.OnSaveLoaded;
         // Stop and settle any in-flight shift (sleep-stop + overflow delivery) BEFORE contracts
         // persist and before the day rolls over — handler order is authoritative. Refund
         // settlement is not part of this path.
         helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;
         helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
+        helper.Events.GameLoop.Saving       += upgradePersistAdapter.OnSaving;
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
         helper.Events.GameLoop.DayStarted   += cabinChestService.OnDayStarted;
         // Reset the "worker done for the day" animation flag each morning (office goes dark again).
