@@ -21,15 +21,19 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         var built = BuildItems(items);
         if (built.Count == 0) return;
 
-        var deposited = DepositToBuildingChestOrBin(built, out var usedChest);
+        var deposited = DepositToBuildingChestOrBin(built, out var usedChest, out var chestWasFull);
 
+        var destination = usedChest && !chestWasFull ? "the farmhand cabin chest"
+                        : chestWasFull               ? "the farmhand cabin chest (partial) + shipping bin"
+                        :                              "the shipping bin";
         ModEntry.ModMonitor.Log(
-            $"[Dayswork] Deposited {deposited} overflow item stack(s) to {(usedChest ? "the farmhand cabin chest" : "the shipping bin")}.",
+            $"[Dayswork] Deposited {deposited} overflow item stack(s) to {destination}.",
             LogLevel.Trace);
 
-        Game1.addHUDMessage(new HUDMessage(
-            I18nHelper.Get(usedChest ? "notify.items_deposited_chest" : "notify.items_deposited_bin"),
-            HUDMessage.newQuest_type));
+        var notifyKey = usedChest && !chestWasFull ? "notify.items_deposited_chest"
+                      : chestWasFull               ? "notify.items_deposited_chest_overflow"
+                      :                              "notify.items_deposited_bin";
+        Game1.addHUDMessage(new HUDMessage(I18nHelper.Get(notifyKey), HUDMessage.newQuest_type));
     }
 
     public void ShowCannotAffordNotice(Contract contract, int dailyPrice, int shortfall)
@@ -57,9 +61,12 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
 
     // Deposits each item stack into the building output chest; any leftover (chest full or missing)
     // goes to the shipping bin. Returns the number of stacks handled and whether the chest was used.
-    private static int DepositToBuildingChestOrBin(List<Item> items, out bool usedChest)
+    // chestWasFull is set when the chest was present but addItem returned a remainder, so the caller
+    // can show a fallback-to-bin notice distinct from the "no chest assigned" case.
+    private static int DepositToBuildingChestOrBin(List<Item> items, out bool usedChest, out bool chestWasFull)
     {
         usedChest = false;
+        chestWasFull = false;
         var chest = Game1.getFarm() is { } farm ? HiringBuilding.TryGetOutputChest(farm) : null;
         var bin = Game1.getFarm()?.getShippingBin(Game1.player);
 
@@ -72,6 +79,8 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
                 leftover = chest.addItem(item);
                 if (leftover is null)
                     usedChest = true;
+                else
+                    chestWasFull = true;
             }
 
             if (leftover is not null && bin is not null)

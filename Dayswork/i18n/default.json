@@ -193,6 +193,7 @@
     "building.action.manage": "Manage farmhand contract",
     "notify.items_deposited_chest": "Your farmhand left some items in the cabin chest.",
     "notify.items_deposited_bin": "Your farmhand left some items in the shipping bin.",
+    "notify.items_deposited_chest_overflow": "Your farmhand left some items in the shipping bin — the cabin chest was full.",
     "notify.shift_started": "Shift started. Fee charged: {{price}}g",
     "notify.upgrade_purchased": "{{name}} purchased.",
     "notify.farmhand_exhausted": "Your farmhand ran out of energy and is heading home.",
