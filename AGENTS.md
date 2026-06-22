@@ -110,6 +110,7 @@ data or a decompile, and note where you confirmed it.
 - `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); plan + status in `docs/plans/machine-management.md`.
 - `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
 - `docs/fences-and-gates.md` — `StardewValley.Fence` gate API (`isGate`, `gatePosition` 0/88, `health > 1f`, `isPassable`, `toggleGate`, `updateWhenCurrentLocation` auto-close rule) backing the worker's open-gates-while-pathing logic in `Dayswork/Worker/WorkerMovementDriver.cs`.
+- `docs/debris-and-drops.md` — which `Game1.create*Debris` overloads route loot to `Game1.currentLocation` vs the passed `location`; the `ResourceClump.destroy()` leak (hardwood/stone spawn at the *player's* location, not the clump's) and the `InvokeTaskActionGuarded` sweep that recovers it.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
 the office building/chest ids in `Dayswork/Integration/HiringBuilding.cs`, the animal-product
@@ -145,5 +146,5 @@ is built and unit-tested through milestone 7 but **awaits its in-game smoke pass
 see `docs/plans/machine-management.md` for status + v1 limitations (notably: a group's input chest
 must be in the same location as its machines, else collect-only). The farmhand uses a **placeholder**
 Marnie sprite/portrait (custom art is specified in `docs/farmhand-art.md`). Dev tooling (verbose logs
-+ console commands like `dayswork_end_shift`, `dayswork_debug_machines`) is gated behind
++ console commands like `dayswork_end_shift`, `dayswork_debug_machines`, `dayswork_debug_leaks`) is gated behind
 `DevLog.Enabled`, off for release.

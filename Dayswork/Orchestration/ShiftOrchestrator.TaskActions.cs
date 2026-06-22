@@ -162,12 +162,35 @@ internal sealed partial class ShiftOrchestrator
         // inventory, so the player should never see those notifications.
         var hudMessageCountBefore = Game1.hudMessages.Count;
 
+        // ResourceClump.destroy() (vanilla) spawns its *collectible* drops — hardwood from large
+        // stumps/logs, stone/ore from boulders and meteorites — into Game1.currentLocation rather
+        // than the clump's own location. The worker keeps clearing autonomously while the player is
+        // free to roam, so a stump or boulder felled on the farm while the player is standing in
+        // another location (e.g. Town) drops its loot at the same tile coords in *that* location,
+        // stranding it there. Snapshot the player's location debris so the leaked worker drops can
+        // be swept back into the buffer below. (The action runs synchronously within this beat, so
+        // any debris added to that location during InvokeTaskAction is necessarily worker-created.)
+        var leakLocation = Game1.currentLocation;
+        var leakDebrisBefore = leakLocation is not null && !ReferenceEquals(leakLocation, location)
+            ? new HashSet<Debris>(leakLocation.debris)
+            : null;
+
         try
         {
             return InvokeTaskAction(tile, task, location);
         }
         finally
         {
+            if (leakDebrisBefore is not null)
+            {
+                // Dev tripwire: how many items vanilla mis-routed into the player's location this
+                // beat (counted before recovery removes the resolvable ones).
+                var leakedItems = DevLog.Enabled ? CountNewItemDebris(leakDebrisBefore, leakLocation!) : 0;
+                CollectLeakedWorkerDebris(leakDebrisBefore, leakLocation!, location, task, tile);
+                if (DevLog.Enabled)
+                    AuditForeignLeak(leakDebrisBefore, leakLocation!, location, task, tile, leakedItems);
+            }
+
             var playerStateChanged = savedState.DiffersFrom(playerState);
             var changedStateDescription = playerStateChanged
                 ? WorkerActionPlayerStateSnapshot.Describe(playerState)

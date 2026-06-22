@@ -233,6 +233,11 @@ public sealed class ModEntry : Mod
             "dayswork_debug_machines",
             "Lists Data/Machines objects in the player's current location with their ready-state, held output, and reload eligibility (verifies the machine reader + per-entry data in-world).",
             (_, _) => LogMachinesInCurrentLocation());
+
+        helper.ConsoleCommands.Add(
+            "dayswork_debug_leaks",
+            "Reports the current shift's worker-action leak audit: item-debris vanilla mis-routed into the player's location, how much was recovered, and how much was stranded (stranded > 0 means loot escaped the recovery sweep).",
+            (_, _) => Orchestrator.LogLeakAudit(LogLevel.Info));
     }
 
     private void LogMachinesInCurrentLocation()

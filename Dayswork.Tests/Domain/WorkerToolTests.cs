@@ -9,6 +9,7 @@ public class WorkerToolTests
     {
         new object[] { TaskKind.WaterCrops, WorkerTool.WateringCan },
         new object[] { TaskKind.HarvestCrops, WorkerTool.None },
+        new object[] { TaskKind.HarvestCave, WorkerTool.None },
         new object[] { TaskKind.CollectFruit, WorkerTool.None },
         new object[] { TaskKind.FeedAnimals, WorkerTool.None },
         new object[] { TaskKind.PetAnimals, WorkerTool.None },
