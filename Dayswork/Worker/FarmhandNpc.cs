@@ -7,8 +7,7 @@ namespace Dayswork.Worker;
 
 internal sealed class FarmhandNpc : NPC
 {
-    // Placeholder sprite uses the vanilla Marnie texture — custom art is post-v1.
-    internal const string PlaceholderSpritePath   = "Characters\\Marnie";
+    internal const string SpritePath         = "Characters\\DaysworkFarmhand";
     internal const string PlaceholderPortraitPath = "Portraits\\Marnie";
     internal const string InternalName            = "DaysworkFarmhand";
 
@@ -18,7 +17,7 @@ internal sealed class FarmhandNpc : NPC
 
     public FarmhandNpc(Vector2 spawnPixelPosition)
         : base(
-            new AnimatedSprite(PlaceholderSpritePath, 0, 16, 32),
+            new AnimatedSprite(SpritePath, 0, 16, 32),
             spawnPixelPosition,
             2,
             InternalName)
@@ -69,7 +68,7 @@ internal sealed class FarmhandNpc : NPC
         if (_staminaCapacity <= 0)
             return;
 
-        var local = Game1.GlobalToLocal(Game1.viewport, this.Position + new Vector2(0f, -44f));
+        var local = Game1.GlobalToLocal(Game1.viewport, this.Position + new Vector2(0f, -80f));
         const int barWidth = 40;
         const int barHeight = 6;
         var barX = (int)local.X - (barWidth / 2) + 32;

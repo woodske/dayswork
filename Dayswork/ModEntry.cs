@@ -146,8 +146,10 @@ public sealed class ModEntry : Mod
 
     private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
     {
-        // Redirect the placeholder NPC portrait to Marnie's existing texture.
-        // Custom farmhand art is post-v1.
+        if (e.NameWithoutLocale.IsEquivalentTo($"Characters/{FarmhandNpc.InternalName}"))
+            e.LoadFromModFile<Texture2D>("assets/farmhand.png", AssetLoadPriority.Medium);
+
+        // Portrait still uses Marnie until a custom portrait is ready.
         if (e.NameWithoutLocale.IsEquivalentTo($"Portraits/{FarmhandNpc.InternalName}"))
             e.LoadFrom(
                 () => Game1.content.Load<Texture2D>(FarmhandNpc.PlaceholderPortraitPath),

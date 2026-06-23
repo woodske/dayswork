@@ -13,14 +13,13 @@ namespace Dayswork.Integration;
 /// HiringBuildingInteraction) rather than via Data/Buildings sub-schemas, to keep that logic under
 /// our control and reuse the existing chest pipeline.
 ///
-/// Art is a placeholder (assets/hq-building.png); swap the texture file for final art.
 /// </summary>
 internal static class HiringBuilding
 {
     public const string BuildingType = "Bindicle.Dayswork_Office";
     public const string TextureAsset = "Mods/Bindicle.Dayswork/Building";
     internal const string OnePerFarmBuildCondition = "!BUILDINGS_CONSTRUCTED All Bindicle.Dayswork_Office 1 2147483647 true";
-    private const string TextureFile = "assets/hq-building.png";
+    private const string TextureFile = "assets/farmhand_office.png";
 
     /// <summary>Id of the building's built-in output chest where missed/overflow items are deposited.</summary>
     public const string OutputChestId = "Bindicle.Dayswork_Output";

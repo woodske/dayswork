@@ -82,6 +82,12 @@ internal sealed partial class ShiftOrchestrator
         if (Session.Ctx.StateMachine.Phase is ShiftPhase.Depositing or ShiftPhase.Exiting or ShiftPhase.Done)
             return;
 
+        // If the 8pm cap (or any external wrap-up trigger) fires while the worker is in the
+        // idle wait loop, IdleWaiting is still true at this point. Clear it so the deposit
+        // loop isn't blocked — the tick handler short-circuits on IdleWaiting=true and the
+        // deposit intent dispatch would never run otherwise.
+        Session.IdleWaiting = false;
+
         // A wrap-up (energy cap, 8pm, cancel, stuck-home) can fire mid-travel; stop the runner
         // before the safety warp below repositions the worker.
         CancelActiveTravel();
