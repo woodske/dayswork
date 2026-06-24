@@ -21,4 +21,9 @@ public sealed record OutputScopeProvenance(OutputScopeFamily Family, string Scop
 
     public static OutputScopeProvenance Cave() =>
         new(OutputScopeFamily.Cave, "FarmCave");
+
+    // Fish ponds share a single output destination for the whole scope (no groups), so a single
+    // fixed provenance routes all collected pond output to that destination.
+    public static OutputScopeProvenance FishPond() =>
+        new(OutputScopeFamily.FishPond, "FishPonds");
 }

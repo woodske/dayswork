@@ -278,6 +278,10 @@ internal sealed partial class ShiftOrchestrator
                      Session.Ctx.WorkScopes.Machines?.Groups))
             map[provenance] = destination;
 
+        foreach (var (provenance, destination) in Dayswork.Core.FishPonds.FishPondOutputRouter.BuildDestinationMap(
+                     Session.Ctx.WorkScopes.FishPonds))
+            map[provenance] = destination;
+
         return map;
     }
 
@@ -296,7 +300,7 @@ internal sealed partial class ShiftOrchestrator
             : Array.Empty<ItemStack>();
         var categories = _overflowCategorizer.Categorize(Session.Ctx.Overflow);
 
-        _shiftOutcomeDispatcher.DispatchOverflowDelivery(items, categories);
+        _shiftOutcomeDispatcher.DispatchOverflowDelivery(items, categories, Session.Flavors.Templates);
         Session.Ctx.Overflow.Clear();
     }
 }

@@ -1,6 +1,7 @@
 namespace Dayswork.Core.Domain;
 
 using Dayswork.Core.Crops;
+using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 
 public sealed record Contract(
@@ -16,9 +17,43 @@ public sealed record Contract(
     IReadOnlyList<TaskCategory> CategoryPriority,
     CropPlan CropPlan,
     MachineWorkScope MachineScope,
+    FishPondWorkScope FishPondScope,
     ContractPreferences Preferences
 )
 {
+    // Back-compat overload: contracts built without a fish-pond scope default to an empty scope.
+    public Contract(
+        ContractId Id,
+        IReadOnlySet<TaskKind> EnabledTasks,
+        IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations,
+        ContractSchedule Schedule,
+        ContractStatus Status,
+        GameDate HireDate,
+        ContractScopeSelection ScopeSelection,
+        ContractTermsSnapshot TermsSnapshot,
+        EnergyTier Tier,
+        IReadOnlyList<TaskCategory> CategoryPriority,
+        CropPlan CropPlan,
+        MachineWorkScope MachineScope,
+        ContractPreferences Preferences)
+        : this(
+            Id,
+            EnabledTasks,
+            TaskDestinations,
+            Schedule,
+            Status,
+            HireDate,
+            ScopeSelection,
+            TermsSnapshot,
+            Tier,
+            CategoryPriority,
+            CropPlan,
+            MachineScope,
+            FishPondWorkScope.Empty,
+            Preferences)
+    {
+    }
+
     // Back-compat overload: contracts built without preferences default to Legacy (preserve old behavior).
     public Contract(
         ContractId Id,

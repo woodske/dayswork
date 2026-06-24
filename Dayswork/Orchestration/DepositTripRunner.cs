@@ -312,7 +312,22 @@ internal sealed class DepositTripRunner
         || item.QualifiedItemId == "(O)"
         || string.Equals(item.Name, "Error Item", StringComparison.Ordinal);
 
-    private static void DepositIntoShippingBin(RoutedItemStack stack, bool animateWhenPlayerHere)
+    // Reconstruct the actual item for a deposit/ship: a captured flavored/colored item (roe, wine…)
+    // is cloned from the per-shift registry so its identity and price survive; everything else is the
+    // ordinary id-based create with quality applied.
+    private Item? CreateDepositItem(RoutedItemStack stack)
+    {
+        if (stack.FlavorId is { } flavorId
+            && FlavorItemRegistry.Rebuild(_session.Flavors.Templates, flavorId, stack.Quantity, stack.Quality) is { } flavored)
+            return flavored;
+
+        var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
+        if (item is SObject obj && stack.Quality > 0)
+            obj.Quality = stack.Quality;
+        return item;
+    }
+
+    private void DepositIntoShippingBin(RoutedItemStack stack, bool animateWhenPlayerHere)
     {
         var farm = Game1.getFarm();
         if (string.IsNullOrWhiteSpace(stack.QualifiedItemId))
@@ -322,7 +337,7 @@ internal sealed class DepositTripRunner
                 LogLevel.Error);
             return;
         }
-        var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
+        var item = CreateDepositItem(stack);
         if (item is null)
             return;
         if (IsDepositErrorItem(item))
@@ -332,8 +347,6 @@ internal sealed class DepositTripRunner
                 LogLevel.Error);
             return;
         }
-        if (item is SObject shipObj && stack.Quality > 0)
-            shipObj.Quality = stack.Quality;
 
         if (animateWhenPlayerHere && Game1.player.currentLocation == farm)
             farm.shipItem(item, Game1.player);           // vanilla lid animation + backpackIN + delayed "Ship"
@@ -369,7 +382,7 @@ internal sealed class DepositTripRunner
                 LogLevel.Error);
             return;
         }
-        var item = ItemRegistry.Create(stack.QualifiedItemId, stack.Quantity);
+        var item = CreateDepositItem(stack);
         if (item is null)
             return;
         if (IsDepositErrorItem(item))
@@ -379,8 +392,6 @@ internal sealed class DepositTripRunner
                 LogLevel.Error);
             return;
         }
-        if (item is SObject chestObj && stack.Quality > 0)
-            chestObj.Quality = stack.Quality;
 
         // addItem returns the remainder that did not fit (null if all fit).
         var leftover = chest.addItem(item);
@@ -388,7 +399,7 @@ internal sealed class DepositTripRunner
         {
             // Chest full: route the remainder to automatic overflow.
             _session.Ctx.Overflow.Add(new OverflowItem(
-                new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance, stack.Quality),
+                new RoutedItemStack(stack.QualifiedItemId, leftover.Stack, stack.SourceTask, stack.Provenance, stack.Quality, stack.FlavorId),
                 OverflowReason.ChestFull));
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][deposit] chest full; {leftover.Stack}x {stack.QualifiedItemId} routed to automatic overflow.",
@@ -491,7 +502,7 @@ internal sealed class DepositTripRunner
     {
         foreach (var b in _session.Ctx.Buffer.TakeAll())
         {
-            var stack = new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance, b.Quality);
+            var stack = new RoutedItemStack(b.QualifiedItemId, b.Quantity, b.SourceTask, b.Provenance, b.Quality, b.FlavorId);
             if (DepositPlanner.ResolveUndelivered(ShiftOrchestrator.ResolveAssignedDestination(b.SourceTask, _session.Ctx.TaskDestinations))
                 == UndeliveredDepositResolution.ShippingBin)
                 DepositIntoShippingBin(stack, animateWhenPlayerHere: false);

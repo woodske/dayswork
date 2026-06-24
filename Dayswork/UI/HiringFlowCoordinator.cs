@@ -94,6 +94,7 @@ internal sealed class HiringFlowCoordinator
             onWorkScope: ShowZoneAndChest,
             onManageCrops: ShowManageCrops,
             onManageMachines: ShowManageMachines,
+            onManageFishPonds: ShowManageFishPonds,
             onUpgrades: ShowUpgrades,
             onOutput: ShowOutputDestinations,
             onPriority: ShowTaskPriority,
@@ -462,6 +463,7 @@ internal sealed class HiringFlowCoordinator
 
     // ── Manage Machines authoring ─────────────────────────────────────
     private readonly MachineReader _machineReader = new();
+    private readonly FishPondReader _fishPondReader = new();
 
     private void ShowManageMachines(ContractDraft draft)
     {
@@ -708,6 +710,85 @@ internal sealed class HiringFlowCoordinator
             onCancel: () => ShowMachineGroupEditor(draft, groupId));
     }
 
+    // ── Manage Fish Ponds authoring ───────────────────────────────────
+    private void ShowManageFishPonds(ContractDraft draft)
+    {
+        Game1.activeClickableMenu = new ManageFishPondsMenu(
+            draft,
+            onBack: ShowHub,
+            onSelectPonds: BeginFishPondSelection,
+            onPickOutput: ShowFishPondOutputPicker);
+    }
+
+    private void BeginFishPondSelection(ContractDraft draft)
+    {
+        var locations = BuildFishPondMapLocations();
+        if (locations.Count == 0)
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("ui.manage_fish_ponds.no_ponds_found"),
+                HUDMessage.error_type));
+            ShowManageFishPonds(draft);
+            return;
+        }
+
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            _helper,
+            locations,
+            initialSelected: draft.FishPondPlan.Ponds,
+            onComplete: ponds =>
+            {
+                draft.FishPondPlan.SetPonds(ponds);
+                draft.MarkDirty();
+                RefreshPreview(draft);
+                ShowManageFishPonds(draft);
+            },
+            onCancel: () => ShowManageFishPonds(draft));
+    }
+
+    private void ShowFishPondOutputPicker(ContractDraft draft)
+    {
+        var locations = _chestResolver.BuildChestMapLocations(Game1.getFarm(), draft.Greenhouses);
+
+        Game1.activeClickableMenu = new ZoneDrawMenu(
+            _helper,
+            locations,
+            initial: draft.FishPondPlan.OutputDestination,
+            options: new ChestPickerOptions(ShowAutomatic: true, ShowShippingBin: true, ShowNone: false),
+            onComplete: destination =>
+            {
+                // Treat "automatic" as a null destination (BuildScope coalesces null → Automatic).
+                draft.FishPondPlan.OutputDestination = destination is AutomaticOutputDestination ? null : destination;
+                draft.MarkDirty();
+                RefreshPreview(draft);
+                ShowManageFishPonds(draft);
+            },
+            onCancel: () => ShowManageFishPonds(draft));
+    }
+
+    private IReadOnlyList<FishPondMapLocation> BuildFishPondMapLocations()
+    {
+        var result = new List<FishPondMapLocation>();
+        foreach (var (location, displayName) in EnumerateCandidateLocations())
+        {
+            var ponds = _fishPondReader.EnumerateFishPonds(location)
+                .Select(entry => new FishPondFootprint(
+                    entry.Tile,
+                    Math.Max(1, entry.Pond.tilesWide.Value),
+                    Math.Max(1, entry.Pond.tilesHigh.Value)))
+                .ToList();
+            if (ponds.Count == 0)
+                continue;
+
+            result.Add(new FishPondMapLocation(location.NameOrUniqueName, displayName, ponds));
+        }
+
+        return result
+            .GroupBy(location => location.LocationName, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+    }
+
     private void BeginMachineSelection(ContractDraft draft, string groupId)
     {
         if (!draft.MachinePlan.TryGetGroup(groupId, out var group))
@@ -895,7 +976,8 @@ internal sealed class HiringFlowCoordinator
                 tier,
                 EffectiveConfig(),
                 draft.CropPlan.BuildCropPlan(),
-                draft.MachinePlan.BuildScope());
+                draft.MachinePlan.BuildScope(),
+                draft.FishPondPlan.BuildScope());
             var terms = preview.ProposedTerms;
             options.Add(new EnergyTierOption(tier, terms?.Energy.DailyCapacity, terms?.Pricing.TotalPrice));
         }
@@ -959,7 +1041,8 @@ internal sealed class HiringFlowCoordinator
             draft.Tier,
             EffectiveConfig(),
             draft.CropPlan.BuildCropPlan(),
-            draft.MachinePlan.BuildScope());
+            draft.MachinePlan.BuildScope(),
+            draft.FishPondPlan.BuildScope());
 
         draft.PreviewState = HiringFlowViewModelBuilder.Build(draft, preview);
     }
@@ -1033,6 +1116,7 @@ internal sealed class HiringFlowCoordinator
             CategoryPriority: draft.CategoryPriority.ToList().AsReadOnly(),
             CropPlan: draft.CropPlan.BuildCropPlan(),
             MachineScope: draft.MachinePlan.BuildScope(),
+            FishPondScope: draft.FishPondPlan.BuildScope(),
             Preferences: draft.Preferences);
     }
 
@@ -1055,6 +1139,7 @@ internal sealed class HiringFlowCoordinator
         LegacyScopeBootstrapper.HydrateDraft(draft, contract);
         draft.CropPlan.HydrateFrom(contract.CropPlan);
         draft.MachinePlan.HydrateFrom(contract.MachineScope);
+        draft.FishPondPlan.HydrateFrom(contract.FishPondScope);
         draft.Preferences = contract.Preferences;
         return draft;
     }

@@ -41,8 +41,8 @@ public sealed class DepositPlanner
         Func<TileCoord, TileCoord, int> distance)
     {
         // Walkable destinations grouped by key → (representative tile, item id → qty).
-        var walkable = new Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance), int> Items)>();
-        var automaticOverflow = new Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance), int>();
+        var walkable = new Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int> Items)>();
+        var automaticOverflow = new Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int>();
 
         foreach (var item in snapshot)
         {
@@ -56,7 +56,7 @@ public sealed class DepositPlanner
                     AddToGroup(walkable, dest, shippingBinTile, item);
                     break;
                 default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow
-                    Accumulate(automaticOverflow, (item.QualifiedItemId, item.Quality, item.SourceTask, item.Provenance), item.Quantity);
+                    Accumulate(automaticOverflow, (item.QualifiedItemId, item.Quality, item.SourceTask, item.Provenance, item.FlavorId), item.Quantity);
                     break;
             }
         }
@@ -85,34 +85,35 @@ public sealed class DepositPlanner
     }
 
     private static void AddToGroup(
-        Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance), int> Items)> walkable,
+        Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int> Items)> walkable,
         DestinationKey dest,
         TileCoord tile,
         BufferedItem item)
     {
         if (!walkable.TryGetValue(dest, out var group))
         {
-            group = (tile, new Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance), int>());
+            group = (tile, new Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int>());
             walkable[dest] = group;
         }
-        Accumulate(group.Items, (item.QualifiedItemId, item.Quality, item.SourceTask, item.Provenance), item.Quantity);
+        Accumulate(group.Items, (item.QualifiedItemId, item.Quality, item.SourceTask, item.Provenance, item.FlavorId), item.Quantity);
     }
 
     private static void Accumulate(
-        Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance), int> map,
-        (string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance) key,
+        Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int> map,
+        (string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId) key,
         int qty) =>
         map[key] = map.TryGetValue(key, out var existing) ? existing + qty : qty;
 
     // Deterministic stack list so planner output is stable regardless of dict order.
     private static IReadOnlyList<RoutedItemStack> ToStacks(
-        Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance), int> map) =>
+        Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int> map) =>
         map.OrderBy(kv => kv.Key.ItemId, StringComparer.Ordinal)
            .ThenBy(kv => kv.Key.Quality)
            .ThenBy(kv => kv.Key.SourceTask)
            .ThenBy(kv => kv.Key.Provenance.Family)
            .ThenBy(kv => kv.Key.Provenance.ScopeName, StringComparer.Ordinal)
-           .Select(kv => new RoutedItemStack(kv.Key.ItemId, kv.Value, kv.Key.SourceTask, kv.Key.Provenance, kv.Key.Quality))
+           .ThenBy(kv => kv.Key.FlavorId, StringComparer.Ordinal)
+           .Select(kv => new RoutedItemStack(kv.Key.ItemId, kv.Value, kv.Key.SourceTask, kv.Key.Provenance, kv.Key.Quality, kv.Key.FlavorId))
            .ToList();
 
     private static IReadOnlyList<DepositTrip> OrderNearestNeighbor(

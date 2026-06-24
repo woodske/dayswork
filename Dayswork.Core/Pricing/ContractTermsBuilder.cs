@@ -4,6 +4,7 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
+using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 
 public sealed class ContractTermsBuilder
@@ -41,9 +42,10 @@ public sealed class ContractTermsBuilder
         EnergyTier tier,
         ConfigSnapshot config,
         CropPlan? cropPlan = null,
-        MachineWorkScope? machineScope = null)
+        MachineWorkScope? machineScope = null,
+        FishPondWorkScope? fishPondScope = null)
     {
-        var scopes = _scopeClassifier.Classify(selection, enabledTasks, cropPlan, machineScope);
+        var scopes = _scopeClassifier.Classify(selection, enabledTasks, cropPlan, machineScope, fishPondScope);
         var issues = BuildValidationIssues(scopes, enabledTasks);
         if (!HasChargeableScopeTaskPair(scopes, enabledTasks))
         {
@@ -125,7 +127,8 @@ public sealed class ContractTermsBuilder
         var hasGreenhousePair = scopes.GreenhouseWork is not null && enabledTasks.Any(TaskKindSets.IsGreenhouseService);
         var hasManagedCrops = scopes.ManagedCrops is not null;
         var hasMachines = scopes.Machines is not null;
+        var hasFishPonds = scopes.FishPonds is not null;
         var hasCave = enabledTasks.Contains(TaskKind.HarvestCave);
-        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair || hasManagedCrops || hasMachines || hasCave;
+        return hasOutdoorPair || hasAnimalPair || hasGreenhousePair || hasManagedCrops || hasMachines || hasFishPonds || hasCave;
     }
 }

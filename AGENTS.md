@@ -45,9 +45,18 @@ facts under `docs/`. Update `docs/game-content-search.md` if any new search tech
    `<EnableHarmony>`. Don't add one without a hard reason; prefer an event hook.
 3. **Single active contract.** At most one Active/Paused contract at a time (enforced in the hiring
    flow and assumed by the scheduler).
-4. **Items are never lost.** Every deposit/overflow path falls back so collected items end up
-   somewhere safe (chest → office output chest → shipping bin). Preserve this when touching deposit
-   or shift-stop code.
+4. **Items are never lost — and never degraded.** Two invariants on every collected item/material:
+   - *Never lost.* Every deposit/overflow path falls back so output ends up somewhere safe
+     (chest → office output chest → shipping bin). Preserve this when touching deposit or shift-stop code.
+   - *Full fidelity preserved through every hop.* An item the worker collects must reach its
+     destination **identical** to what the player would have picked up — same **quantity**, **quality**
+     (base/silver/gold/iridium), and **distinct identity/traits**: flavored-preserve id + type (Sturgeon
+     Roe, Blueberry Wine, flavored honey…), color, and any other `Object` traits. The collect → buffer →
+     planner → deposit/overflow chain must carry these end-to-end; when a trait can't be reconstructed
+     from the qualified id alone, capture the real item and clone it back (see the per-shift
+     `FlavorItemRegistry` + `BufferedItem.FlavorId`). Quality/flavor/etc. are also part of the
+     consolidation key so distinct variants never merge. When you add a new collect path or touch the
+     deposit pipeline, verify nothing silently genericizes an item.
 5. **The worker is removed before save.** `CalendarHandlers.OnSavingHook` runs before persistence
    and despawns the `FarmhandNpc`; never let it serialize into the save.
 6. **Single-player only.** Guard new entry points with `MultiplayerGuard.IsMultiplayer()`.
@@ -107,7 +116,7 @@ data or a decompile, and note where you confirmed it.
 - `docs/game-content-search.md` — local Stardew/SVE paths, folder maps, and search/parsing tips for
   base `.xnb`/DLL content, SVE Content Patcher packs, C# source, and `.tmx` maps.
 - `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
-- `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); plan + status in `docs/plans/machine-management.md`.
+- `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); plan + status in `docs/plans/machine-management.md`. Its "Fish ponds" section verifies the `StardewValley.Buildings.FishPond` API (`output` NetRef, `tileX/tileY` identity, direct-null collect, 5×5 footprint) backing Manage Fish Ponds (built 2026-06-23; reader = `Dayswork/Orchestration/FishPondReader.cs`); plan + status in `docs/plans/fish-ponds.md`.
 - `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
 - `docs/fences-and-gates.md` — `StardewValley.Fence` gate API (`isGate`, `gatePosition` 0/88, `health > 1f`, `isPassable`, `toggleGate`, `updateWhenCurrentLocation` auto-close rule) backing the worker's open-gates-while-pathing logic in `Dayswork/Worker/WorkerMovementDriver.cs`.
 - `docs/debris-and-drops.md` — which `Game1.create*Debris` overloads route loot to `Game1.currentLocation` vs the passed `location`; the `ResourceClump.destroy()` leak (hardwood/stone spawn at the *player's* location, not the clump's) and the `InvokeTaskActionGuarded` sweep that recovers it.
@@ -138,13 +147,18 @@ ids in `HiringBuilding.BuildData`.
 
 Builds clean and runs. Working today: build the office and hire from its bulletin board; the
 hiring flow (tasks, zone-draw work scope, output chests, energy tier, task priority, one-time vs
-recurring schedule, managed crops, **Manage Machines**); the full shift loop (animal care, crops,
-fieldwork, managed-crop planting with auto-buy, **machine collect/reload**, multi-trip deposits,
-overflow safety, stuck recovery, 8pm cap, sleep settle); save/load persistence; evening office
-lighting/smoke; optional GMCM config; and SVE expansion compatibility. **Manage Machines** (2026-06-19)
+recurring schedule, managed crops, **Manage Machines**, **Manage Fish Ponds**); the full shift loop
+(animal care, crops, fieldwork, managed-crop planting with auto-buy, **machine collect/reload**,
+**fish-pond collect**, multi-trip deposits, overflow safety, stuck recovery, 8pm cap, sleep settle);
+save/load persistence; evening office lighting/smoke; optional GMCM config; and SVE expansion
+compatibility. **Manage Machines** (2026-06-19)
 is built and unit-tested through milestone 7 but **awaits its in-game smoke pass** (milestone 8) —
 see `docs/plans/machine-management.md` for status + v1 limitations (notably: a group's input chest
-must be in the same location as its machines, else collect-only). The farmhand uses a **placeholder**
+must be in the same location as its machines, else collect-only). **Manage Fish Ponds** (2026-06-23,
+collect-only) is built and unit-tested but **awaits its in-game smoke pass** — see
+`docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
+blueberry wine, flavored honey…) end-to-end via the per-shift `FlavorItemRegistry` +
+`BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). The farmhand uses a **placeholder**
 Marnie sprite/portrait (custom art is specified in `docs/farmhand-art.md`). Dev tooling (verbose logs
 + console commands like `dayswork_end_shift`, `dayswork_debug_machines`, `dayswork_debug_leaks`) is gated behind
 `DevLog.Enabled`, off for release.

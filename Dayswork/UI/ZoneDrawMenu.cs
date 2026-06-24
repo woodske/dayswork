@@ -34,8 +34,17 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private readonly string? _machineTypeFilter;   // only machines of this qualified id are selectable
     private readonly Dictionary<string, HashSet<TileCoord>> _selectedMachines = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<TileCoord>> _protectedMachines = new(StringComparer.Ordinal);
-    private int _locationIndex;   // shared by machine + chest location switchers
+    private int _locationIndex;   // shared by machine + chest + fish-pond location switchers
     private ClickableComponent? _locationBtn;
+
+    // ── Fish-pond-selection mode (Manage Fish Ponds) ─────────────────────────
+    // When set, the session selects whole fish ponds across multiple locations. A click anywhere on a
+    // pond's footprint toggles that pond; selected ponds render as green footprint fills. Reuses the
+    // _selectedMachines tile-set keyed by each pond's anchor tile. Collect-only — no type filter or
+    // protected sets (a pond belongs to the single fish-pond plan).
+    private readonly bool _fishPondMode;
+    private readonly Action<List<Dayswork.Core.FishPonds.FishPondRef>>? _onFishPondsComplete;
+    private readonly IReadOnlyList<FishPondMapLocation> _fishPondLocations = Array.Empty<FishPondMapLocation>();
 
     // ── Chest-selection mode (output/input chest pickers) ────────────────────
     // When set, the session selects a SINGLE chest (1×1) across multiple locations, plus the
@@ -66,7 +75,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private readonly List<Zone> _protectedZones = new();
 
     IReadOnlyList<Zone>            IZoneDrawSource.CompletedZones    =>
-        _machineMode ? MachineZones(_selectedMachines) : _chestMode ? SelectedChestZones() : _completedZones;
+        _fishPondMode ? FishPondZones() : _machineMode ? MachineZones(_selectedMachines) : _chestMode ? SelectedChestZones() : _completedZones;
     IReadOnlyList<Zone>            IZoneDrawSource.ProtectedZones    =>
         _machineMode ? MachineZones(_protectedMachines) : _chestMode ? Array.Empty<Zone>() : _protectedZones;
     IReadOnlyList<BuildingOutline> IZoneDrawSource.SelectedBuildings => _selectedBuildings;
@@ -220,6 +229,60 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         }
 
         _targetLocationName = _machineLocations[_locationIndex].LocationName;
+        var drawLocation = ResolveDrawLocation(_targetLocationName);
+
+        _returnLocation = Game1.currentLocation;
+        Game1.currentLocation = drawLocation;
+        Game1.viewportFreeze  = true;
+        Game1.displayHUD      = false;
+        _savedZoom     = Game1.options.baseZoomLevel;
+        _effectiveZoom = _savedZoom;
+        CenterViewport(drawLocation);
+
+        _overlay = new ZoneDrawOverlay(this, Game1.game1.GraphicsDevice);
+        helper.Events.Display.RenderedWorld += _overlay.OnRenderedWorld;
+
+        BuildComponents();
+        populateClickableComponentList();
+    }
+
+    /// <summary>
+    /// Fish-pond-selection session: pick whole fish ponds across the candidate
+    /// <paramref name="locations"/> (switching the displayed map with the location switcher). A click
+    /// anywhere on a pond toggles it. Returns the selected <see cref="Dayswork.Core.FishPonds.FishPondRef"/>s.
+    /// </summary>
+    public ZoneDrawMenu(
+        IModHelper helper,
+        IReadOnlyList<FishPondMapLocation> locations,
+        IReadOnlyList<Dayswork.Core.FishPonds.FishPondRef> initialSelected,
+        Action<List<Dayswork.Core.FishPonds.FishPondRef>> onComplete,
+        Action onCancel)
+        : base(0, 0, 0, 0)
+    {
+        _fishPondMode        = true;
+        _fishPondLocations   = locations;
+        _helper              = helper;
+        _onFishPondsComplete = onComplete;
+        _onCancel            = onCancel;
+        _onComplete          = null;
+        _buildingOutlines    = new List<BuildingOutline>();
+        _allowBuildingSelection = false;
+        _overlapToggles      = true;
+        _zoneFillColor       = Color.LimeGreen * 0.5f;
+        _protectedZoneFillColor = Color.Red * 0.35f;
+
+        foreach (var pond in initialSelected)
+            Selected(pond.LocationName).Add(pond.Tile);
+
+        _locationIndex = 0;
+        if (initialSelected.Count > 0)
+        {
+            var idx = IndexOfLocation(initialSelected[0].LocationName);
+            if (idx >= 0)
+                _locationIndex = idx;
+        }
+
+        _targetLocationName = _fishPondLocations[_locationIndex].LocationName;
         var drawLocation = ResolveDrawLocation(_targetLocationName);
 
         _returnLocation = Game1.currentLocation;
@@ -400,11 +463,93 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
 
     private int IndexOfLocation(string locationName)
     {
+        if (_fishPondMode)
+        {
+            for (var i = 0; i < _fishPondLocations.Count; i++)
+                if (string.Equals(_fishPondLocations[i].LocationName, locationName, StringComparison.Ordinal))
+                    return i;
+            return -1;
+        }
+
         for (var i = 0; i < _machineLocations.Count; i++)
             if (string.Equals(_machineLocations[i].LocationName, locationName, StringComparison.Ordinal))
                 return i;
         return -1;
     }
+
+    // ── Fish-pond-mode helpers ───────────────────────────────────────────────
+
+    private FishPondMapLocation CurrentFishPondLocation => _fishPondLocations[_locationIndex];
+
+    // Selected ponds for the CURRENT display location as full-footprint zones for the overlay.
+    private IReadOnlyList<Zone> FishPondZones()
+    {
+        if (!_selectedMachines.TryGetValue(_targetLocationName, out var anchors) || anchors.Count == 0)
+            return Array.Empty<Zone>();
+
+        var ponds = CurrentFishPondLocation.Ponds;
+        return anchors
+            .Select(anchor => ponds.FirstOrDefault(p => p.Anchor.Equals(anchor)))
+            .Where(pond => pond is not null)
+            .Select(pond => pond!.ToZone(_targetLocationName))
+            .ToList();
+    }
+
+    private void HandleFishPondSelection(TileCoord topLeft, TileCoord bottomRight, bool singleTile)
+    {
+        var selected = Selected(_targetLocationName);
+        var ponds = CurrentFishPondLocation.Ponds;
+
+        if (singleTile)
+        {
+            var pond = ponds.FirstOrDefault(p => p.Contains(topLeft));
+            if (pond is null)
+            {
+                Game1.playSound("cancel");
+                return;
+            }
+
+            if (selected.Remove(pond.Anchor))
+                Game1.playSound("bigDeSelect");
+            else
+            {
+                selected.Add(pond.Anchor);
+                Game1.playSound("coin");
+            }
+
+            return;
+        }
+
+        // Drag rectangle: select every pond whose footprint overlaps the rectangle.
+        var added = 0;
+        foreach (var pond in ponds)
+        {
+            var overlaps = pond.Anchor.X + pond.Width - 1 >= topLeft.X && pond.Anchor.X <= bottomRight.X
+                && pond.Anchor.Y + pond.Height - 1 >= topLeft.Y && pond.Anchor.Y <= bottomRight.Y;
+            if (overlaps && selected.Add(pond.Anchor))
+                added++;
+        }
+
+        Game1.playSound(added > 0 ? "coin" : "cancel");
+    }
+
+    private List<Dayswork.Core.FishPonds.FishPondRef> CollectSelectedFishPonds()
+    {
+        var result = new List<Dayswork.Core.FishPonds.FishPondRef>();
+        foreach (var location in _fishPondLocations)
+        {
+            if (!_selectedMachines.TryGetValue(location.LocationName, out var anchors))
+                continue;
+
+            foreach (var pond in location.Ponds)
+                if (anchors.Contains(pond.Anchor))
+                    result.Add(new Dayswork.Core.FishPonds.FishPondRef(location.LocationName, pond.Anchor));
+        }
+
+        return result;
+    }
+
+    private int SelectedFishPondCount => _selectedMachines.Values.Sum(set => set.Count);
 
     // Selected/protected machines for the CURRENT display location only, as 1×1 zones the overlay
     // renders in the active viewport. (Selections for other locations persist off-screen.)
@@ -413,10 +558,13 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             ? tiles.Select(tile => new Zone(_targetLocationName, tile, tile)).ToList()
             : Array.Empty<Zone>();
 
-    private int LocationCount => _chestMode ? _chestLocations.Count : _machineLocations.Count;
+    private int LocationCount =>
+        _fishPondMode ? _fishPondLocations.Count : _chestMode ? _chestLocations.Count : _machineLocations.Count;
 
     private string CurrentLocationDisplayName =>
-        _chestMode ? CurrentChestLocation.DisplayName : CurrentMachineLocation.DisplayName;
+        _fishPondMode ? CurrentFishPondLocation.DisplayName
+        : _chestMode ? CurrentChestLocation.DisplayName
+        : CurrentMachineLocation.DisplayName;
 
     private string LocationButtonLabel() =>
         I18nHelper.Get("ui.manage_machines.viewing", new { name = CurrentLocationDisplayName });
@@ -430,9 +578,11 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         }
 
         _locationIndex = ((_locationIndex + direction) % LocationCount + LocationCount) % LocationCount;
-        _targetLocationName = _chestMode
-            ? _chestLocations[_locationIndex].LocationName
-            : _machineLocations[_locationIndex].LocationName;
+        _targetLocationName = _fishPondMode
+            ? _fishPondLocations[_locationIndex].LocationName
+            : _chestMode
+                ? _chestLocations[_locationIndex].LocationName
+                : _machineLocations[_locationIndex].LocationName;
         var loc = ResolveDrawLocation(_targetLocationName);
         Game1.currentLocation = loc;
         CenterViewport(loc);
@@ -569,7 +719,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         // Machine/chest mode: a top-left location switcher cycles the displayed map among candidate
         // locations (farm + interiors/greenhouse with ≥1 machine/chest). Chest mode may have no
         // candidate locations (no selectable chests yet) — then there's nothing to switch.
-        _locationBtn = _machineMode || (_chestMode && _chestLocations.Count > 0)
+        _locationBtn = _machineMode || _fishPondMode || (_chestMode && _chestLocations.Count > 0)
             ? new ClickableComponent(new Rectangle(pad, 80, 320, bh), "Location", LocationButtonLabel()) { myID = 210 }
             : null;
 
@@ -750,7 +900,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         if (_cancelBtn.bounds.Contains(x, y)) { DoCancel();   return; }
         if (_clearBtn.bounds.Contains(x, y))
         {
-            if (_machineMode)
+            if (_machineMode || _fishPondMode)
             {
                 _selectedMachines.Clear();
             }
@@ -767,7 +917,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             Game1.playSound("trashcan");
             return;
         }
-        if ((_machineMode || _chestMode) && _locationBtn is not null && _locationBtn.bounds.Contains(x, y))
+        if ((_machineMode || _fishPondMode || _chestMode) && _locationBtn is not null && _locationBtn.bounds.Contains(x, y))
         {
             SwitchLocation(1);
             return;
@@ -847,6 +997,12 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         if (_machineMode)
         {
             HandleMachineSelection(topLeft, bottomRight, singleTile);
+            return;
+        }
+
+        if (_fishPondMode)
+        {
+            HandleFishPondSelection(topLeft, bottomRight, singleTile);
             return;
         }
 
@@ -933,6 +1089,14 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             return;
         }
 
+        if (_fishPondMode)
+        {
+            var ponds = CollectSelectedFishPonds();
+            exitThisMenu(false);
+            _onFishPondsComplete!(ponds);
+            return;
+        }
+
         var zones     = new List<Zone>(_completedZones);
         var buildings = new List<BuildingOutline>(_selectedBuildings);
         exitThisMenu(false);
@@ -1002,6 +1166,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         string hint = I18nHelper.Get(
             _chestMode ? "ui.zone_chest.chest_session_hint"
             : _machineMode ? "ui.manage_machines.draw_hint"
+            : _fishPondMode ? "ui.manage_fish_ponds.draw_hint"
             : "ui.zone_chest.session_hint");
         var size = Game1.smallFont.MeasureString(hint);
         var box  = new Rectangle((int)((w - size.X) / 2) - 16, 24, (int)size.X + 32, (int)size.Y + 14);
@@ -1021,9 +1186,11 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
 
         int total = _machineMode
             ? SelectedMachineCount
-            : _chestMode
-                ? (_selectedChest is not null || _selectedSpecial is not null ? 1 : 0)
-                : _completedZones.Count + _selectedBuildings.Count;
+            : _fishPondMode
+                ? SelectedFishPondCount
+                : _chestMode
+                    ? (_selectedChest is not null || _selectedSpecial is not null ? 1 : 0)
+                    : _completedZones.Count + _selectedBuildings.Count;
         DrawButton(b, _cancelBtn,  enabled: true);
         DrawButton(b, _clearBtn,   enabled: total > 0);
         DrawButton(b, _zoomOutBtn, enabled: true);
@@ -1031,15 +1198,17 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         DrawButton(b, _panBtn,     enabled: true, active: _isPanMode);
         DrawButton(b, _doneBtn,    enabled: true);
 
-        if ((_machineMode || _chestMode) && _locationBtn is not null)
+        if ((_machineMode || _fishPondMode || _chestMode) && _locationBtn is not null)
         {
             _locationBtn.label = LocationButtonLabel();
             DrawButton(b, _locationBtn, enabled: LocationCount > 1);
         }
 
-        if (_machineMode)
+        if (_machineMode || _fishPondMode)
         {
-            var countText = I18nHelper.Get("ui.manage_machines.selected_count", new { count = total });
+            var countText = I18nHelper.Get(
+                _fishPondMode ? "ui.manage_fish_ponds.selected_count" : "ui.manage_machines.selected_count",
+                new { count = total });
             var countBox = new Rectangle(_locationBtn!.bounds.X, _locationBtn.bounds.Bottom + 8,
                 (int)Game1.smallFont.MeasureString(countText).X + 24, 36);
             b.Draw(Game1.staminaRect, countBox, Color.Black * 0.55f);

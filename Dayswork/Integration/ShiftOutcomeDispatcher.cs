@@ -14,11 +14,14 @@ namespace Dayswork.Integration;
 // in-game HUD messages. Festival one-time refunds are credited directly to the player's gold.
 internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
 {
-    public void DispatchOverflowDelivery(IReadOnlyList<ItemStack> items, IReadOnlyList<OverflowCategory> categories)
+    public void DispatchOverflowDelivery(
+        IReadOnlyList<ItemStack> items,
+        IReadOnlyList<OverflowCategory> categories,
+        IReadOnlyDictionary<string, SObject> flavorTemplates)
     {
         if (items.Count == 0) return;
 
-        var built = BuildItems(items);
+        var built = BuildItems(items, flavorTemplates);
         if (built.Count == 0) return;
 
         var deposited = DepositToBuildingChestOrBin(built, out var usedChest, out var chestWasFull);
@@ -98,7 +101,7 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
     private static void ShowError(string text) =>
         Game1.addHUDMessage(new HUDMessage(text, HUDMessage.error_type));
 
-    private static List<Item> BuildItems(IReadOnlyList<ItemStack> stacks)
+    private static List<Item> BuildItems(IReadOnlyList<ItemStack> stacks, IReadOnlyDictionary<string, SObject> flavorTemplates)
     {
         var result = new List<Item>(stacks.Count);
         foreach (var s in stacks)
@@ -106,7 +109,13 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
             if (string.IsNullOrWhiteSpace(s.QualifiedItemId))
                 continue;
 
-            var item = ItemRegistry.Create(s.QualifiedItemId, s.Quantity);
+            // A captured flavored/colored item (roe, wine…) is cloned from its template so identity
+            // and price survive; everything else is the ordinary id-based create.
+            Item? item = s.FlavorId is { } flavorId
+                ? Orchestration.FlavorItemRegistry.Rebuild(flavorTemplates, flavorId, s.Quantity, s.Quality)
+                : null;
+            item ??= ItemRegistry.Create(s.QualifiedItemId, s.Quantity);
+
             if (item is null || IsErrorItem(item))
             {
                 ModEntry.ModMonitor.Log(
@@ -114,7 +123,7 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
                     DevLog.WarnLevel);
                 continue;
             }
-            if (item is SObject sObj && s.Quality > 0)
+            if (item is SObject sObj && s.FlavorId is null && s.Quality > 0)
                 sObj.Quality = s.Quality;
 
             result.Add(item);

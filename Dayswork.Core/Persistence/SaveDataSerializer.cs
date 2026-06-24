@@ -2,6 +2,7 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
+using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 using Dayswork.Core.Persistence.Dto;
 using Newtonsoft.Json;
@@ -161,6 +162,7 @@ public sealed class SaveDataSerializer
             CategoryPriority = contract.CategoryPriority.Select(category => category.ToString()).ToList(),
             CropPlan = CropPlanSerialization.MapDomainToDto(contract.CropPlan),
             MachineWorkScope = MachineWorkScopeSerialization.MapDomainToDto(contract.MachineScope),
+            FishPondWorkScope = FishPondWorkScopeSerialization.MapDomainToDto(contract.FishPondScope),
             Preferences = new ContractPreferencesDtoV1
             {
                 AvoidBlueGrass = contract.Preferences.AvoidBlueGrass,
@@ -190,6 +192,7 @@ public sealed class SaveDataSerializer
         var categoryPriority = MapCategoryPriority(dto.CategoryPriority);
         var cropPlan = CropPlanSerialization.MapDtoToDomain(dto.CropPlan);
         var machineScope = MachineWorkScopeSerialization.MapDtoToDomain(dto.MachineWorkScope);
+        var fishPondScope = FishPondWorkScopeSerialization.MapDtoToDomain(dto.FishPondWorkScope);
         ContractPreferences preferences;
         if (dto.Preferences is { AvoidBlueGrass: { } avoidBlueGrass })
         {
@@ -216,6 +219,7 @@ public sealed class SaveDataSerializer
             CategoryPriority: categoryPriority,
             CropPlan: cropPlan,
             MachineScope: machineScope,
+            FishPondScope: fishPondScope,
             Preferences: preferences);
     }
 

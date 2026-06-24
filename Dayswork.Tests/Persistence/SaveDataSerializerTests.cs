@@ -1,4 +1,5 @@
 using Dayswork.Core.Domain;
+using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Persistence.Dto;
@@ -307,6 +308,88 @@ public sealed class SaveDataSerializerTests
 
         var hydrated = Assert.Single(result);
         Assert.Equal(IdleTaskKind.None, hydrated.Preferences.IdleTask);
+    }
+
+    [Fact]
+    public void Deserialize_FishPondScope_RoundTrips()
+    {
+        var contract = ContractWithFishPondScope();
+
+        var result = _serializer.Deserialize(_serializer.Serialize(new[] { contract }, "0.2.0"));
+
+        var hydrated = Assert.Single(result);
+        Assert.True(ContractStructuralComparer.ContractsEqual(contract, hydrated));
+        Assert.True(hydrated.FishPondScope.IsEnabled);
+        Assert.Equal(3, hydrated.FishPondScope.Ponds.Count);
+    }
+
+    [Fact]
+    public void Serialize_EmptyFishPondScope_OmitsFishPondScope()
+    {
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
+
+        var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
+        var dto = payload["Contracts"]!.Single()!;
+
+        Assert.Null(dto["FishPondWorkScope"]);
+    }
+
+    [Fact]
+    public void Deserialize_MissingFishPondScope_DefaultsToEmpty()
+    {
+        // Migration: a v3 contract authored before Manage Fish Ponds has no FishPondWorkScope field;
+        // it must upgrade cleanly to an empty scope.
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
+        var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
+        ((JObject)payload["Contracts"]!.Single()!).Remove("FishPondWorkScope");
+
+        var result = _serializer.Deserialize(payload.ToString(Formatting.None));
+
+        var hydrated = Assert.Single(result);
+        Assert.False(hydrated.FishPondScope.IsEnabled);
+    }
+
+    [Fact]
+    public void Deserialize_MalformedFishPondScope_SkipsOnlyAffectedContract()
+    {
+        var validContract = PersistenceGenerators.CreateExampleCurrentSchemaContract();
+        var payload = JObject.Parse(_serializer.Serialize(new[] { validContract }, "0.2.0"));
+        var malformed = (JObject)((JObject)payload["Contracts"]!.Single()!).DeepClone();
+        malformed["Id"] = "aaaaaaaa-bbbb-cccc-dddd-ffffffffffff";
+        malformed["FishPondWorkScope"] = new JObject
+        {
+            ["Ponds"] = new JArray
+            {
+                new JObject
+                {
+                    // Missing LocationName ⇒ MapDtoToDomain throws ⇒ contract skipped.
+                    ["X"] = 1,
+                    ["Y"] = 1,
+                },
+            },
+        };
+        ((JArray)payload["Contracts"]!).Add(malformed);
+
+        var result = _serializer.Deserialize(payload.ToString(Formatting.None));
+
+        var hydrated = Assert.Single(result);
+        Assert.True(ContractStructuralComparer.ContractsEqual(validContract, hydrated));
+        Assert.Single(_warnings);
+        Assert.Contains("Skipping schema v3 contract", _warnings[0]);
+    }
+
+    private static Contract ContractWithFishPondScope()
+    {
+        var scope = new FishPondWorkScope(
+            new[]
+            {
+                new FishPondRef("Farm", new TileCoord(10, 12)),
+                new FishPondRef("Farm", new TileCoord(15, 12)),
+                new FishPondRef("Farm", new TileCoord(20, 20)),
+            },
+            new ChestDestination(new ChestRef("Farm", new TileCoord(21, 21))));
+
+        return PersistenceGenerators.CreateExampleCurrentSchemaContract() with { FishPondScope = scope };
     }
 
     private static Contract ContractWithMachineScope()

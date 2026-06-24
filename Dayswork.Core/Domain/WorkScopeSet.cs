@@ -1,6 +1,7 @@
 namespace Dayswork.Core.Domain;
 
 using Dayswork.Core.Crops;
+using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 
 public sealed record WorkScopeSet
@@ -11,6 +12,9 @@ public sealed record WorkScopeSet
 
     /// <summary>The authored machine work, or null when no machine group is enabled.</summary>
     public MachineWorkScope? Machines { get; }
+
+    /// <summary>The authored fish-pond work, or null when no pond is selected.</summary>
+    public FishPondWorkScope? FishPonds { get; }
 
     /// <summary>All greenhouse work scopes (one per selected greenhouse).</summary>
     public IReadOnlyList<GreenhouseWorkScope> GreenhouseWorks { get; }
@@ -23,13 +27,15 @@ public sealed record WorkScopeSet
         IReadOnlyList<AnimalBuildingScope> AnimalBuildings,
         IReadOnlyList<GreenhouseWorkScope> GreenhouseWorks,
         ManagedCropWorkScope? ManagedCrops = null,
-        MachineWorkScope? Machines = null)
+        MachineWorkScope? Machines = null,
+        FishPondWorkScope? FishPonds = null)
     {
         this.OutdoorWork = OutdoorWork;
         this.AnimalBuildings = AnimalBuildings;
         this.GreenhouseWorks = GreenhouseWorks;
         this.ManagedCrops = ManagedCrops;
         this.Machines = Machines;
+        this.FishPonds = FishPonds;
     }
 
     /// <summary>
@@ -42,7 +48,8 @@ public sealed record WorkScopeSet
         IReadOnlyList<AnimalBuildingScope> animalBuildings,
         GreenhouseWorkScope? greenhouseWork,
         ManagedCropWorkScope? managedCrops = null,
-        MachineWorkScope? machines = null) =>
+        MachineWorkScope? machines = null,
+        FishPondWorkScope? fishPonds = null) =>
         new(
             outdoorWork,
             animalBuildings,
@@ -50,5 +57,6 @@ public sealed record WorkScopeSet
                 ? Array.Empty<GreenhouseWorkScope>()
                 : new[] { greenhouseWork },
             managedCrops,
-            machines);
+            machines,
+            fishPonds);
 }

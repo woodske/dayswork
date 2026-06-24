@@ -215,6 +215,62 @@ public sealed class DepositPlannerTests
     }
 
     [Fact]
+    public void SameFlavorId_Consolidates_And_Carries_FlavorId()
+    {
+        var chest = new ChestRef("Farm", new TileCoord(4, 4));
+        // Two Sturgeon Roe stacks (same base id (O)812, same flavor token) from two ponds.
+        var snapshot = new List<BufferedItem>
+        {
+            new("(O)812", 2, TaskKind.HarvestCrops, OutputScopeProvenance.FishPond(), 0, "(O)812|sturgeon|Roe|0"),
+            new("(O)812", 3, TaskKind.HarvestCrops, OutputScopeProvenance.FishPond(), 0, "(O)812|sturgeon|Roe|0"),
+        };
+        var assignments = new Dictionary<TaskKind, DestinationKey> { [TaskKind.HarvestCrops] = new ChestDestination(chest) };
+
+        var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
+
+        var trip = Assert.Single(plan.Trips);
+        var item = Assert.Single(trip.Items);
+        Assert.Equal(5, item.Quantity);
+        Assert.Equal("(O)812|sturgeon|Roe|0", item.FlavorId);
+    }
+
+    [Fact]
+    public void DifferentFlavorIds_SameBaseId_StayDistinct()
+    {
+        var chest = new ChestRef("Farm", new TileCoord(4, 4));
+        // Sturgeon Roe vs Sardine Roe — same base id (O)812, different flavor tokens.
+        var snapshot = new List<BufferedItem>
+        {
+            new("(O)812", 2, TaskKind.HarvestCrops, OutputScopeProvenance.FishPond(), 0, "(O)812|sturgeon|Roe|0"),
+            new("(O)812", 3, TaskKind.HarvestCrops, OutputScopeProvenance.FishPond(), 0, "(O)812|sardine|Roe|0"),
+        };
+        var assignments = new Dictionary<TaskKind, DestinationKey> { [TaskKind.HarvestCrops] = new ChestDestination(chest) };
+
+        var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
+
+        var trip = Assert.Single(plan.Trips);
+        Assert.Equal(2, trip.Items.Count);
+        Assert.Contains(trip.Items, i => i.FlavorId == "(O)812|sturgeon|Roe|0" && i.Quantity == 2);
+        Assert.Contains(trip.Items, i => i.FlavorId == "(O)812|sardine|Roe|0" && i.Quantity == 3);
+    }
+
+    [Fact]
+    public void FlavorId_Survives_To_AutomaticOverflow()
+    {
+        var snapshot = new List<BufferedItem>
+        {
+            new("(O)812", 4, TaskKind.HarvestCrops, OutputScopeProvenance.FishPond(), 0, "(O)812|sturgeon|Roe|0"),
+        };
+
+        var plan = new DepositPlanner().Plan(snapshot, new Dictionary<TaskKind, DestinationKey>(), BinTile, Start, Manhattan);
+
+        Assert.Empty(plan.Trips);
+        var overflow = Assert.Single(plan.AutomaticOverflow);
+        Assert.Equal("(O)812|sturgeon|Roe|0", overflow.FlavorId);
+        Assert.Equal(4, overflow.Quantity);
+    }
+
+    [Fact]
     public void ProvenanceAssignment_Wins_Before_TaskAssignment()
     {
         var managed = OutputScopeProvenance.ManagedCrop("group-a|Farm|0|0|1|1");

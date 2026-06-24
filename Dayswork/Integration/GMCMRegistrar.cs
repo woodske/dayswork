@@ -240,6 +240,7 @@ internal sealed class GMCMRegistrar
         WorkActionKind.ApplyFertilizer => "apply_fertilizer",
         WorkActionKind.CollectMachine => "collect_machine",
         WorkActionKind.LoadMachine => "load_machine",
+        WorkActionKind.CollectFishPond => "collect_fish_pond",
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
     };
 

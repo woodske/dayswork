@@ -370,7 +370,16 @@ internal sealed partial class ShiftOrchestrator
                 return;
             }
 
-            Session.Ctx.Buffer.Add(qualifiedId, stack, TaskKind.HarvestCrops, MachineOutputRouter.ProvenanceFor(step.Group));
+            // Capture flavored/colored identity (blueberry wine, aged roe, flavored honey…) and the
+            // output's quality (cask-aged wine/cheese can be silver/gold/iridium) so the deposit
+            // pipeline rebuilds the exact item. Prefer the item the worker actually collected (correct
+            // for RecalculateOnCollect machines like bee houses), else the held output.
+            var collected = who.Items.FirstOrDefault(i =>
+                i is not null && string.Equals(i.QualifiedItemId, qualifiedId, StringComparison.Ordinal)) ?? output;
+            var flavorId = Session.Flavors.Register(collected);
+            var quality = (collected as SObject)?.Quality ?? output.Quality;
+
+            Session.Ctx.Buffer.Add(qualifiedId, stack, TaskKind.HarvestCrops, MachineOutputRouter.ProvenanceFor(step.Group), quality: quality, flavorId: flavorId);
         });
     }
 

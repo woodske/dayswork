@@ -96,6 +96,7 @@ public static class TaskKindSets
         TaskCategory.Crops,
         TaskCategory.Fieldwork,
         TaskCategory.Machines,
+        TaskCategory.FishPonds,
     };
 
     /// <summary>

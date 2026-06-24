@@ -2,6 +2,7 @@ namespace Dayswork.Core.Pricing;
 
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 
 public sealed class WorkScopeClassifier
@@ -10,7 +11,8 @@ public sealed class WorkScopeClassifier
         ContractScopeSelection selection,
         IReadOnlySet<TaskKind> enabledTasks,
         CropPlan? cropPlan = null,
-        MachineWorkScope? machineScope = null)
+        MachineWorkScope? machineScope = null,
+        FishPondWorkScope? fishPondScope = null)
     {
         OutdoorWorkScope? outdoorWork = null;
         if (selection.OutdoorZones.Count > 0 && enabledTasks.Any(TaskKindSets.IsOutdoorService))
@@ -45,8 +47,9 @@ public sealed class WorkScopeClassifier
             : null;
 
         var machines = machineScope is { IsEnabled: true } ? machineScope : null;
+        var fishPonds = fishPondScope is { IsEnabled: true } ? fishPondScope : null;
 
-        return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks, managedCrops, machines);
+        return new WorkScopeSet(outdoorWork, animalScopes, greenhouseWorks, managedCrops, machines, fishPonds);
     }
 
     private static OutdoorWorkScope BuildOutdoorWorkScope(IReadOnlyList<Zone> zones)

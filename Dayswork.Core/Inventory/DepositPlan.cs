@@ -3,8 +3,10 @@ using Dayswork.Core.Domain;
 namespace Dayswork.Core.Inventory;
 
 // A destination-agnostic quantity of one item, used inside trips and overflow sets
-// after consolidation (same item id + quality are summed).
-public sealed record ItemStack(string QualifiedItemId, int Quantity, int Quality = 0);
+// after consolidation (same item id + quality [+ flavor] are summed).
+// FlavorId: see BufferedItem — opaque token so flavored items rebuild faithfully and don't merge
+// with the plain variant of the same base id.
+public sealed record ItemStack(string QualifiedItemId, int Quantity, int Quality = 0, string? FlavorId = null);
 
 // One physical visit to one walkable destination, carrying every item bound for it.
 // Destination is never AutomaticOutputDestination (automatic-overflow items are not walked to);

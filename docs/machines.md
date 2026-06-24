@@ -190,9 +190,36 @@ from a chest's contents. `MachineReader` exposes (all probe-only):
 `category_fruits`/`keg_wine`, butter churner `milk_item`+`quality_*`) — hence the probe approach.
 `GetMachineDataForType(qualifiedId)` reads `Data/Machines` for a type without a placed instance.
 
-## Fish ponds (deferred phase — buildings, not machines)
+## Fish ponds (separate phase — buildings, not machines)
 
 Fish ponds are `StardewValley.Buildings.FishPond`, **not** `Data/Machines` objects, so none of the
-above applies to them. They accumulate produce in a building-owned output and are collect-only (their
-"input" is the initial fish stocking, out of scope). Their API (`FishPond.output`, population, the
-optional capacity-quest item request) must be verified separately when that phase begins.
+machine reader/planner above applies to them. They are **collect-only** (their "input" is the initial
+fish stocking + the optional capacity-quest item — both player-handled, out of scope). API confirmed
+by decompiling `Stardew Valley.dll` (1.6.15) → `StardewValley.Buildings.FishPond`:
+
+- **Enumerate:** ponds live in `location.buildings`, not `location.objects` — `location.buildings.OfType<FishPond>()`.
+  (Vanilla = Farm only, but scan worker-traveled locations like machines do, since mods/SVE can place
+  them elsewhere.)
+- **Identity / resolve:** a pond has no qualified item id; identity is `(location, tileX, tileY)`.
+  Re-resolve at shift start by matching a `FishPond` whose `tileX.Value`/`tileY.Value` equals the
+  stored tile (same skip-if-gone contract as machine tiles).
+- **Ready state:** `output` is a `NetRef<Item>`; **`output.Value != null` ⇒ ready to collect**. No
+  `readyForHarvest`/`heldObject` (those are `Object` fields, absent on buildings). Produce is rolled in
+  `dayUpdate` into `output.Value`; it holds **one** item stack at a time.
+- **Collect (verified in `doAction`, lines ~300–320):** vanilla takes `output.Value`, sets
+  `output.Value = null`, adds to the player, plays `"coin"`, grants fishing xp. For the worker, the
+  clean path is **direct field manipulation**: capture `output.Value`, null it, push the stack into the
+  deposit `ItemBuffer`. This avoids the player-inventory/HUD/xp entanglement entirely — **no fake
+  `Farmer` or `InvokeTaskActionGuarded` needed** (simpler than machine collect, which must go through
+  `checkForAction`). Duplication-safe: only credit the buffer after `output.Value` is nulled.
+  Pond roe is usually a flavored `ColoredObject` (Sturgeon Roe etc.); its identity/price is preserved
+  through deposit by the per-shift `FlavorItemRegistry` (capture-and-clone keyed by `BufferedItem.FlavorId`)
+  rather than reconstructed from `(O)812` — see `docs/plans/fish-ponds.md` → "Flavored roe is preserved".
+- **Nav/facing:** footprint is `tilesWide`×`tilesHigh` (5×5) and the interior tiles are water
+  (impassable). `GetItemBucketTile()` = `(tileX+4, tileY+4)` is where the output bucket visually sits;
+  worker should stand on a walkable tile adjacent to the footprint (not on water) — pick a stand tile
+  around the building perimeter, not the machine single-tile `+1` heuristic.
+- **Out of scope (confirmed fields, do not touch):** `neededItem`/`neededItemCount`/`needsMutex`
+  (capacity-gate quest), `sign`, `goldenAnimalCracker`, `currentOccupants`/`fishType` (stocking).
+- `GetFishProduce()`/`CatchFish()` exist but are the game's own roll/removal helpers — the worker only
+  reads the already-produced `output`, never re-rolls.

@@ -32,6 +32,7 @@ internal sealed class HubMenu : LayoutMenu
         Action<ContractDraft> onWorkScope,
         Action<ContractDraft> onManageCrops,
         Action<ContractDraft> onManageMachines,
+        Action<ContractDraft> onManageFishPonds,
         Action<ContractDraft> onUpgrades,
         Action<ContractDraft> onOutput,
         Action<ContractDraft> onPriority,
@@ -51,6 +52,7 @@ internal sealed class HubMenu : LayoutMenu
         _items.Add(new NavItem("ui.hub.work_scope", onWorkScope, WorkScopeStatus));
         _items.Add(new NavItem("ui.hub.manage_crops", onManageCrops, ManageCropsStatus));
         _items.Add(new NavItem("ui.hub.manage_machines", onManageMachines, ManageMachinesStatus));
+        _items.Add(new NavItem("ui.hub.manage_fish_ponds", onManageFishPonds, ManageFishPondsStatus));
         _items.Add(new NavItem("ui.hub.upgrades", onUpgrades, () => HubStatus.None));
         _items.Add(new NavItem("ui.hub.output_destination", onOutput, OutputStatus));
         _items.Add(new NavItem("ui.hub.task_priority", onPriority, () => HubStatus.None));
@@ -121,6 +123,10 @@ internal sealed class HubMenu : LayoutMenu
     // Machine management is opt-in: "Ready" once at least one machine has been selected.
     private HubStatus ManageMachinesStatus() =>
         _draft.MachinePlan.HasAnyAssignment ? Done() : Optional();
+
+    // Fish-pond management is opt-in: "Ready" once at least one pond has been selected.
+    private HubStatus ManageFishPondsStatus() =>
+        _draft.FishPondPlan.HasAnyAssignment ? Done() : Optional();
 
     // Energy/Recurrence always have a value; show the current selection as the status text.
     private HubStatus EnergyStatus() =>

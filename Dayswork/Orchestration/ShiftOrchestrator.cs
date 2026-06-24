@@ -231,7 +231,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
         var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
-        var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks, contract.CropPlan, contract.MachineScope);
+        var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks, contract.CropPlan, contract.MachineScope, contract.FishPondScope);
 
         DevLog.Log(
             $"[Dayswork][managed-crops] StartShift cropPlan enabled={contract.CropPlan.IsEnabled} assignments={contract.CropPlan.Assignments.Count} " +
@@ -239,6 +239,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             LogLevel.Info);
         DevLog.Log(
             $"[Dayswork][machines] StartShift machineScope enabled={contract.MachineScope?.IsEnabled ?? false} groups={contract.MachineScope?.Groups.Count ?? 0}.",
+            LogLevel.Info);
+        DevLog.Log(
+            $"[Dayswork][fishponds] StartShift fishPondScope enabled={contract.FishPondScope?.IsEnabled ?? false} ponds={contract.FishPondScope?.Ponds.Count ?? 0}.",
             LogLevel.Info);
 
         // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,
@@ -385,8 +388,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                 case BatchKind.Greenhouse:
                 case BatchKind.ManagedCrops:
                 case BatchKind.Machines:
-                    // ManagedCrops/Machines carry no TileWork; their runners read the authored
-                    // assignments (WorkScopeSet.ManagedCrops / .Machines) at batch start.
+                case BatchKind.FishPonds:
+                    // ManagedCrops/Machines/FishPonds carry no TileWork; their runners read the
+                    // authored scope (WorkScopeSet.ManagedCrops / .Machines / .FishPonds) at batch start.
                     batches.Add(batch);
                     break;
 
@@ -588,6 +592,42 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             }
 
             BeginMachineBatch(batch);
+            return;
+        }
+
+        if (IsFishPondBatch(batch))
+        {
+            if (!string.Equals(batch.LocationName, "Farm", StringComparison.Ordinal))
+            {
+                if (ModEntry.ExpansionCompat is { } compat &&
+                    compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
+                    descriptor.Role == ExpansionLocationRole.GreenhouseWork)
+                {
+                    if (TryStartExpansionTravel(
+                            "Farm",
+                            batch.LocationName,
+                            ExpansionRoutePurpose.WorkEntry,
+                            TravelFailurePolicy.ReportFailure,
+                            TravelPurpose.WorkEntry))
+                        return;
+
+                    Session.Ctx.CurrentBatchIndex++;
+                    BeginCurrentBatch();
+                    return;
+                }
+
+                if (TryBuildBuildingEntryPlan(batch.LocationName, TravelFailurePolicy.ReportFailure, out var plan))
+                {
+                    StartTravel(plan, TravelPurpose.WorkEntry);
+                    return;
+                }
+
+                Session.Ctx.CurrentBatchIndex++;
+                BeginCurrentBatch();
+                return;
+            }
+
+            BeginFishPondBatch(batch);
             return;
         }
 
@@ -848,6 +888,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             case IntentPerformMachineAction intent:
                 HandleMachineAction(intent, currentLocation);
                 break;
+            case IntentPerformFishPondAction intent:
+                HandleFishPondAction(intent, currentLocation);
+                break;
             case IntentPetAnimal intent:
                 HandlePetAnimal(intent);
                 break;
@@ -976,16 +1019,17 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     private static IReadOnlyList<ItemStack> ConsolidateOverflow(IEnumerable<OverflowItem> overflow)
     {
-        var totals = new Dictionary<(string Id, int Quality), int>();
+        var totals = new Dictionary<(string Id, int Quality, string? FlavorId), int>();
         foreach (var o in overflow)
         {
-            var key = (o.Stack.QualifiedItemId, o.Stack.Quality);
+            var key = (o.Stack.QualifiedItemId, o.Stack.Quality, o.Stack.FlavorId);
             totals[key] = totals.TryGetValue(key, out var e) ? e + o.Stack.Quantity : o.Stack.Quantity;
         }
         return totals
             .OrderBy(kv => kv.Key.Id, StringComparer.Ordinal)
             .ThenBy(kv => kv.Key.Quality)
-            .Select(kv => new ItemStack(kv.Key.Id, kv.Value, kv.Key.Quality))
+            .ThenBy(kv => kv.Key.FlavorId, StringComparer.Ordinal)
+            .Select(kv => new ItemStack(kv.Key.Id, kv.Value, kv.Key.Quality, kv.Key.FlavorId))
             .ToList();
     }
 

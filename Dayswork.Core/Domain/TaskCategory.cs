@@ -11,4 +11,5 @@ public enum TaskCategory
     Crops,
     Fieldwork,
     Machines,
+    FishPonds,
 }
