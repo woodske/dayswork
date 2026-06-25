@@ -115,6 +115,8 @@ internal sealed class ShiftSession
     // ── Idle loop (post-work "repeat a task until cap/exhaustion") ────────────
     // True only while parked at the office door polling for ready machines (no travel, no action).
     public bool IdleWaiting;
+    // True while a pre-idle deposit run is executing (items in buffer when idle loop was entered).
+    public bool ResumeIdleAfterDeposit;
     // Throttled-tick counter while parked, drives the periodic music-note re-emote.
     public int IdleWaitTicks;
     // Direction the worker faces while waiting (away from the office door); re-applied each emote.

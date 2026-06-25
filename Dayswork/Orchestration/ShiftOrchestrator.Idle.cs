@@ -43,8 +43,44 @@ internal sealed partial class ShiftOrchestrator
         if (Session.Ctx.WorkScopes.Machines is not { IsEnabled: true })
             return false;
 
+        // Deposit any items collected this round before parking at the door.
+        if (!Session.Ctx.Buffer.IsEmpty)
+        {
+            Session.ResumeIdleAfterDeposit = true;
+            BeginDeposit();
+            return true;
+        }
+
+        // Skip the walk to the door if there's already work to start.
+        if (AnyManagedMachineReady())
+        {
+            BeginIdleMachineServicing();
+            return true;
+        }
+
         BeginIdleWait();
         return true;
+    }
+
+    /// <summary>
+    /// Called by DepositTripRunner when the pre-idle deposit round finishes.
+    /// Honours any stop reason that fired mid-deposit; otherwise parks at the door.
+    /// </summary>
+    internal void OnPreIdleDepositComplete()
+    {
+        Session.ResumeIdleAfterDeposit = false;
+        if (ShouldWrapUpBeforeNextUnit())
+        {
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed);
+            return;
+        }
+        // Skip the walk to the door if there's already work to start.
+        if (AnyManagedMachineReady())
+        {
+            BeginIdleMachineServicing();
+            return;
+        }
+        BeginIdleWait();
     }
 
     /// <summary>Announce the wait and walk back to the office door to park.</summary>

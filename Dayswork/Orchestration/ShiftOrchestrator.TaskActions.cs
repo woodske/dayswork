@@ -144,7 +144,7 @@ internal sealed partial class ShiftOrchestrator
 
     private static void PlayAnimalCollectSound(GameLocation location, WorkerTool collectTool)
     {
-        location.playSound(AnimalCollectAudioCue.ForTool(collectTool));
+        if (Game1.player.currentLocation == location) location.playSound(AnimalCollectAudioCue.ForTool(collectTool));
     }
 
     private LaborBeatOutcome InvokeTaskActionGuarded(TileCoord tile, TaskKind task, GameLocation location)
@@ -271,7 +271,7 @@ internal sealed partial class ShiftOrchestrator
             if (loc.objects.TryGetValue(tileVec, out var leftover) &&
                 ManagedCropFieldReader.IsProduceObjectOnCropTile(tileVec, loc))
             {
-                loc.playSound("harvest", tileVec);
+                if (Game1.player.currentLocation == loc) loc.playSound("harvest", tileVec);
                 Session.Ctx.Buffer.Add(leftover.QualifiedItemId, Math.Max(1, leftover.Stack),
                     TaskKind.HarvestCrops, Session.PendingOutputProvenance,
                     quality: (leftover as SObject)?.Quality ?? 0);
@@ -284,7 +284,7 @@ internal sealed partial class ShiftOrchestrator
 
         // crop.harvest() is called directly rather than via tool infrastructure, so the
         // vanilla "harvest" sound doesn't reliably fire — emit it explicitly here.
-        loc.playSound("harvest", tileVec);
+        if (Game1.player.currentLocation == loc) loc.playSound("harvest", tileVec);
 
         // SDV 1.6: crop.harvest() adds produce directly to Game1.player (or creates debris that
         // the player magnet instantly collects). Snapshot player inventory by reference+stack so we
@@ -373,7 +373,7 @@ internal sealed partial class ShiftOrchestrator
         // Bat cave: loose spawned fruit — remove from location and buffer directly.
         if (obj.IsSpawnedObject)
         {
-            loc.playSound("harvest", tileVec);
+            if (Game1.player.currentLocation == loc) loc.playSound("harvest", tileVec);
             Session.Ctx.Buffer.Add(obj.QualifiedItemId, Math.Max(1, obj.Stack), TaskKind.HarvestCave,
                 Session.PendingOutputProvenance, quality: (obj as SObject)?.Quality ?? 0);
             loc.removeObject(tileVec, false);
@@ -384,7 +384,7 @@ internal sealed partial class ShiftOrchestrator
         if (obj.bigCraftable.Value && obj.readyForHarvest.Value && obj.heldObject.Value is { } mushroom &&
             string.Equals(obj.QualifiedItemId, "(BC)128", StringComparison.Ordinal))
         {
-            loc.playSound("coin", tileVec);
+            if (Game1.player.currentLocation == loc) loc.playSound("coin", tileVec);
             Session.Ctx.Buffer.Add(mushroom.QualifiedItemId, Math.Max(1, mushroom.Stack), TaskKind.HarvestCave,
                 Session.PendingOutputProvenance, quality: (mushroom as SObject)?.Quality ?? 0);
             obj.heldObject.Value = null;
