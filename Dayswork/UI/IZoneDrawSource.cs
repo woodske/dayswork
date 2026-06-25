@@ -18,4 +18,10 @@ internal interface IZoneDrawSource
     // crops) render in its own color so they are visually distinct.
     Color ZoneFillColor { get; }
     Color ProtectedZoneFillColor { get; }
+
+    // Managed-crop layer: highlight only the individual valid (tillable/plantable, non-sprinkler)
+    // tiles inside a zone/drag rather than the whole rectangle. False for general task scope, which
+    // fills the full rectangle.
+    bool HighlightValidTilesOnly { get; }
+    bool IsHighlightableTile(TileCoord tile);
 }

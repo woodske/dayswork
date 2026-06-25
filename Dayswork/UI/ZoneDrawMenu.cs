@@ -1,6 +1,8 @@
 using Dayswork.Core.Domain;
+using Dayswork.Core.Geometry;
 using Dayswork.Core.Machines;
 using Dayswork.Integration;
+using Dayswork.Orchestration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -74,6 +76,14 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private string _targetLocationName;
     private readonly List<Zone> _protectedZones = new();
 
+    // Managed-crop draw layer: zones are flattened to the fewest rectangles and the count of valid
+    // (tillable/plantable, non-sprinkler) tiles is shown on screen. Note _overlapToggles is also true
+    // in machine mode, so crop mode must exclude the special modes.
+    private bool CropMode => _overlapToggles && !_machineMode && !_fishPondMode && !_chestMode;
+    private int _validCropTileCount;
+    private GameLocation? _cropLocation;   // cached live map for the per-tile plantable test
+    private GameLocation CropLocation => _cropLocation ??= ResolveDrawLocation(_targetLocationName);
+
     IReadOnlyList<Zone>            IZoneDrawSource.CompletedZones    =>
         _fishPondMode ? FishPondZones() : _machineMode ? MachineZones(_selectedMachines) : _chestMode ? SelectedChestZones() : _completedZones;
     IReadOnlyList<Zone>            IZoneDrawSource.ProtectedZones    =>
@@ -84,6 +94,9 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     TileCoord  IZoneDrawSource.DragCurrent      => _dragCurrent;
     Color      IZoneDrawSource.ZoneFillColor    => _zoneFillColor;
     Color      IZoneDrawSource.ProtectedZoneFillColor => _protectedZoneFillColor;
+    bool       IZoneDrawSource.HighlightValidTilesOnly => CropMode;
+    bool       IZoneDrawSource.IsHighlightableTile(TileCoord tile) =>
+        ManagedCropFieldReader.IsPlantableGroundTile(CropLocation, tile.X, tile.Y);
 
     private readonly ZoneDrawOverlay _overlay;
 
@@ -146,6 +159,12 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         // Restore prior selections (for the active layer only) so navigating back preserves work.
         _completedZones.AddRange((initialZones ?? draft.OutdoorZones)
             .Where(zone => string.Equals(zone.LocationName, _targetLocationName, StringComparison.Ordinal)));
+
+        if (CropMode)
+        {
+            FlattenCropZones();
+            RecomputeCropTileCount();
+        }
 
         if (_allowBuildingSelection)
         {
@@ -913,6 +932,7 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             {
                 _completedZones.Clear();
                 _selectedBuildings.Clear();
+                RecomputeCropTileCount();
             }
             Game1.playSound("trashcan");
             return;
@@ -1041,9 +1061,11 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
             else
             {
                 _completedZones.Add(new Zone(_targetLocationName, topLeft, bottomRight));
+                FlattenCropZones();   // collapse the new zone into any touching zones
                 Game1.playSound("coin");
             }
 
+            RecomputeCropTileCount();
             return;
         }
 
@@ -1125,6 +1147,21 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
 
         return Game1.getLocationFromName(locationName) ?? Game1.getFarm();
     }
+
+    // ── Managed-crop zone flattening + valid-tile count ──────────────────────
+
+    // Collapse touching/co-aligned crop rectangles into the fewest zones (crop mode only).
+    private void FlattenCropZones()
+    {
+        if (!CropMode) return;
+        var flattened = ZoneFlattener.Flatten(_completedZones);
+        _completedZones.Clear();
+        _completedZones.AddRange(flattened);
+    }
+
+    // Count tiles inside the drawn zones that are tillable/plantable and not occupied by a sprinkler.
+    private void RecomputeCropTileCount() =>
+        _validCropTileCount = CropMode ? ManagedCropFieldReader.CountPlantableTiles(_completedZones) : 0;
 
     // ── Gamepad snapping ─────────────────────────────────────────────────────
 
@@ -1211,6 +1248,20 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
                 new { count = total });
             var countBox = new Rectangle(_locationBtn!.bounds.X, _locationBtn.bounds.Bottom + 8,
                 (int)Game1.smallFont.MeasureString(countText).X + 24, 36);
+            b.Draw(Game1.staminaRect, countBox, Color.Black * 0.55f);
+            Utility.drawTextWithShadow(b, countText, Game1.smallFont,
+                new Vector2(countBox.X + 12, countBox.Y + 6), Color.White);
+        }
+        else if (CropMode)
+        {
+            // No location switcher in crop mode — anchor the valid-tile count above the toolbar,
+            // right-aligned to the Done button's right edge so it never runs off the screen. Reserve
+            // width for a 3-digit count so the box doesn't shift as the number grows.
+            var countText = I18nHelper.Get("ui.manage_crops.selected_count", new { count = _validCropTileCount });
+            var reserveText = I18nHelper.Get("ui.manage_crops.selected_count", new { count = 888 });
+            int boxW = (int)Game1.smallFont.MeasureString(reserveText).X + 24;
+            int boxX = _doneBtn.bounds.Right - boxW;
+            var countBox = new Rectangle(boxX, _doneBtn.bounds.Y - 44, boxW, 36);
             b.Draw(Game1.staminaRect, countBox, Color.Black * 0.55f);
             Utility.drawTextWithShadow(b, countText, Game1.smallFont,
                 new Vector2(countBox.X + 12, countBox.Y + 6), Color.White);

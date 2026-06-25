@@ -34,9 +34,10 @@ internal sealed class ZoneDrawOverlay : IDisposable
         if (_source.IsInZoneDrawMode)
             DrawTileGrid(e.SpriteBatch);
 
-        // Completed zones — semi-transparent fill in the layer's color (O(zone count), not O(tile count))
+        // Completed zones — semi-transparent fill in the layer's color. General scope fills the whole
+        // rectangle (O(zone count)); the managed-crop layer highlights only valid plantable tiles.
         foreach (var zone in _source.CompletedZones)
-            DrawZoneFill(e.SpriteBatch, zone.TopLeft, zone.BottomRight, _source.ZoneFillColor);
+            DrawZoneOrTiles(e.SpriteBatch, zone.TopLeft, zone.BottomRight, _source.ZoneFillColor);
 
         // Protected zones belong to other managed-crop groups and cannot be selected in this session.
         foreach (var zone in _source.ProtectedZones)
@@ -56,7 +57,26 @@ internal sealed class ZoneDrawOverlay : IDisposable
             var current = _source.DragCurrent;
             var topLeft     = new TileCoord(Math.Min(start.X, current.X), Math.Min(start.Y, current.Y));
             var bottomRight = new TileCoord(Math.Max(start.X, current.X), Math.Max(start.Y, current.Y));
-            DrawZoneFill(e.SpriteBatch, topLeft, bottomRight, DragPreviewFillColor * 0.35f);
+            DrawZoneOrTiles(e.SpriteBatch, topLeft, bottomRight, DragPreviewFillColor * 0.35f);
+        }
+    }
+
+    // Fills the whole rectangle, or — in the managed-crop layer — only the valid plantable tiles
+    // inside it (so sprinklers, non-diggable ground, and off-map tiles are never highlighted).
+    private void DrawZoneOrTiles(SpriteBatch sb, TileCoord topLeft, TileCoord bottomRight, Color color)
+    {
+        if (!_source.HighlightValidTilesOnly)
+        {
+            DrawZoneFill(sb, topLeft, bottomRight, color);
+            return;
+        }
+
+        for (int x = topLeft.X; x <= bottomRight.X; x++)
+        for (int y = topLeft.Y; y <= bottomRight.Y; y++)
+        {
+            var tile = new TileCoord(x, y);
+            if (_source.IsHighlightableTile(tile))
+                DrawZoneFill(sb, tile, tile, color);
         }
     }
 

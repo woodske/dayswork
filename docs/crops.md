@@ -29,6 +29,24 @@ placeholder confirmed by observing "Wild Horseradish" appear in the crop picker 
 check as `Crop.isWildSeedCrop()`) and uses `seedId` as both `CropItemId` and the display name
 source, so they appear in the picker as "Spring Seeds" / "Summer Seeds" etc.
 
+## Sprinkler detection on a crop tile
+
+`StardewValley.Object.IsSprinkler()` (public virtual bool, `Object.cs` line ~6071 in the v1.6
+decompile) returns `GetBaseRadiusForSprinkler() >= 0`. Sprinklers are **regular objects**
+(not big-craftables) stored in `GameLocation.objects`, keyed by the tile `Vector2`.
+
+**Mod handling**: `ManagedCropFieldReader.HasSprinkler` / `IsPlantableGroundTile` use this to skip
+sprinkler tiles entirely — a sprinkler tile is the player's own fixture, so the farmhand must never
+till, plant on, or clear it. (Before this, a sprinkler sat in `location.objects` and was read as
+`HasDebris`, which queued a `ClearDebris` action that would destroy the sprinkler.) The same helper
+backs the Draw-Zones valid-tile count **and per-tile highlight** for managed-crop groups: the crop
+draw layer fills only individual plantable tiles, not the whole drawn rectangle.
+
+`GameLocation.doesTileHaveProperty(x, y, "Diggable", "Back")` is **bounds-safe for off-map tiles** —
+it resolves `map.GetLayer(...)?.Tiles[x, y]`, and xTile's `TileArray` indexer returns `null` for
+out-of-range coordinates (no throw). So `IsPlantableGroundTile` can be called on any tile in a drawn
+rectangle (including the black off-map area) and simply returns `false` there.
+
 ## Regular spring crop seed IDs (partial — confirmed from game code)
 
 From `Crop.getRandomLowGradeCropForThisSeason(Season.Spring)` → `random.Next(472, 476)`:

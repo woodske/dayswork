@@ -1,5 +1,6 @@
 using Dayswork.Core.Domain;
 using Dayswork.Integration;
+using Dayswork.Orchestration;
 using Dayswork.UI.Layout;
 using Microsoft.Xna.Framework;
 using StardewValley;
@@ -151,10 +152,10 @@ internal sealed class ManageCropsMenu : LayoutMenu
         return visibleRows * RowHeight + Math.Max(0, visibleRows - 1) * RowGap;
     }
 
+    // Tillable/plantable tile count (excludes sprinklers & non-diggable ground), matching the live
+    // Draw Zones overlay count — not the raw rectangle area.
     private static int CountTiles(IEnumerable<Zone> zones) =>
-        zones.Sum(zone =>
-            (zone.BottomRight.X - zone.TopLeft.X + 1)
-            * (zone.BottomRight.Y - zone.TopLeft.Y + 1));
+        ManagedCropFieldReader.CountPlantableTiles(zones);
 
     private static string SeasonLabel(Season season) => season switch
     {

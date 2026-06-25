@@ -372,8 +372,15 @@ internal sealed partial class ShiftOrchestrator
                     // houses) will use the stored output rather than re-deriving flavor at collection
                     // time, which is acceptable when the player isn't present.
                     who.addItemToInventory(output.getOne());
-                    machine.heldObject.Value = null;
-                    machine.readyForHarvest.Value = false;
+                    // For AllowLoadWhenFull machines (Crystalarium), heldObject IS the input mineral —
+                    // vanilla only clears readyForHarvest on collect; leave the gem in place.
+                    if (machine.GetMachineData() is { AllowLoadWhenFull: true })
+                        machine.readyForHarvest.Value = false;
+                    else
+                    {
+                        machine.heldObject.Value = null;
+                        machine.readyForHarvest.Value = false;
+                    }
                     cleared = true;
                 }
             }

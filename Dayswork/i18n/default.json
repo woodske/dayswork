@@ -86,6 +86,7 @@
     "ui.manage_crops.locked": "{{crop}} — locked (from {{origin}})",
     "ui.manage_crops.set_btn": "Set output chest",
     "ui.manage_crops.draw_btn": "Draw zone(s)",
+    "ui.manage_crops.selected_count": "Plantable tiles: {{count}}",
     "ui.manage_crops.clear_zones_btn": "Clear crop zones",
     "ui.manage_crops.zones_configured": "Crop zones configured: {{count}}",
     "ui.manage_crops.output_label": "Output destination: {{name}}",
