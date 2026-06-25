@@ -3,6 +3,7 @@ using Dayswork.Core.Energy;
 using Dayswork.Core.FishPonds;
 using Dayswork.Core.Shifts;
 using Dayswork.Worker;
+using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Buildings;
@@ -148,7 +149,7 @@ internal sealed partial class ShiftOrchestrator
             var live = _fishPondReader.Resolve(location, step.Pond.Tile);
             if (live is not null)
             {
-                CollectFishPond(live, step);
+                CollectFishPond(live, step, location);
                 SpendStaminaForBeat(WorkActionKind.CollectFishPond);
             }
 
@@ -177,7 +178,7 @@ internal sealed partial class ShiftOrchestrator
         StartNextFishPondStep();
     }
 
-    private void CollectFishPond(FishPond pond, FishPondStep step)
+    private void CollectFishPond(FishPond pond, FishPondStep step, GameLocation location)
     {
         if (_session is null)
             return;
@@ -201,6 +202,12 @@ internal sealed partial class ShiftOrchestrator
         // — only credit after the pond actually released its output). No player-inventory/HUD/xp side
         // effects, so no action guard is needed.
         pond.output.Value = null;
+
+        // Vanilla FishPond.doAction plays "coin" on collect. The worker collects via direct field
+        // write (never doAction), so emit it explicitly — but only while the player is in this
+        // location, so off-farm pond work stays silent (matches every other worker action).
+        if (Game1.player.currentLocation == location)
+            location.playSound("coin", new Vector2(step.Pond.Tile.X, step.Pond.Tile.Y));
 
         Session.Ctx.Buffer.Add(qualifiedId, stack, TaskKind.HarvestCrops, FishPondOutputRouter.Provenance, quality, flavorId);
         DevLog.Log($"[Dayswork][fishponds] collected {stack}x {qualifiedId} (q{quality}, flavor={flavorId ?? "none"}) at ({step.Pond.Tile.X},{step.Pond.Tile.Y}).", LogLevel.Debug);

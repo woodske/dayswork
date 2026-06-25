@@ -120,6 +120,7 @@ data or a decompile, and note where you confirmed it.
 - `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
 - `docs/fences-and-gates.md` — `StardewValley.Fence` gate API (`isGate`, `gatePosition` 0/88, `health > 1f`, `isPassable`, `toggleGate`, `updateWhenCurrentLocation` auto-close rule) backing the worker's open-gates-while-pathing logic in `Dayswork/Worker/WorkerMovementDriver.cs`.
 - `docs/debris-and-drops.md` — which `Game1.create*Debris` overloads route loot to `Game1.currentLocation` vs the passed `location`; the `ResourceClump.destroy()` leak (hardwood/stone spawn at the *player's* location, not the clump's) and the `InvokeTaskActionGuarded` sweep that recovers it.
+- `docs/sound-cues.md` — the **worker-sound invariant** (every worker action emits the player's sound, gated on `Game1.player.currentLocation == location`; silent off-location), the verified cue-per-action table, how to enumerate cue names from the XACT sound bank, and the `IsLocalPlayer` gotcha (vanilla machine-collect `"coin"` won't fire for the fake worker farmer).
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
 the office building/chest ids in `Dayswork/Integration/HiringBuilding.cs`, the animal-product
@@ -142,6 +143,12 @@ ids in `HiringBuilding.BuildData`.
   C#-rendered in `Display.RenderedWorld`.
 - `FarmerSprite.StopAnimation` is a no-op while `pauseForSingleAnimation` is true — clear the flag
   first.
+- **Worker sounds don't auto-fire.** Every worker action must emit the player's sound, gated on
+  `if (Game1.player.currentLocation == location) location.playSound(cue, tileVec)` — audible
+  on-location, silent off-location. Many vanilla APIs that "play the sound for you" gate it behind
+  `who.IsLocalPlayer`, which is false for the worker's `CreateFakeEventFarmer()` (e.g.
+  `Object.CheckForActionOnMachine`'s collect `"coin"`), so the sound silently doesn't play — emit it
+  yourself. When adding any collect/work path, wire its cue per `docs/sound-cues.md`.
 
 ## Current state
 
