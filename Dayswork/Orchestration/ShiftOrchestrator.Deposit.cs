@@ -82,6 +82,12 @@ internal sealed partial class ShiftOrchestrator
         if (Session.Ctx.StateMachine.Phase is ShiftPhase.Depositing or ShiftPhase.Exiting or ShiftPhase.Done)
             return;
 
+        // Guard: in pre-idle deposit mode, don't re-plan once trips are already executing.
+        // Any pending stop reason (energy/8pm) will be honoured in OnPreIdleDepositComplete.
+        if (Session.ResumeIdleAfterDeposit
+            && Session.Ctx.StateMachine.CurrentIntent is IntentDepositInShippingBin or IntentDepositAtChest)
+            return;
+
         // If the 8pm cap (or any external wrap-up trigger) fires while the worker is in the
         // idle wait loop, IdleWaiting is still true at this point. Clear it so the deposit
         // loop isn't blocked — the tick handler short-circuits on IdleWaiting=true and the
@@ -135,7 +141,22 @@ internal sealed partial class ShiftOrchestrator
 
         Session.Deposits.Load(plan.Trips);
 
-        // Enter Depositing. With no walkable trips, pass straight through to Exiting.
+        if (Session.ResumeIdleAfterDeposit)
+        {
+            // Pre-idle path: stay in Working phase so we can return to idle after depositing.
+            if (!Session.Deposits.HasPending)
+            {
+                Session.ResumeIdleAfterDeposit = false;
+                BeginIdleWait();
+                return;
+            }
+            var firstIdleTrip = Session.Deposits.BeginNextTrip();
+            Session.Ctx.StateMachine.SetIntent(ToDepositIntent(firstIdleTrip));
+            Session.Deposits.StartTravelToTrip(firstIdleTrip);
+            return;
+        }
+
+        // Normal terminal deposit: transition to Depositing and head home.
         var stopReason = Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed;
         Session.Ctx.PendingStopReason = null;
         if (stopReason == ShiftStopReason.Exhausted)
@@ -278,6 +299,10 @@ internal sealed partial class ShiftOrchestrator
                      Session.Ctx.WorkScopes.Machines?.Groups))
             map[provenance] = destination;
 
+        foreach (var (provenance, destination) in Dayswork.Core.FishPonds.FishPondOutputRouter.BuildDestinationMap(
+                     Session.Ctx.WorkScopes.FishPonds))
+            map[provenance] = destination;
+
         return map;
     }
 
@@ -296,7 +321,7 @@ internal sealed partial class ShiftOrchestrator
             : Array.Empty<ItemStack>();
         var categories = _overflowCategorizer.Categorize(Session.Ctx.Overflow);
 
-        _shiftOutcomeDispatcher.DispatchOverflowDelivery(items, categories);
+        _shiftOutcomeDispatcher.DispatchOverflowDelivery(items, categories, Session.Flavors.Templates);
         Session.Ctx.Overflow.Clear();
     }
 }

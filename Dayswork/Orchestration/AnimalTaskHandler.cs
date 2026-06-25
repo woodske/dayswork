@@ -149,7 +149,7 @@ internal sealed class AnimalTaskHandler
             return false;
 
         farm.piecesOfHay.Value -= taken;
-        animalHouseLocation.playSound("shwip");
+        if (Game1.player.currentLocation == animalHouseLocation) animalHouseLocation.playSound("shwip");
         return true;
     }
 
@@ -169,7 +169,7 @@ internal sealed class AnimalTaskHandler
         if (!animalHouse.dropObject(hay, tileVec * 64f, Game1.viewport, initialPlacement: false, who: Game1.player))
             return false;
 
-        animalHouseLocation.playSound("grassyStep");
+        if (Game1.player.currentLocation == animalHouseLocation) animalHouseLocation.playSound("grassyStep");
         return true;
     }
 
@@ -180,7 +180,11 @@ internal sealed class AnimalTaskHandler
         if (!ShouldPet(animal))
             return false;
 
-        animal.pet(Game1.player, is_auto_pet: false);
+        // After 7pm with a stationary animal, is_auto_pet:false would show a "trying to sleep"
+        // DialogueBox and return without petting. Mirror the game's own guard and use
+        // is_auto_pet:true instead — it skips that block so the animal still gets petted silently.
+        bool wouldTriggerSleepDialog = Game1.timeOfDay >= 1900 && !animal.isMoving();
+        animal.pet(Game1.player, is_auto_pet: wouldTriggerSleepDialog);
         return true;
     }
 

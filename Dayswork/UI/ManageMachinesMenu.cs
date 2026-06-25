@@ -9,11 +9,11 @@ namespace Dayswork.UI;
 
 internal sealed class ManageMachinesMenu : LayoutMenu
 {
-    private const int GroupColW = 96;
-    private const int CountColW = 140;
-    private const int ModeColW = 150;
+    private const int GroupColW = 110;
+    private const int MachineColW = 160;
+    private const int CountColW = 130;
     private const int ActionButtonW = 82;
-    private const int RowHeight = 88;
+    private const int RowHeight = 130;
     private const int RowGap = 8;
     private const int MaxVisibleRows = 5;
 
@@ -87,17 +87,17 @@ internal sealed class ManageMachinesMenu : LayoutMenu
     private static ILayoutElement BuildHeaderRow() =>
         new HStack(8,
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_machines.header_group"), color: HeaderColor), GroupColW),
-            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_machines.header_machines"), color: HeaderColor), CountColW),
-            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_machines.header_mode"), color: HeaderColor), ModeColW),
-            HStack.Fill(new Spacer(0)));
+            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_machines.header_machine"), color: HeaderColor), MachineColW),
+            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_machines.header_count"), color: HeaderColor), CountColW),
+            HStack.Fill(new Label(I18nHelper.Get("ui.manage_machines.header_mode"), color: HeaderColor)));
 
     private ILayoutElement BuildGroupRow(MachineGroupDraft group, int displayIndex)
     {
         var topLine = new HStack(8,
             HStack.Fixed(new Label(I18nHelper.Get("ui.manage_machines.group_label", new { index = displayIndex })), GroupColW),
-            HStack.Fixed(new Label(I18nHelper.Get("ui.manage_machines.machine_count", new { count = group.Machines.Count }), ellipsize: true), CountColW),
-            HStack.Fixed(new Label(ModeLabel(group.Mode), ellipsize: true), ModeColW),
-            HStack.Fill(new Spacer(0)),
+            HStack.Fixed(new Label(MachineTypeLabel(group), ellipsize: true), MachineColW),
+            HStack.Fixed(new Label(group.Machines.Count.ToString()), CountColW),
+            HStack.Fill(new Label(ModeLabel(group.Mode), ellipsize: true)),
             HStack.Auto(new MenuButton(
                 I18nHelper.Get("ui.manage_machines.edit_group_btn"),
                 () => _onEditGroup(_draft, group.Id),
@@ -110,19 +110,7 @@ internal sealed class ManageMachinesMenu : LayoutMenu
                 height: 42,
                 sound: "trashcan")));
 
-        var detailLine = new Padding(
-            new Label(DetailSummary(group), color: SecondaryTextColor),
-            top: 2,
-            left: GroupColW + 8);
-
-        return new VStack(0, topLine, detailLine);
-    }
-
-    private string DetailSummary(MachineGroupDraft group)
-    {
-        var type = group.HasType
-            ? ItemRegistry.GetData(group.MachineType!)?.DisplayName ?? group.MachineType!
-            : I18nHelper.Get("ui.manage_machines.type_none");
+        var indent = GroupColW + 8;
         var input = group.IsAnyInput
             ? I18nHelper.Get("ui.manage_machines.input_any")
             : I18nHelper.Get("ui.manage_machines.input_specific", new { count = group.AllowedInputIds.Count });
@@ -130,8 +118,18 @@ internal sealed class ManageMachinesMenu : LayoutMenu
             ? ChestResolver.DescribeChestRef(chestRef)
             : I18nHelper.Get("ui.manage_machines.chest_none");
         var output = OutputLabel(group.OutputDestination);
-        return I18nHelper.Get("ui.manage_machines.detail_summary", new { type, input, chest, output });
+
+        return new VStack(0,
+            topLine,
+            new Padding(new Label(I18nHelper.Get("ui.manage_machines.detail_input", new { input }), color: SecondaryTextColor), top: 2, left: indent),
+            new Padding(new Label(chest, color: SecondaryTextColor), top: 1, left: indent),
+            new Padding(new Label(I18nHelper.Get("ui.manage_machines.detail_output", new { output }), color: SecondaryTextColor), top: 1, left: indent));
     }
+
+    private static string MachineTypeLabel(MachineGroupDraft group) =>
+        group.HasType
+            ? ItemRegistry.GetData(group.MachineType!)?.DisplayName ?? group.MachineType!
+            : I18nHelper.Get("ui.manage_machines.type_none");
 
     internal static string ModeLabel(MachineGroupMode mode) => mode switch
     {

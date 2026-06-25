@@ -3,6 +3,7 @@ namespace Dayswork.Tests.Pricing;
 using Dayswork.Core.Config;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 using Dayswork.Core.Pricing;
 using Xunit;
@@ -179,6 +180,42 @@ public sealed class ContractTermsBuilderTests
             preview.ValidationIssues,
             issue => issue.Code == ContractValidationCode.MachineGroupNeedsInputChest);
     }
+
+    [Fact]
+    public void BuildPreview_FishPondsOnly_IsValid()
+    {
+        var preview = _builder.BuildPreview(
+            EmptySelection,
+            new HashSet<TaskKind>(),
+            EnergyTier.FullDay,
+            _config,
+            cropPlan: null,
+            machineScope: null,
+            fishPondScope: FishPondScope());
+
+        Assert.True(preview.IsValid);
+        Assert.NotNull(preview.ProposedTerms);
+    }
+
+    [Fact]
+    public void BuildPreview_FishPondsAddNoSurcharge_PriceEqualsTierPrice()
+    {
+        var preview = _builder.BuildPreview(
+            EmptySelection,
+            new HashSet<TaskKind>(),
+            EnergyTier.FullDay,
+            _config,
+            cropPlan: null,
+            machineScope: null,
+            fishPondScope: FishPondScope());
+
+        Assert.Equal(_config.EnergyTierPrice[EnergyTier.FullDay], preview.ProposedTerms!.Pricing.TotalPrice);
+    }
+
+    private static FishPondWorkScope FishPondScope() =>
+        new(
+            new[] { new FishPondRef("Farm", new TileCoord(8, 8)) },
+            new ChestDestination(new ChestRef("Farm", new TileCoord(2, 2))));
 
     [Fact]
     public void BuildTerms_InvalidSelection_Throws()

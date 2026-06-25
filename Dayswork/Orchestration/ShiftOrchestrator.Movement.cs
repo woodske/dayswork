@@ -163,6 +163,13 @@ internal sealed partial class ShiftOrchestrator
                 }
             }
 
+            if (Session.FishPondsActive && Session.CurrentFishPondStep is not null)
+            {
+                Session.CurrentFishPondStep = null;   // couldn't reach this pond; skip it
+                StartNextFishPondStep();
+                return;
+            }
+
             if (Session.ManagedActive && Session.CurrentManagedAction is not null)
             {
                 Session.CurrentManagedAction = null;
@@ -215,6 +222,13 @@ internal sealed partial class ShiftOrchestrator
                     Session.ActionPending = false;
                     return;
                 }
+            }
+
+            if (Session.FishPondsActive && Session.CurrentFishPondStep is { } pondStep)
+            {
+                Session.Ctx.StateMachine.SetIntent(new IntentPerformFishPondAction(pondStep.Pond));
+                Session.ActionPending = false;
+                return;
             }
 
             if (Session.ManagedActive && Session.CurrentManagedAction is { } managedAction)

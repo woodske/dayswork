@@ -30,6 +30,11 @@ public enum BatchKind
     // Harvest Cave: visit the FarmCave location and collect bat fruit or mushroom-box output.
     // No scope selection; the cave is always a single static location.
     FarmCave,
+
+    // Manage Fish Ponds: the contract's selected fish ponds in this location, visited to collect
+    // finished pond output. Collect-only (the player stocks the fish). The pond refs are carried
+    // out-of-band by the runtime (Tasks empty), like managed crops and machines.
+    FishPonds,
 }
 
 public enum AnimalProductKind

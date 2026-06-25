@@ -20,6 +20,9 @@ internal sealed class ContractDraft
     /// <summary>In-progress machine plan authored on the Manage Machines page. Transient.</summary>
     public MachinePlanDraft MachinePlan { get; } = new();
 
+    /// <summary>In-progress fish-pond plan authored on the Manage Fish Ponds page. Transient.</summary>
+    public FishPondPlanDraft FishPondPlan { get; } = new();
+
     /// <summary>Purchased energy tier (sets the worker's daily capacity and the contract price).</summary>
     public EnergyTier Tier { get; set; } = EnergyTier.FullDay;
 

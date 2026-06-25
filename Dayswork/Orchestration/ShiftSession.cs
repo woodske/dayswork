@@ -115,6 +115,8 @@ internal sealed class ShiftSession
     // ── Idle loop (post-work "repeat a task until cap/exhaustion") ────────────
     // True only while parked at the office door polling for ready machines (no travel, no action).
     public bool IdleWaiting;
+    // True while a pre-idle deposit run is executing (items in buffer when idle loop was entered).
+    public bool ResumeIdleAfterDeposit;
     // Throttled-tick counter while parked, drives the periodic music-note re-emote.
     public int IdleWaitTicks;
     // Direction the worker faces while waiting (away from the office door); re-applied each emote.
@@ -138,6 +140,18 @@ internal sealed class ShiftSession
     // inputs were withdrawn from (so leftovers settle back there on stop). Items are never lost.
     public readonly Dictionary<string, int> CarriedInputs = new(StringComparer.Ordinal);
     public ChestRef? CarriedInputsChest;
+
+    // Capture-and-clone store for flavored/colored output (roe, wine, jelly, flavored honey…) so the
+    // deposit pipeline rebuilds the exact item instead of a generic one. Fresh per shift.
+    public readonly FlavorItemRegistry Flavors = new();
+
+    // ── Fish pond batch state ────────────────────────────────────────────────
+    // Collect-only: each step visits one ready pond, takes its output into the deposit buffer. No
+    // reload/fetch machinery (the player stocks the fish).
+    public readonly Queue<FishPondStep> FishPondSteps = new();
+    public FishPondStep? CurrentFishPondStep;
+    public bool FishPondsActive;
+    public string FishPondBatchLocationName = "Farm";
 }
 
 /// <summary>A delayed debris collection pass (felled-tree trunks, shaken fruit settle late).</summary>

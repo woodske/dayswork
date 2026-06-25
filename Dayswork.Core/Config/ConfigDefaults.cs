@@ -44,6 +44,9 @@ public static class ConfigDefaults
             // many items the recipe consumes (a 5-fruit dehydrator load is one LoadMachine charge).
             [WorkActionKind.CollectMachine] = 1,
             [WorkActionKind.LoadMachine] = 1,
+            // Fish ponds are collect-only (the player stocks the fish); one charge to collect a
+            // pond's ready output, mirroring the machine collect charge.
+            [WorkActionKind.CollectFishPond] = 1,
         };
 
         return ConfigSnapshotFactory.Create(

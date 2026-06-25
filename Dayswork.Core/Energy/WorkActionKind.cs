@@ -16,4 +16,5 @@ public enum WorkActionKind
     ApplyFertilizer,
     CollectMachine,
     LoadMachine,
+    CollectFishPond,
 }

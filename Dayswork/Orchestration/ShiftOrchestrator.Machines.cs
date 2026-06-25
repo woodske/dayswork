@@ -4,6 +4,7 @@ using Dayswork.Core.Inventory;
 using Dayswork.Core.Machines;
 using Dayswork.Core.Shifts;
 using Dayswork.Worker;
+using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.GameData.Machines;
@@ -351,9 +352,30 @@ internal sealed partial class ShiftOrchestrator
             var stack = Math.Max(1, output.Stack);
 
             var who = CreateWorkerActionFarmer(step.Machine.Tile, location);
+            bool cleared;
             try
             {
-                machine.checkForAction(who);
+                if (Game1.player.currentLocation == location)
+                {
+                    // Player is here — use checkForAction for correct RecalculateOnCollect flavor
+                    // (e.g. bee houses re-derive honey at collect time). Note: checkForAction's own
+                    // "coin" sound is gated behind who.IsLocalPlayer, which is false for the fake
+                    // worker farmer — so it stays silent here and we emit the sound explicitly below.
+                    machine.checkForAction(who);
+                    cleared = machine.heldObject.Value is null || !machine.readyForHarvest.Value;
+                }
+                else
+                {
+                    // Player is elsewhere — checkForAction has no playSounds:false equivalent, so bypass
+                    // it to avoid cross-location sounds. Give the held output to the fake farmer directly
+                    // and clear the machine state manually. RecalculateOnCollect machines (e.g. bee
+                    // houses) will use the stored output rather than re-deriving flavor at collection
+                    // time, which is acceptable when the player isn't present.
+                    who.addItemToInventory(output.getOne());
+                    machine.heldObject.Value = null;
+                    machine.readyForHarvest.Value = false;
+                    cleared = true;
+                }
             }
             catch (Exception ex)
             {
@@ -363,14 +385,28 @@ internal sealed partial class ShiftOrchestrator
 
             // Only credit the buffer if the machine actually released its output (duplication-safe:
             // if checkForAction couldn't collect, the item is still in the world for the player).
-            var cleared = machine.heldObject.Value is null || !machine.readyForHarvest.Value;
             if (!cleared || string.IsNullOrWhiteSpace(qualifiedId))
             {
                 DevLog.Log($"[Dayswork][machines] collect at ({step.Machine.Tile.X},{step.Machine.Tile.Y}) left output in place; not credited.", DevLog.WarnLevel);
                 return;
             }
 
-            Session.Ctx.Buffer.Add(qualifiedId, stack, TaskKind.HarvestCrops, MachineOutputRouter.ProvenanceFor(step.Group));
+            // Capture flavored/colored identity (blueberry wine, aged roe, flavored honey…) and the
+            // output's quality (cask-aged wine/cheese can be silver/gold/iridium) so the deposit
+            // pipeline rebuilds the exact item. Prefer the item the worker actually collected (correct
+            // for RecalculateOnCollect machines like bee houses), else the held output.
+            var collected = who.Items.FirstOrDefault(i =>
+                i is not null && string.Equals(i.QualifiedItemId, qualifiedId, StringComparison.Ordinal)) ?? output;
+            var flavorId = Session.Flavors.Register(collected);
+            var quality = (collected as SObject)?.Quality ?? output.Quality;
+
+            Session.Ctx.Buffer.Add(qualifiedId, stack, TaskKind.HarvestCrops, MachineOutputRouter.ProvenanceFor(step.Group), quality: quality, flavorId: flavorId);
+
+            // Vanilla plays "coin" on machine collect, but only for the local player (see comment
+            // above) — emit it ourselves, gated on the player being here so off-farm machine work
+            // stays silent (matches every other worker action).
+            if (Game1.player.currentLocation == location)
+                location.playSound("coin", new Vector2(step.Machine.Tile.X, step.Machine.Tile.Y));
         });
     }
 
@@ -411,7 +447,9 @@ internal sealed partial class ShiftOrchestrator
             bool loaded;
             try
             {
-                loaded = machine.PlaceInMachine(data, inputItem, probe: false, who, showMessages: false, playSounds: false);
+                // Let vanilla emit the machine-specific load sound (PlayEffects, not IsLocalPlayer-gated)
+                // only while the player is in this location — silent for off-farm machine work.
+                loaded = machine.PlaceInMachine(data, inputItem, probe: false, who, showMessages: false, playSounds: Game1.player.currentLocation == location);
             }
             catch (Exception ex)
             {
@@ -479,11 +517,33 @@ internal sealed partial class ShiftOrchestrator
         }
 
         Session.CarriedInputsChest = job.Chest;
+
+        // The worker pulls inputs directly from the chest's item list (no ItemGrabMenu), so the
+        // vanilla open + per-item pickup sounds never fire. Emit them ourselves, mirroring the
+        // deposit trip's chest audio: "openChest" on open, then the inventory move cue "dwop" for
+        // each item type taken — staggered, since the withdrawal is synchronous and same-frame cues
+        // would overlap into one. Gated on the player being in the chest's location so off-farm
+        // fetches stay silent (matches every other worker action).
+        var chestLoc = chest.Location;
+        var playerHere = chestLoc is not null && Game1.player.currentLocation == chestLoc;
+        var chestTile = new Vector2(chest.TileLocation.X, chest.TileLocation.Y);
+        if (playerHere)
+        {
+            chest.frameCounter.Value = 5;  // vanilla open trigger (matches DepositTripRunner)
+            chestLoc!.playSound("openChest", chestTile);
+        }
+
+        var takeSoundIndex = 0;
         foreach (var (id, want) in job.Plan.Withdrawals)
         {
             var taken = RemoveFromChest(chest, id, want);
-            if (taken > 0)
-                Session.CarriedInputs[id] = Session.CarriedInputs.GetValueOrDefault(id) + taken;
+            if (taken <= 0)
+                continue;
+
+            Session.CarriedInputs[id] = Session.CarriedInputs.GetValueOrDefault(id) + taken;
+            if (playerHere)
+                DelayedAction.playSoundAfterDelay("dwop", 150 + takeSoundIndex * 90, chestLoc, chestTile);
+            takeSoundIndex++;
         }
     }
 
@@ -516,6 +576,16 @@ internal sealed partial class ShiftOrchestrator
         var chest = Session.CarriedInputsChest is { } chestRef ? _chestResolver.ResolveChest(chestRef) : null;
         var chestWritable = chest is not null && !chest.GetMutex().IsLocked();
 
+        // Returning leftover inputs is the inverse of WithdrawInputs and writes the chest directly,
+        // so emit the same hand-rolled chest audio (the menu sounds never fire): "openChest" once,
+        // then "dwop" per item type actually returned (staggered, since this is synchronous). Gated
+        // on the player being in the chest's location so off-farm settles stay silent.
+        var chestLoc = chestWritable ? chest!.Location : null;
+        var playerHere = chestLoc is not null && Game1.player.currentLocation == chestLoc;
+        var chestTile = chest is not null ? new Vector2(chest.TileLocation.X, chest.TileLocation.Y) : Vector2.Zero;
+        var chestOpened = false;
+        var returnSoundIndex = 0;
+
         foreach (var (id, count) in Session.CarriedInputs.ToList())
         {
             if (count <= 0)
@@ -528,6 +598,19 @@ internal sealed partial class ShiftOrchestrator
             Item? leftover = item;
             if (chestWritable)
                 leftover = chest!.addItem(item);
+
+            // At least part of the stack landed in the chest → play the return audio.
+            if (playerHere && (leftover is null || leftover.Stack < count))
+            {
+                if (!chestOpened)
+                {
+                    chest!.frameCounter.Value = 5;  // vanilla open trigger (matches WithdrawInputs)
+                    chestLoc!.playSound("openChest", chestTile);
+                    chestOpened = true;
+                }
+                DelayedAction.playSoundAfterDelay("dwop", 150 + returnSoundIndex * 90, chestLoc, chestTile);
+                returnSoundIndex++;
+            }
 
             if (leftover is not null && leftover.Stack > 0)
                 Session.Ctx.Overflow.Add(new OverflowItem(

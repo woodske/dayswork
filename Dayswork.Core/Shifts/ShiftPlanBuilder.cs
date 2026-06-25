@@ -1,5 +1,6 @@
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
+using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 
 namespace Dayswork.Core.Shifts;
@@ -19,9 +20,10 @@ public sealed class ShiftPlanBuilder
         var cropBatches    = BuildCropsBatches(scopes, enabledTasks);
         var fieldworkBatches = BuildFieldworkBatches(scopes, enabledTasks);
         var machineBatches = BuildMachineBatches(scopes);
+        var fishPondBatches = BuildFishPondBatches(scopes);
 
         var result = new List<WorkBatch>(
-            animalBatches.Count + cropBatches.Count + fieldworkBatches.Count + machineBatches.Count);
+            animalBatches.Count + cropBatches.Count + fieldworkBatches.Count + machineBatches.Count + fishPondBatches.Count);
         foreach (var category in categoryPriority.Distinct())
         {
             result.AddRange(category switch
@@ -30,6 +32,7 @@ public sealed class ShiftPlanBuilder
                 TaskCategory.Crops      => cropBatches,
                 TaskCategory.Fieldwork  => fieldworkBatches,
                 TaskCategory.Machines   => machineBatches,
+                TaskCategory.FishPonds  => fishPondBatches,
                 _                       => (IReadOnlyList<WorkBatch>)Array.Empty<WorkBatch>(),
             });
         }
@@ -63,6 +66,26 @@ public sealed class ShiftPlanBuilder
 
         foreach (var location in locations)
             batches.Add(CreateSkeleton(location, BatchKind.Machines, Array.Empty<TaskKind>(), feedBuilding: false));
+
+        return batches;
+    }
+
+    private static List<WorkBatch> BuildFishPondBatches(WorkScopeSet scopes)
+    {
+        var batches = new List<WorkBatch>();
+        if (scopes.FishPonds is not { IsEnabled: true } fishPonds)
+            return batches;
+
+        // Bucket selected ponds by location: one FishPonds batch per location with ≥1 pond. Each
+        // pond is re-resolved at runtime; the scope's single output destination applies to all.
+        var locations = fishPonds.Ponds
+            .Select(pond => pond.LocationName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal);
+
+        foreach (var location in locations)
+            batches.Add(CreateSkeleton(location, BatchKind.FishPonds, Array.Empty<TaskKind>(), feedBuilding: false));
 
         return batches;
     }

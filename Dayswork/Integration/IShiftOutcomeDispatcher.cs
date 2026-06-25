@@ -8,8 +8,12 @@ namespace Dayswork.Integration;
 internal interface IShiftOutcomeDispatcher
 {
     // Delivers every overflow item to the farmhand office chest, with a shipping-bin fallback.
-    // Sends nothing when there are no items.
-    void DispatchOverflowDelivery(IReadOnlyList<ItemStack> items, IReadOnlyList<OverflowCategory> categories);
+    // Sends nothing when there are no items. flavorTemplates clones captured flavored/colored items
+    // (roe, wine…) back faithfully — keyed by RoutedItemStack.FlavorId; pass an empty map for none.
+    void DispatchOverflowDelivery(
+        IReadOnlyList<ItemStack> items,
+        IReadOnlyList<OverflowCategory> categories,
+        IReadOnlyDictionary<string, StardewValley.Object> flavorTemplates);
 
     // Same-day HUD notice that the recurring contract's fixed daily price was unaffordable.
     void ShowCannotAffordNotice(Contract contract, int dailyPrice, int shortfall);

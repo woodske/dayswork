@@ -314,6 +314,7 @@ internal sealed class SummaryMenu : IClickableMenu
         TaskCategory.Crops => "crops",
         TaskCategory.Fieldwork => "fieldwork",
         TaskCategory.Machines => "machines",
+        TaskCategory.FishPonds => "fish_ponds",
         _ => category.ToString(),
     };
 

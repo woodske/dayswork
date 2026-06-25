@@ -9,4 +9,5 @@ public enum OutputScopeFamily
     ManagedCrop,
     Machine,
     Cave,
+    FishPond,
 }
