@@ -83,9 +83,10 @@ internal sealed partial class ShiftOrchestrator
             return;
 
         // Guard: in pre-idle deposit mode, don't re-plan once trips are already executing.
+        // Use IsActive (not intent) because StartTravel overwrites the intent with IntentMoveToTile
+        // during deposit trip travel, which would make an intent check silently fail.
         // Any pending stop reason (energy/8pm) will be honoured in OnPreIdleDepositComplete.
-        if (Session.ResumeIdleAfterDeposit
-            && Session.Ctx.StateMachine.CurrentIntent is IntentDepositInShippingBin or IntentDepositAtChest)
+        if (Session.ResumeIdleAfterDeposit && Session.Deposits.IsActive)
             return;
 
         // If the 8pm cap (or any external wrap-up trigger) fires while the worker is in the
@@ -147,6 +148,11 @@ internal sealed partial class ShiftOrchestrator
             if (!Session.Deposits.HasPending)
             {
                 Session.ResumeIdleAfterDeposit = false;
+                if (ShouldWrapUpBeforeNextUnit())
+                {
+                    QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed);
+                    return;
+                }
                 BeginIdleWait();
                 return;
             }

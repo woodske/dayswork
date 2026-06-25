@@ -60,6 +60,10 @@ internal sealed class DepositTripRunner
 
     public bool HasPending => _trips.Count > 0;
 
+    // True while any pre-idle deposit trip is in-flight or queued. Unlike HasPending this also
+    // covers the currently executing trip (_current), which BeginNextTrip already dequeued.
+    public bool IsActive => _current is not null || _trips.Count > 0;
+
     /// <summary>Replaces the queue with a freshly planned trip list.</summary>
     public void Load(IReadOnlyList<DepositTrip> trips)
     {

@@ -160,6 +160,14 @@ internal sealed partial class ShiftOrchestrator
         if (_session is null)
             return;
 
+        // Resuming active work after parking at the office: the idle wait skips SampleProgress, so the
+        // stuck detector's elapsed-time baseline (LastSampledGameTime) is frozen at park-time. Without
+        // this refresh the first servicing tick reads the whole wait as one giant no-progress sample,
+        // fires a false "stuck," and (on the second occurrence) teleports the worker home — ending the
+        // shift hours before the 8pm cap. Reset both so only real servicing time is measured.
+        Session.Stuck.Reset();
+        Session.LastSampledGameTime = Game1.timeOfDay;
+
         Session.Ctx.ResetBatches(new ShiftPlanBuilder().BuildMachineBatchPlan(Session.Ctx.WorkScopes));
         BeginCurrentBatch();
     }
