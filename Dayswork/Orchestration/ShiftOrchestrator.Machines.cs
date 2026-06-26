@@ -372,14 +372,26 @@ internal sealed partial class ShiftOrchestrator
                     // houses) will use the stored output rather than re-deriving flavor at collection
                     // time, which is acceptable when the player isn't present.
                     who.addItemToInventory(output.getOne());
-                    // For AllowLoadWhenFull machines (Crystalarium), heldObject IS the input mineral —
-                    // vanilla only clears readyForHarvest on collect; leave the gem in place.
-                    if (machine.GetMachineData() is { AllowLoadWhenFull: true })
-                        machine.readyForHarvest.Value = false;
-                    else
+                    machine.heldObject.Value = null;
+                    machine.readyForHarvest.Value = false;
+                    machine.showNextIndex.Value = false;
+                    machine.ResetParentSheetIndex();
+
+                    // Re-fire the OutputCollected rule so chained-output machines keep producing —
+                    // most importantly the Crystalarium, which re-derives the next gem from its
+                    // remembered input (machine.lastInputItem), not a fresh chest input. This mirrors
+                    // vanilla CheckForActionOnMachine; without it the machine is left empty (the bug:
+                    // the loaded mineral vanishes). The re-trigger is silent off-location — OutputMachine
+                    // sets a future ready time (no "dwop") and addWorkingAnimation early-returns when
+                    // no farmer is in the location. Machines with no OutputCollected rule (furnace,
+                    // keg, …) match no rule here, so heldObject stays null exactly as before.
+                    var machineData = machine.GetMachineData();
+                    if (machineData is not null
+                        && MachineDataUtility.TryGetMachineOutputRule(
+                            machine, machineData, MachineOutputTrigger.OutputCollected, output.getOne(),
+                            who, location, out var collectRule, out _, out _, out _))
                     {
-                        machine.heldObject.Value = null;
-                        machine.readyForHarvest.Value = false;
+                        machine.OutputMachine(machineData, collectRule, machine.lastInputItem.Value, who, location, probe: false);
                     }
                     cleared = true;
                 }

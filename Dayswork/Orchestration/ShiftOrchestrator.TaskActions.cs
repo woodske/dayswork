@@ -175,12 +175,26 @@ internal sealed partial class ShiftOrchestrator
             ? new HashSet<Debris>(leakLocation.debris)
             : null;
 
+        // Many vanilla worker-facing APIs (notably Crop.harvest) play their sounds on
+        // Game1.player.currentLocation rather than the location the action happens in. The audio
+        // engine only makes a cue audible when its location matches Game1.currentLocation
+        // (SoundsHelper.GetVolumeForDistance), so those cues leak to wherever the player is standing
+        // while the worker works elsewhere (e.g. greenhouse harvest heard from town). Point the
+        // player's currentLocation at the work location for the beat so the engine gates them to the
+        // worker's location — audible when the player is here, silent otherwise. Setting
+        // currentLocation only writes net fields + a cached ref and is reverted synchronously below,
+        // so nothing else observes the swap. Restored first in the finally.
+        var savedPlayerLocation = Game1.player.currentLocation;
+        Game1.player.currentLocation = location;
+
         try
         {
             return InvokeTaskAction(tile, task, location);
         }
         finally
         {
+            Game1.player.currentLocation = savedPlayerLocation;
+
             if (leakDebrisBefore is not null)
             {
                 // Dev tripwire: how many items vanilla mis-routed into the player's location this
@@ -298,6 +312,33 @@ internal sealed partial class ShiftOrchestrator
         // instead of the player's inventory.
         loc.objects.TryGetValue(tileVec, out var objectBefore);
 
+        // Guarantee Crop.harvest()'s grab branch has somewhere to put its produce. With a full
+        // player inventory, addItemToInventoryBool fails and vanilla silently discards the ENTIRE
+        // yield (its extra-drop createItemDebris calls are gated on the same success flag) while we
+        // still destroy the crop below — losing the item (hard rule 4). Free one slot when the
+        // inventory is full; the produce is redirected to the worker buffer immediately after and
+        // the stashed item restored to its slot. crop.harvest adds at most one item to the
+        // inventory, so one free slot suffices; the remaining drops go through debris, which the
+        // redirect/debris sweep already captures.
+        Item? stashedItem = null;
+        var stashedSlot = -1;
+        if (Game1.player.freeSpotsInInventory() == 0)
+        {
+            for (var i = 0; i < Game1.player.Items.Count; i++)
+            {
+                if (Game1.player.Items[i] is { } occupant)
+                {
+                    stashedItem = occupant;
+                    stashedSlot = i;
+                    Game1.player.Items[i] = null;
+                    break;
+                }
+            }
+        }
+
+        // crop.harvest()'s vanilla cues play on Game1.player.currentLocation; InvokeTaskActionGuarded
+        // points that at the work location for the beat so they gate to the worker's location (don't
+        // re-wrap here).
         dirt.crop.harvest(tile.X, tile.Y, dirt, null);
 
         // Redirect any items that landed in the player's inventory to the worker buffer.
@@ -321,6 +362,11 @@ internal sealed partial class ShiftOrchestrator
                     Game1.player.removeItemFromInventory(item);
             }
         }
+
+        // Restore the slot we freed above (if any) now that the produce has been pulled into the
+        // buffer. removeItemFromInventory nulls slots in place, so the index is still valid.
+        if (stashedItem is not null && stashedSlot >= 0)
+            Game1.player.Items[stashedSlot] = stashedItem;
 
         // Collect any Object placed at this tile by harvest (wild seed forage path).
         if (loc.objects.TryGetValue(tileVec, out var newObj) && !ReferenceEquals(objectBefore, newObj))

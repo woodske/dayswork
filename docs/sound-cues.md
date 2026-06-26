@@ -54,6 +54,28 @@ the animator (before the guard) would play a phantom sound on empty-tile no-ops.
 machine collect follow the same rule — the cue sits after the "has output" guard so empty
 ponds/machines make no phantom sound.
 
+**How `playSound` self-gates (verified in the decompile):** `GameLocation.playSound(cue)` →
+`SoundsHelper.PlayAll` → (single-player) `NetAudio.Fire` → `SoundsHelper.PlayLocal` →
+`GetVolumeForDistance(location, position)`, which returns **0 (silent)** unless
+`location.NameOrUniqueName == Game1.currentLocation.NameOrUniqueName`. So a cue is audible only
+when it's emitted **on the player's current location** — this is *why* the worker-sound invariant
+gate (`if (Game1.player.currentLocation == location)`) works, and why emitting on the wrong
+location object leaks. (`Game1.playSound(cue)`, by contrast, is global/ungated — it always plays
+for the local player.)
+
+**Worker-beat location redirect (`Game1.player.currentLocation`):** several vanilla worker-facing
+APIs play their cues on **`Game1.player.currentLocation`** — the *player's* location, not the
+location the action happens in — so they're **always audible wherever the player stands** (e.g.
+greenhouse harvest heard from town). The worst offender is `Crop.harvest()` (called with
+`junimoHarvester == null` in `InvokeHarvest`), which plays `"harvest"`/delayed-`"coin"`/`"dwoop"`
+this way. Rather than wrap each such call, [`InvokeTaskActionGuarded`](../Dayswork/Orchestration/ShiftOrchestrator.TaskActions.cs)
+points `Game1.player.currentLocation` at the work `location` for the whole worker beat (restored in
+`finally`, alongside the other `Game1.player` state it already snapshots). The engine's distance
+gate then silences any such cue off-location and plays it normally when the player is present —
+covering this entire class in one place, including delayed cues that capture the location at
+schedule time. (`FruitTree.shake` and the tree/rock/grass/weed terrain APIs already play on their
+own `location` argument, so they were never affected.) Do **not** re-wrap individual calls.
+
 **Machine collect gotcha (`IsLocalPlayer`):** vanilla `Object.CheckForActionOnMachine` plays its
 `"coin"` *inside* `if (who.IsLocalPlayer)`. The worker acts as a fake `CreateFakeEventFarmer()`
 farmer, which is never the local player, so `machine.checkForAction(who)` is **silent** — the mod
