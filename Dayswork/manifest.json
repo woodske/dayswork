@@ -1,7 +1,7 @@
 {
   "Name": "Dayswork",
   "Author": "Bindicle",
-  "Version": "1.1.1",
+  "Version": "1.2.0",
   "Description": "Hire an NPC farmhand to work your farm while you adventure.",
   "UniqueID": "Bindicle.Dayswork",
   "MinimumApiVersion": "4.0.0",
