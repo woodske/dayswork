@@ -78,13 +78,13 @@ internal sealed partial class ShiftOrchestrator
         foreach (var group in groups)
             PlanMachineGroup(group, batch.LocationName, location);
 
-        ModEntry.ModMonitor.Log(
+        DevLog.Log(
             $"[Dayswork][machines] batch={batch.LocationName} groups={groups.Count} collectSteps={Session.MachineSteps.Count} reloadJobs={Session.MachineReloads.Count}.",
             DevLog.WarnLevel);
 
         if (Session.MachineSteps.Count == 0 && Session.MachineReloads.Count == 0)
         {
-            ModEntry.ModMonitor.Log(
+            DevLog.Log(
                 $"[Dayswork][machines] batch={batch.LocationName} — no machines ready to collect or reload; skipping.",
                 DevLog.WarnLevel);
             Session.Ctx.CurrentBatchIndex++;
@@ -155,20 +155,20 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        var supply = ReadChestSupply(chestRef);
+        var supply = ReadChestSupply(chestRef, out var samples);
         var probeFarmer = CreateWorkerActionFarmer(reloadable[0].Ref.Tile, location);
         var candidates = new List<MachineLoadCandidate>();
         foreach (var (machineRef, machine, data) in reloadable)
         {
-            var candidate = _machineReader.BuildLoadCandidate(machineRef, machine, data, group.InputFilter, supply, probeFarmer, location);
+            var candidate = _machineReader.BuildLoadCandidate(machineRef, machine, data, group.InputFilter, supply, samples, probeFarmer, location);
             if (candidate is not null)
                 candidates.Add(candidate);
         }
 
         if (candidates.Count == 0)
         {
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][machines] group '{group.Id}': {reloadable.Count} reloadable machine(s) but no matching inputs in chest — check the input chest contents.",
+            DevLog.Log(
+                $"[Dayswork][machines] group '{group.Id}': {reloadable.Count} reloadable machine(s) but no matching inputs in chest.",
                 DevLog.WarnLevel);
             return;
         }
@@ -177,7 +177,7 @@ internal sealed partial class ShiftOrchestrator
         if (plan.HasWork)
             Session.MachineReloads.Enqueue(new MachineReloadJob(group, chestRef, plan));
         else
-            ModEntry.ModMonitor.Log(
+            DevLog.Log(
                 $"[Dayswork][machines] group '{group.Id}': {candidates.Count} matchable machine(s) but chest supply insufficient to fill any.",
                 DevLog.WarnLevel);
     }
@@ -437,7 +437,7 @@ internal sealed partial class ShiftOrchestrator
         var demand = recipe.TotalDemand();
         foreach (var (id, need) in demand)
         {
-            if (Session.CarriedInputs.GetValueOrDefault(id) < need)
+            if (CarriedCount(id) < need)
             {
                 DevLog.Log($"[Dayswork][machines] load skipped at ({step.Machine.Tile.X},{step.Machine.Tile.Y}) — carry buffer short of {id}.", DevLog.WarnLevel);
                 return;
@@ -451,43 +451,45 @@ internal sealed partial class ShiftOrchestrator
                 return;
 
             var who = CreateWorkerActionFarmer(step.Machine.Tile, location);
+
+            // Hand the worker the REAL carried items (flavored roe keeps its preserve id/type + color,
+            // so the jar produces Caviar / correctly-flavored Aged Roe), not a flavorless rebuild.
             foreach (var (id, need) in demand)
-            {
-                var item = ItemRegistry.Create(id, need, allowNull: true);
-                if (item is not null)
+                foreach (var item in TakeCarried(id, need))
                     who.addItemToInventory(item);
+
+            // Whatever the machine doesn't consume stays with the throwaway farmer — return those real
+            // stacks (flavor intact) to the carry buffer so inputs are never lost (hard rule 4). Runs on
+            // every exit path (input missing, throw, partial/failed load).
+            void ReturnUnconsumed()
+            {
+                foreach (var (id, _) in demand)
+                    foreach (var leftover in who.Items
+                                 .Where(i => i is not null && string.Equals(i.QualifiedItemId, id, StringComparison.Ordinal))
+                                 .ToList())
+                        ReturnCarried(id, leftover);
             }
 
             var inputItem = who.Items.FirstOrDefault(i =>
                 i is not null && string.Equals(i.QualifiedItemId, recipe.InputQualifiedId, StringComparison.Ordinal));
             if (inputItem is null)
+            {
+                ReturnUnconsumed();
                 return;
+            }
 
-            bool loaded;
             try
             {
                 // Let vanilla emit the machine-specific load sound (PlayEffects, not IsLocalPlayer-gated)
                 // only while the player is in this location — silent for off-farm machine work.
-                loaded = machine.PlaceInMachine(data, inputItem, probe: false, who, showMessages: false, playSounds: Game1.player.currentLocation == location);
+                machine.PlaceInMachine(data, inputItem, probe: false, who, showMessages: false, playSounds: Game1.player.currentLocation == location);
             }
             catch (Exception ex)
             {
                 ModEntry.ModMonitor.Log($"[Dayswork][machines] load threw at ({step.Machine.Tile.X},{step.Machine.Tile.Y}): {ex.Message}", DevLog.WarnLevel);
-                return;
             }
 
-            if (!loaded)
-                return;
-
-            // Consumed = what we gave minus what the fake farmer has left; subtract from the carry buffer.
-            foreach (var (id, need) in demand)
-            {
-                var remaining = who.Items
-                    .Where(i => i is not null && string.Equals(i.QualifiedItemId, id, StringComparison.Ordinal))
-                    .Sum(i => i.Stack);
-                var consumed = Math.Max(0, need - remaining);
-                Session.CarriedInputs[id] = Math.Max(0, Session.CarriedInputs.GetValueOrDefault(id) - consumed);
-            }
+            ReturnUnconsumed();
         });
     }
 
@@ -509,16 +511,25 @@ internal sealed partial class ShiftOrchestrator
         }
     }
 
-    private IReadOnlyDictionary<string, int> ReadChestSupply(ChestRef chestRef)
+    private IReadOnlyDictionary<string, int> ReadChestSupply(ChestRef chestRef, out IReadOnlyDictionary<string, Item> samples)
     {
         var chest = _chestResolver.ResolveChest(chestRef);
         var supply = new Dictionary<string, int>(StringComparer.Ordinal);
+        var sampleMap = new Dictionary<string, Item>(StringComparer.Ordinal);
+        samples = sampleMap;
         if (chest is null)
             return supply;
 
         foreach (var item in chest.Items)
             if (item is not null && !string.IsNullOrWhiteSpace(item.QualifiedItemId))
+            {
                 supply[item.QualifiedItemId] = supply.GetValueOrDefault(item.QualifiedItemId) + item.Stack;
+
+                // Keep one real (flavor-bearing) item per id as the acceptance-probe template, so the
+                // machine matcher sees the genuine input (flavored roe etc.), not a generic rebuild.
+                if (!sampleMap.ContainsKey(item.QualifiedItemId) && item.getOne() is { } sample)
+                    sampleMap[item.QualifiedItemId] = sample;
+            }
 
         return supply;
     }
@@ -556,18 +567,28 @@ internal sealed partial class ShiftOrchestrator
         foreach (var (id, want) in job.Plan.Withdrawals)
         {
             var taken = RemoveFromChest(chest, id, want);
-            if (taken <= 0)
+            if (taken.Count == 0)
                 continue;
 
-            Session.CarriedInputs[id] = Session.CarriedInputs.GetValueOrDefault(id) + taken;
+            if (!Session.CarriedInputs.TryGetValue(id, out var carried))
+            {
+                carried = new List<Item>();
+                Session.CarriedInputs[id] = carried;
+            }
+            carried.AddRange(taken);
+
             if (playerHere)
                 DelayedAction.playSoundAfterDelay("dwop", 150 + takeSoundIndex * 90, chestLoc, chestTile);
             takeSoundIndex++;
         }
     }
 
-    private static int RemoveFromChest(Chest chest, string qualifiedId, int amount)
+    // Removes up to `amount` units of `qualifiedId` from the chest, returning the real item stacks
+    // taken (the taken portion is cloned via getOne so flavored/colored identity — Sturgeon Roe etc. —
+    // rides along intact; reconstructing from the bare id would strip it, hard rule 4).
+    private static List<Item> RemoveFromChest(Chest chest, string qualifiedId, int amount)
     {
+        var taken = new List<Item>();
         var remaining = amount;
         for (var i = chest.Items.Count - 1; i >= 0 && remaining > 0; i--)
         {
@@ -576,13 +597,19 @@ internal sealed partial class ShiftOrchestrator
                 continue;
 
             var take = Math.Min(item.Stack, remaining);
+            if (item.getOne() is { } piece)
+            {
+                piece.Stack = take;
+                taken.Add(piece);
+            }
+
             item.Stack -= take;
             remaining -= take;
             if (item.Stack <= 0)
                 chest.Items.RemoveAt(i);
         }
 
-        return amount - remaining;
+        return taken;
     }
 
     // Settles any inputs still in the carry buffer back into their source chest (mutex-checked), or
@@ -605,40 +632,112 @@ internal sealed partial class ShiftOrchestrator
         var chestOpened = false;
         var returnSoundIndex = 0;
 
-        foreach (var (id, count) in Session.CarriedInputs.ToList())
+        foreach (var (id, stacks) in Session.CarriedInputs.ToList())
         {
-            if (count <= 0)
-                continue;
-
-            var item = ItemRegistry.Create(id, count, allowNull: true);
-            if (item is null)
-                continue;
-
-            Item? leftover = item;
-            if (chestWritable)
-                leftover = chest!.addItem(item);
-
-            // At least part of the stack landed in the chest → play the return audio.
-            if (playerHere && (leftover is null || leftover.Stack < count))
+            foreach (var carried in stacks)
             {
-                if (!chestOpened)
-                {
-                    chest!.frameCounter.Value = 5;  // vanilla open trigger (matches WithdrawInputs)
-                    chestLoc!.playSound("openChest", chestTile);
-                    chestOpened = true;
-                }
-                DelayedAction.playSoundAfterDelay("dwop", 150 + returnSoundIndex * 90, chestLoc, chestTile);
-                returnSoundIndex++;
-            }
+                if (carried is null || carried.Stack <= 0)
+                    continue;
 
-            if (leftover is not null && leftover.Stack > 0)
-                Session.Ctx.Overflow.Add(new OverflowItem(
-                    new RoutedItemStack(id, leftover.Stack, TaskKind.HarvestCrops, OutputScopeProvenance.Unknown),
-                    OverflowReason.NotDelivered));
+                var count = carried.Stack;
+                Item? leftover = carried;   // the real item, flavor/color/quality intact
+                if (chestWritable)
+                    leftover = chest!.addItem(carried);
+
+                // At least part of the stack landed in the chest → play the return audio.
+                if (playerHere && (leftover is null || leftover.Stack < count))
+                {
+                    if (!chestOpened)
+                    {
+                        chest!.frameCounter.Value = 5;  // vanilla open trigger (matches WithdrawInputs)
+                        chestLoc!.playSound("openChest", chestTile);
+                        chestOpened = true;
+                    }
+                    DelayedAction.playSoundAfterDelay("dwop", 150 + returnSoundIndex * 90, chestLoc, chestTile);
+                    returnSoundIndex++;
+                }
+
+                if (leftover is not null && leftover.Stack > 0)
+                {
+                    // Preserve flavored identity through overflow too (hard rule 4): capture the real
+                    // item so the overflow dispatch clones it back via the flavor templates instead of
+                    // rebuilding a generic item from the id.
+                    var flavorId = Session.Flavors.Register(leftover);
+                    var quality = (leftover as SObject)?.Quality ?? 0;
+                    Session.Ctx.Overflow.Add(new OverflowItem(
+                        new RoutedItemStack(id, leftover.Stack, TaskKind.HarvestCrops, OutputScopeProvenance.Unknown, quality, flavorId),
+                        OverflowReason.NotDelivered));
+                }
+            }
         }
 
         Session.CarriedInputs.Clear();
         Session.CarriedInputsChest = null;
+    }
+
+    /// <summary>Total units of <paramref name="id"/> currently in the carry buffer (sum of real stacks).</summary>
+    private int CarriedCount(string id) =>
+        Session.CarriedInputs.TryGetValue(id, out var stacks) ? stacks.Sum(i => i?.Stack ?? 0) : 0;
+
+    /// <summary>
+    /// Removes up to <paramref name="count"/> units of <paramref name="id"/> from the carry buffer,
+    /// returning the real item stacks taken. A stack that overshoots is split with <c>getOne()</c> so
+    /// flavored/colored identity and quality are preserved on both the taken piece and the remainder.
+    /// </summary>
+    private List<Item> TakeCarried(string id, int count)
+    {
+        var taken = new List<Item>();
+        if (count <= 0 || !Session.CarriedInputs.TryGetValue(id, out var stacks))
+            return taken;
+
+        var remaining = count;
+        while (stacks.Count > 0 && remaining > 0)
+        {
+            var stack = stacks[0];
+            if (stack is null || stack.Stack <= 0)
+            {
+                stacks.RemoveAt(0);
+                continue;
+            }
+
+            if (stack.Stack <= remaining)
+            {
+                taken.Add(stack);
+                remaining -= stack.Stack;
+                stacks.RemoveAt(0);
+            }
+            else if (stack.getOne() is { } piece)
+            {
+                piece.Stack = remaining;
+                stack.Stack -= remaining;
+                taken.Add(piece);
+                remaining = 0;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        if (stacks.Count == 0)
+            Session.CarriedInputs.Remove(id);
+
+        return taken;
+    }
+
+    /// <summary>Returns a real item stack to the carry buffer (e.g. the machine left it unconsumed).</summary>
+    private void ReturnCarried(string id, Item item)
+    {
+        if (item is null || item.Stack <= 0)
+            return;
+
+        if (!Session.CarriedInputs.TryGetValue(id, out var stacks))
+        {
+            stacks = new List<Item>();
+            Session.CarriedInputs[id] = stacks;
+        }
+
+        stacks.Add(item);
     }
 
     private TileCoord ResolveMachineNavTile(TileCoord machineTile, GameLocation location)

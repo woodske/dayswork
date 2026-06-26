@@ -225,12 +225,12 @@ internal sealed partial class ShiftOrchestrator
                 if (!string.Equals(chestRef.LocationName, location.NameOrUniqueName, StringComparison.Ordinal))
                     continue;
 
-                var supply = ReadChestSupply(chestRef);
+                var supply = ReadChestSupply(chestRef, out var samples);
                 var probeFarmer = CreateWorkerActionFarmer(reloadable[0].Ref.Tile, location);
                 foreach (var (machineRef, machine, data) in reloadable)
                 {
                     var candidate = _machineReader.BuildLoadCandidate(
-                        machineRef, machine, data, group.InputFilter, supply, probeFarmer, location);
+                        machineRef, machine, data, group.InputFilter, supply, samples, probeFarmer, location);
                     if (candidate is not null && MachineInputPlanner.Plan(new[] { candidate }, supply).HasWork)
                         return true;
                 }

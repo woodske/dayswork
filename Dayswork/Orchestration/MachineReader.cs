@@ -181,6 +181,7 @@ internal sealed class MachineReader
         MachineData data,
         MachineInputFilter filter,
         IReadOnlyDictionary<string, int> chestSupply,
+        IReadOnlyDictionary<string, Item> chestSamples,
         Farmer who,
         GameLocation location)
     {
@@ -199,7 +200,7 @@ internal sealed class MachineReader
             if (!filter.Allows(id) || !chestSupply.ContainsKey(id))
                 continue;
 
-            var requirement = TryBuildRequirement(machine, data, id, who, location);
+            var requirement = TryBuildRequirement(machine, data, id, chestSamples.GetValueOrDefault(id), who, location);
             if (requirement is not null)
                 options.Add(requirement);
         }
@@ -211,14 +212,20 @@ internal sealed class MachineReader
         SObject machine,
         MachineData data,
         string qualifiedId,
+        Item? chestSample,
         Farmer who,
         GameLocation location)
     {
-        // Probe with a generous stack so the count-matching rule (not just ruleIgnoringCount) binds,
-        // letting us read the recipe's RequiredCount; the planner clamps to real supply afterwards.
-        var probe = ItemRegistry.Create(qualifiedId, 999, allowNull: true);
+        // Probe with the real chest item (a clone) so acceptance honors the input's flavor: all roe is
+        // (O)812, but the preserve jar's roe rules key on the preserve_sheet_index_<fish> context tag
+        // that only flavored roe carries — a flavorless ItemRegistry.Create(id) rebuild would be
+        // rejected (or matched as the wrong recipe). Fall back to id-create when no sample is on hand.
+        // Either way bump the stack so the count-matching rule (not just ruleIgnoringCount) binds and
+        // RequiredCount is readable; the planner clamps to real supply afterwards.
+        var probe = chestSample?.getOne() ?? ItemRegistry.Create(qualifiedId, 999, allowNull: true);
         if (probe is null)
             return null;
+        probe.Stack = 999;
 
         if (!MachineDataUtility.TryGetMachineOutputRule(
                 machine,

@@ -136,9 +136,12 @@ internal sealed class ShiftSession
     // True while the worker is walking to the current reload job's input chest to withdraw inputs.
     public bool MachineFetchPending;
 
-    // Physical input carry buffer for the reload fetch: qualified id → count, plus the chest the
-    // inputs were withdrawn from (so leftovers settle back there on stop). Items are never lost.
-    public readonly Dictionary<string, int> CarriedInputs = new(StringComparer.Ordinal);
+    // Physical input carry buffer for the reload fetch: qualified id → the real withdrawn item
+    // stacks, plus the chest they came from (so leftovers settle back there on stop). The real items
+    // are carried — not a bare count — so flavored inputs (Sturgeon/flavored roe, etc.) keep their
+    // identity end-to-end and the machine produces the correct output; nothing is lost or degraded
+    // (hard rule 4).
+    public readonly Dictionary<string, List<Item>> CarriedInputs = new(StringComparer.Ordinal);
     public ChestRef? CarriedInputsChest;
 
     // Capture-and-clone store for flavored/colored output (roe, wine, jelly, flavored honey…) so the

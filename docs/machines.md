@@ -191,6 +191,35 @@ from a chest's contents. `MachineReader` exposes (all probe-only):
 `category_fruits`/`keg_wine`, butter churner `milk_item`+`quality_*`) — hence the probe approach.
 `GetMachineDataForType(qualifiedId)` reads `Data/Machines` for a type without a placed instance.
 
+### Flavored inputs must be the *real* item — never a rebuilt id (roe → Aged Roe / Caviar)
+
+A machine input that carries flavor cannot be reconstructed from its qualified id. **All roe is
+`(O)812`**; the flavor lives in `Object.preservedParentSheetIndex` and surfaces only as the context
+tag `preserve_sheet_index_<fishId>` (verified in `Object` context-tag generation — the
+`preserve`-type switch emits only `honey_item`/`jelly_item`/`juice_item`/`wine_item`/`pickle_item`,
+**not** a roe/aged-roe tag, so the *only* flavored-roe tag is `preserve_sheet_index_*`). A fresh
+`ItemRegistry.Create("(O)812")` has none of it. Consequences, all verified against the 1.6.15
+decompile:
+
+- **Matching** (`MachineDataUtility.CanApplyOutput`, `ItemPlacedInMachine`): an input must satisfy
+  `Condition` (a `GameStateQuery`), `RequiredItemId` (via `ItemRegistry.HasItemId`, base-id match),
+  **all** `RequiredTags` (`ItemContextTagManager.DoAllTagsMatch`), and `RequiredCount`. The Preserve
+  Jar's Sturgeon-Roe→Caviar rule keys on the sturgeon flavor tag, so a flavorless probe never reaches
+  it.
+- **Output flavoring** (`MachineDataUtility.GetOutputItem`): Aged Roe uses the `DROP_IN` /
+  `DROP_IN_PRESERVE` preserve mechanism, which copies the flavor from **`inputItem`** onto the output
+  (`obj.preservedParentSheetIndex = inputItem.GetPreservedItemId()`). A flavorless input yields
+  generic Aged Roe — never the correct flavored Aged Roe / Caviar.
+
+Therefore the reload pipeline carries the **real withdrawn chest items** through
+`ShiftSession.CarriedInputs` (`Dictionary<string, List<Item>>`, not a count) and feeds them straight
+into `PlaceInMachine`; the acceptance probe (`MachineReader.TryBuildRequirement`) clones a real chest
+**sample** (`ReadChestSupply` keeps one per id) instead of `ItemRegistry.Create(id)`. This is the
+input-side analog of the output-side `FlavorItemRegistry` capture-and-clone (built 2026-06-26). The
+pure `MachineInputPlanner` still allocates by count keyed on `(O)812` — pooling roe flavors for
+allocation is correct; only the executor must keep the real items. Leftovers/overflow preserve flavor
+via the same `Session.Flavors` token path.
+
 ## Fish ponds (separate phase — buildings, not machines)
 
 Fish ponds are `StardewValley.Buildings.FishPond`, **not** `Data/Machines` objects, so none of the

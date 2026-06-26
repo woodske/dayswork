@@ -61,6 +61,12 @@ build-verified and await the in-game smoke pass per AGENTS.md):
   open question flagged below) — `dayswork_debug_machines` lists machine state to verify.
 - **Load via `PlaceInMachine(probe:false)`** with the carry buffer populated on a fake `Farmer`;
   confirm fish-smoker (fish+coal) / dehydrator (×5) actually load in-world.
+- **Flavored inputs carry the real item (2026-06-26).** `ShiftSession.CarriedInputs` holds the real
+  withdrawn chest items (`Dictionary<string, List<Item>>`), and the acceptance probe uses a real
+  chest sample — never a flavorless `ItemRegistry.Create(id)` rebuild — so a Preserve Jar fed
+  flavored roe produces **Caviar** (Sturgeon Roe) / correctly-flavored **Aged Roe**, not generic
+  output. See `docs/machines.md` → "Flavored inputs must be the *real* item". Smoke-verify with a
+  mixed-roe input chest (M8).
 - Sleep-settle of *collected machine output* still in the buffer routes by the buffer's nominal task
   tag (provenance is honored on the normal deposit path) — same minor imperfection managed crops
   have; items are never lost. Acceptable for v1.

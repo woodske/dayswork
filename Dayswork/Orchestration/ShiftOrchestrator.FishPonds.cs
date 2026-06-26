@@ -79,7 +79,7 @@ internal sealed partial class ShiftOrchestrator
                 DevLog.Log($"[Dayswork][fishponds] skip ({pondRef.Tile.X},{pondRef.Tile.Y}) — no output ready.", LogLevel.Debug);
         }
 
-        ModEntry.ModMonitor.Log(
+        DevLog.Log(
             $"[Dayswork][fishponds] batch={batch.LocationName} readyPonds={Session.FishPondSteps.Count}.",
             DevLog.WarnLevel);
 
