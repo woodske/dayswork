@@ -93,7 +93,7 @@ the previous output without consuming new input (chained outputs). `MachinePutDo
 
 ### Loading input (reload)
 - `bool Object.PlaceInMachine(MachineData machineData, Item inputItem, bool probe, Farmer who, bool showMessages = true, bool playSounds = true)`
-  — the canonical 1.6 load entry. **`probe: true` tests acceptance without mutating anything** (no consume, no animation) — use it for "would this machine take this item?" checks. `probe: false` performs the load: consumes `RequiredCount` from `inputItem` (+ any `AdditionalConsumedItems`) and starts processing.
+  — the canonical 1.6 load entry. `probe: false` performs the load. **`probe: true` is NOT a full acceptance check** — it returns `true` immediately after `TryGetMachineOutputRule` succeeds, *before* calling `OutputMachine` or the output delegate. Use `PlaceInMachine(probe:true)` only to confirm the trigger-rule level matches; call `GetOutputItem` separately for delegate-level filtering (see below).
 - `bool Object.performObjectDropInAction(Item dropInItem, bool probe, Farmer who, bool returnFalseIfItemConsumed = false)`
   — the general drop-in entry that routes into `PlaceInMachine` for machines; also probe-able.
 - `Task<bool> Object.AttemptAutoLoad(Farmer who)` and **`bool Object.AttemptAutoLoad(IInventory inventory, Farmer who)`**
@@ -111,7 +111,9 @@ the previous output without consuming new input (chained outputs). `MachinePutDo
 
 ### Producing / collecting output
 - `bool Object.OutputMachine(MachineData machine, MachineOutputRule outputRule, Item inputItem, Farmer who, GameLocation location, bool probe, bool heldObjectOnly = false)` — produces the output into `heldObject` (normally called internally by the load path).
-- `static Item MachineDataUtility.GetOutputItem(Object machine, MachineItemOutput outputData, Item inputItem, Farmer who, bool probe, out int? overrideMinutesUntilReady)` — compute the output item (probe-able) — useful for **best-effort UI preview**.
+- `static MachineItemOutput MachineDataUtility.GetOutputData(Object machine, MachineData machineData, MachineOutputRule outputRule, Item inputItem, Farmer who, GameLocation location)` — returns the first matching `MachineItemOutput` by delegating to the list overload below.
+- `static MachineItemOutput MachineDataUtility.GetOutputData(List<MachineItemOutput> outputs, bool useFirstValidOutput, Item inputItem, Farmer who, GameLocation location)` — filters output items by their `Condition` (GSQ). When `useFirstValidOutput: true`, returns the first match; when `false`, **collects all condition-matches and picks one at random** (`Game1.random.ChooseFrom`). The machine-rule overload above passes `outputRule.UseFirstValidOutput`, which defaults to `false` in JSON — so multi-item output lists are **randomly sampled**. Call this overload directly with `useFirstValidOutput: true` when you need a deterministic result, or skip it entirely and pass a specific `MachineItemOutput` directly to `GetOutputItem`.
+- `static Item MachineDataUtility.GetOutputItem(Object machine, MachineItemOutput outputData, Item inputItem, Farmer who, bool probe, out int? overrideMinutesUntilReady)` — compute the output item (probe-able). When `outputData.OutputMethod` is set, calls the named delegate (e.g. `StardewValley.Object.OutputGeodeCrusher`), which can return null to reject the input. **Null propagates correctly** — `ApplyItemFields(null, …)` returns null, so the full call returns null. Useful for **authoritative input acceptance** when the delegate is the real filter (Geode Crusher pattern).
 - `bool Object.checkForAction(Farmer who, bool justCheckingForActivity = false)` — the player-interaction entry; on a `readyForHarvest` machine it **collects** the held output (gives it to `who`, plays sound, clears `readyForHarvest`/`heldObject`, may re-trigger an `OutputCollected` rule). `justCheckingForActivity: true` probes.
 
 ### Worker-action guarding (reuse existing pattern)
@@ -178,10 +180,16 @@ from a chest's contents. `MachineReader` exposes (all probe-only):
   (bee houses, tappers) that have no input picker.
 - `EnumerateAcceptedInputs(machine, data, who, location)` — sweeps the **whole object catalog**
   (`Game1.objectData.Keys` → `(O)<key>`), creates each with `ItemRegistry.Create(id, 999, allowNull:true)`,
-  and keeps those for which `TryGetMachineOutputRule(ItemPlacedInMachine,…)` matches. This makes the
-  game's own matcher resolve **both** `RequiredItemId` and `RequiredTags` rules to concrete items —
-  no need to reimplement context-tag matching. ~900 probes, **cached per machine type** for the
-  session. Needs a placed instance of the type (the picker opens after map selection, so one exists).
+  and keeps those that the machine would actually accept. Two-stage filter:
+  1. `TryGetMachineOutputRule(ItemPlacedInMachine,…)` — the game's own matcher resolves `RequiredItemId`
+     and `RequiredTags` rules; no need to reimplement context-tag matching.
+  2. **Catch-all trigger check** (no `RequiredItemId`, no `RequiredTags`): for machines like the Geode
+     Crusher whose trigger accepts everything, the real input filter is an `OutputMethod` delegate on one
+     of the rule's `OutputItem` entries. `EnumerateAcceptedInputs` finds the first such delegate item
+     and calls `GetOutputItem(probe:true)` directly. This avoids `GetOutputData`'s non-deterministic
+     random selection (`UseFirstValidOutput:false` + multiple items → `Game1.random.ChooseFrom`),
+     which would let non-delegate items (e.g. mineral-conditioned fallback) randomly pass wrong inputs.
+  ~900 probes, **cached per machine type** for the session. Needs a placed instance of the type.
 - `EnumerateRequiredCompanions(MachineData?)` — `AdditionalConsumedItems` → the coal-style companions
   the load engine already consumes automatically; surfaced in the picker as auto-selected/locked rows
   (informational: "stock coal in the input chest"), not added to the `MachineInputFilter`.

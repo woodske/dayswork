@@ -87,6 +87,11 @@ facts under `docs/`. Update `docs/game-content-search.md` if any new search tech
     `DevLog.Log(message, level)`. Gated by `DevLog.Enabled` — silent in release builds. Never
     use `DevLog.Log` for something the player or a support log would need to see.
 
+## Bug Fixing
+
+- When fixing bugs that relate to game behavior, always verify the root cause against the decompiled Stardew Valley game code before proposing a fix; 
+  do not rely on assumptions or the explore agent's mental model.
+
 ## Where things live
 
 - `Dayswork/Orchestration/` — the shift engine. `ShiftOrchestrator.*` partials drive the tick

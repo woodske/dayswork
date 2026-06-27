@@ -97,6 +97,21 @@ internal sealed class MachineReader
                     continue;
                 }
 
+                // Catch-all triggers (no RequiredItemId/RequiredTags) let every item through
+                // TryGetMachineOutputRule. For these machines the real input filter lives in an
+                // OutputMethod delegate on one of the rule's output items. Probe that delegate
+                // directly instead of going through GetOutputData, which uses UseFirstValidOutput
+                // to randomly pick among multiple output items — a non-delegate item in the list
+                // (e.g. a mineral-conditioned fallback) would return non-null for wrong inputs.
+                if (triggerRule.RequiredItemId is null &&
+                    (triggerRule.RequiredTags is null || triggerRule.RequiredTags.Count == 0))
+                {
+                    var delegateItem = rule.OutputItem?.FirstOrDefault(o => o.OutputMethod is not null);
+                    if (delegateItem is not null &&
+                        MachineDataUtility.GetOutputItem(machine, delegateItem, probe, who, true, out _) is null)
+                        continue;
+                }
+
                 results.Add(new AcceptedInput(probe.QualifiedItemId, probe.DisplayName, probe.Category, probe.getCategoryName()));
             }
 
@@ -244,6 +259,16 @@ internal sealed class MachineReader
 
         if (rule is null || triggerRule is null)
             return null;
+
+        // Same catch-all delegate probe as EnumerateAcceptedInputs.
+        if (triggerRule.RequiredItemId is null &&
+            (triggerRule.RequiredTags is null || triggerRule.RequiredTags.Count == 0))
+        {
+            var delegateItem = rule.OutputItem?.FirstOrDefault(o => o.OutputMethod is not null);
+            if (delegateItem is not null &&
+                MachineDataUtility.GetOutputItem(machine, delegateItem, probe, who, true, out _) is null)
+                return null;
+        }
 
         var requiredCount = Math.Max(1, triggerRule.RequiredCount);
         var additional = (data.AdditionalConsumedItems ?? new List<MachineItemAdditionalConsumedItems>())
