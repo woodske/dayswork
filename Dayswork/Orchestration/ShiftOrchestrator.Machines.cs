@@ -15,10 +15,11 @@ namespace Dayswork.Orchestration;
 
 /// <summary>
 /// Manage Machines execution. A machine batch (one per location with selected machines) services its
-/// groups one at a time, running a full collect→reload cycle per group before moving to the next:
-/// collect a group's ready output into the deposit buffer, then — for collect-and-reload groups —
-/// fetch input from that group's chest (physically walking to it) and load its empty machines, and
-/// only then advance to the next group. Mirrors the managed-crop batch lifecycle.
+/// groups one at a time, running a full collect→reload cycle per group before moving to the next. For
+/// a collect-and-reload group the worker first walks to that group's input chest and withdraws the
+/// planned inputs (one trip), then visits each machine exactly once — collecting its ready output into
+/// the deposit buffer and immediately reloading the now-empty machine — before advancing to the next
+/// group. Collect-only groups skip the chest trip. Mirrors the managed-crop batch lifecycle.
 ///
 /// v1 scope: the input fetch is a within-location walk. A group whose input chest is in a different
 /// location than its machines is serviced collect-only for that location (a HUD/dev note), so the
@@ -127,7 +128,13 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
-        StartNextMachineStep();
+        // Fetch this group's inputs FIRST (one chest trip), then visit each machine once to
+        // collect→reload (the collect/load steps are already queued interleaved per machine).
+        // Collect-only groups (no reload job) skip the fetch and go straight to their collect steps.
+        if (Session.MachineReloads.Count > 0)
+            AdvanceMachineReload();
+        else
+            StartNextMachineStep();
     }
 
     private void PlanMachineGroup(MachineGroup group, string batchLocationName, GameLocation location)
@@ -139,6 +146,7 @@ internal sealed partial class ShiftOrchestrator
             .Where(machine => string.Equals(machine.LocationName, batchLocationName, StringComparison.Ordinal))
             .ToList();
 
+        var readyToCollect = new HashSet<TileCoord>();
         var reloadable = new List<(MachineRef Ref, SObject Machine, MachineData Data)>();
         foreach (var machineRef in groupMachinesHere)
         {
@@ -153,15 +161,15 @@ internal sealed partial class ShiftOrchestrator
 
             // A machine wants reloading when its group is in reload mode and the machine type is
             // reloadable. A ReadyToCollect machine qualifies too — it becomes Empty after its Collect
-            // step runs, so we plan its reload now (the Load step is guarded on Empty, so it only
-            // fires once the collect has emptied it).
+            // step runs in the same visit (the Load step is guarded on Empty, so it only fires once
+            // the collect has emptied it).
             var wantsReload = group.Mode == MachineGroupMode.CollectAndReload
                 && live.GetMachineData() is { } data
                 && MachineReader.IsReloadable(data);
 
             if (state == MachineReadyState.ReadyToCollect)
             {
-                Session.MachineSteps.Enqueue(new MachineStep(machineRef, MachineActionKind.Collect, group, null));
+                readyToCollect.Add(machineRef.Tile);
                 if (wantsReload && live.GetMachineData() is { } collectData)
                     reloadable.Add((machineRef, live, collectData));
             }
@@ -177,8 +185,40 @@ internal sealed partial class ShiftOrchestrator
             }
         }
 
+        // Build the load plan (assignments + withdrawals) BEFORE queuing any steps, so each machine's
+        // collect and reload can be queued back-to-back as one visit and the chest fetch can run
+        // first (one trip, each machine visited once).
+        var (plan, chestRef) = BuildGroupLoadPlan(group, location, reloadable);
+        var loadByTile = plan?.Assignments.ToDictionary(a => a.Machine.Tile);
+
+        // Queue collect→reload per machine in walking order: collect first (so a ReadyToCollect
+        // machine is emptied), then its load (guarded on Empty). The worker visits each machine once.
+        foreach (var machineRef in groupMachinesHere)
+        {
+            if (readyToCollect.Contains(machineRef.Tile))
+                Session.MachineSteps.Enqueue(new MachineStep(machineRef, MachineActionKind.Collect, group, null));
+
+            if (loadByTile is not null && loadByTile.TryGetValue(machineRef.Tile, out var assignment))
+                Session.MachineSteps.Enqueue(new MachineStep(machineRef, MachineActionKind.Load, group, assignment.Requirement));
+        }
+
+        if (plan is not null && chestRef is not null && plan.HasWork)
+            Session.MachineReloads.Enqueue(new MachineReloadJob(group, chestRef, plan));
+    }
+
+    /// <summary>
+    /// Builds the load plan for one group's reloadable machines: validates the input chest is usable
+    /// and same-location, probes each reloadable machine for a recipe it accepts against the chest
+    /// supply, and plans withdrawals + assignments. Returns <c>(null, null)</c> for collect-only
+    /// groups, a cross-location chest, or when nothing loadable was found.
+    /// </summary>
+    private (MachineLoadPlan? Plan, ChestRef? Chest) BuildGroupLoadPlan(
+        MachineGroup group,
+        GameLocation location,
+        List<(MachineRef Ref, SObject Machine, MachineData Data)> reloadable)
+    {
         if (group.Mode != MachineGroupMode.CollectAndReload || group.InputChest is not { } chestRef || reloadable.Count == 0)
-            return;
+            return (null, null);
 
         if (!string.Equals(chestRef.LocationName, location.NameOrUniqueName, StringComparison.Ordinal))
         {
@@ -186,7 +226,7 @@ internal sealed partial class ShiftOrchestrator
             ModEntry.ModMonitor.Log(
                 $"[Dayswork][machines] group '{group.Id}' input chest is in '{chestRef.LocationName}', not '{location.NameOrUniqueName}'; reload skipped this location (collect-only).",
                 DevLog.WarnLevel);
-            return;
+            return (null, null);
         }
 
         var supply = ReadChestSupply(chestRef, out var samples);
@@ -204,16 +244,19 @@ internal sealed partial class ShiftOrchestrator
             DevLog.Log(
                 $"[Dayswork][machines] group '{group.Id}': {reloadable.Count} reloadable machine(s) but no matching inputs in chest.",
                 DevLog.WarnLevel);
-            return;
+            return (null, null);
         }
 
         var plan = MachineInputPlanner.Plan(candidates, supply);
-        if (plan.HasWork)
-            Session.MachineReloads.Enqueue(new MachineReloadJob(group, chestRef, plan));
-        else
+        if (!plan.HasWork)
+        {
             DevLog.Log(
                 $"[Dayswork][machines] group '{group.Id}': {candidates.Count} matchable machine(s) but chest supply insufficient to fill any.",
                 DevLog.WarnLevel);
+            return (null, null);
+        }
+
+        return (plan, chestRef);
     }
 
     /// <summary>
@@ -358,8 +401,12 @@ internal sealed partial class ShiftOrchestrator
         var location = Session.CurrentLocation ?? ResolveMachineBatchLocation(Session.MachineBatchLocationName) ?? Game1.getFarm();
         if (!ShiftOrchestrator.TrySelectChestDepositStandTile(job.Chest.Tile, location, Session.Worker, out var standTile))
         {
-            DevLog.Log($"[Dayswork][machines] cannot reach input chest ({job.Chest.Tile.X},{job.Chest.Tile.Y}); reload skipped.", DevLog.WarnLevel);
-            AdvanceMachineReload();
+            // Can't reach the input chest — fall back to collecting this group only. Its collect→reload
+            // steps are already queued; the loads no-op against an empty carry buffer, so nothing is
+            // withdrawn or lost. (StartNextMachineStep → AdvanceMachineReload advances to the next group.)
+            DevLog.Log($"[Dayswork][machines] cannot reach input chest ({job.Chest.Tile.X},{job.Chest.Tile.Y}); collecting this group only.", DevLog.WarnLevel);
+            Session.CurrentMachineReload = null;
+            StartNextMachineStep();
             return;
         }
 
@@ -385,9 +432,9 @@ internal sealed partial class ShiftOrchestrator
 
         WithdrawInputs(job);
 
-        foreach (var assignment in job.Plan.Assignments)
-            Session.MachineSteps.Enqueue(new MachineStep(assignment.Machine, MachineActionKind.Load, job.Group, assignment.Requirement));
-
+        // The collect→reload steps for this group are already queued (interleaved per machine in
+        // PlanMachineGroup); the fetch only had to fill the carry buffer. Drain them now — each
+        // machine is collected and then reloaded in a single visit.
         StartNextMachineStep();
     }
 

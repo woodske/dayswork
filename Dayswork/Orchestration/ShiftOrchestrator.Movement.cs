@@ -150,8 +150,12 @@ internal sealed partial class ShiftOrchestrator
             {
                 if (Session.MachineFetchPending)
                 {
+                    // Couldn't reach the input chest — fall back to collecting this group only. Its
+                    // collect→reload steps are already queued; the loads no-op with an empty carry
+                    // buffer, so nothing is withdrawn or lost.
                     Session.MachineFetchPending = false;
-                    AdvanceMachineReload();   // couldn't reach chest; skip this reload job
+                    Session.CurrentMachineReload = null;
+                    StartNextMachineStep();
                     return;
                 }
 

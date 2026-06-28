@@ -1,7 +1,8 @@
 # Plan — Manage Machines
 
 **Status:** implemented 2026-06-19 (milestones 1–7 built, unit-tested, builds clean);
-**milestone 8 (in-game smoke pass) is pending** and must be run before release.
+**milestone 8 (in-game smoke pass) PASSED 2026-06-28** — feature is release-ready. The per-group
+fetch-first single-visit workflow (2026-06-28) was verified in the same pass.
 **Game-content reference:** [`docs/machines.md`](../machines.md) (verified `Data/Machines`
 schema + API for SDV 1.6.15).
 
@@ -52,32 +53,32 @@ build-verified and await the in-game smoke pass per AGENTS.md):
   collect → fetch → load passes; per-group output routed via `OutputScopeProvenance.Machine`;
   carried inputs settled back to chest/overflow on stop (items never lost).
 
-**v1 limitations / open verification (do in M8):**
+**v1 limitations / M8 verification (smoke pass PASSED 2026-06-28):**
 - **Input chest must be in the same location as the machines.** A cross-location input chest makes
   that group collect-only for that location (dev log) — inputs are never touched/lost. Full
   cross-location fetch trips are a follow-up (see `ManagedShoppingCoordinator` for the pattern).
+  *(Remains a v1 design limit, not a bug — collect-only degrade verified in-game.)*
 - **Collect via `checkForAction`** credits the buffer only if the machine actually released its
-  output (duplication-safe). Confirm in-world that a fake worker `Farmer` cleanly collects (the
-  open question flagged below) — `dayswork_debug_machines` lists machine state to verify.
-- **Load via `PlaceInMachine(probe:false)`** with the carry buffer populated on a fake `Farmer`;
-  confirm fish-smoker (fish+coal) / dehydrator (×5) actually load in-world.
+  output (duplication-safe). ✓ Verified in-world: the fake worker `Farmer` cleanly collects.
+- **Load via `PlaceInMachine(probe:false)`** with the carry buffer populated on a fake `Farmer`.
+  ✓ Verified in-world: fish-smoker (fish+coal) / dehydrator (×5) load correctly.
 - **Flavored inputs carry the real item (2026-06-26).** `ShiftSession.CarriedInputs` holds the real
   withdrawn chest items (`Dictionary<string, List<Item>>`), and the acceptance probe uses a real
   chest sample — never a flavorless `ItemRegistry.Create(id)` rebuild — so a Preserve Jar fed
   flavored roe produces **Caviar** (Sturgeon Roe) / correctly-flavored **Aged Roe**, not generic
-  output. See `docs/machines.md` → "Flavored inputs must be the *real* item". Smoke-verify with a
-  mixed-roe input chest (M8).
+  output. See `docs/machines.md` → "Flavored inputs must be the *real* item". ✓ Verified in-game
+  with a mixed-roe input chest.
 - Sleep-settle of *collected machine output* still in the buffer routes by the buffer's nominal task
   tag (provenance is honored on the normal deposit path) — same minor imperfection managed crops
   have; items are never lost. Acceptable for v1.
-- **Per-group collect→reload cycle (2026-06-28).** A batch services its groups one at a time as a
-  full cycle — collect a group, reload that group, *then* move to the next — rather than collecting
-  every group first and reloading them all afterward (groups are planned lazily in
-  `AdvanceMachineGroup`, so a shared input chest reflects earlier groups' withdrawals). Smoke-verify
-  with **two** CollectAndReload groups both ready (e.g. loom + fish smoker), each with a
-  same-location input chest: the order must be collect A → load A → collect B → load B (worker walks
-  back to each group's machines after its chest fetch), and a collect-only group is still serviced
-  and skipped past.
+- **Per-group, fetch-first, single-visit collect→reload cycle (2026-06-28 — VERIFIED in-game).** A
+  batch services its groups one at a time as a full cycle — rather than collecting every group first
+  and reloading them all afterward — and within a group the worker **walks to the input chest first**,
+  withdraws inputs, then visits each machine **exactly once** (collect, then immediately reload).
+  Groups are planned lazily in `AdvanceMachineGroup`, so a shared input chest reflects earlier groups'
+  withdrawals. Confirmed in-game: fetch A → (collect+reload each A machine once) → fetch B →
+  (collect+reload each B machine once); no machine visited twice; collect-only groups and unreachable
+  input chests (degrade to collect-only) handled correctly.
 
 **Smoke pass:** enable `DevLog.Enabled`, build a machine group, run a shift, and use
 `dayswork_debug_machines` (current location) + `dayswork_end_shift` to inspect collect/reload.
@@ -228,22 +229,27 @@ state on `ShiftSession` (machine batch queue, input carry buffer, current group/
 in `categoryPriority` order. (Machines carry their refs out-of-band like managed crops carry
 `CropZoneAssignment`s — `Tasks` is empty.)
 
-**Per machine batch (group-major within the location):**
-For each group that has machines in this location:
-1. **Collect pass** — walk machine→machine; at each `readyForHarvest` machine, collect output into the
-   output `ItemBuffer` (guarded), spend `CollectMachine` energy. (No input needed — runs for
-   collect-only groups too.)
-2. **Reload pass** (skipped for collect-only / no-input groups):
-   a. Compute load needs for this group's empty machines in this location (reader builds
-      `RecipeRequirement`s via `MachineDataUtility`; `MachineInputPlanner` produces withdrawal +
-      assignments against the input chest, mutex-checked).
-   b. **Fetch trip** — `MachineTripRunner` walks to the input chest (any location, via Travel +
-      building doors), withdraws the planned inputs into the carry buffer (mutex re-check per stack),
-      walks back to the machine area.
-   c. **Load pass** — walk machine→machine; at each empty machine, if the carry buffer holds the
-      assigned input(s) (and `HasAdditionalRequirements` is satisfied — **atomic**), load via
-      `PlaceInMachine`/`AttemptAutoLoad` (probe-then-commit to honor the filter), consume from the
-      carry buffer, spend `LoadMachine` energy.
+**Per machine batch — one group at a time, fetch-first single visit per machine** (updated
+2026-06-28; the original two-pass collect-all-then-reload-all model is superseded):
+For each group that has machines in this location, run a full collect→reload cycle before the next
+group. Groups are planned lazily in `AdvanceMachineGroup` (so a shared input chest reflects earlier
+groups' withdrawals):
+1. **Plan** (`PlanMachineGroup` / `BuildGroupLoadPlan`) — classify the group's machines, build the
+   load plan (reader builds `RecipeRequirement`s via `MachineDataUtility`; `MachineInputPlanner`
+   produces withdrawals + assignments against the input chest, mutex-checked), then queue the
+   collect/load steps **interleaved per machine in walking order** (collect first, then that
+   machine's load, guarded on `Empty`).
+2. **Fetch first** (collect-and-reload groups only) — walk to the group's input chest and withdraw
+   the planned inputs into the carry buffer (mutex re-check per stack) *before* any collect, so each
+   machine is visited only once. Collect-only groups skip this. If the chest can't be reached, fall
+   back to **collect-only** for the group (queued loads no-op against the empty carry buffer — nothing
+   withdrawn or lost).
+3. **Visit each machine once** — drain the interleaved steps: at each machine collect the
+   `readyForHarvest` output into the output `ItemBuffer` (guarded, spend `CollectMachine` energy),
+   then, if the carry buffer holds the assigned input(s) (and `HasAdditionalRequirements` is satisfied
+   — **atomic**), reload the now-empty machine via `PlaceInMachine` (probe-then-commit to honor the
+   filter), consume from the carry buffer, spend `LoadMachine` energy. Same-tile navigation between a
+   machine's collect and load resolves immediately (no re-walk), so it is genuinely one visit.
 
 **Stop/settle:** energy exhaustion, 8pm cap, cancel, and sleep route through the existing Depositing
 path. **Leftover carried inputs** must settle safely on stop — return them to the input chest, then
@@ -271,19 +277,17 @@ so no special off-screen animation handling (contrast with `Debris` tree-fall pu
 7. **Execution** — `ShiftOrchestrator.Machines.cs`, `MachineTripRunner`, batch emit in
    `ShiftPlanBuilder`, session state, collect/fetch/load passes, settle-on-stop, HUD notices.
 8. **In-game smoke pass** (`DevLog.Enabled` + a `dayswork_*` console command) — the shift engine is
-   verified by play-testing per AGENTS.md, not ritual unit tests.
+   verified by play-testing per AGENTS.md, not ritual unit tests. ✓ **PASSED 2026-06-28.**
 
-## Open verification items (do before/within the relevant milestone)
+## Open verification items — all resolved in the 2026-06-28 smoke pass ✓
 
-- Per-entry recipes for fish smoker (fish + coal placement: trigger vs `AdditionalConsumedItems`),
-  dehydrator (×5), keg/jar flavoring — read live `Data/Machines`.
-- Exact collect path for a worker (does `checkForAction` cleanly hand the held output to the
-  fake worker Farmer, and does the `OutputCollected` re-trigger fire without a real player?). Confirm
-  via the worker-action guard during milestone 7.
-- `AttemptAutoLoad` vs `PlaceInMachine` for filtered loads — pick probe-then-commit if auto-load
-  can't be constrained to the filter.
-- Save schema bump mechanics (`SaveDataSerializer`) — whether an added optional contract field needs
-  a full version bump or is back-compatible.
+- ✓ Per-entry recipes for fish smoker (fish + coal), dehydrator (×5), keg/jar flavoring — load and
+  collect correctly in-world.
+- ✓ Worker collect path: `checkForAction` cleanly hands held output to the fake worker Farmer and the
+  `OutputCollected` re-trigger fires without a real player present.
+- ✓ Filtered loads use probe-then-commit `PlaceInMachine` and honor the input filter.
+- ✓ Save schema: the optional `Contract.MachineScope` field is back-compatible (no full version bump);
+  old saves load with an empty scope.
 
 ## Risks
 

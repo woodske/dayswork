@@ -12,10 +12,11 @@ input into output over time — mayonnaise machine, keg, preserves jar, bee hous
 dehydrator, furnace, tapper, crystalarium, etc. Dayswork's "Manage Machines" feature has the
 farmhand visit each selected machine to collect finished output and reload it with input. A machine
 batch (one per location) services its groups **one at a time, as a full collect→reload cycle per
-group** — collect a group's ready output, then fetch from that group's input chest and reload its
-machines, and only then move on to the next group (not all collects across every group followed by
-all reloads). Fish ponds are a separate, later phase (they are **buildings**, not `Data/Machines`
-objects — see end).
+group** (not all collects across every group followed by all reloads). Within a collect-and-reload
+group the worker **fetches the group's inputs from its chest first (one trip), then visits each
+machine exactly once** — collecting its ready output and immediately reloading the now-empty machine
+— before moving on to the next group. Collect-only groups skip the chest trip. Fish ponds are a
+separate, later phase (they are **buildings**, not `Data/Machines` objects — see end).
 
 ## What a machine is
 

@@ -163,12 +163,14 @@ recurring schedule, managed crops, **Manage Machines**, **Manage Fish Ponds**); 
 (animal care, crops, fieldwork, managed-crop planting with auto-buy, **machine collect/reload**,
 **fish-pond collect**, multi-trip deposits, overflow safety, stuck recovery, 8pm cap, sleep settle);
 save/load persistence; evening office lighting/smoke; optional GMCM config; and SVE expansion
-compatibility. **Manage Machines** (2026-06-19)
-is built and unit-tested through milestone 7 but **awaits its in-game smoke pass** (milestone 8) —
-see `docs/plans/machine-management.md` for status + v1 limitations (notably: a group's input chest
-must be in the same location as its machines, else collect-only). **Manage Fish Ponds** (2026-06-23,
-collect-only) is built and unit-tested but **awaits its in-game smoke pass** — see
-`docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
+compatibility. **Manage Machines** (2026-06-19) is built, unit-tested, and **passed its in-game smoke
+pass (milestone 8) on 2026-06-28 — release-ready**: worker collect/reload, fish-smoker (fish+coal) and
+dehydrator (×5) loads, flavored-roe round-trip, filtered loads, and the **per-group fetch-first
+single-visit** workflow (worker fetches a group's inputs in one chest trip, then visits each machine
+once to collect→reload) all verified in-world. See `docs/plans/machine-management.md` for status + v1
+limitations (notably: a group's input chest must be in the same location as its machines, else
+collect-only). **Manage Fish Ponds** (2026-06-23, collect-only) is built and unit-tested but **awaits
+its in-game smoke pass** — see `docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
 blueberry wine, flavored honey…) end-to-end via the per-shift `FlavorItemRegistry` +
 `BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). The farmhand uses a **placeholder**
 Marnie sprite/portrait (custom art is specified in `docs/farmhand-art.md`). Dev tooling (verbose logs
