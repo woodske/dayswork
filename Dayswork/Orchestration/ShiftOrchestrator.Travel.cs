@@ -312,10 +312,30 @@ internal sealed partial class ShiftOrchestrator
         if (_session is null)
             return;
 
-        _buildingNavigator.LogSkipped(Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex].LocationName);
+        // Walk-only policy: the worker never warps to reach work. When it can't path to a
+        // destination, tell the player (HUD) and emit an always-on error so the unreachable work is
+        // visible in the production SMAPI console, then skip the batch. LogSkipped adds the detailed
+        // route/resolve diagnostics for bug reports.
+        var locationName = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex].LocationName;
+        var destination = ResolveDestinationDisplayName(locationName);
+        Game1.addHUDMessage(new HUDMessage(
+            I18nHelper.Get("notify.building_unreachable", new { destination }),
+            HUDMessage.error_type));
+        ModEntry.ModMonitor.Log(
+            I18nHelper.Get("log.building.unreachable", new { destination }),
+            LogLevel.Error);
+        _buildingNavigator.LogSkipped(locationName);
+
         Session.Ctx.CurrentBatchIndex++;
         BeginCurrentBatch();
     }
+
+    // Friendly name for a skipped work destination: the building type (e.g. "Deluxe Coop") when the
+    // location resolves to a building, else the raw location name.
+    private static string ResolveDestinationDisplayName(string locationName) =>
+        BuildingLocationResolver.TryResolve(Game1.getFarm(), locationName, out var match)
+            ? match.DisplayName
+            : locationName;
 
     private static string DescribeTravelDestination(TravelPlan plan)
     {

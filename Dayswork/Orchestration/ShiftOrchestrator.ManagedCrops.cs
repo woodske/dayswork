@@ -76,8 +76,7 @@ internal sealed partial class ShiftOrchestrator
         if (activeLocation is null)
         {
             DevLog.Log($"[Dayswork][managed-crops] skipped batch={batch.LocationName} reason=location_unavailable.", DevLog.WarnLevel);
-            Session.Ctx.CurrentBatchIndex++;
-            BeginCurrentBatch();
+            CompleteManagedCropBatch();
             return;
         }
 
@@ -89,8 +88,7 @@ internal sealed partial class ShiftOrchestrator
 
         if (Session.ManagedAssignments.Count == 0)
         {
-            Session.Ctx.CurrentBatchIndex++;
-            BeginCurrentBatch();
+            CompleteManagedCropBatch();
             return;
         }
 

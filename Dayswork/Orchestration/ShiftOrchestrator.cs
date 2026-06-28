@@ -523,6 +523,10 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         var batch = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex];
+
+        // WorkEntry plans walk only (TravelFailurePolicy.ReportFailure). If the worker can't path to
+        // the destination, the batch is skipped and SkipCurrentBatchAfterEntryFailure surfaces a HUD
+        // message + an always-on log — the worker never warps to reach work.
         if (IsManagedCropBatch(batch))
         {
             if (!string.Equals(batch.LocationName, "Farm", StringComparison.Ordinal))

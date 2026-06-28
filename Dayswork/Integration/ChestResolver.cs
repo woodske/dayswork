@@ -58,7 +58,7 @@ internal sealed class ChestResolver
                     {
                         var tileX = (int)tile.X;
                         var tileY = (int)tile.Y;
-                        var chestRef = new ChestRef(indoors.Name, new TileCoord(tileX, tileY));
+                        var chestRef = new ChestRef(indoors.NameOrUniqueName, new TileCoord(tileX, tileY));
                         result.Add(new ChestEntry(chestRef, GetDisplayName(chest, indoors, tileX, tileY), buildingName));
                     }
                 }

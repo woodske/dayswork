@@ -56,8 +56,7 @@ internal sealed partial class ShiftOrchestrator
         if (location is null || scope is null)
         {
             DevLog.Log($"[Dayswork][fishponds] skipped batch={batch.LocationName} reason=location_or_scope_unavailable.", DevLog.WarnLevel);
-            Session.Ctx.CurrentBatchIndex++;
-            BeginCurrentBatch();
+            CompleteFishPondBatch();
             return;
         }
 
@@ -85,8 +84,7 @@ internal sealed partial class ShiftOrchestrator
 
         if (Session.FishPondSteps.Count == 0)
         {
-            Session.Ctx.CurrentBatchIndex++;
-            BeginCurrentBatch();
+            CompleteFishPondBatch();
             return;
         }
 

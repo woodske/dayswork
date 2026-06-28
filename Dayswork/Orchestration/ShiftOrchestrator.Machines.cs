@@ -63,8 +63,7 @@ internal sealed partial class ShiftOrchestrator
         if (location is null || scope is null)
         {
             DevLog.Log($"[Dayswork][machines] skipped batch={batch.LocationName} reason=location_or_scope_unavailable.", DevLog.WarnLevel);
-            Session.Ctx.CurrentBatchIndex++;
-            BeginCurrentBatch();
+            CompleteMachineBatch();
             return;
         }
 
@@ -87,8 +86,7 @@ internal sealed partial class ShiftOrchestrator
             DevLog.Log(
                 $"[Dayswork][machines] batch={batch.LocationName} — no machines ready to collect or reload; skipping.",
                 DevLog.WarnLevel);
-            Session.Ctx.CurrentBatchIndex++;
-            BeginCurrentBatch();
+            CompleteMachineBatch();
             return;
         }
 

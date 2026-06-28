@@ -224,6 +224,7 @@
     "notify.crop_wont_grow": "Your farmhand skipped planting {{crop}} — it can't mature before the season ends.",
     "notify.water_skipped_season_end": "Your farmhand skipped watering crops that can't mature before the season ends.",
     "notify.crop_cannot_till_zones": "Your farmhand couldn't clear all tiles in crop groups {{zones}} — some tiles remain unplanted.",
+    "notify.building_unreachable": "Your farmhand can't reach {{destination}} — that work was skipped today.",
     "notify.bought_item": "Bought {{count}}× {{item}}.",
     "notify.using_fallback_store": "{{store}} was closed — your farmhand shopped at the other store.",
     "notify.using_partial_fallback_store": "{{store}} doesn't have everything — your farmhand will visit the other store too.",
@@ -336,6 +337,7 @@
     "log.festival.skipped": "Festival today — the farmhand is taking the day off.",
     "log.building.entering": "Farmhand entering {{location}}.",
     "log.building.skipped": "Farmhand skipped {{location}} because it could not be reached or resolved.",
+    "log.building.unreachable": "Farmhand could not reach {{destination}} — that work was skipped.",
     "log.animal.fed": "Farmhand fed {{count}} animal spot(s) in {{location}}.",
     "log.animal.no_silo": "Farmhand could not feed animals in {{location}} because no hay was available.",
 
