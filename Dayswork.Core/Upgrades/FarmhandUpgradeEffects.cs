@@ -10,7 +10,9 @@ public static class FarmhandUpgradeEffects
         if (state == FarmhandUpgradeState.Empty)
             return config;
 
-        var speedBonus = state.SpeedPurchased ? FarmhandUpgradeCatalog.Speed.SpeedBonus : 0;
+        var speedBonus =
+            (state.SpeedPurchased ? FarmhandUpgradeCatalog.Speed.SpeedBonus : 0)
+            + (state.Speed2Purchased ? FarmhandUpgradeCatalog.Speed2.SpeedBonus : 0);
         var energyBonus = state.EnergyPurchased ? FarmhandUpgradeCatalog.Energy.EnergyBonus : 0;
 
         var tierEnergy = config.EnergyTierEnergy.ToDictionary(

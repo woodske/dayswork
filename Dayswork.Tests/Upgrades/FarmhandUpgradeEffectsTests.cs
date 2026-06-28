@@ -29,6 +29,30 @@ public sealed class FarmhandUpgradeEffectsTests
     }
 
     [Fact]
+    public void Apply_BothSpeedTiers_AddsTwoToConfiguredWalkSpeed()
+    {
+        var config = ConfigDefaults.Build() with { WorkerWalkPixelsPerTick = 3.5f };
+        var state = FarmhandUpgradeState.Empty
+            .MarkPurchased(FarmhandUpgradeKind.Speed)
+            .MarkPurchased(FarmhandUpgradeKind.Speed2);
+
+        var upgraded = FarmhandUpgradeEffects.Apply(config, state);
+
+        Assert.Equal(5.5f, upgraded.WorkerWalkPixelsPerTick);
+    }
+
+    [Fact]
+    public void Apply_SecondSpeedTierOnly_AddsOneToConfiguredWalkSpeed()
+    {
+        var config = ConfigDefaults.Build() with { WorkerWalkPixelsPerTick = 3.5f };
+        var state = FarmhandUpgradeState.Empty.MarkPurchased(FarmhandUpgradeKind.Speed2);
+
+        var upgraded = FarmhandUpgradeEffects.Apply(config, state);
+
+        Assert.Equal(4.5f, upgraded.WorkerWalkPixelsPerTick);
+    }
+
+    [Fact]
     public void Apply_EnergyUpgrade_AddsFiftyToEveryTier()
     {
         var config = ConfigDefaults.Build();

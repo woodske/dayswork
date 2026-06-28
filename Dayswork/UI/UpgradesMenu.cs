@@ -38,33 +38,56 @@ internal sealed class UpgradesMenu : LayoutMenu
     private ILayoutElement BuildUpgradeRow(FarmhandUpgradeDefinition definition)
     {
         var purchased = _state.IsPurchased(definition.Kind);
+        var locked = definition.Prerequisite is { } prerequisite && !_state.IsPurchased(prerequisite);
         var name = I18nHelper.Get(NameKey(definition.Kind));
         var detail = I18nHelper.Get(DetailKey(definition.Kind), new { price = definition.Price });
+
+        string statusText;
+        Color statusColor;
+        if (purchased)
+        {
+            statusText = I18nHelper.Get("ui.upgrades.purchased");
+            statusColor = PurchasedColor;
+        }
+        else if (locked)
+        {
+            statusText = I18nHelper.Get("ui.upgrades.locked");
+            statusColor = SecondaryTextColor;
+        }
+        else
+        {
+            statusText = string.Empty;
+            statusColor = PurchasedColor;
+        }
 
         return new FixedHeight(
             new HStack(12,
                 HStack.Fill(new VStack(8,
                     new Label(name),
                     new Label(detail, color: SecondaryTextColor, wrap: true),
-                    new Label(
-                        purchased ? I18nHelper.Get("ui.upgrades.purchased") : string.Empty,
-                        color: PurchasedColor))),
+                    new Label(statusText, color: statusColor))),
                 HStack.Auto(new MenuButton(
                     I18nHelper.Get("ui.upgrades.purchase_btn"),
                     () => _onPurchase(definition.Kind),
-                    enabled: !purchased && Game1.player.Money >= definition.Price,
+                    enabled: !purchased && !locked && Game1.player.Money >= definition.Price,
                     fixedWidth: ButtonWidth,
                     height: 52))),
             RowHeight);
     }
 
     private static string NameKey(FarmhandUpgradeKind kind) =>
-        kind == FarmhandUpgradeKind.Speed
-            ? "ui.upgrades.speed.name"
-            : "ui.upgrades.energy.name";
+        kind switch
+        {
+            FarmhandUpgradeKind.Speed => "ui.upgrades.speed.name",
+            FarmhandUpgradeKind.Speed2 => "ui.upgrades.speed2.name",
+            _ => "ui.upgrades.energy.name",
+        };
 
     private static string DetailKey(FarmhandUpgradeKind kind) =>
-        kind == FarmhandUpgradeKind.Speed
-            ? "ui.upgrades.speed.detail"
-            : "ui.upgrades.energy.detail";
+        kind switch
+        {
+            FarmhandUpgradeKind.Speed => "ui.upgrades.speed.detail",
+            FarmhandUpgradeKind.Speed2 => "ui.upgrades.speed2.detail",
+            _ => "ui.upgrades.energy.detail",
+        };
 }

@@ -10,8 +10,12 @@
 "Machine" is the game's own term (`Data/Machines`, `MachineData`) for a placed object that turns
 input into output over time — mayonnaise machine, keg, preserves jar, bee house, fish smoker,
 dehydrator, furnace, tapper, crystalarium, etc. Dayswork's "Manage Machines" feature has the
-farmhand visit each selected machine to collect finished output and reload it with input.
-Fish ponds are a separate, later phase (they are **buildings**, not `Data/Machines` objects — see end).
+farmhand visit each selected machine to collect finished output and reload it with input. A machine
+batch (one per location) services its groups **one at a time, as a full collect→reload cycle per
+group** — collect a group's ready output, then fetch from that group's input chest and reload its
+machines, and only then move on to the next group (not all collects across every group followed by
+all reloads). Fish ponds are a separate, later phase (they are **buildings**, not `Data/Machines`
+objects — see end).
 
 ## What a machine is
 

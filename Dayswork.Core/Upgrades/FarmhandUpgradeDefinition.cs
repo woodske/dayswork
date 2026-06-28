@@ -4,4 +4,5 @@ public sealed record FarmhandUpgradeDefinition(
     FarmhandUpgradeKind Kind,
     int Price,
     int SpeedBonus,
-    int EnergyBonus);
+    int EnergyBonus,
+    FarmhandUpgradeKind? Prerequisite = null);

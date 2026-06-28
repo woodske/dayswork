@@ -27,11 +27,30 @@ public sealed class FarmhandUpgradeSaveDataSerializerTests
     [Fact]
     public void SerializeAndDeserialize_PurchasedUpgrades_RoundTrip()
     {
-        var state = new FarmhandUpgradeState(SpeedPurchased: true, EnergyPurchased: true);
+        var state = new FarmhandUpgradeState(SpeedPurchased: true, EnergyPurchased: true, Speed2Purchased: true);
 
         var hydrated = _serializer.Deserialize(_serializer.Serialize(state));
 
         Assert.Equal(state, hydrated);
+    }
+
+    [Fact]
+    public void Deserialize_LegacyV1Payload_MigratesWithSecondSpeedTierUnowned()
+    {
+        // A v1 save predates the second speed upgrade — it has no Speed2Purchased field.
+        var payload = new JObject
+        {
+            ["SchemaVersion"] = 1,
+            ["SpeedPurchased"] = true,
+            ["EnergyPurchased"] = true,
+        };
+
+        var state = _serializer.Deserialize(payload.ToString());
+
+        Assert.True(state.SpeedPurchased);
+        Assert.True(state.EnergyPurchased);
+        Assert.False(state.Speed2Purchased);
+        Assert.Empty(_warnings);
     }
 
     [Fact]

@@ -18,6 +18,15 @@ public static class FarmhandUpgradePurchaser
                 definition.Price);
         }
 
+        if (definition.Prerequisite is { } prerequisite && !state.IsPurchased(prerequisite))
+        {
+            return new FarmhandUpgradePurchaseResult(
+                FarmhandUpgradePurchaseStatus.PrerequisiteNotMet,
+                state,
+                availableGold,
+                definition.Price);
+        }
+
         if (availableGold < definition.Price)
         {
             return new FarmhandUpgradePurchaseResult(

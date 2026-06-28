@@ -128,6 +128,10 @@ internal sealed class ShiftSession
     public bool MachinesActive;
     public string MachineBatchLocationName = "Farm";
 
+    // Groups in the current batch still to be serviced, FIFO. Drained one at a time so each group
+    // runs a full collect→reload cycle before the next (per-group, not collect-all-then-reload-all).
+    public readonly Queue<MachineGroup> PendingMachineGroups = new();
+
     // Pending reload jobs for the current batch (one per group with empty machines to load). Each is
     // a fetch-then-load: withdraw the planned inputs from the group's chest, then load its machines.
     public readonly Queue<MachineReloadJob> MachineReloads = new();

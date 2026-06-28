@@ -5,6 +5,7 @@ public enum FarmhandUpgradePurchaseStatus
     Purchased,
     AlreadyPurchased,
     InsufficientFunds,
+    PrerequisiteNotMet,
 }
 
 public sealed record FarmhandUpgradePurchaseResult(

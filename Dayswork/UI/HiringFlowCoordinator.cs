@@ -163,6 +163,12 @@ internal sealed class HiringFlowCoordinator
                     HUDMessage.error_type));
                 return false;
 
+            case FarmhandUpgradePurchaseStatus.PrerequisiteNotMet:
+                Game1.addHUDMessage(new HUDMessage(
+                    I18nHelper.Get("ui.upgrades.prereq_required"),
+                    HUDMessage.error_type));
+                return false;
+
             case FarmhandUpgradePurchaseStatus.AlreadyPurchased:
                 return false;
 
@@ -959,9 +965,12 @@ internal sealed class HiringFlowCoordinator
         FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, _upgradeStore.State);
 
     private static string UpgradeDisplayName(FarmhandUpgradeKind kind) =>
-        I18nHelper.Get(kind == FarmhandUpgradeKind.Speed
-            ? "ui.upgrades.speed.name"
-            : "ui.upgrades.energy.name");
+        I18nHelper.Get(kind switch
+        {
+            FarmhandUpgradeKind.Speed => "ui.upgrades.speed.name",
+            FarmhandUpgradeKind.Speed2 => "ui.upgrades.speed2.name",
+            _ => "ui.upgrades.energy.name",
+        });
 
     // Prices each energy tier against the current scope/tasks so the Energy page can show energy + cost
     // per option. Tiers with no chargeable scope yet have null terms (the card shows just the name).

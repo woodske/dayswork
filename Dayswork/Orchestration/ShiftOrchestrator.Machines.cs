@@ -14,10 +14,11 @@ using SObject = StardewValley.Object;
 namespace Dayswork.Orchestration;
 
 /// <summary>
-/// Manage Machines execution. A machine batch (one per location with selected machines) visits each
-/// machine group-major: collect ready output into the deposit buffer, then — for collect-and-reload
-/// groups — fetch input from the group's chest (physically walking to it) and load the empty
-/// machines. Mirrors the managed-crop batch lifecycle.
+/// Manage Machines execution. A machine batch (one per location with selected machines) services its
+/// groups one at a time, running a full collect→reload cycle per group before moving to the next:
+/// collect a group's ready output into the deposit buffer, then — for collect-and-reload groups —
+/// fetch input from that group's chest (physically walking to it) and load its empty machines, and
+/// only then advance to the next group. Mirrors the managed-crop batch lifecycle.
 ///
 /// v1 scope: the input fetch is a within-location walk. A group whose input chest is in a different
 /// location than its machines is serviced collect-only for that location (a HUD/dev note), so the
@@ -38,6 +39,7 @@ internal sealed partial class ShiftOrchestrator
         s.CurrentMachineStep = null;
         s.MachinesActive = false;
         s.MachineBatchLocationName = "Farm";
+        s.PendingMachineGroups.Clear();
         s.MachineReloads.Clear();
         s.CurrentMachineReload = null;
         s.MachineFetchPending = false;
@@ -75,22 +77,56 @@ internal sealed partial class ShiftOrchestrator
             .ToList();
 
         foreach (var group in groups)
-            PlanMachineGroup(group, batch.LocationName, location);
+            Session.PendingMachineGroups.Enqueue(group);
 
         DevLog.Log(
-            $"[Dayswork][machines] batch={batch.LocationName} groups={groups.Count} collectSteps={Session.MachineSteps.Count} reloadJobs={Session.MachineReloads.Count}.",
+            $"[Dayswork][machines] batch={batch.LocationName} groups={groups.Count} (per-group collect→reload).",
             DevLog.WarnLevel);
 
-        if (Session.MachineSteps.Count == 0 && Session.MachineReloads.Count == 0)
+        // Each group is planned lazily when it comes up (see AdvanceMachineGroup) so its collect and
+        // reload run as one cycle before the next group. An all-empty batch falls through to
+        // CompleteMachineBatch on the first AdvanceMachineGroup; no game tick elapses before then, so
+        // setting MachinesActive here is safe even on the skip path.
+        Session.MachinesActive = true;
+        AdvanceMachineGroup();
+    }
+
+    /// <summary>
+    /// Begins the next group's collect→reload cycle. Plans just that group (so each group is read
+    /// against fresh live state and a shared input chest reflects earlier groups' withdrawals), runs
+    /// its steps, and only advances to the following group once this one's reload settles. When no
+    /// groups remain, completes the batch. Groups that plan to nothing are skipped.
+    /// </summary>
+    private void AdvanceMachineGroup()
+    {
+        if (_session is null || Session.Worker is null)
+            return;
+
+        if (ShouldWrapUpBeforeNextUnit())
         {
-            DevLog.Log(
-                $"[Dayswork][machines] batch={batch.LocationName} — no machines ready to collect or reload; skipping.",
-                DevLog.WarnLevel);
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            return;
+        }
+
+        if (Session.PendingMachineGroups.Count == 0)
+        {
             CompleteMachineBatch();
             return;
         }
 
-        Session.MachinesActive = true;
+        var group = Session.PendingMachineGroups.Dequeue();
+        var location = Session.CurrentLocation
+            ?? ResolveMachineBatchLocation(Session.MachineBatchLocationName) ?? Game1.getFarm();
+
+        PlanMachineGroup(group, Session.MachineBatchLocationName, location);
+
+        // Group planned to nothing (busy / collect-only with no output / no matching inputs) → next.
+        if (Session.MachineSteps.Count == 0 && Session.MachineReloads.Count == 0)
+        {
+            AdvanceMachineGroup();
+            return;
+        }
+
         StartNextMachineStep();
     }
 
@@ -309,7 +345,10 @@ internal sealed partial class ShiftOrchestrator
 
         if (Session.MachineReloads.Count == 0)
         {
-            CompleteMachineBatch();
+            // This group's collect→reload cycle is done — move on to the next group (or, when none
+            // remain, AdvanceMachineGroup completes the batch). PlanMachineGroup enqueues at most one
+            // reload job per group, so this branch is reached exactly once per group.
+            AdvanceMachineGroup();
             return;
         }
 

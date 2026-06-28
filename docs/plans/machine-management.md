@@ -70,6 +70,14 @@ build-verified and await the in-game smoke pass per AGENTS.md):
 - Sleep-settle of *collected machine output* still in the buffer routes by the buffer's nominal task
   tag (provenance is honored on the normal deposit path) — same minor imperfection managed crops
   have; items are never lost. Acceptable for v1.
+- **Per-group collect→reload cycle (2026-06-28).** A batch services its groups one at a time as a
+  full cycle — collect a group, reload that group, *then* move to the next — rather than collecting
+  every group first and reloading them all afterward (groups are planned lazily in
+  `AdvanceMachineGroup`, so a shared input chest reflects earlier groups' withdrawals). Smoke-verify
+  with **two** CollectAndReload groups both ready (e.g. loom + fish smoker), each with a
+  same-location input chest: the order must be collect A → load A → collect B → load B (worker walks
+  back to each group's machines after its chest fetch), and a collect-only group is still serviced
+  and skipped past.
 
 **Smoke pass:** enable `DevLog.Enabled`, build a machine group, run a shift, and use
 `dayswork_debug_machines` (current location) + `dayswork_end_shift` to inspect collect/reload.
