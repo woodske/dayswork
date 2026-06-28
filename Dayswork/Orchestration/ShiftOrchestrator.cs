@@ -567,6 +567,20 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         {
             if (!string.Equals(batch.LocationName, "Farm", StringComparison.Ordinal))
             {
+                // Only path into the building if something inside is actually serviceable right now.
+                // Without this, an off-farm machine batch always walks in, re-plans, finds every
+                // machine still mid-cycle, and walks straight back out — the wasteful round trip the
+                // idle-machine loop repeats every rotation.
+                if (!MachineBatchHasReadyWork(batch))
+                {
+                    DevLog.Log(
+                        $"[Dayswork][machines] batch={batch.LocationName} — no machines ready to collect or reload; skipping building entry.",
+                        DevLog.WarnLevel);
+                    Session.Ctx.CurrentBatchIndex++;
+                    BeginCurrentBatch();
+                    return;
+                }
+
                 if (ModEntry.ExpansionCompat is { } compat &&
                     compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
                     descriptor.Role == ExpansionLocationRole.GreenhouseWork)

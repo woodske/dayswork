@@ -175,8 +175,9 @@ internal sealed partial class ShiftOrchestrator
     /// <summary>
     /// True when at least one managed machine can be serviced right now: a machine with output to
     /// collect, or (for reload groups) an empty reloadable machine whose same-location input chest
-    /// actually holds a loadable recipe. The reload probe mirrors <see cref="PlanMachineGroup"/> so
-    /// the wait never wakes up for work that the servicing pass would then find nothing to do.
+    /// actually holds a loadable recipe. Delegates to the shared per-location probe
+    /// (<see cref="GroupHasReadyMachineWork"/>, which mirrors <see cref="PlanMachineGroup"/>) so the
+    /// wait never wakes up for work that the servicing pass would then find nothing to do.
     /// </summary>
     private bool AnyManagedMachineReady()
     {
@@ -197,43 +198,8 @@ internal sealed partial class ShiftOrchestrator
                 if (location is null)
                     continue;
 
-                var reloadable = new List<(MachineRef Ref, SObject Machine, MachineData Data)>();
-                foreach (var machineRef in group.Machines
-                             .Where(machine => string.Equals(machine.LocationName, locationName, StringComparison.Ordinal)))
-                {
-                    var live = _machineReader.Resolve(location, machineRef.Tile, machineRef.ExpectedQualifiedId);
-                    if (live is null)
-                        continue;
-
-                    var state = _machineReader.Classify(live);
-                    if (state == MachineReadyState.ReadyToCollect)
-                        return true; // output to collect is always serviceable
-
-                    var wantsReload = group.Mode == MachineGroupMode.CollectAndReload
-                        && live.GetMachineData() is { } data
-                        && MachineReader.IsReloadable(data);
-                    if (state == MachineReadyState.Empty && wantsReload && live.GetMachineData() is { } emptyData)
-                        reloadable.Add((machineRef, live, emptyData));
-                }
-
-                if (group.Mode != MachineGroupMode.CollectAndReload
-                    || group.InputChest is not { } chestRef
-                    || reloadable.Count == 0)
-                    continue;
-
-                // v1: reload fetch is within-location only — a chest elsewhere is collect-only.
-                if (!string.Equals(chestRef.LocationName, location.NameOrUniqueName, StringComparison.Ordinal))
-                    continue;
-
-                var supply = ReadChestSupply(chestRef, out var samples);
-                var probeFarmer = CreateWorkerActionFarmer(reloadable[0].Ref.Tile, location);
-                foreach (var (machineRef, machine, data) in reloadable)
-                {
-                    var candidate = _machineReader.BuildLoadCandidate(
-                        machineRef, machine, data, group.InputFilter, supply, samples, probeFarmer, location);
-                    if (candidate is not null && MachineInputPlanner.Plan(new[] { candidate }, supply).HasWork)
-                        return true;
-                }
+                if (GroupHasReadyMachineWork(group, locationName, location))
+                    return true;
             }
         }
 
