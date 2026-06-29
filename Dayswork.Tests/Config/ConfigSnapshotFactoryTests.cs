@@ -23,6 +23,7 @@ public class ConfigSnapshotFactoryTests
             workerActionAnimationMs: defaults.WorkerActionAnimationMs,
             workerEntranceHoldTicks: defaults.WorkerEntranceHoldTicks,
             workOnHolidays: defaults.WorkOnHolidays,
+            eagerChestDeposits: defaults.EagerChestDeposits,
             energyTierEnergy: tierEnergy ?? defaults.EnergyTierEnergy,
             energyTierPrice: tierPrice ?? defaults.EnergyTierPrice,
             workActionCosts: defaults.WorkActionCosts);

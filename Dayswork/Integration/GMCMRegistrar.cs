@@ -111,6 +111,14 @@ internal sealed class GMCMRegistrar
             () => I18nHelper.Get("gmcm.worker.work_on_holidays.tooltip"),
             fieldId: "worker-work-on-holidays");
 
+        api.AddBoolOption(
+            _manifest,
+            () => _config.Editable.EagerChestDeposits,
+            value => _config.Editable.EagerChestDeposits = value,
+            () => I18nHelper.Get("gmcm.worker.eager_chest_deposits.name"),
+            () => I18nHelper.Get("gmcm.worker.eager_chest_deposits.tooltip"),
+            fieldId: "worker-eager-chest-deposits");
+
         RegisterFloatOption(
             api,
             new FloatOptionSpec(

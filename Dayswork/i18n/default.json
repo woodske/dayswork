@@ -378,6 +378,8 @@
     "gmcm.worker.entrance_hold_ticks.tooltip": "How long the worker pauses at the farm entrance so their arrival reads clearly.",
     "gmcm.worker.work_on_holidays.name": "Work on holidays",
     "gmcm.worker.work_on_holidays.tooltip": "When enabled, the farmhand works on festival and holiday days. Turn this off to keep the current skip-holidays behavior.",
+    "gmcm.worker.eager_chest_deposits.name": "Deposit to chests during the day",
+    "gmcm.worker.eager_chest_deposits.tooltip": "When enabled, the farmhand drops off items bound for your assigned chests as work progresses, rather than holding everything until the end of the shift. Items bound for the shipping bin or the office output chest are still delivered at the end. Turn this off to keep the single end-of-day deposit.",
     "gmcm.worker.hard_cap_time.name": "Hard cap time",
     "gmcm.worker.hard_cap_time.tooltip": "The Stardew HHMM time when the worker stops starting new work and begins wrap-up.",
     "gmcm.worker.stuck_initial_wait.name": "Initial stuck wait (minutes)",

@@ -27,6 +27,7 @@ public static class FarmhandUpgradeEffects
             config.WorkerActionAnimationMs,
             config.WorkerEntranceHoldTicks,
             config.WorkOnHolidays,
+            config.EagerChestDeposits,
             tierEnergy,
             config.EnergyTierPrice,
             config.WorkActionCosts);

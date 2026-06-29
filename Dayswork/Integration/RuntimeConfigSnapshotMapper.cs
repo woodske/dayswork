@@ -20,6 +20,7 @@ internal static class RuntimeConfigSnapshotMapper
             WorkerActionAnimationMs = Math.Max(1, config.WorkerActionAnimationMs),
             WorkerEntranceHoldTicks = Math.Max(0, config.WorkerEntranceHoldTicks),
             WorkOnHolidays = config.WorkOnHolidays,
+            EagerChestDeposits = config.EagerChestDeposits,
             EnergyTierEnergy = NormalizePositiveDictionary(
                 config.EnergyTierEnergy,
                 defaults.EnergyTierEnergy,
@@ -62,6 +63,7 @@ internal static class RuntimeConfigSnapshotMapper
             normalized.WorkerActionAnimationMs,
             normalized.WorkerEntranceHoldTicks,
             normalized.WorkOnHolidays,
+            normalized.EagerChestDeposits,
             energyTierEnergy,
             energyTierPrice,
             workActionCosts);

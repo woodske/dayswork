@@ -67,6 +67,12 @@ public class ConfigDefaultsTests
     }
 
     [Fact]
+    public void Build_EagerChestDeposits_defaults_true()
+    {
+        Assert.True(ConfigDefaults.Build().EagerChestDeposits);
+    }
+
+    [Fact]
     public void Build_WorkActionCosts_cover_every_work_action()
     {
         var snapshot = ConfigDefaults.Build();

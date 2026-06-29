@@ -46,7 +46,7 @@ internal sealed partial class ShiftOrchestrator
         // Deposit any items collected this round before parking at the door.
         if (!Session.Ctx.Buffer.IsEmpty)
         {
-            Session.ResumeIdleAfterDeposit = true;
+            Session.DepositResume = DepositResumeMode.ResumeIdle;
             BeginDeposit();
             return true;
         }
@@ -68,7 +68,7 @@ internal sealed partial class ShiftOrchestrator
     /// </summary>
     internal void OnPreIdleDepositComplete()
     {
-        Session.ResumeIdleAfterDeposit = false;
+        Session.DepositResume = DepositResumeMode.None;
         if (ShouldWrapUpBeforeNextUnit())
         {
             QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed);

@@ -51,6 +51,15 @@ public sealed class AnimalProductDetectionTests
         Assert.False(WorkAreaScanner.IsAnimalProductForageObject("(BC)16", "16", AnimalGoods, bigCraftable: true));
     }
 
+    [Fact]
+    public void Geode_crusher_is_not_collected_as_animal_product()
+    {
+        // (BC)182 (Geode Crusher) shares itemId "182" with (O)182 (Large Egg). The bare-id
+        // check must not match placed machines — regression for the bug where the crusher was
+        // removed from the world and deposited into the animal-product output chest.
+        Assert.False(WorkAreaScanner.IsAnimalProductForageObject("(BC)182", "182", Other, bigCraftable: true));
+    }
+
     [Property(MaxTest = 300)]
     public void Detection_is_deterministic(string qid, string id, int category, bool bigCraftable)
     {

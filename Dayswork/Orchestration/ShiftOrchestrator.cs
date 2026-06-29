@@ -522,6 +522,11 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
+        // Eager chest deposits: at each batch boundary, drop off items bound for the player's chests
+        // before starting the next batch. Resumes here (this same batch) once the run completes.
+        if (TryBeginEagerChestDeposit())
+            return;
+
         var batch = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex];
 
         // WorkEntry plans walk only (TravelFailurePolicy.ReportFailure). If the worker can't path to

@@ -14,6 +14,7 @@ public sealed class ModConfig
     public int WorkerActionAnimationMs { get; set; } = DefaultSnapshot.WorkerActionAnimationMs;
     public int WorkerEntranceHoldTicks { get; set; } = DefaultSnapshot.WorkerEntranceHoldTicks;
     public bool WorkOnHolidays { get; set; } = DefaultSnapshot.WorkOnHolidays;
+    public bool EagerChestDeposits { get; set; } = DefaultSnapshot.EagerChestDeposits;
 
     public Dictionary<string, int> EnergyTierEnergy { get; set; } = CreateEnergyTierEnergyDefaults();
     public Dictionary<string, int> EnergyTierPrice { get; set; } = CreateEnergyTierPriceDefaults();

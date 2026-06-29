@@ -82,11 +82,11 @@ internal sealed partial class ShiftOrchestrator
         if (Session.Ctx.StateMachine.Phase is ShiftPhase.Depositing or ShiftPhase.Exiting or ShiftPhase.Done)
             return;
 
-        // Guard: in pre-idle deposit mode, don't re-plan once trips are already executing.
-        // Use IsActive (not intent) because StartTravel overwrites the intent with IntentMoveToTile
-        // during deposit trip travel, which would make an intent check silently fail.
-        // Any pending stop reason (energy/8pm) will be honoured in OnPreIdleDepositComplete.
-        if (Session.ResumeIdleAfterDeposit && Session.Deposits.IsActive)
+        // Guard: in a resume deposit mode (pre-idle flush or eager mid-batch flush), don't re-plan once
+        // trips are already executing. Use IsActive (not intent) because StartTravel overwrites the
+        // intent with IntentMoveToTile during deposit trip travel, which would make an intent check
+        // silently fail. Any pending stop reason (energy/8pm) is honoured in the resume callback.
+        if (Session.DepositResume != DepositResumeMode.None && Session.Deposits.IsActive)
             return;
 
         // If the 8pm cap (or any external wrap-up trigger) fires while the worker is in the
@@ -125,29 +125,54 @@ internal sealed partial class ShiftOrchestrator
         var workerTile = Session.Worker is not null
             ? new TileCoord(Session.Worker.TilePoint.X, Session.Worker.TilePoint.Y)
             : Session.FarmExitTile;
+        // Eager mid-batch flush deposits only player-chest-bound items; the terminal/pre-idle flush
+        // takes everything.
+        var eager = Session.DepositResume == DepositResumeMode.ResumeBatch;
         var plan = _depositPlanner.Plan(
             Session.Ctx.Buffer.Snapshot(),
             Session.Ctx.TaskDestinations,
             BuildOutputProvenanceMap(),
             ResolveShippingBinDepositTile(farm),
             workerTile,
-            Manhattan);
+            Manhattan,
+            chestDestinationsOnly: eager);
 
         // Items resolved straight to automatic delivery are seeded into the overflow set.
+        // (Empty for an eager plan — non-chest items are retained in the buffer instead.)
         foreach (var stack in plan.AutomaticOverflow)
             Session.Ctx.Overflow.Add(new OverflowItem(stack, OverflowReason.NoChestAssigned));
 
         // The buffer is now consumed into the plan; clear it so nothing is double-counted.
         Session.Ctx.Buffer.TakeAll();
 
+        // Eager plans hold back everything not bound for a player chest (shipping bin / office output);
+        // put it back in the buffer to ride along to the terminal deposit.
+        foreach (var stack in plan.Retained)
+            Session.Ctx.Buffer.Add(stack.QualifiedItemId, stack.Quantity, stack.SourceTask, stack.Provenance, stack.Quality, stack.FlavorId);
+
         Session.Deposits.Load(plan.Trips);
 
-        if (Session.ResumeIdleAfterDeposit)
+        if (eager)
+        {
+            // Mid-shift chest flush: stay in Working phase and resume the next batch when done.
+            if (!Session.Deposits.HasPending)
+            {
+                Session.DepositResume = DepositResumeMode.None;
+                BeginCurrentBatch();
+                return;
+            }
+            var firstBatchTrip = Session.Deposits.BeginNextTrip();
+            Session.Ctx.StateMachine.SetIntent(ToDepositIntent(firstBatchTrip));
+            Session.Deposits.StartTravelToTrip(firstBatchTrip);
+            return;
+        }
+
+        if (Session.DepositResume == DepositResumeMode.ResumeIdle)
         {
             // Pre-idle path: stay in Working phase so we can return to idle after depositing.
             if (!Session.Deposits.HasPending)
             {
-                Session.ResumeIdleAfterDeposit = false;
+                Session.DepositResume = DepositResumeMode.None;
                 if (ShouldWrapUpBeforeNextUnit())
                 {
                     QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed);
@@ -177,6 +202,61 @@ internal sealed partial class ShiftOrchestrator
         var first = Session.Deposits.BeginNextTrip();
         Session.Ctx.StateMachine.BeginWrapUp(ToDepositIntent(first), stopReason);
         Session.Deposits.StartTravelToTrip(first);
+    }
+
+    /// <summary>
+    /// Eager mid-shift deposit hook, called at each work-batch boundary. If the feature is enabled and
+    /// the buffer holds items bound for a player-assigned chest, runs a chest-only deposit run and
+    /// resumes the next batch when it finishes (see <see cref="OnBatchDepositComplete"/>). Returns true
+    /// when a deposit run was started (the caller must return). Shipping-bin / office-output items are
+    /// left in the buffer for the terminal deposit, so this never detours for a terminal-sink-only haul.
+    /// </summary>
+    private bool TryBeginEagerChestDeposit()
+    {
+        if (_session is null || Session.Worker is null)
+            return false;
+
+        if (!_config.EagerChestDeposits)
+            return false;
+
+        // Don't detour if a resume deposit is already in flight or the shift is winding down.
+        if (Session.DepositResume != DepositResumeMode.None)
+            return false;
+
+        if (ShouldWrapUpBeforeNextUnit())
+            return false;
+
+        if (Session.Ctx.Buffer.IsEmpty)
+            return false;
+
+        if (!DepositPlanner.HasChestDestination(
+                Session.Ctx.Buffer.Snapshot(),
+                Session.Ctx.TaskDestinations,
+                BuildOutputProvenanceMap()))
+            return false;
+
+        Session.DepositResume = DepositResumeMode.ResumeBatch;
+        BeginDeposit();
+        return true;
+    }
+
+    /// <summary>
+    /// Called by <see cref="DepositTripRunner"/> when an eager mid-batch deposit run finishes. Honours
+    /// a stop reason that fired mid-deposit; otherwise resumes the work plan at the current batch.
+    /// </summary>
+    internal void OnBatchDepositComplete()
+    {
+        if (_session is null)
+            return;
+
+        Session.DepositResume = DepositResumeMode.None;
+        if (ShouldWrapUpBeforeNextUnit())
+        {
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed);
+            return;
+        }
+
+        BeginCurrentBatch();
     }
 
     internal static bool TrySelectChestDepositStandTile(

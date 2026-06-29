@@ -9,6 +9,14 @@ using StardewValley.TerrainFeatures;
 
 namespace Dayswork.Orchestration;
 
+/// <summary>What to resume when a deposit run completes (see <see cref="ShiftSession.DepositResume"/>).</summary>
+internal enum DepositResumeMode
+{
+    None,        // terminal deposit → wrap up and exit the farm
+    ResumeIdle,  // pre-idle flush → re-enter the idle wait loop
+    ResumeBatch, // eager mid-shift chest deposit → resume the next work batch
+}
+
 /// <summary>
 /// All mutable state for one worker shift. Created by <see cref="ShiftOrchestrator.StartShift"/>
 /// once spawn succeeds and discarded when the shift ends (exit, sleep, or session boundary) —
@@ -115,8 +123,10 @@ internal sealed class ShiftSession
     // ── Idle loop (post-work "repeat a task until cap/exhaustion") ────────────
     // True only while parked at the office door polling for ready machines (no travel, no action).
     public bool IdleWaiting;
-    // True while a pre-idle deposit run is executing (items in buffer when idle loop was entered).
-    public bool ResumeIdleAfterDeposit;
+    // What the worker should do when the in-flight deposit run finishes: nothing special (terminal
+    // wrap-up → exit), re-enter the idle wait loop (pre-idle flush), or resume the next work batch
+    // (eager mid-shift chest deposit). Only one is ever in effect at a time.
+    public DepositResumeMode DepositResume = DepositResumeMode.None;
     // Throttled-tick counter while parked, drives the periodic music-note re-emote.
     public int IdleWaitTicks;
     // Direction the worker faces while waiting (away from the office door); re-applied each emote.

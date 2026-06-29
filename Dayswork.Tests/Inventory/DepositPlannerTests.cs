@@ -385,6 +385,142 @@ public sealed class DepositPlannerTests
             DepositPlanner.ResolveUndelivered(chest));
     }
 
+    // ── Eager (chestDestinationsOnly) mode ───────────────────────────────────
+
+    // Conservation in eager mode: every buffered item appears exactly once across
+    // trips ∪ automatic overflow ∪ retained (nothing lost or created by the partition).
+    [Property(MaxTest = 1000, Replay = "")]
+    public Property ChestOnly_Conservation_Holds()
+    {
+        return Prop.ForAll(DepositInputGen.PlannerInput(), input =>
+        {
+            var (snapshot, assignments) = input;
+            var plan = new DepositPlanner().Plan(
+                snapshot,
+                assignments,
+                new Dictionary<OutputScopeProvenance, DestinationKey>(),
+                BinTile,
+                Start,
+                Manhattan,
+                chestDestinationsOnly: true);
+
+            var inTotals = Totals(snapshot.Select(b => (b.QualifiedItemId, b.Quality, b.Quantity)));
+            var outTotals = Totals(
+                plan.Trips.SelectMany(t => t.Items)
+                    .Concat(plan.AutomaticOverflow)
+                    .Concat(plan.Retained)
+                    .Select(s => (s.QualifiedItemId, s.Quality, s.Quantity)));
+
+            return (inTotals.Count == outTotals.Count
+                    && inTotals.All(kv => outTotals.TryGetValue(kv.Key, out var v) && v == kv.Value))
+                .Label($"in={inTotals.Values.Sum()} out={outTotals.Values.Sum()}");
+        });
+    }
+
+    // Eager mode only walks player chests: bin and automatic-output items are retained (not walked,
+    // not mailed), and every trip targets a ChestDestination.
+    [Property(MaxTest = 1000, Replay = "")]
+    public Property ChestOnly_Walks_Only_Chests_And_Retains_Rest()
+    {
+        return Prop.ForAll(DepositInputGen.PlannerInput(), input =>
+        {
+            var (snapshot, assignments) = input;
+            var plan = new DepositPlanner().Plan(
+                snapshot,
+                assignments,
+                new Dictionary<OutputScopeProvenance, DestinationKey>(),
+                BinTile,
+                Start,
+                Manhattan,
+                chestDestinationsOnly: true);
+
+            var onlyChestTrips = plan.Trips.All(t => t.Destination is ChestDestination);
+            var nothingMailed = plan.AutomaticOverflow.Count == 0;
+
+            return (onlyChestTrips && nothingMailed)
+                .Label($"chestTrips={onlyChestTrips} mailed={plan.AutomaticOverflow.Count}");
+        });
+    }
+
+    [Fact]
+    public void ChestOnly_Retains_Bin_And_Automatic_With_Identity_Preserved()
+    {
+        var chest = new ChestRef("Farm", new TileCoord(4, 4));
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)24", 5, TaskKind.HarvestCrops),                  // → assigned chest
+            Buffered("(O)634", 3, TaskKind.CollectFruit),                 // → shipping bin
+            // flavored roe, unassigned → office output (automatic); must be retained with flavor intact
+            new("(O)812", 4, TaskKind.CollectAnimalProducts, OutputScopeProvenance.FishPond(), 1, "(O)812|sturgeon|Roe|0"),
+        };
+        var assignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.HarvestCrops] = new ChestDestination(chest),
+            [TaskKind.CollectFruit] = ShippingBinDestination.Instance,
+        };
+
+        var plan = new DepositPlanner().Plan(
+            snapshot,
+            assignments,
+            new Dictionary<OutputScopeProvenance, DestinationKey>(),
+            BinTile,
+            Start,
+            Manhattan,
+            chestDestinationsOnly: true);
+
+        // Only the chest item is walked.
+        var trip = Assert.Single(plan.Trips);
+        Assert.IsType<ChestDestination>(trip.Destination);
+        Assert.Equal("(O)24", Assert.Single(trip.Items).QualifiedItemId);
+
+        // Nothing mailed mid-shift.
+        Assert.Empty(plan.AutomaticOverflow);
+
+        // Bin + automatic items retained, full identity preserved.
+        Assert.Equal(2, plan.Retained.Count);
+        Assert.Contains(plan.Retained, s => s.QualifiedItemId == "(O)634" && s.Quantity == 3);
+        var roe = Assert.Single(plan.Retained, s => s.QualifiedItemId == "(O)812");
+        Assert.Equal(4, roe.Quantity);
+        Assert.Equal(1, roe.Quality);
+        Assert.Equal("(O)812|sturgeon|Roe|0", roe.FlavorId);
+    }
+
+    [Fact]
+    public void HasChestDestination_True_When_Any_Item_Targets_A_Chest()
+    {
+        var chest = new ChestRef("Farm", new TileCoord(4, 4));
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)634", 3, TaskKind.CollectFruit),    // bin
+            Buffered("(O)24", 5, TaskKind.HarvestCrops),     // chest
+        };
+        var assignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.CollectFruit] = ShippingBinDestination.Instance,
+            [TaskKind.HarvestCrops] = new ChestDestination(chest),
+        };
+
+        Assert.True(DepositPlanner.HasChestDestination(
+            snapshot, assignments, new Dictionary<OutputScopeProvenance, DestinationKey>()));
+    }
+
+    [Fact]
+    public void HasChestDestination_False_When_Only_Bin_And_Automatic()
+    {
+        var snapshot = new List<BufferedItem>
+        {
+            Buffered("(O)634", 3, TaskKind.CollectFruit),         // bin
+            Buffered("(O)709", 2, TaskKind.CutTrees),             // unassigned → automatic
+        };
+        var assignments = new Dictionary<TaskKind, DestinationKey>
+        {
+            [TaskKind.CollectFruit] = ShippingBinDestination.Instance,
+        };
+
+        Assert.False(DepositPlanner.HasChestDestination(
+            snapshot, assignments, new Dictionary<OutputScopeProvenance, DestinationKey>()));
+    }
+
     // Regression: items of the same kind but different quality must not be merged.
     // Before the fix, BufferedItem had no Quality field and the planner's grouping key omitted
     // quality — a gold parsnip and a regular parsnip targeting the same chest were summed into

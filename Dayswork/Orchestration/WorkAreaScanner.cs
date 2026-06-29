@@ -302,8 +302,8 @@ internal sealed class WorkAreaScanner
 
     /// <summary>
     /// Pure animal-product test (SMAPI-free, for unit testing). True when the object is a ground
-    /// animal product: a guaranteed-parity legacy id, or an item in an animal-product category
-    /// (Egg -5 / Animal Goods -18) that is not a big-craftable and not explicitly excluded.
+    /// animal product: a guaranteed-parity legacy id or an item in an animal-product category
+    /// (Egg -5 / Animal Goods -18), and the object is not a big-craftable and not explicitly excluded.
     /// </summary>
     internal static bool IsAnimalProductForageObject(string qualifiedItemId, string itemId, int category, bool bigCraftable)
     {
@@ -311,9 +311,14 @@ internal sealed class WorkAreaScanner
             AnimalProductExcludedIds.Contains(itemId))
             return false;
 
+        // The bare-id set shares numbers with BigCraftable ItemIds (e.g. "182" = Large Egg AND
+        // Geode Crusher). Guard both id checks so placed machines are never collected as forage.
+        if (bigCraftable)
+            return false;
+
         return AnimalProductObjectIds.Contains(qualifiedItemId) ||
                AnimalProductObjectIds.Contains(itemId) ||
-               (!bigCraftable && AnimalProductCategories.Contains(category));
+               AnimalProductCategories.Contains(category);
     }
 
     /// <summary>

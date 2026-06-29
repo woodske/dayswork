@@ -38,25 +38,36 @@ public sealed class DepositPlanner
         IReadOnlyDictionary<OutputScopeProvenance, DestinationKey> provenanceAssignments,
         TileCoord shippingBinTile,
         TileCoord workerStart,
-        Func<TileCoord, TileCoord, int> distance)
+        Func<TileCoord, TileCoord, int> distance,
+        bool chestDestinationsOnly = false)
     {
         // Walkable destinations grouped by key → (representative tile, item id → qty).
         var walkable = new Dictionary<DestinationKey, (TileCoord Tile, Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int> Items)>();
         var automaticOverflow = new Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int>();
+        // Eager (chestDestinationsOnly) plans hold back everything not bound for a player chest so the
+        // caller can leave it in the buffer; an ordinary plan leaves this empty.
+        var retained = new Dictionary<(string ItemId, int Quality, TaskKind SourceTask, OutputScopeProvenance Provenance, string? FlavorId), int>();
 
         foreach (var item in snapshot)
         {
             var dest = ResolveDestination(item, taskAssignments, provenanceAssignments);
+            var key = (item.QualifiedItemId, item.Quality, item.SourceTask, item.Provenance, item.FlavorId);
             switch (dest)
             {
                 case ChestDestination chest:
                     AddToGroup(walkable, dest, chest.Ref.Tile, item);
                     break;
                 case ShippingBinDestination:
-                    AddToGroup(walkable, dest, shippingBinTile, item);
+                    if (chestDestinationsOnly)
+                        Accumulate(retained, key, item.Quantity);
+                    else
+                        AddToGroup(walkable, dest, shippingBinTile, item);
                     break;
-                default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow
-                    Accumulate(automaticOverflow, (item.QualifiedItemId, item.Quality, item.SourceTask, item.Provenance, item.FlavorId), item.Quantity);
+                default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow (or retained, when eager)
+                    if (chestDestinationsOnly)
+                        Accumulate(retained, key, item.Quantity);
+                    else
+                        Accumulate(automaticOverflow, key, item.Quantity);
                     break;
             }
         }
@@ -67,8 +78,16 @@ public sealed class DepositPlanner
 
         var ordered = OrderNearestNeighbor(unordered, workerStart, distance);
 
-        return new DepositPlan(ordered, ToStacks(automaticOverflow));
+        return new DepositPlan(ordered, ToStacks(automaticOverflow)) { Retained = ToStacks(retained) };
     }
+
+    // Cheap predicate: does any buffered item currently resolve to a player-assigned chest? Used by the
+    // orchestrator to decide whether an eager mid-shift deposit detour is worth starting.
+    public static bool HasChestDestination(
+        IReadOnlyList<BufferedItem> snapshot,
+        IReadOnlyDictionary<TaskKind, DestinationKey> taskAssignments,
+        IReadOnlyDictionary<OutputScopeProvenance, DestinationKey> provenanceAssignments) =>
+        snapshot.Any(item => ResolveDestination(item, taskAssignments, provenanceAssignments) is ChestDestination);
 
     private static DestinationKey ResolveDestination(
         BufferedItem item,

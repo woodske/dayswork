@@ -38,6 +38,7 @@ public static class ConfigSnapshotGen
             from actionAnimationMs in Gen.Choose(100, 1500)
             from entranceHoldTicks in Gen.Choose(0, 300)
             from workOnHolidays in Arb.Generate<bool>()
+            from eagerChestDeposits in Arb.Generate<bool>()
             from tierEnergy in tierEnergyGen
             from tierPrice in tierPriceGen
             from actionCosts in actionCostGen
@@ -49,6 +50,7 @@ public static class ConfigSnapshotGen
                 actionAnimationMs,
                 entranceHoldTicks,
                 workOnHolidays,
+                eagerChestDeposits,
                 tierEnergy,
                 tierPrice,
                 actionCosts);

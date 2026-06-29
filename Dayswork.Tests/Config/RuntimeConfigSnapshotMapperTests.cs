@@ -51,6 +51,7 @@ public class RuntimeConfigSnapshotMapperTests
     {
         var config = ModConfig.CreateDefaults();
         config.WorkOnHolidays = false;
+        config.EagerChestDeposits = false;
         config.EnergyTierEnergy["FullDay"] = 222;
         config.EnergyTierPrice["FullDay"] = 999;
         config.WorkActionCosts["AxeSwing"] = 7;
@@ -58,6 +59,7 @@ public class RuntimeConfigSnapshotMapperTests
         var snapshot = RuntimeConfigSnapshotMapper.BuildSnapshot(config);
 
         Assert.False(snapshot.WorkOnHolidays);
+        Assert.False(snapshot.EagerChestDeposits);
         Assert.Equal(222, snapshot.EnergyTierEnergy[EnergyTier.FullDay]);
         Assert.Equal(999, snapshot.EnergyTierPrice[EnergyTier.FullDay]);
         Assert.Equal(7, snapshot.WorkActionCosts[WorkActionKind.AxeSwing]);

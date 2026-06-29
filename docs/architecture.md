@@ -161,6 +161,16 @@ worker walks to the farm exit and despawns. Undelivered/overflow items are conso
 into the office Output chest (falling back to the shipping bin) with a HUD notice — **nothing is
 lost**.
 
+**Eager chest deposits** (config `EagerChestDeposits`, default on): at each work-batch boundary
+the worker also runs a *chest-only* deposit for buffered items bound for a player-assigned chest
+(`DepositPlanner.Plan(chestDestinationsOnly: true)`), then resumes the next batch — so the player's
+chests fill through the day instead of all at once at clock-out (machines reading from those chests
+benefit as a side effect). Shipping-bin and office-output items are *retained* in the buffer
+(`DepositPlan.Retained`) for the terminal deposit — no mid-day trip to a terminal sink. This reuses
+the same deposit-then-resume machinery as the pre-idle flush via `ShiftSession.DepositResume`
+(`None`/`ResumeIdle`/`ResumeBatch`); the energy/8pm wrap-up pre-empts a detour through the shared
+`DepositResume != None` re-plan guard in `BeginDeposit`.
+
 **Stuck recovery** (no tile progress for N in-game minutes, `StuckDetector`): emote, then teleport
 once to the next reachable work tile; if still stuck, teleport home and end the shift via the normal
 deposit path. Teleporting is the *only* time the worker skips walking.

@@ -17,10 +17,16 @@ public sealed record DepositTrip(
     IReadOnlyList<RoutedItemStack> Items);
 
 // The complete routing result for a shift's buffer.
-// Conservation invariant: items across Trips[*].Items ∪ AutomaticOverflow == input snapshot.
+// Conservation invariant: items across Trips[*].Items ∪ AutomaticOverflow ∪ Retained == input snapshot.
+// Retained is non-empty only for an eager (chestDestinationsOnly) plan: items not bound for a player
+// chest (shipping bin / office-output) are held back here for the caller to leave in the buffer,
+// rather than walked or mailed mid-shift.
 public sealed record DepositPlan(
     IReadOnlyList<DepositTrip> Trips,
-    IReadOnlyList<RoutedItemStack> AutomaticOverflow);
+    IReadOnlyList<RoutedItemStack> AutomaticOverflow)
+{
+    public IReadOnlyList<RoutedItemStack> Retained { get; init; } = Array.Empty<RoutedItemStack>();
+}
 
 // Why an item ended up in automatic overflow rather than a walked deposit.
 public enum OverflowReason

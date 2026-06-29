@@ -200,10 +200,18 @@ internal sealed class DepositTripRunner
             return;
         }
 
-        if (_session.ResumeIdleAfterDeposit)
-            _host.OnPreIdleDepositComplete();
-        else
-            _host.BeginExit(farm);
+        switch (_session.DepositResume)
+        {
+            case DepositResumeMode.ResumeIdle:
+                _host.OnPreIdleDepositComplete();
+                break;
+            case DepositResumeMode.ResumeBatch:
+                _host.OnBatchDepositComplete();
+                break;
+            default:
+                _host.BeginExit(farm);
+                break;
+        }
     }
 
     /// <summary>The DepositEntry travel arrived inside the trip's building; walk to the chest.</summary>

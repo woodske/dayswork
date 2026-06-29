@@ -14,6 +14,7 @@ public static class ConfigSnapshotFactory
         int workerActionAnimationMs,
         int workerEntranceHoldTicks,
         bool workOnHolidays,
+        bool eagerChestDeposits,
         IReadOnlyDictionary<EnergyTier, int> energyTierEnergy,
         IReadOnlyDictionary<EnergyTier, int> energyTierPrice,
         IReadOnlyDictionary<WorkActionKind, int> workActionCosts)
@@ -60,6 +61,7 @@ public static class ConfigSnapshotFactory
             workerActionAnimationMs,
             workerEntranceHoldTicks,
             workOnHolidays,
+            eagerChestDeposits,
             new ReadOnlyDictionary<EnergyTier, int>(normalizedTierEnergy),
             new ReadOnlyDictionary<EnergyTier, int>(normalizedTierPrice),
             new ReadOnlyDictionary<WorkActionKind, int>(normalizedActionCosts));
