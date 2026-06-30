@@ -147,7 +147,18 @@ internal sealed partial class ShiftOrchestrator
         if (Game1.player.currentLocation == location) location.playSound(AnimalCollectAudioCue.ForTool(collectTool));
     }
 
-    private LaborBeatOutcome InvokeTaskActionGuarded(TileCoord tile, TaskKind task, GameLocation location)
+    private LaborBeatOutcome InvokeTaskActionGuarded(TileCoord tile, TaskKind task, GameLocation location) =>
+        RunGuardedWorkerBeat(tile, task, location, () => InvokeTaskAction(tile, task, location));
+
+    // Shared worker-beat guard used by BOTH the regular task path (InvokeTaskActionGuarded) and the
+    // managed-crop path (ApplyManagedActionGuarded). It MUST wrap every worker action that calls a
+    // vanilla API on Game1.player (harvest/clear/etc.), because those APIs play sounds and spawn
+    // debris on the *player's* currentLocation rather than the worker's — see the comments inside.
+    // Keep this the single implementation: the two callers previously hand-rolled partial copies and
+    // the managed copy drifted (it omitted the sound swap + foreign-debris sweep), leaking cucumber
+    // harvest sounds/drops into the player's location with the leak detector blind to it.
+    internal LaborBeatOutcome RunGuardedWorkerBeat(
+        TileCoord tile, TaskKind task, GameLocation location, Func<LaborBeatOutcome> body)
     {
         // Some vanilla worker-facing callbacks still mutate Game1.player directly
         // (crop harvest, HUD/item gain flows, etc.) even though the worker is taking
@@ -189,7 +200,7 @@ internal sealed partial class ShiftOrchestrator
 
         try
         {
-            return InvokeTaskAction(tile, task, location);
+            return body();
         }
         finally
         {

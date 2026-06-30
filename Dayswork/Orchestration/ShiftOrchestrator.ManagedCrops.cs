@@ -856,23 +856,28 @@ internal sealed partial class ShiftOrchestrator
 
     private void ApplyManagedActionGuarded(TileAction action, WorkerTool debrisTool, GameLocation location)
     {
-        // Mirror InvokeTaskActionGuarded: some vanilla crop callbacks mutate Game1.player and enqueue
-        // HUD pickup messages even though the worker is acting. Snapshot/restore and trim.
-        var playerState = new Game1WorkerActionPlayerState(Game1.player);
-        var savedState = WorkerActionPlayerStateSnapshot.Capture(playerState);
-        var hudCountBefore = Game1.hudMessages.Count;
-
-        try
+        // Run the managed action through the SAME full guard as the regular task path so it gets the
+        // sound-location swap AND the foreign-debris leak sweep + audit (not just the player-state /
+        // HUD trim). Routing the vanilla worker APIs (crop harvest, resource-clump clears) directly
+        // without this swap/sweep leaks their sounds + drops into the player's location while the
+        // worker works elsewhere, and the leak detector never sees it. See RunGuardedWorkerBeat.
+        RunGuardedWorkerBeat(action.Tile, ManagedActionTaskKind(action.Kind), location, () =>
         {
             ApplyManagedAction(action, debrisTool, location);
-        }
-        finally
-        {
-            savedState.Restore(playerState);
-            while (Game1.hudMessages.Count > hudCountBefore)
-                Game1.hudMessages.RemoveAt(Game1.hudMessages.Count - 1);
-        }
+            return new LaborBeatOutcome(true, true);
+        });
     }
+
+    // Best-effort TaskKind for a managed action, used only to tag the leak sweep's buffer source +
+    // diagnostic log text. ClearDebris resolves to a specific clear kind at runtime inside
+    // InvokeManagedClearDebris (which sets Session.PendingTask); ClearWeeds is a benign stand-in here.
+    private static TaskKind ManagedActionTaskKind(ManagedCropActionKind kind) => kind switch
+    {
+        ManagedCropActionKind.Harvest => TaskKind.HarvestCrops,
+        ManagedCropActionKind.Water => TaskKind.WaterCrops,
+        ManagedCropActionKind.ClearDebris => TaskKind.ClearWeeds,
+        _ => TaskKind.HarvestCrops,
+    };
 
     private void ApplyManagedAction(TileAction action, WorkerTool debrisTool, GameLocation location)
     {
