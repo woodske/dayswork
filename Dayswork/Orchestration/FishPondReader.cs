@@ -77,6 +77,13 @@ internal sealed class FishPondReader
         for (int y = top; y <= bottom; y++)
             ring.Add(new TileCoord(left - 1, y));
 
+        // Diagonal footprint corners last: the player can collect from a diagonal too, but the
+        // caller picks the nearest reachable tile, so corners are only used when closer/only-option.
+        ring.Add(new TileCoord(left - 1, top - 1));
+        ring.Add(new TileCoord(right + 1, top - 1));
+        ring.Add(new TileCoord(left - 1, bottom + 1));
+        ring.Add(new TileCoord(right + 1, bottom + 1));
+
         return ring;
     }
 }

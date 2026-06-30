@@ -362,14 +362,14 @@ internal sealed class WorkAreaScanner
     public static IReadOnlyList<TileCoord> FindNavigationTiles(TileCoord taskTile, TaskKind task, Vector2 tileVec, GameLocation loc)
     {
         if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is { } clump)
-            return OrthogonalInteractionTiles(clump, loc);
+            return AdjacentInteractionTiles(clump, loc);
 
         if (!RequiresAdjacentNavigation(task) &&
             !IsTrellisCrop(tileVec, loc) &&
             IsWithinMap(taskTile, loc))
             return new[] { taskTile };
 
-        return OrthogonalInteractionTiles(taskTile, loc);
+        return AdjacentInteractionTiles(taskTile, loc);
     }
 
     public static bool RequiresAdjacentNavigation(TaskKind task) =>
@@ -440,7 +440,11 @@ internal sealed class WorkAreaScanner
         }
     }
 
-    public static IReadOnlyList<TileCoord> OrthogonalInteractionTiles(TileCoord tile, GameLocation loc)
+    // The player can act on any of the 8 surrounding tiles, so the worker may stand orthogonally
+    // OR diagonally adjacent. Cardinals are listed first: the route selectors are first-wins-on-ties,
+    // so the worker keeps preferring an orthogonal standing tile and only uses a diagonal when it's
+    // strictly closer or the only reachable option.
+    public static IReadOnlyList<TileCoord> AdjacentInteractionTiles(TileCoord tile, GameLocation loc)
     {
         TileCoord[] candidates =
         {
@@ -448,12 +452,16 @@ internal sealed class WorkAreaScanner
             new(tile.X + 1, tile.Y),
             new(tile.X, tile.Y + 1),
             new(tile.X - 1, tile.Y),
+            new(tile.X - 1, tile.Y - 1),
+            new(tile.X + 1, tile.Y - 1),
+            new(tile.X - 1, tile.Y + 1),
+            new(tile.X + 1, tile.Y + 1),
         };
 
         return candidates.Where(candidate => IsWithinMap(candidate, loc)).ToList();
     }
 
-    public static IReadOnlyList<TileCoord> OrthogonalInteractionTiles(ResourceClump clump, GameLocation loc)
+    public static IReadOnlyList<TileCoord> AdjacentInteractionTiles(ResourceClump clump, GameLocation loc)
     {
         var minX = (int)clump.Tile.X;
         var minY = (int)clump.Tile.Y;
@@ -472,6 +480,12 @@ internal sealed class WorkAreaScanner
             candidates.Add(new TileCoord(minX - 1, y));
             candidates.Add(new TileCoord(maxX + 1, y));
         }
+
+        // Diagonal footprint corners last (see AdjacentInteractionTiles(TileCoord) for the ordering rationale).
+        candidates.Add(new TileCoord(minX - 1, minY - 1));
+        candidates.Add(new TileCoord(maxX + 1, minY - 1));
+        candidates.Add(new TileCoord(minX - 1, maxY + 1));
+        candidates.Add(new TileCoord(maxX + 1, maxY + 1));
 
         return candidates
             .Distinct()

@@ -273,12 +273,20 @@ internal sealed partial class ShiftOrchestrator
             out standTile);
     }
 
+    // Covers chest/bin deposits and machine collect/reload (machines route here via
+    // ResolveMachineNavTile → TrySelectChestDepositStandTile). Cardinals first, then diagonals: the
+    // player can interact diagonally too, and the route selector is first-wins-on-ties, so a diagonal
+    // is only chosen when it's strictly closer or the only reachable tile.
     internal static IEnumerable<TileCoord> DepositStandTilesAround(TileCoord tile)
     {
         yield return new TileCoord(tile.X, tile.Y - 1);
         yield return new TileCoord(tile.X + 1, tile.Y);
         yield return new TileCoord(tile.X, tile.Y + 1);
         yield return new TileCoord(tile.X - 1, tile.Y);
+        yield return new TileCoord(tile.X - 1, tile.Y - 1);
+        yield return new TileCoord(tile.X + 1, tile.Y - 1);
+        yield return new TileCoord(tile.X - 1, tile.Y + 1);
+        yield return new TileCoord(tile.X + 1, tile.Y + 1);
     }
 
     private bool TryStartExitTravelForDeposit()

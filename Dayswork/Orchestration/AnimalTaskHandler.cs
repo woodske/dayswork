@@ -248,7 +248,7 @@ internal sealed class AnimalTaskHandler
     {
         var current = CurrentTile(animal);
         var candidates = new List<TileCoord> { current };
-        candidates.AddRange(WorkAreaScanner.OrthogonalInteractionTiles(current, location));
+        candidates.AddRange(WorkAreaScanner.AdjacentInteractionTiles(current, location));
         return candidates
             .Where(tile => IsWithinMap(tile, location))
             .Distinct()
