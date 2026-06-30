@@ -39,6 +39,7 @@ don't fire reliably (same reason the hoe/pickaxe sounds are explicit in `ToolSwa
 | Pickaxe (rock clear) | `"hammer"`      | `ToolSwapAnimator.SpawnToolSwing` — Pickaxe case          |
 | Shears               | `"scissors"`    | `AnimalCollectAudioCue.ForTool` → `HandleCollectFromAnimal` |
 | Milk pail            | `"Milking"`     | `AnimalCollectAudioCue.ForTool` → `HandleCollectFromAnimal` |
+| Fruit tree shake     | `"leafrustle"`  | `ShiftOrchestrator.TaskActions.InvokeCollectFruit` (after `hadFruit` guard)  |
 | Fish pond collect    | `"coin"`        | `ShiftOrchestrator.FishPonds.CollectFishPond` (after output captured/nulled) |
 | Machine collect      | `"coin"`        | `ShiftOrchestrator.Machines.CollectMachine` (after buffer credited) |
 | Machine load/reload  | machine `LoadEffects` | `ShiftOrchestrator.Machines.LoadMachine` — `PlaceInMachine(..., playSounds: <player here>)` |
@@ -73,8 +74,10 @@ points `Game1.player.currentLocation` at the work `location` for the whole worke
 `finally`, alongside the other `Game1.player` state it already snapshots). The engine's distance
 gate then silences any such cue off-location and plays it normally when the player is present —
 covering this entire class in one place, including delayed cues that capture the location at
-schedule time. (`FruitTree.shake` and the tree/rock/grass/weed terrain APIs already play on their
-own `location` argument, so they were never affected.) Do **not** re-wrap individual calls.
+schedule time. (The tree/rock/grass/weed terrain APIs already play on their own `location`
+argument, so they were never affected. `FruitTree.shake` is the exception — the `"leafrustle"` cue
+lives in `performUseAction`, which the worker bypasses by calling `shake()` directly;
+`InvokeCollectFruit` emits it explicitly — see table above.) Do **not** re-wrap individual calls.
 
 **Machine collect gotcha (`IsLocalPlayer`):** vanilla `Object.CheckForActionOnMachine` plays its
 `"coin"` *inside* `if (who.IsLocalPlayer)`. The worker acts as a fake `CreateFakeEventFarmer()`

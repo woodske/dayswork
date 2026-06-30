@@ -402,6 +402,8 @@ internal sealed partial class ShiftOrchestrator
         var before = new HashSet<Debris>(loc.debris);
         var hadFruit = tree.fruit.Count > 0;
         tree.shake(tileVec, false);
+        if (hadFruit && Game1.player.currentLocation == loc)
+            loc.playSound("leafrustle", tileVec);
         CollectNewDebrisAtTile(before, loc, Session.PendingTask, tileVec, Session.PendingOutputProvenance);
         // Shaken fruit settles over the next several beats, so an immediate sweep misses it.
         // Queue a delayed sweep (same mechanism trees use for falling wood) to catch it.
