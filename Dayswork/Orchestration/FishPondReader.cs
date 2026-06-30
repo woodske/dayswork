@@ -1,4 +1,5 @@
 using Dayswork.Core.Domain;
+using Dayswork.Core.Shifts;
 using StardewValley;
 using StardewValley.Buildings;
 
@@ -56,7 +57,7 @@ internal sealed class FishPondReader
     /// worker tends to approach the side where the output appears. The caller picks the nearest
     /// reachable one via the route selector.
     /// </summary>
-    public static IEnumerable<TileCoord> StandTilesAround(FishPond pond)
+    public static IEnumerable<StandTile> StandTilesAround(FishPond pond)
     {
         int left = pond.tileX.Value;
         int top = pond.tileY.Value;
@@ -65,24 +66,24 @@ internal sealed class FishPondReader
         int right = left + width - 1;
         int bottom = top + height - 1;
 
-        var ring = new List<TileCoord>();
+        var ring = new List<StandTile>();
 
         // Bottom edge (where the output bucket renders) first, then right, top, left.
         for (int x = left; x <= right; x++)
-            ring.Add(new TileCoord(x, bottom + 1));
+            ring.Add(new StandTile(new TileCoord(x, bottom + 1), false));
         for (int y = top; y <= bottom; y++)
-            ring.Add(new TileCoord(right + 1, y));
+            ring.Add(new StandTile(new TileCoord(right + 1, y), false));
         for (int x = left; x <= right; x++)
-            ring.Add(new TileCoord(x, top - 1));
+            ring.Add(new StandTile(new TileCoord(x, top - 1), false));
         for (int y = top; y <= bottom; y++)
-            ring.Add(new TileCoord(left - 1, y));
+            ring.Add(new StandTile(new TileCoord(left - 1, y), false));
 
         // Diagonal footprint corners last: the player can collect from a diagonal too, but the
-        // caller picks the nearest reachable tile, so corners are only used when closer/only-option.
-        ring.Add(new TileCoord(left - 1, top - 1));
-        ring.Add(new TileCoord(right + 1, top - 1));
-        ring.Add(new TileCoord(left - 1, bottom + 1));
-        ring.Add(new TileCoord(right + 1, bottom + 1));
+        // selector adds a travel penalty, so corners are only used when closer/only-option.
+        ring.Add(new StandTile(new TileCoord(left - 1, top - 1), true));
+        ring.Add(new StandTile(new TileCoord(right + 1, top - 1), true));
+        ring.Add(new StandTile(new TileCoord(left - 1, bottom + 1), true));
+        ring.Add(new StandTile(new TileCoord(right + 1, bottom + 1), true));
 
         return ring;
     }

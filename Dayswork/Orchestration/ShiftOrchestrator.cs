@@ -1088,7 +1088,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         AnimalWorkItem? AnimalWork,
         TaskKind Task,
         TileCoord TaskTile,
-        IReadOnlyList<TileCoord> NavigationTiles,
+        IReadOnlyList<StandTile> NavigationTiles,
         int StableOrder);
 
 }

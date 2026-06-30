@@ -267,7 +267,7 @@ internal sealed partial class ShiftOrchestrator
     {
         var source = new TileCoord(worker.TilePoint.X, worker.TilePoint.Y);
         var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
-        return WorkerRouteSelector.TrySelectNearestReachableTile(
+        return WorkerRouteSelector.TrySelectPreferredStandTile(
             DepositStandTilesAround(chestTile),
             routeCosts,
             out standTile);
@@ -277,16 +277,16 @@ internal sealed partial class ShiftOrchestrator
     // ResolveMachineNavTile → TrySelectChestDepositStandTile). Cardinals first, then diagonals: the
     // player can interact diagonally too, and the route selector is first-wins-on-ties, so a diagonal
     // is only chosen when it's strictly closer or the only reachable tile.
-    internal static IEnumerable<TileCoord> DepositStandTilesAround(TileCoord tile)
+    internal static IEnumerable<StandTile> DepositStandTilesAround(TileCoord tile)
     {
-        yield return new TileCoord(tile.X, tile.Y - 1);
-        yield return new TileCoord(tile.X + 1, tile.Y);
-        yield return new TileCoord(tile.X, tile.Y + 1);
-        yield return new TileCoord(tile.X - 1, tile.Y);
-        yield return new TileCoord(tile.X - 1, tile.Y - 1);
-        yield return new TileCoord(tile.X + 1, tile.Y - 1);
-        yield return new TileCoord(tile.X - 1, tile.Y + 1);
-        yield return new TileCoord(tile.X + 1, tile.Y + 1);
+        yield return new StandTile(new TileCoord(tile.X, tile.Y - 1), false);
+        yield return new StandTile(new TileCoord(tile.X + 1, tile.Y), false);
+        yield return new StandTile(new TileCoord(tile.X, tile.Y + 1), false);
+        yield return new StandTile(new TileCoord(tile.X - 1, tile.Y), false);
+        yield return new StandTile(new TileCoord(tile.X - 1, tile.Y - 1), true);
+        yield return new StandTile(new TileCoord(tile.X + 1, tile.Y - 1), true);
+        yield return new StandTile(new TileCoord(tile.X - 1, tile.Y + 1), true);
+        yield return new StandTile(new TileCoord(tile.X + 1, tile.Y + 1), true);
     }
 
     private bool TryStartExitTravelForDeposit()

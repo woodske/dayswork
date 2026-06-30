@@ -948,8 +948,8 @@ internal sealed class ManagedShoppingCoordinator
         {
             foreach (var stand in ShiftOrchestrator.DepositStandTilesAround(actionTile))
             {
-                if (WorkerMovementDriver.IsTilePassableForWorker(new Point(stand.X, stand.Y), interior))
-                    yield return stand;
+                if (WorkerMovementDriver.IsTilePassableForWorker(new Point(stand.Tile.X, stand.Tile.Y), interior))
+                    yield return stand.Tile;
             }
         }
     }

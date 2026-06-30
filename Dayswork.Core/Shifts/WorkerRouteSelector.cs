@@ -40,6 +40,38 @@ public sealed class WorkerRouteSelector
         tile = bestTile ?? default;
         return bestTile is not null;
     }
+
+    // The worker can stand orthogonally or diagonally adjacent to a target (player parity), but an
+    // orthogonal stand looks more natural — so diagonal candidates carry a +1 travel-cost penalty.
+    // Effect: pick the nearest reachable stand, but only take a diagonal when it's 2+ tiles closer
+    // than the nearest orthogonal one (or when no orthogonal stand is reachable). Cardinals are
+    // listed first, so the strict `<` keeps an orthogonal tile on an effective-cost tie.
+    private const int DiagonalTravelPenalty = 1;
+
+    public static bool TrySelectPreferredStandTile(
+        IEnumerable<StandTile> candidates,
+        IReadOnlyDictionary<TileCoord, int> routeCosts,
+        out TileCoord tile)
+    {
+        var bestCost = int.MaxValue;
+        TileCoord? bestTile = null;
+
+        foreach (var candidate in candidates.Distinct())
+        {
+            if (!routeCosts.TryGetValue(candidate.Tile, out var cost))
+                continue;
+
+            var effectiveCost = cost + (candidate.Diagonal ? DiagonalTravelPenalty : 0);
+            if (effectiveCost >= bestCost)
+                continue;
+
+            bestCost = effectiveCost;
+            bestTile = candidate.Tile;
+        }
+
+        tile = bestTile ?? default;
+        return bestTile is not null;
+    }
 }
 
 public sealed record WorkerRouteCandidate(

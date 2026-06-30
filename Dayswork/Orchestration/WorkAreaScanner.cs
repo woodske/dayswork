@@ -122,7 +122,7 @@ internal sealed class WorkAreaScanner
                 }
 
                 Increment(acceptedByKind, task.Value);
-                rawItems.Add(new WorkItem(navTiles[0], taskTile, task.Value, location.Name, provenance, navTiles));
+                rawItems.Add(new WorkItem(navTiles[0].Tile, taskTile, task.Value, location.Name, provenance, navTiles));
 //                 ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted {task.Value}: loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}) candidates=[{string.Join("; ", navTiles.Select(tile => $"({tile.X},{tile.Y})"))}].", LogLevel.Trace);
 
                 // Harvest leaves regrowable crops in place. Queue a separate WaterCrops beat
@@ -142,7 +142,7 @@ internal sealed class WorkAreaScanner
                     {
                         Increment(detectedByKind, TaskKind.WaterCrops);
                         Increment(acceptedByKind, TaskKind.WaterCrops);
-                        rawItems.Add(new WorkItem(navTiles[0], taskTile, TaskKind.WaterCrops, location.Name, provenance, navTiles));
+                        rawItems.Add(new WorkItem(navTiles[0].Tile, taskTile, TaskKind.WaterCrops, location.Name, provenance, navTiles));
 //                         ModEntry.ModMonitor.Log($"[Dayswork][scan] accepted WaterCrops (post-harvest regrow): loc={location.Name} nav=({navTiles[0].X},{navTiles[0].Y}) task=({taskTile.X},{taskTile.Y}).", LogLevel.Trace);
                     }
                 }
@@ -350,16 +350,16 @@ internal sealed class WorkAreaScanner
 
     public static TileCoord? FindNavigationTile(TileCoord taskTile, TaskKind task, Vector2 tileVec, GameLocation loc)
     {
-        foreach (var tile in FindNavigationTiles(taskTile, task, tileVec, loc))
+        foreach (var stand in FindNavigationTiles(taskTile, task, tileVec, loc))
         {
-            if (IsTileReachable(tile, loc))
-                return tile;
+            if (IsTileReachable(stand.Tile, loc))
+                return stand.Tile;
         }
 
         return null;
     }
 
-    public static IReadOnlyList<TileCoord> FindNavigationTiles(TileCoord taskTile, TaskKind task, Vector2 tileVec, GameLocation loc)
+    public static IReadOnlyList<StandTile> FindNavigationTiles(TileCoord taskTile, TaskKind task, Vector2 tileVec, GameLocation loc)
     {
         if (ObjectTargetClassifier.FindResourceClumpAt(tileVec, loc) is { } clump)
             return AdjacentInteractionTiles(clump, loc);
@@ -367,7 +367,7 @@ internal sealed class WorkAreaScanner
         if (!RequiresAdjacentNavigation(task) &&
             !IsTrellisCrop(tileVec, loc) &&
             IsWithinMap(taskTile, loc))
-            return new[] { taskTile };
+            return new[] { new StandTile(taskTile, false) };
 
         return AdjacentInteractionTiles(taskTile, loc);
     }
@@ -444,52 +444,56 @@ internal sealed class WorkAreaScanner
     // OR diagonally adjacent. Cardinals are listed first: the route selectors are first-wins-on-ties,
     // so the worker keeps preferring an orthogonal standing tile and only uses a diagonal when it's
     // strictly closer or the only reachable option.
-    public static IReadOnlyList<TileCoord> AdjacentInteractionTiles(TileCoord tile, GameLocation loc)
+    // The player can act on any of the 8 surrounding tiles, so the worker may stand orthogonally
+    // OR diagonally adjacent. Cardinals are tagged Diagonal:false and diagonals Diagonal:true so the
+    // selector can prefer an orthogonal stand (see WorkerRouteSelector.TrySelectPreferredStandTile).
+    // Cardinals are listed first so they also win an effective-cost tie.
+    public static IReadOnlyList<StandTile> AdjacentInteractionTiles(TileCoord tile, GameLocation loc)
     {
-        TileCoord[] candidates =
+        StandTile[] candidates =
         {
-            new(tile.X, tile.Y - 1),
-            new(tile.X + 1, tile.Y),
-            new(tile.X, tile.Y + 1),
-            new(tile.X - 1, tile.Y),
-            new(tile.X - 1, tile.Y - 1),
-            new(tile.X + 1, tile.Y - 1),
-            new(tile.X - 1, tile.Y + 1),
-            new(tile.X + 1, tile.Y + 1),
+            new(new(tile.X, tile.Y - 1), false),
+            new(new(tile.X + 1, tile.Y), false),
+            new(new(tile.X, tile.Y + 1), false),
+            new(new(tile.X - 1, tile.Y), false),
+            new(new(tile.X - 1, tile.Y - 1), true),
+            new(new(tile.X + 1, tile.Y - 1), true),
+            new(new(tile.X - 1, tile.Y + 1), true),
+            new(new(tile.X + 1, tile.Y + 1), true),
         };
 
-        return candidates.Where(candidate => IsWithinMap(candidate, loc)).ToList();
+        return candidates.Where(candidate => IsWithinMap(candidate.Tile, loc)).ToList();
     }
 
-    public static IReadOnlyList<TileCoord> AdjacentInteractionTiles(ResourceClump clump, GameLocation loc)
+    public static IReadOnlyList<StandTile> AdjacentInteractionTiles(ResourceClump clump, GameLocation loc)
     {
         var minX = (int)clump.Tile.X;
         var minY = (int)clump.Tile.Y;
         var maxX = minX + clump.width.Value - 1;
         var maxY = minY + clump.height.Value - 1;
 
-        var candidates = new List<TileCoord>();
+        var candidates = new List<StandTile>();
         for (var x = minX; x <= maxX; x++)
         {
-            candidates.Add(new TileCoord(x, minY - 1));
-            candidates.Add(new TileCoord(x, maxY + 1));
+            candidates.Add(new StandTile(new TileCoord(x, minY - 1), false));
+            candidates.Add(new StandTile(new TileCoord(x, maxY + 1), false));
         }
 
         for (var y = minY; y <= maxY; y++)
         {
-            candidates.Add(new TileCoord(minX - 1, y));
-            candidates.Add(new TileCoord(maxX + 1, y));
+            candidates.Add(new StandTile(new TileCoord(minX - 1, y), false));
+            candidates.Add(new StandTile(new TileCoord(maxX + 1, y), false));
         }
 
         // Diagonal footprint corners last (see AdjacentInteractionTiles(TileCoord) for the ordering rationale).
-        candidates.Add(new TileCoord(minX - 1, minY - 1));
-        candidates.Add(new TileCoord(maxX + 1, minY - 1));
-        candidates.Add(new TileCoord(minX - 1, maxY + 1));
-        candidates.Add(new TileCoord(maxX + 1, maxY + 1));
+        candidates.Add(new StandTile(new TileCoord(minX - 1, minY - 1), true));
+        candidates.Add(new StandTile(new TileCoord(maxX + 1, minY - 1), true));
+        candidates.Add(new StandTile(new TileCoord(minX - 1, maxY + 1), true));
+        candidates.Add(new StandTile(new TileCoord(maxX + 1, maxY + 1), true));
 
         return candidates
             .Distinct()
-            .Where(candidate => IsWithinMap(candidate, loc))
+            .Where(candidate => IsWithinMap(candidate.Tile, loc))
             .ToList();
     }
 

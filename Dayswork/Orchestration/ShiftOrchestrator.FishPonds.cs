@@ -217,7 +217,7 @@ internal sealed partial class ShiftOrchestrator
         {
             var source = new TileCoord(Session.Worker.TilePoint.X, Session.Worker.TilePoint.Y);
             var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
-            if (WorkerRouteSelector.TrySelectNearestReachableTile(
+            if (WorkerRouteSelector.TrySelectPreferredStandTile(
                     FishPondReader.StandTilesAround(pond), routeCosts, out var stand))
                 return stand;
         }

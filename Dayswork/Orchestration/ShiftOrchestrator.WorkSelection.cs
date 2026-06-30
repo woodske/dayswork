@@ -240,17 +240,22 @@ internal sealed partial class ShiftOrchestrator
         out WorkerRouteCandidate routeCandidate)
     {
         var bestCost = int.MaxValue;
+        var bestRouteCost = int.MaxValue;
         TileCoord? bestTile = null;
 
         foreach (var navTile in candidate.NavigationTiles.Distinct())
         {
-            if (!routeCosts.TryGetValue(navTile, out var routeCost))
+            if (!routeCosts.TryGetValue(navTile.Tile, out var routeCost))
                 continue;
 
-            if (routeCost < bestCost)
+            // Diagonal stands carry a +1 travel penalty so an orthogonal stand wins unless the
+            // diagonal is 2+ tiles closer (cardinals are listed first → orthogonal wins ties).
+            var effectiveCost = routeCost + (navTile.Diagonal ? 1 : 0);
+            if (effectiveCost < bestCost)
             {
-                bestCost = routeCost;
-                bestTile = navTile;
+                bestCost = effectiveCost;
+                bestRouteCost = routeCost;
+                bestTile = navTile.Tile;
             }
         }
 
@@ -267,7 +272,9 @@ internal sealed partial class ShiftOrchestrator
             StableOrder: candidate.StableOrder,
             InteractionTile: bestTile.Value,
             Reachable: true,
-            RouteCost: bestCost);
+            // Report the chosen tile's real travel cost (not the diagonal-biased value) so candidate
+            // ordering keeps reflecting genuine proximity — the bias only steers tile choice.
+            RouteCost: bestRouteCost);
         return true;
     }
 

@@ -112,7 +112,7 @@ internal sealed class AnimalTaskHandler
         var feedItems = new List<WorkItem>
         {
             new(hopperNav, hopperTile, TaskKind.FeedAnimals, animalHouseLocation.Name, null,
-                hopperNavTiles.Count > 0 ? hopperNavTiles : new[] { hopperTile }),
+                AsUnbiasedStands(hopperNavTiles.Count > 0 ? hopperNavTiles : new[] { hopperTile })),
         };
 
         var feederItems = emptyTroughTiles
@@ -128,7 +128,7 @@ internal sealed class AnimalTaskHandler
                     TaskKind.FeedAnimals,
                     animalHouseLocation.Name,
                     null,
-                    standTiles.Count > 0 ? standTiles : new[] { navTile });
+                    AsUnbiasedStands(standTiles.Count > 0 ? standTiles : new[] { navTile }));
             })
             .ToList();
 
@@ -137,6 +137,12 @@ internal sealed class AnimalTaskHandler
             $"[Dayswork][feed-plan] location={animalHouse.Name} hopper=({hopperTile.X},{hopperTile.Y}) hopperNav=({hopperNav.X},{hopperNav.Y}) hopperSource={hopperSource} troughSource=Back:Trough filled={filled} empty={emptySlots} hayToTake={feederItems.Count} feeders=[{string.Join("; ", feederItems.Select(item => $"task=({item.TaskTile.X},{item.TaskTile.Y}) nav=({item.NavTile.X},{item.NavTile.Y})"))}]");
         return new FeedWorkPlan(feedItems, hopperTile, feederItems.Count, emptySlots);
     }
+
+    // Feed stand lists (hopper/trough) are hand-ordered preference lists — including some geometric
+    // diagonals — that should NOT get the selector's diagonal penalty, so tag them all unbiased to
+    // preserve the existing feeding behaviour.
+    private static IReadOnlyList<StandTile> AsUnbiasedStands(IReadOnlyList<TileCoord> tiles) =>
+        tiles.Select(tile => new StandTile(tile, false)).ToList();
 
     public bool TakeHay(GameLocation animalHouseLocation, int count)
     {
@@ -241,16 +247,16 @@ internal sealed class AnimalTaskHandler
 
     public TileCoord? CurrentNavigationTile(FarmAnimal animal, GameLocation location)
     {
-        return CurrentNavigationTiles(animal, location).FirstOrDefaultPassable(location);
+        return CurrentNavigationTiles(animal, location).Select(stand => stand.Tile).FirstOrDefaultPassable(location);
     }
 
-    public IReadOnlyList<TileCoord> CurrentNavigationTiles(FarmAnimal animal, GameLocation location)
+    public IReadOnlyList<StandTile> CurrentNavigationTiles(FarmAnimal animal, GameLocation location)
     {
         var current = CurrentTile(animal);
-        var candidates = new List<TileCoord> { current };
+        var candidates = new List<StandTile> { new(current, false) };
         candidates.AddRange(WorkAreaScanner.AdjacentInteractionTiles(current, location));
         return candidates
-            .Where(tile => IsWithinMap(tile, location))
+            .Where(stand => IsWithinMap(stand.Tile, location))
             .Distinct()
             .ToList();
     }

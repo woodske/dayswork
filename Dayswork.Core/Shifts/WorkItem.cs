@@ -17,10 +17,10 @@ public sealed record WorkItem(
     TaskKind Task,
     string LocationName = "Farm",
     OutputScopeProvenance? Provenance = null,
-    IReadOnlyList<TileCoord>? InteractionTiles = null)
+    IReadOnlyList<StandTile>? InteractionTiles = null)
 {
-    public IReadOnlyList<TileCoord> NavigationTiles =>
+    public IReadOnlyList<StandTile> NavigationTiles =>
         InteractionTiles is { Count: > 0 }
             ? InteractionTiles
-            : new[] { NavTile };
+            : new[] { new StandTile(NavTile, false) };
 }
