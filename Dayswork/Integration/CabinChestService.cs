@@ -26,6 +26,8 @@ internal sealed class CabinChestService
                 continue;
 
             EnsureInputChest(building);
+            ApplyBigChest(building.GetBuildingChest(HiringBuilding.InputChestId));
+            ApplyBigChest(building.GetBuildingChest(HiringBuilding.OutputChestId));
             ApplyDisplayNameFormats(building);
         }
     }
@@ -44,9 +46,21 @@ internal sealed class CabinChestService
         chest = new Chest(true)
         {
             Name = HiringBuilding.InputChestId,
+            SpecialChestType = Chest.SpecialChestTypes.BigChest,
         };
         office.buildingChests.Add(chest);
         return chest;
+    }
+
+    // The office chests hold a whole day's worker output / a batch of managed-crop supplies, so give
+    // them the vanilla Big Chest capacity (70 vs 36). Idempotent; runs each SaveLoaded/DayStarted so
+    // it also self-heals offices from saves made before this upgrade. specialChestType is a
+    // serialized NetField, so the upgrade persists once saved. GetActualCapacity() (used by both
+    // ShowMenu and Chest.addItem) reads it, so no other code needs to change.
+    private static void ApplyBigChest(Chest? chest)
+    {
+        if (chest is not null && chest.SpecialChestType != Chest.SpecialChestTypes.BigChest)
+            chest.SpecialChestType = Chest.SpecialChestTypes.BigChest;
     }
 
     internal void ApplyDisplayNameFormats(Building office)

@@ -19,6 +19,22 @@ public sealed class CabinChestServiceTests
     }
 
     [Fact]
+    public void Office_chests_are_upgraded_to_big_chests()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindWorkspaceRoot(),
+            "Dayswork",
+            "Integration",
+            "CabinChestService.cs"));
+
+        // Both porch chests get the vanilla Big Chest capacity (70 vs 36); the fallback-created
+        // input chest is born big, and EnsureOfficeChests upgrades both idempotently.
+        Assert.Contains("SpecialChestType = Chest.SpecialChestTypes.BigChest", source);
+        Assert.Contains("ApplyBigChest(building.GetBuildingChest(HiringBuilding.InputChestId))", source);
+        Assert.Contains("ApplyBigChest(building.GetBuildingChest(HiringBuilding.OutputChestId))", source);
+    }
+
+    [Fact]
     public void BuiltInChestNameKeys_are_distinct_and_role_specific()
     {
         Assert.Equal("building.office.input_chest.name", CabinChestService.InputChestNameKey);
