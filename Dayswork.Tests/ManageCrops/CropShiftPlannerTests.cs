@@ -232,4 +232,60 @@ public sealed class CropShiftPlannerTests
         Assert.DoesNotContain(result.AllActions, a => a.Kind == ManagedCropActionKind.Till);
         Assert.DoesNotContain(result.AllActions, a => a.Kind == ManagedCropActionKind.PlantSeed);
     }
+
+    // Regression: steady-state "no work" day — every tile in the zone holds a growing crop that is
+    // already watered and not yet ready to harvest. Nothing to plant (no open tile), water, or
+    // harvest, so the plan is empty even with seed on hand. This is the predicate
+    // ManagedCropBatchHasReadyWork keys off to skip the daily walk into an idle managed location.
+    [Fact]
+    public void Plan_GrowingWateredUnripeCrop_ProducesEmptyPlan()
+    {
+        var planner = new CropShiftPlanner();
+        var crop = new CropDescriptor("crop.parsnip", "seed.parsnip", null, 4, null, null, new[] { Season.Spring });
+        var assignment = new CropZoneAssignment(
+            new Zone("Farm", new TileCoord(0, 0), new TileCoord(0, 0)),
+            CropAssignmentMode.Seasonal,
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.InputChestOnly) });
+        var field = new FieldState(
+            "Farm",
+            new GameDate(2, Season.Spring, 1),
+            false,
+            new[]
+            {
+                // ReadyToHarvest: false, HasCrop: true, HasDebris: false, IsTilled: true,
+                // HasFertilizer: false, IsWatered: true → nothing to do.
+                new TileState(new TileCoord(0, 0), false, true, false, true, false, true),
+            });
+        var inventory = new SupplyInventory(new Dictionary<string, int> { ["seed.parsnip"] = 5 });
+
+        var result = planner.Plan(assignment, field, inventory);
+
+        Assert.Empty(result.SupplyIndependentActions);
+        Assert.Empty(result.SupplyDependentActions);
+        Assert.Empty(result.AllActions);
+    }
+
+    // Regression: an out-of-season managed group (a Seasonal assignment with no choice for the
+    // current season) has no work regardless of open tiles or seed — the planner finds no crop to
+    // plant and no live crop to maintain, so the plan is empty and the location is skipped.
+    [Fact]
+    public void Plan_NoChoiceForCurrentSeason_ProducesEmptyPlan()
+    {
+        var planner = new CropShiftPlanner();
+        var crop = new CropDescriptor("crop.parsnip", "seed.parsnip", null, 4, null, null, new[] { Season.Spring });
+        var assignment = new CropZoneAssignment(
+            new Zone("Farm", new TileCoord(0, 0), new TileCoord(0, 0)),
+            CropAssignmentMode.Seasonal,
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.InputChestOnly) });
+        var field = new FieldState(
+            "Farm",
+            new GameDate(1, Season.Summer, 1),
+            false,
+            new[] { new TileState(new TileCoord(0, 0), false, false, false, false, false, false) });
+        var inventory = new SupplyInventory(new Dictionary<string, int> { ["seed.parsnip"] = 5 });
+
+        var result = planner.Plan(assignment, field, inventory);
+
+        Assert.Empty(result.AllActions);
+    }
 }

@@ -64,6 +64,33 @@ internal sealed partial class ShiftOrchestrator
 
     private static bool IsManagedCropBatch(WorkBatch batch) => batch.Kind == BatchKind.ManagedCrops;
 
+    /// <summary>
+    /// True when the managed group(s) at <paramref name="batch"/>'s location have at least one
+    /// plant/water/harvest/clear beat to run today. Runs the same <see cref="BuildManagedActions"/>
+    /// planner the batch will run, probing live field + input-chest state <em>without</em> entering
+    /// the building — so an idle group (out of season, fully grown mid-cycle, or out of seed) is
+    /// skipped from outside instead of walked into every morning to find nothing to do. Mirrors
+    /// <see cref="MachineBatchHasReadyWork"/>. Only meaningful for off-farm batches.
+    /// </summary>
+    private bool ManagedCropBatchHasReadyWork(WorkBatch batch)
+    {
+        var location = ResolveManagedBatchLocation(batch.LocationName);
+        if (location is null)
+            return false;
+
+        var assignments = ManagedAssignmentsForLocation(batch.LocationName);
+        if (assignments.Count == 0)
+            return false;
+
+        var seasonAgnostic = IsManagedBatchSeasonAgnostic(batch.LocationName, assignments);
+        return BuildManagedActions(location, assignments, seasonAgnostic, logDetail: false).Count > 0;
+    }
+
+    private List<CropZoneAssignment> ManagedAssignmentsForLocation(string locationName) =>
+        (Session.Ctx.WorkScopes.ManagedCrops?.Assignments ?? Array.Empty<CropZoneAssignment>())
+            .Where(assignment => string.Equals(assignment.Zone.LocationName, locationName, StringComparison.Ordinal))
+            .ToList();
+
     private void BeginManagedCropBatch(WorkBatch batch)
     {
         if (_session is null || Session.Worker is null)
@@ -82,9 +109,7 @@ internal sealed partial class ShiftOrchestrator
 
         Session.CurrentLocation = activeLocation;
 
-        Session.ManagedAssignments = (Session.Ctx.WorkScopes.ManagedCrops?.Assignments ?? Array.Empty<CropZoneAssignment>())
-            .Where(assignment => string.Equals(assignment.Zone.LocationName, batch.LocationName, StringComparison.Ordinal))
-            .ToList();
+        Session.ManagedAssignments = ManagedAssignmentsForLocation(batch.LocationName);
 
         if (Session.ManagedAssignments.Count == 0)
         {
@@ -109,8 +134,18 @@ internal sealed partial class ShiftOrchestrator
     /// mutation. Used both for the initial plan and each re-plan pass.
     /// </summary>
     private List<TileAction> BuildManagedActions(bool logDetail)
+        => BuildManagedActions(
+            Session.CurrentLocation ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName) ?? Game1.getFarm(),
+            Session.ManagedAssignments,
+            IsCurrentManagedBatchSeasonAgnostic(),
+            logDetail);
+
+    private List<TileAction> BuildManagedActions(
+        GameLocation location,
+        IReadOnlyList<CropZoneAssignment> assignments,
+        bool seasonAgnostic,
+        bool logDetail)
     {
-        var location = Session.CurrentLocation ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName) ?? Game1.getFarm();
         var date = CurrentManagedGameDate();
         var isFestival = Utility.isFestivalDay(date.Day, Game1.season);
         var inputChest = TryGetInputChest();
@@ -118,8 +153,8 @@ internal sealed partial class ShiftOrchestrator
         var fieldState = _cropFieldReader.Read(
             location,
             date,
-            Session.ManagedAssignments,
-            IsCurrentManagedBatchSeasonAgnostic());
+            assignments,
+            seasonAgnostic);
 
         if (logDetail)
             DevLog.Log(
@@ -134,7 +169,7 @@ internal sealed partial class ShiftOrchestrator
         var working = new Dictionary<string, int>(supply.Items, StringComparer.Ordinal);
 
         var actions = new List<TileAction>();
-        foreach (var assignment in Session.ManagedAssignments)
+        foreach (var assignment in assignments)
         {
             var assignmentSupply = new SupplyInventory(working);
             var plan = _cropShiftPlanner.Plan(assignment, fieldState, assignmentSupply);
@@ -465,22 +500,53 @@ internal sealed partial class ShiftOrchestrator
         if (_session is null || Session.ManagedAssignments.Count == 0)
             return;
 
-        var inputChest = TryGetInputChest();
-        var supply = ReadSupply(inputChest);
         var location = Session.CurrentLocation
             ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName)
             ?? Game1.getFarm();
-        var date = CurrentManagedGameDate();
-        var fieldState = _cropFieldReader.Read(
-            location, date, Session.ManagedAssignments, IsCurrentManagedBatchSeasonAgnostic());
+        NotifySkippedZones(location, Session.ManagedAssignments, IsCurrentManagedBatchSeasonAgnostic());
+    }
 
-        foreach (var assignment in Session.ManagedAssignments)
+    private void NotifySkippedZones(
+        GameLocation location,
+        IReadOnlyList<CropZoneAssignment> assignments,
+        bool seasonAgnostic)
+    {
+        if (assignments.Count == 0)
+            return;
+
+        var inputChest = TryGetInputChest();
+        var supply = ReadSupply(inputChest);
+        var date = CurrentManagedGameDate();
+        var fieldState = _cropFieldReader.Read(location, date, assignments, seasonAgnostic);
+
+        foreach (var assignment in assignments)
         {
             var plan = _cropShiftPlanner.Plan(assignment, fieldState, supply);
 
             if (ShouldSkipZonePrep(assignment, fieldState, supply, plan))
                 NotifyZoneSkipped(assignment, fieldState, supply);
         }
+    }
+
+    /// <summary>
+    /// Fires the once-per-day "group skipped — no seed/fertilizer" HUD notice for a managed batch we
+    /// are skipping from outside (no work today), so a genuinely idle/misconfigured group isn't
+    /// silently ignored just because the worker never walked in.
+    /// </summary>
+    private void NotifyManagedBatchSkipped(WorkBatch batch)
+    {
+        if (_session is null)
+            return;
+
+        var location = ResolveManagedBatchLocation(batch.LocationName);
+        if (location is null)
+            return;
+
+        var assignments = ManagedAssignmentsForLocation(batch.LocationName);
+        if (assignments.Count == 0)
+            return;
+
+        NotifySkippedZones(location, assignments, IsManagedBatchSeasonAgnostic(batch.LocationName, assignments));
     }
 
     internal void CompleteManagedCropBatch()
@@ -1047,7 +1113,10 @@ internal sealed partial class ShiftOrchestrator
         string.Equals(LocationKey(left), LocationKey(right), StringComparison.OrdinalIgnoreCase);
 
     internal bool IsCurrentManagedBatchSeasonAgnostic() =>
-        !string.Equals(Session.ManagedBatchLocationName, "Farm", StringComparison.Ordinal)
-        || Session.ManagedAssignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
+        IsManagedBatchSeasonAgnostic(Session.ManagedBatchLocationName, Session.ManagedAssignments);
+
+    private static bool IsManagedBatchSeasonAgnostic(string locationName, IReadOnlyList<CropZoneAssignment> assignments) =>
+        !string.Equals(locationName, "Farm", StringComparison.Ordinal)
+        || assignments.Any(assignment => assignment.Mode == CropAssignmentMode.SeasonAgnostic);
 
 }

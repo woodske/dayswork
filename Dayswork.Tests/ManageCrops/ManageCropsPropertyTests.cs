@@ -86,7 +86,7 @@ public sealed class ManageCropsPropertyTests
     public Property CropShiftPlanner_TileActionsRespectDependencyOrder(ShiftPlanCase input)
     {
         var planner = new CropShiftPlanner();
-        var plan = planner.Plan(input.Assignment, input.FieldState, input.Inventory, input.Stock, false);
+        var plan = planner.Plan(input.Assignment, input.FieldState, input.Inventory);
 
         var ordered = plan.AllActions
             .GroupBy(action => $"{action.LocationName}:{action.Tile.X}:{action.Tile.Y}")

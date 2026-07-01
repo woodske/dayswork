@@ -546,6 +546,20 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
             if (!string.Equals(batch.LocationName, "Farm", StringComparison.Ordinal))
             {
+                // Only walk into the building if the group actually has crops to plant/water/harvest
+                // today. Without this, an idle managed group (out of season, fully grown mid-cycle, or
+                // out of seed) drags the worker into the shed/greenhouse every morning to do nothing.
+                if (!ManagedCropBatchHasReadyWork(batch))
+                {
+                    DevLog.Log(
+                        $"[Dayswork][managed-crops] batch={batch.LocationName} — no crops to plant/water/harvest; skipping building entry.",
+                        DevLog.WarnLevel);
+                    NotifyManagedBatchSkipped(batch);
+                    Session.Ctx.CurrentBatchIndex++;
+                    BeginCurrentBatch();
+                    return;
+                }
+
                 if (ModEntry.ExpansionCompat is { } compat &&
                     compat.TryGetExpansionLocationDescriptor(batch.LocationName, out var descriptor) &&
                     descriptor.Role == ExpansionLocationRole.GreenhouseWork)

@@ -1,10 +1,10 @@
 # Dayswork — AI context
 
 Single-player Stardew Valley SMAPI mod. The player builds a farm office
-(`Bindicle.Dayswork_Office`) and hires an NPC farmhand from it. The worker spawns at the farm
+(`Bindicle.Dayswork_Office`) and hires an NPC farmhand from it. The worker spawns at the farmhand office
 entrance each morning, **walks** the farm doing the contract's configured work (water/harvest
 crops, collect fruit, animal care, clear rocks/weeds/grass/trees, plus a full managed-crop
-lifecycle), deposits output into the player's chests, and leaves. Payment is **upfront** for a block
+lifecycle), deposits output into the player's chests, and return to the office. Payment is **upfront** for a block
 of worker energy. Constraints baked into the design: progression-aware (worker inherits the
 player's tool levels), safe (items are never lost — undelivered output goes to the office output
 chest / shipping bin), single-player only, and the worker must physically walk (no warping except
@@ -173,7 +173,6 @@ limitations (notably: a group's input chest must be in the same location as its 
 collect-only). **Manage Fish Ponds** (2026-06-23, collect-only) is built and unit-tested but **awaits
 its in-game smoke pass** — see `docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
 blueberry wine, flavored honey…) end-to-end via the per-shift `FlavorItemRegistry` +
-`BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). The farmhand uses a **placeholder**
-Marnie sprite/portrait (custom art is specified in `docs/farmhand-art.md`). Dev tooling (verbose logs
+`BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). Dev tooling (verbose logs
 + console commands like `dayswork_end_shift`, `dayswork_debug_machines`, `dayswork_debug_leaks`) is gated behind
 `DevLog.Enabled`, off for release.
