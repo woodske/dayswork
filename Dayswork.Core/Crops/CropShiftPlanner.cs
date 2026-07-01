@@ -41,20 +41,30 @@ public sealed class CropShiftPlanner
             .ThenBy(tile => tile.Tile.X)
             .ToList();
 
-        // Viability gates planting AND ground preparation: if the crop cannot mature before the
-        // season ends, the farmhand neither tills nor plants the zone's bare tiles this shift
-        // (it would only be tilling ground it can't use). Harvest/water of existing crops and
-        // debris clearing still run.
+        // Viability gates planting AND its ground prep: if the crop can't mature before the season
+        // ends, the farmhand neither tills nor plants (it would only be prepping ground it can't
+        // use). Harvest and watering of EXISTING crops still run regardless.
         var isViable = _viabilityCalculator.IsPlantingViable(
             fieldState,
             choice.Crop,
             useFertilizer: choice.Crop.RequiresFertilizer);
 
-        var independent = BuildSupplyIndependentActions(assignment, fieldState.LocationName, zoneTiles, allowTill: isViable);
+        // Supply-independent maintenance: harvest ready crops + water existing live crops.
+        var independent = BuildSupplyIndependentActions(assignment, fieldState.LocationName, zoneTiles);
+
+        // Plant candidates are every non-crop tile (bare, tilled-empty, fresh debris, dead crop);
+        // each is cleared/tilled/planted in one sequence, bounded by supply, so we never prep ground
+        // we can't seed.
         var candidates = isViable
-            ? zoneTiles.Where(tile => tile.CanAcceptSeed).ToList()
+            ? zoneTiles.Where(tile => !tile.HasCrop).ToList()
             : new List<TileState>();
 
+        // Planting is sized from the ACTUAL input-chest supply — shopping already ran up front, so
+        // the chest is the source of truth (no projecting in seed the worker won't have on hand).
+        var supplyDependent = BuildSupplyDependentActions(fieldState.LocationName, candidates, choice.Crop, inventory);
+
+        // Purchases are unused by the planting path now (the up-front trip aggregates its own
+        // manifest); kept so the DTO shape is stable. TODO: drop with a dedicated cleanup.
         var preFertilizedCount = choice.Crop.RequiresFertilizer
             ? candidates.Count(tile => tile.HasFertilizer)
             : 0;
@@ -66,8 +76,6 @@ public sealed class CropShiftPlanner
             stockSnapshots,
             preFertilizedCount);
         var purchases = _storeResolver.ResolvePurchaseLines(supplyTargets, isFestivalDay, stockSnapshots);
-        var projectedInventory = ProjectInventory(inventory, purchases);
-        var supplyDependent = BuildSupplyDependentActions(fieldState.LocationName, candidates, choice.Crop, projectedInventory);
 
         return new ManagedCropShiftPlan(independent, supplyDependent, purchases);
     }
@@ -80,11 +88,13 @@ public sealed class CropShiftPlanner
         return assignment.Choices.FirstOrDefault(choice => choice.Season == fieldState.Date.Season);
     }
 
+    // Supply-independent maintenance for tiles that already hold a crop: harvest what's ready and
+    // water what's growing. Ground prep (clear/till) is NOT here — it belongs to a tile's planting
+    // sequence so it only runs when there's seed for that tile.
     private static IReadOnlyList<TileAction> BuildSupplyIndependentActions(
         CropZoneAssignment assignment,
         string locationName,
-        IReadOnlyList<TileState> tiles,
-        bool allowTill)
+        IReadOnlyList<TileState> tiles)
     {
         var actions = new List<TileAction>();
         var harvestProvenance = ManagedCropOutputRouter.ProvenanceFor(assignment);
@@ -96,10 +106,6 @@ public sealed class CropShiftPlanner
                     tile.Tile,
                     ManagedCropActionKind.Harvest,
                     OutputProvenance: harvestProvenance));
-            if (tile.HasDebris)
-                actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.ClearDebris));
-            if (allowTill && !tile.HasCrop && !tile.IsTilled)
-                actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Till, RequiresDiggable: true));
             if (tile.HasCrop && !tile.IsWatered)
                 actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Water));
         }
@@ -107,6 +113,9 @@ public sealed class CropShiftPlanner
         return actions.AsReadOnly();
     }
 
+    // Full per-tile flow, bounded by what the chest actually holds: for each candidate we can seed,
+    // clear debris (if any) → till (if untilled) → fertilize (if required) → plant → water. A tile
+    // we lack the seed/fertilizer for emits nothing, so the worker never preps ground it can't plant.
     private static IReadOnlyList<TileAction> BuildSupplyDependentActions(
         string locationName,
         IReadOnlyList<TileState> candidates,
@@ -126,7 +135,12 @@ public sealed class CropShiftPlanner
 
             var tileNeedsFertilizer = crop.RequiresFertilizer && !tile.HasFertilizer;
             if (tileNeedsFertilizer && remainingFertilizer <= 0)
-                continue; // tile needs fertilizing but inventory is spent; a later pre-fertilized tile may still be plantable
+                continue; // save the seed for a tile we can fully prepare (a later pre-fertilized one)
+
+            if (tile.HasDebris)
+                actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.ClearDebris));
+            if (!tile.IsTilled)
+                actions.Add(new TileAction(locationName, tile.Tile, ManagedCropActionKind.Till, RequiresDiggable: true));
 
             if (tileNeedsFertilizer)
             {
@@ -141,18 +155,6 @@ public sealed class CropShiftPlanner
         }
 
         return actions.AsReadOnly();
-    }
-
-    private static SupplyInventory ProjectInventory(SupplyInventory inventory, IReadOnlyList<PurchaseLine> purchases)
-    {
-        var projected = inventory.Items.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
-        foreach (var purchase in purchases)
-        {
-            projected.TryGetValue(purchase.ItemId, out var existing);
-            projected[purchase.ItemId] = existing + purchase.Quantity;
-        }
-
-        return new SupplyInventory(projected);
     }
 
     private static bool Contains(Zone zone, TileCoord tile) =>

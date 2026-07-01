@@ -165,10 +165,50 @@ public sealed class CropShiftPlannerTests
     }
 
     [Fact]
-    public void Plan_DebrisTile_QueuesClearDebrisThenTillBeforeNextTile()
+    public void Plan_DebrisAndBareTiles_RunFullFlowPerTile_BoundedBySeed()
     {
-        // Zone (0,0)-(1,0): tile (0,0) has debris, tile (1,0) is bare untilled.
-        // Expected order: ClearDebris(0,0), Till(0,0), Till(1,0).
+        // Zone (0,0)-(1,0): tile (0,0) has debris, tile (1,0) is bare untilled. Two seeds on hand,
+        // so each plantable tile runs its whole flow before the next: (0,0) Clear→Till→Plant→Water,
+        // then (1,0) Till→Plant→Water. Ground prep now lives in the supply-dependent sequence.
+        var planner = new CropShiftPlanner();
+        var crop = new CropDescriptor("crop.parsnip", "seed.parsnip", null, 4, null, null, new[] { Season.Spring });
+        var assignment = new CropZoneAssignment(
+            new Zone("Farm", new TileCoord(0, 0), new TileCoord(1, 0)),
+            CropAssignmentMode.Seasonal,
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.InputChestOnly) });
+        var field = new FieldState(
+            "Farm",
+            new GameDate(1, Season.Spring, 1),
+            false,
+            new[]
+            {
+                new TileState(new TileCoord(0, 0), false, false, HasDebris: true, false, false, false),
+                new TileState(new TileCoord(1, 0), false, false, HasDebris: false, false, false, false),
+            });
+        var inventory = new SupplyInventory(new Dictionary<string, int> { ["seed.parsnip"] = 2 });
+
+        var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
+
+        Assert.Empty(result.SupplyIndependentActions);
+        Assert.Equal(
+            new[]
+            {
+                (new TileCoord(0, 0), ManagedCropActionKind.ClearDebris),
+                (new TileCoord(0, 0), ManagedCropActionKind.Till),
+                (new TileCoord(0, 0), ManagedCropActionKind.PlantSeed),
+                (new TileCoord(0, 0), ManagedCropActionKind.Water),
+                (new TileCoord(1, 0), ManagedCropActionKind.Till),
+                (new TileCoord(1, 0), ManagedCropActionKind.PlantSeed),
+                (new TileCoord(1, 0), ManagedCropActionKind.Water),
+            },
+            result.AllActions.Select(a => (a.Tile, a.Kind)));
+    }
+
+    [Fact]
+    public void Plan_NoSeedOnHand_DoesNotClearOrTill()
+    {
+        // Same debris + bare zone, but the chest is empty: with no seed, the worker preps nothing —
+        // no clear, no till, no plant. This is the whole-zone-tilling waste the change removes.
         var planner = new CropShiftPlanner();
         var crop = new CropDescriptor("crop.parsnip", "seed.parsnip", null, 4, null, null, new[] { Season.Spring });
         var assignment = new CropZoneAssignment(
@@ -188,14 +228,8 @@ public sealed class CropShiftPlannerTests
 
         var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
 
-        var kinds = result.SupplyIndependentActions.Select(a => (a.Tile, a.Kind)).ToList();
-        Assert.Equal(
-            new[]
-            {
-                (new TileCoord(0, 0), ManagedCropActionKind.ClearDebris),
-                (new TileCoord(0, 0), ManagedCropActionKind.Till),
-                (new TileCoord(1, 0), ManagedCropActionKind.Till),
-            },
-            kinds);
+        Assert.DoesNotContain(result.AllActions, a => a.Kind == ManagedCropActionKind.ClearDebris);
+        Assert.DoesNotContain(result.AllActions, a => a.Kind == ManagedCropActionKind.Till);
+        Assert.DoesNotContain(result.AllActions, a => a.Kind == ManagedCropActionKind.PlantSeed);
     }
 }
