@@ -82,6 +82,7 @@ internal sealed class ManagedShoppingCoordinator
     private bool _attempted;
     private bool _inProgress;
     private bool _wrapAfterReturn;
+    private bool _consolidated;
     private Phase _phase;
     private readonly Queue<StorePurchaseGroup> _groups = new();
     private StorePurchaseGroup? _group;
@@ -135,6 +136,7 @@ internal sealed class ManagedShoppingCoordinator
     {
         _inProgress = false;
         _wrapAfterReturn = false;
+        _consolidated = false;
         _phase = Phase.None;
         _groups.Clear();
         _group = null;
@@ -202,6 +204,99 @@ internal sealed class ManagedShoppingCoordinator
             $" unavailable=[{string.Join(", ", manifest.ChestSupplyOnlyItems)}]",
             LogLevel.Info);
 
+        return TryFinalizeManifest(manifest, storePreference, stock, date.Day, out affordable);
+    }
+
+    /// <summary>
+    /// One shopping trip covering every managed location's shortfall, resolved up front before the
+    /// managed-crop batches plant. Returns true when a trip departs; false when there's nothing to
+    /// buy (festival, no chest, no shortfall, or unaffordable), in which case the caller proceeds
+    /// straight to the batches.
+    /// </summary>
+    public bool TryStartConsolidatedTrip()
+    {
+        if (_session.Worker is null || _inProgress)
+            return false;
+
+        if (!TryBuildConsolidatedPlan(out var affordable))
+            return false;
+
+        Start(affordable, wrapAfterReturn: false);
+        _consolidated = true;
+        return true;
+    }
+
+    private bool TryBuildConsolidatedPlan(out AffordablePurchasePlan affordable)
+    {
+        affordable = AffordablePurchasePlan.Empty;
+
+        var date = ShiftOrchestrator.CurrentManagedGameDate();
+        if (Utility.isFestivalDay(date.Day, Game1.season))
+        {
+            CropHudNotifier.ShoppingFestivalSkipped();
+            return false;
+        }
+
+        var inputChest = _host.TryGetInputChest();
+        if (inputChest is null)
+        {
+            CropHudNotifier.ShoppingUnavailable();
+            return false;
+        }
+
+        var assignments = _session.Ctx.WorkScopes.ManagedCrops?.Assignments
+            ?? Array.Empty<CropZoneAssignment>();
+        if (assignments.Count == 0)
+            return false;
+
+        // One live FieldState per managed location (the worker need not be present to read it).
+        var fields = new List<FieldState>();
+        foreach (var group in assignments.GroupBy(a => a.Zone.LocationName, StringComparer.Ordinal))
+        {
+            var location = _host.ResolveManagedBatchLocation(group.Key);
+            if (location is null)
+                continue;
+
+            var locationAssignments = group.ToList();
+            var seasonAgnostic = !string.Equals(group.Key, "Farm", StringComparison.Ordinal)
+                || locationAssignments.Any(a => a.Mode == CropAssignmentMode.SeasonAgnostic);
+            fields.Add(_cropFieldReader.Read(location, date, locationAssignments, seasonAgnostic));
+        }
+
+        if (fields.Count == 0)
+            return false;
+
+        var supply = ShiftOrchestrator.ReadSupply(inputChest);
+        var stock = _shopStockReader.ReadAll(date.Day, Game1.timeOfDay, includeClosedStock: true);
+        var storePreference = _session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
+            ? StorePreference.Joja : StorePreference.Pierre;
+        var manifest = _shiftSupplyAggregator.BuildManifest(
+            new CropPlan(assignments),
+            fields,
+            supply,
+            storePreference,
+            stock,
+            isFestivalDay: false,
+            debugLog: DevLog.Enabled ? msg => DevLog.Log($"[Dayswork][managed-crops][shopping] manifest-dbg: {msg}", LogLevel.Info) : null);
+
+        DevLog.Log(
+            $"[Dayswork][managed-crops][shopping] consolidated manifest resolved=[{string.Join(", ", manifest.Groups.SelectMany(g => g.Lines.Select(l => $"{l.ItemId}:{l.Quantity}@{g.Store}")))}]" +
+            $" unavailable=[{string.Join(", ", manifest.ChestSupplyOnlyItems)}]",
+            LogLevel.Info);
+
+        return TryFinalizeManifest(manifest, storePreference, stock, date.Day, out affordable);
+    }
+
+    /// <summary>Shared tail: fallback notice, wallet clamp, drop stores that can't open today.</summary>
+    private bool TryFinalizeManifest(
+        ShiftPurchaseManifest manifest,
+        StorePreference storePreference,
+        IReadOnlyList<ShopStockSnapshot> stock,
+        int dayOfMonth,
+        out AffordablePurchasePlan affordable)
+    {
+        affordable = AffordablePurchasePlan.Empty;
+
         if (!manifest.HasPurchases)
             return false;
 
@@ -210,7 +305,7 @@ internal sealed class ManagedShoppingCoordinator
         var walletClamped = _purchaseAffordability.ClampToWallet(manifest, Game1.player.Money);
 
         var groups = walletClamped.Groups
-            .Where(group => StoreCanStillOpenToday(group.Store, date.Day))
+            .Where(group => StoreCanStillOpenToday(group.Store, dayOfMonth))
             .ToList();
 
         if (groups.Count == 0)
@@ -576,6 +671,7 @@ internal sealed class ManagedShoppingCoordinator
     private void CompleteReturn()
     {
         var wrapAfterReturn = _wrapAfterReturn;
+        var consolidated = _consolidated;
         SettleCarriedItems(showHud: true);
         ClearRuntime(clearCarriedItems: false);
         _attempted = true;
@@ -584,6 +680,15 @@ internal sealed class ManagedShoppingCoordinator
         if (wrapAfterReturn || _host.ShouldWrapUpBeforeNextUnit())
         {
             _host.QueueWrapUpNow(_session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            return;
+        }
+
+        // The up-front consolidated trip bought for every location before any managed batch ran, so
+        // it hands straight back to the batch loop (worker is already on the farm) rather than
+        // re-entering a single batch's location.
+        if (consolidated)
+        {
+            _host.ResumeAfterConsolidatedShopping();
             return;
         }
 

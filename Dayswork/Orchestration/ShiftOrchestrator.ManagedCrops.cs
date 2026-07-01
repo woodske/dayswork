@@ -394,9 +394,6 @@ internal sealed partial class ShiftOrchestrator
 
         if (ShouldWrapUpBeforeNextUnit())
         {
-            if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: true))
-                return;
-
             QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }
@@ -425,9 +422,6 @@ internal sealed partial class ShiftOrchestrator
             StartNextManagedAction();
             return;
         }
-
-        if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: false))
-            return;
 
         CompleteManagedCropBatch();
     }
@@ -641,6 +635,20 @@ internal sealed partial class ShiftOrchestrator
         return false;
     }
 
+    /// <summary>
+    /// Return path for the up-front consolidated shopping trip: purchases are already in the input
+    /// chest and the worker is back on the farm, so hand control back to the batch loop, which begins
+    /// the first managed batch (now with shopping resolved).
+    /// </summary>
+    internal void ResumeAfterConsolidatedShopping()
+    {
+        if (_session is null || Session.Worker is null)
+            return;
+
+        Session.CurrentLocation = Game1.getFarm();
+        BeginCurrentBatch();
+    }
+
     /// <summary>Re-plan and resume planting once the worker is back in the managed batch's location.</summary>
     internal void ResumeManagedBatchAfterShopping()
     {
@@ -741,9 +749,6 @@ internal sealed partial class ShiftOrchestrator
 
         if (boundary.ShouldWrapUpAfterCurrentUnit)
         {
-            if (Session.Shopping.TryStartIfNeeded(wrapAfterReturn: true))
-                return;
-
             QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
             return;
         }

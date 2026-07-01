@@ -36,10 +36,40 @@ public sealed class ShiftSupplyAggregator
         StorePreference globalPreference,
         IReadOnlyList<ShopStockSnapshot>? liveStock,
         bool isFestivalDay,
+        Action<string>? debugLog = null) =>
+        BuildManifest(
+            plan,
+            new[] { field },
+            chestInventory,
+            globalPreference,
+            liveStock,
+            isFestivalDay,
+            debugLog);
+
+    /// <summary>
+    /// Builds one manifest spanning several managed locations at once: each assignment is sized
+    /// against its own location's <see cref="FieldState"/> while all zones draw from the single
+    /// shared input-chest reservoir, so two locations needing the same seed don't both assume the
+    /// full chest stock. Backs the up-front consolidated shopping trip.
+    /// </summary>
+    public ShiftPurchaseManifest BuildManifest(
+        CropPlan plan,
+        IReadOnlyList<FieldState> fields,
+        SupplyInventory chestInventory,
+        StorePreference globalPreference,
+        IReadOnlyList<ShopStockSnapshot>? liveStock,
+        bool isFestivalDay,
         Action<string>? debugLog = null)
     {
-        if (plan is null || !plan.IsEnabled)
+        if (plan is null || !plan.IsEnabled || fields is null || fields.Count == 0)
             return ShiftPurchaseManifest.Empty;
+
+        var fieldByLocation = new Dictionary<string, FieldState>(StringComparer.Ordinal);
+        foreach (var f in fields)
+        {
+            if (f is not null)
+                fieldByLocation[f.LocationName] = f;
+        }
 
         // Working copy of the input chest, decremented per zone so two zones sharing a seed or
         // fertilizer don't both assume the full chest stock.
@@ -52,7 +82,7 @@ public sealed class ShiftSupplyAggregator
 
         foreach (var assignment in plan.Assignments)
         {
-            if (!string.Equals(assignment.Zone.LocationName, field.LocationName, StringComparison.Ordinal))
+            if (!fieldByLocation.TryGetValue(assignment.Zone.LocationName, out var field))
                 continue;
 
             var choice = ResolveChoice(assignment, field);

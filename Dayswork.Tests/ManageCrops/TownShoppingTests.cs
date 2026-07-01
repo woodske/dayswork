@@ -67,6 +67,106 @@ public sealed class TownShoppingTests
         Assert.Equal(20, line.UnitCost);
     }
 
+    // Backs the up-front consolidated shopping trip: demand from every managed location is summed
+    // against ONE shared input-chest reservoir, so the single seed in the chest is subtracted once
+    // from the combined demand (3), not once per location (which would leave 2×(2-1) = 2).
+    [Fact]
+    public void Multi_location_manifest_sums_demand_against_one_shared_chest_reservoir()
+    {
+        var crop = Parsnip();
+        var farm = new CropZoneAssignment(
+            new Zone("Farm", new TileCoord(0, 0), new TileCoord(1, 0)),
+            CropAssignmentMode.Seasonal,
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.Pierre) });
+        var shed = new CropZoneAssignment(
+            new Zone("Greenhouse", new TileCoord(0, 0), new TileCoord(1, 0)),
+            CropAssignmentMode.SeasonAgnostic,
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.Pierre) });
+
+        var manifest = new ShiftSupplyAggregator().BuildManifest(
+            new CropPlan(new[] { farm, shed }),
+            new[]
+            {
+                PlantableField("Farm", isSeasonAgnostic: false),
+                PlantableField("Greenhouse", isSeasonAgnostic: true),
+            },
+            new SupplyInventory(new Dictionary<string, int> { ["seed.parsnip"] = 1 }),
+            StorePreference.Pierre,
+            ParsnipStock(),
+            isFestivalDay: false);
+
+        var line = Assert.Single(Assert.Single(manifest.Groups).Lines);
+        Assert.Equal("seed.parsnip", line.ItemId);
+        Assert.Equal(3, line.Quantity);
+    }
+
+    // Each assignment is sized against ITS OWN location's field: the greenhouse tiles already hold
+    // crops (nothing to plant), so only the farm zone's two tiles drive the purchase.
+    [Fact]
+    public void Multi_location_manifest_sizes_each_zone_against_its_own_field()
+    {
+        var crop = Parsnip();
+        var farm = new CropZoneAssignment(
+            new Zone("Farm", new TileCoord(0, 0), new TileCoord(1, 0)),
+            CropAssignmentMode.Seasonal,
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.Pierre) });
+        var shed = new CropZoneAssignment(
+            new Zone("Greenhouse", new TileCoord(0, 0), new TileCoord(1, 0)),
+            CropAssignmentMode.SeasonAgnostic,
+            new[] { new SeasonCropChoice(Season.Spring, crop, StorePreference.Pierre) });
+
+        // Greenhouse tiles: HasCrop=true → not plantable this shift.
+        var shedField = new FieldState(
+            "Greenhouse",
+            new GameDate(1, Season.Spring, 1),
+            isSeasonAgnosticLocation: true,
+            new[]
+            {
+                new TileState(new TileCoord(0, 0), false, true, false, false, false, false),
+                new TileState(new TileCoord(1, 0), false, true, false, false, false, false),
+            });
+
+        var manifest = new ShiftSupplyAggregator().BuildManifest(
+            new CropPlan(new[] { farm, shed }),
+            new[] { PlantableField("Farm", isSeasonAgnostic: false), shedField },
+            new SupplyInventory(new Dictionary<string, int>()),
+            StorePreference.Pierre,
+            ParsnipStock(),
+            isFestivalDay: false);
+
+        var line = Assert.Single(Assert.Single(manifest.Groups).Lines);
+        Assert.Equal("seed.parsnip", line.ItemId);
+        Assert.Equal(2, line.Quantity);
+    }
+
+    private static CropDescriptor Parsnip() => new(
+        "crop.parsnip",
+        "seed.parsnip",
+        fertilizerItemId: null,
+        daysToFirstHarvest: 4,
+        fertilizedDaysToFirstHarvest: null,
+        regrowDays: null,
+        new[] { Season.Spring });
+
+    private static FieldState PlantableField(string locationName, bool isSeasonAgnostic) => new(
+        locationName,
+        new GameDate(1, Season.Spring, 1),
+        isSeasonAgnostic,
+        new[]
+        {
+            new TileState(new TileCoord(0, 0), false, false, false, false, false, false),
+            new TileState(new TileCoord(1, 0), false, false, false, false, false, false),
+        });
+
+    private static ShopStockSnapshot[] ParsnipStock() => new[]
+    {
+        new ShopStockSnapshot(
+            Store.Pierre,
+            true,
+            new Dictionary<string, int> { ["seed.parsnip"] = 99 },
+            new Dictionary<string, int> { ["seed.parsnip"] = 20 }),
+    };
+
     // Fertilizer (unit 20) is ordered first within the group, so under a wallet shortfall it is
     // funded before its seed (unit 30) — a seed is never bought that can't be fertilized.
     [Theory]

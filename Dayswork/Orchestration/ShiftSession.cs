@@ -120,6 +120,12 @@ internal sealed class ShiftSession
     public string LastManagedSignature = string.Empty;
     public string ManagedBatchLocationName = "Farm";
 
+    // One consolidated managed-crop shopping trip per shift covers every location's needs up front.
+    // Set true when that trip is resolved (started, or found nothing to buy) so it never re-fires as
+    // later managed batches begin; a fresh session per shift is the reset. Not touched by the
+    // per-batch ResetManagedCropState.
+    public bool ManagedShoppingResolved;
+
     // ── Idle loop (post-work "repeat a task until cap/exhaustion") ────────────
     // True only while parked at the office door polling for ready machines (no travel, no action).
     public bool IdleWaiting;

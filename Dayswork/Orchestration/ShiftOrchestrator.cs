@@ -534,6 +534,16 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         // message + an always-on log — the worker never warps to reach work.
         if (IsManagedCropBatch(batch))
         {
+            // Before any managed planting, make one shopping trip covering every managed location's
+            // shortfall (deposited into the input chest). Gated once per shift; on the trip's return
+            // this re-enters BeginCurrentBatch with the flag set so we proceed to the batch itself.
+            if (!Session.ManagedShoppingResolved)
+            {
+                Session.ManagedShoppingResolved = true;
+                if (Session.Shopping.TryStartConsolidatedTrip())
+                    return;
+            }
+
             if (!string.Equals(batch.LocationName, "Farm", StringComparison.Ordinal))
             {
                 if (ModEntry.ExpansionCompat is { } compat &&
