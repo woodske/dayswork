@@ -66,6 +66,12 @@ internal sealed class ManagedCropFieldReader
     internal static bool HasSprinkler(GameLocation location, Vector2 vec) =>
         location.objects.TryGetValue(vec, out var obj) && obj.IsSprinkler();
 
+    /// <summary>True when a scarecrow occupies <paramref name="vec"/> (scarecrows live in
+    /// <see cref="GameLocation.objects"/> like sprinklers; <c>IsScarecrow()</c> matches the
+    /// <c>crow_scare</c> context tag or an "arecrow" name — covers deluxe/rarecrow/modded variants).</summary>
+    internal static bool HasScarecrow(GameLocation location, Vector2 vec) =>
+        location.objects.TryGetValue(vec, out var obj) && obj.IsScarecrow();
+
     /// <summary>
     /// True when the tile is a tillable/plantable managed-crop candidate: existing <see cref="HoeDirt"/>
     /// or bare ground the live map marks <c>Diggable</c> — and <b>not</b> occupied by a sprinkler. A
@@ -75,7 +81,7 @@ internal sealed class ManagedCropFieldReader
     internal static bool IsPlantableGroundTile(GameLocation location, int x, int y)
     {
         var vec = new Vector2(x, y);
-        if (HasSprinkler(location, vec))
+        if (HasSprinkler(location, vec) || HasScarecrow(location, vec))
             return false;
         if (location.terrainFeatures.TryGetValue(vec, out var tf) && tf is HoeDirt)
             return true;
@@ -116,9 +122,9 @@ internal sealed class ManagedCropFieldReader
         var vec = new Vector2(coord.X, coord.Y);
         var diggable = location.doesTileHaveProperty(coord.X, coord.Y, "Diggable", "Back") is not null;
 
-        // A sprinkler is the player's own fixture — never till, plant on, or clear it. Skipping the
-        // tile entirely keeps it out of FieldState so no action is queued on it.
-        if (HasSprinkler(location, vec))
+        // A sprinkler or scarecrow is the player's own fixture — never till, plant on, or clear it.
+        // Skipping the tile entirely keeps it out of FieldState so no action is queued on it.
+        if (HasSprinkler(location, vec) || HasScarecrow(location, vec))
         {
             state = default!;
             return false;

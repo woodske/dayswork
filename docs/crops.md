@@ -29,18 +29,24 @@ placeholder confirmed by observing "Wild Horseradish" appear in the crop picker 
 check as `Crop.isWildSeedCrop()`) and uses `seedId` as both `CropItemId` and the display name
 source, so they appear in the picker as "Spring Seeds" / "Summer Seeds" etc.
 
-## Sprinkler detection on a crop tile
+## Sprinkler & scarecrow detection on a crop tile
 
 `StardewValley.Object.IsSprinkler()` (public virtual bool, `Object.cs` line ~6071 in the v1.6
 decompile) returns `GetBaseRadiusForSprinkler() >= 0`. Sprinklers are **regular objects**
 (not big-craftables) stored in `GameLocation.objects`, keyed by the tile `Vector2`.
 
-**Mod handling**: `ManagedCropFieldReader.HasSprinkler` / `IsPlantableGroundTile` use this to skip
-sprinkler tiles entirely — a sprinkler tile is the player's own fixture, so the farmhand must never
-till, plant on, or clear it. (Before this, a sprinkler sat in `location.objects` and was read as
-`HasDebris`, which queued a `ClearDebris` action that would destroy the sprinkler.) The same helper
-backs the Draw-Zones valid-tile count **and per-tile highlight** for managed-crop groups: the crop
-draw layer fills only individual plantable tiles, not the whole drawn rectangle.
+`StardewValley.Object.IsScarecrow()` (public virtual bool, v1.6 decompile) returns true when the
+object has context tag `crow_scare` **or** `Name.Contains("arecrow")` — covering vanilla Scarecrow,
+Deluxe Scarecrow `(BC)126`, all rarecrows, and modded scarecrows. Scarecrows are also stored in
+`GameLocation.objects` keyed by the tile `Vector2`, exactly like sprinklers.
+
+**Mod handling**: `ManagedCropFieldReader.HasSprinkler` / `HasScarecrow` / `IsPlantableGroundTile`
+use these to skip sprinkler **and scarecrow** tiles entirely — both are the player's own fixtures, so
+the farmhand must never till, plant on, or clear them. (Before this, the fixture sat in
+`location.objects` and was read as `HasDebris`, which queued a `ClearDebris` action that would destroy
+it.) The exclusion is the fixture's **own tile only**, not its protection/coverage radius. The same
+helpers back the Draw-Zones valid-tile count **and per-tile highlight** for managed-crop groups: the
+crop draw layer fills only individual plantable tiles, not the whole drawn rectangle.
 
 `GameLocation.doesTileHaveProperty(x, y, "Diggable", "Back")` is **bounds-safe for off-map tiles** —
 it resolves `map.GetLayer(...)?.Tiles[x, y]`, and xTile's `TileArray` indexer returns `null` for
