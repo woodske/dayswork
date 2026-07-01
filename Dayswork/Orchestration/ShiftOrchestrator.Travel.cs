@@ -18,7 +18,6 @@ internal enum TravelPurpose
     DepositEntry,    // to the active deposit trip's chest location
     DepositExit,     // back to the farm after an interior deposit
     ShoppingStep,    // managed shopping; sub-dispatched on the shopping phase
-    ManagedReentry,  // back into the managed-crop field location after shopping
     ExitForDeposit,  // leave a building interior before beginning the deposit run
     IdleReturn,      // back to the office door to park between idle-loop machine rounds
 }
@@ -91,9 +90,6 @@ internal sealed partial class ShiftOrchestrator
                 break;
             case TravelPurpose.WorkExit:
                 CompleteWorkExitTravel();
-                break;
-            case TravelPurpose.ManagedReentry:
-                ResumeManagedBatchAfterShopping();
                 break;
             case TravelPurpose.DepositEntry:
                 Session.Deposits.OnDepositEntryTravelArrived();

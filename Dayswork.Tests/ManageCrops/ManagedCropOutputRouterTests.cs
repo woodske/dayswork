@@ -94,9 +94,7 @@ public sealed class ManagedCropOutputRouterTests
         var result = planner.Plan(
             assignment,
             field,
-            new SupplyInventory(new Dictionary<string, int>()),
-            Array.Empty<ShopStockSnapshot>(),
-            isFestivalDay: false);
+            new SupplyInventory(new Dictionary<string, int>()));
 
         var harvest = Assert.Single(result.SupplyIndependentActions, action => action.Kind == ManagedCropActionKind.Harvest);
         Assert.Equal(ManagedCropOutputRouter.ProvenanceFor(assignment), harvest.OutputProvenance);

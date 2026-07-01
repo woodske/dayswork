@@ -137,14 +137,7 @@ internal sealed partial class ShiftOrchestrator
         foreach (var assignment in Session.ManagedAssignments)
         {
             var assignmentSupply = new SupplyInventory(working);
-            var plan = _cropShiftPlanner.Plan(
-                assignment,
-                fieldState,
-                assignmentSupply,
-                stockSnapshots: null,
-                isFestivalDay: isFestival,
-                storePreferenceOverride: Session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
-                    ? StorePreference.Joja : StorePreference.Pierre);
+            var plan = _cropShiftPlanner.Plan(assignment, fieldState, assignmentSupply);
 
             var skipPrep = ShouldSkipZonePrep(assignment, fieldState, assignmentSupply, plan);
 
@@ -478,20 +471,12 @@ internal sealed partial class ShiftOrchestrator
             ?? ResolveManagedBatchLocation(Session.ManagedBatchLocationName)
             ?? Game1.getFarm();
         var date = CurrentManagedGameDate();
-        var isFestival = Utility.isFestivalDay(date.Day, Game1.season);
         var fieldState = _cropFieldReader.Read(
             location, date, Session.ManagedAssignments, IsCurrentManagedBatchSeasonAgnostic());
 
         foreach (var assignment in Session.ManagedAssignments)
         {
-            var plan = _cropShiftPlanner.Plan(
-                assignment,
-                fieldState,
-                supply,
-                stockSnapshots: null,
-                isFestivalDay: isFestival,
-                storePreferenceOverride: Session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
-                    ? StorePreference.Joja : StorePreference.Pierre);
+            var plan = _cropShiftPlanner.Plan(assignment, fieldState, supply);
 
             if (ShouldSkipZonePrep(assignment, fieldState, supply, plan))
                 NotifyZoneSkipped(assignment, fieldState, supply);
@@ -572,70 +557,6 @@ internal sealed partial class ShiftOrchestrator
     }
 
     /// <summary>
-    /// Walks the worker back into the managed batch's building after a shopping trip, then resumes
-    /// planting via the ManagedReentry travel completion. Returns false when re-entry is impossible
-    /// and the caller should complete the batch instead.
-    /// </summary>
-    internal bool TryStartManagedReentryTravel()
-    {
-        if (Session.Worker is null)
-            return false;
-
-        var farm = Game1.getFarm();
-        var current = Session.Worker.currentLocation ?? Session.CurrentLocation ?? farm;
-        var target = ResolveManagedBatchLocation(Session.ManagedBatchLocationName);
-        if (target is null)
-        {
-            DevLog.Log(
-                $"[Dayswork][managed-crops][shopping] re-entry skipped location={Session.ManagedBatchLocationName} reason=location_unavailable.",
-                DevLog.WarnLevel);
-            return false;
-        }
-
-        if (SameLocation(current, target))
-        {
-            Session.CurrentLocation = target;
-            ResumeManagedBatchAfterShopping();
-            return true;
-        }
-
-        // Expansion greenhouse: hop back in along the validated route.
-        if (ModEntry.ExpansionCompat is { } compat &&
-            compat.TryGetExpansionLocationDescriptor(Session.ManagedBatchLocationName, out var descriptor) &&
-            descriptor.Role == ExpansionLocationRole.GreenhouseWork)
-        {
-            if (compat.TryValidateRoute(
-                    farm,
-                    current.NameOrUniqueName,
-                    Session.ManagedBatchLocationName,
-                    ExpansionRoutePurpose.WorkEntry,
-                    out var route,
-                    out var failure))
-            {
-                StartTravel(
-                    BuildExpansionPlan(route, TravelFailurePolicy.WarpToDestination),
-                    TravelPurpose.ManagedReentry);
-                return true;
-            }
-
-            LogExpansionRouteFailure(failure);
-            return false;
-        }
-
-        // Vanilla building: walk to its outdoor door, warp inside.
-        if (TryBuildBuildingEntryPlan(
-                Session.ManagedBatchLocationName,
-                TravelFailurePolicy.WarpToDestination,
-                out var plan))
-        {
-            StartTravel(plan, TravelPurpose.ManagedReentry);
-            return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
     /// Return path for the up-front consolidated shopping trip: purchases are already in the input
     /// chest and the worker is back on the farm, so hand control back to the batch loop, which begins
     /// the first managed batch (now with shopping resolved).
@@ -647,24 +568,6 @@ internal sealed partial class ShiftOrchestrator
 
         Session.CurrentLocation = Game1.getFarm();
         BeginCurrentBatch();
-    }
-
-    /// <summary>Re-plan and resume planting once the worker is back in the managed batch's location.</summary>
-    internal void ResumeManagedBatchAfterShopping()
-    {
-        Session.ManagedReplanCount = 0;
-        var actions = BuildManagedActions(logDetail: true);
-        foreach (var action in actions)
-            Session.ManagedActions.Enqueue(action);
-        Session.LastManagedSignature = Signature(actions);
-
-        if (Session.ManagedActions.Count == 0)
-        {
-            CompleteManagedCropBatch();
-            return;
-        }
-
-        StartNextManagedAction();
     }
 
     internal static void NotifyFallbackStoreIfUsed(

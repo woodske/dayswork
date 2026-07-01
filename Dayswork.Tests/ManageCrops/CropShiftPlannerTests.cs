@@ -26,7 +26,7 @@ public sealed class CropShiftPlannerTests
             ["fert.basic"] = 1,
         });
 
-        var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
+        var result = planner.Plan(assignment, field, inventory);
 
         Assert.Equal(
             new[]
@@ -55,7 +55,7 @@ public sealed class CropShiftPlannerTests
             new[] { new TileState(new TileCoord(0, 0), false, false, false, true, false, false) });
         var inventory = new SupplyInventory(new Dictionary<string, int> { ["seed.parsnip"] = 1 });
 
-        var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
+        var result = planner.Plan(assignment, field, inventory);
 
         Assert.DoesNotContain(result.AllActions, action => action.Kind == ManagedCropActionKind.PlantSeed);
     }
@@ -77,7 +77,7 @@ public sealed class CropShiftPlannerTests
             new[] { new TileState(new TileCoord(0, 0), false, false, false, false, false, false) });
         var inventory = new SupplyInventory(new Dictionary<string, int> { ["seed.x"] = 1 });
 
-        var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
+        var result = planner.Plan(assignment, field, inventory);
 
         Assert.DoesNotContain(result.AllActions, action => action.Kind == ManagedCropActionKind.Till);
         Assert.DoesNotContain(result.AllActions, action => action.Kind == ManagedCropActionKind.PlantSeed);
@@ -99,7 +99,7 @@ public sealed class CropShiftPlannerTests
             new[] { new TileState(new TileCoord(0, 0), false, false, false, false, false, false) });
         var inventory = new SupplyInventory(new Dictionary<string, int> { ["seed.x"] = 1 });
 
-        var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
+        var result = planner.Plan(assignment, field, inventory);
 
         Assert.Contains(result.AllActions, action => action.Kind == ManagedCropActionKind.Till);
         Assert.Contains(result.AllActions, action => action.Kind == ManagedCropActionKind.PlantSeed);
@@ -141,7 +141,7 @@ public sealed class CropShiftPlannerTests
         var totalPlanted = 0;
         foreach (var assignment in assignments)
         {
-            var plan = planner.Plan(assignment, field, new SupplyInventory(working), Array.Empty<ShopStockSnapshot>(), false);
+            var plan = planner.Plan(assignment, field, new SupplyInventory(working));
             totalPlanted += plan.AllActions.Count(a => a.Kind == ManagedCropActionKind.PlantSeed);
 
             foreach (var action in plan.SupplyDependentActions)
@@ -187,7 +187,7 @@ public sealed class CropShiftPlannerTests
             });
         var inventory = new SupplyInventory(new Dictionary<string, int> { ["seed.parsnip"] = 2 });
 
-        var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
+        var result = planner.Plan(assignment, field, inventory);
 
         Assert.Empty(result.SupplyIndependentActions);
         Assert.Equal(
@@ -226,7 +226,7 @@ public sealed class CropShiftPlannerTests
             });
         var inventory = new SupplyInventory(new Dictionary<string, int>());
 
-        var result = planner.Plan(assignment, field, inventory, Array.Empty<ShopStockSnapshot>(), false);
+        var result = planner.Plan(assignment, field, inventory);
 
         Assert.DoesNotContain(result.AllActions, a => a.Kind == ManagedCropActionKind.ClearDebris);
         Assert.DoesNotContain(result.AllActions, a => a.Kind == ManagedCropActionKind.Till);

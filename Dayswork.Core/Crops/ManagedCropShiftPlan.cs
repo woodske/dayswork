@@ -4,21 +4,13 @@ public sealed record ManagedCropShiftPlan
 {
     public IReadOnlyList<TileAction> SupplyIndependentActions { get; }
     public IReadOnlyList<TileAction> SupplyDependentActions { get; }
-    public IReadOnlyList<PurchaseLine> Purchases { get; }
 
     public ManagedCropShiftPlan(
         IReadOnlyList<TileAction>? supplyIndependentActions,
-        IReadOnlyList<TileAction>? supplyDependentActions,
-        IReadOnlyList<PurchaseLine>? purchases)
+        IReadOnlyList<TileAction>? supplyDependentActions)
     {
         SupplyIndependentActions = OrderActions(supplyIndependentActions);
         SupplyDependentActions = OrderActions(supplyDependentActions);
-        Purchases = (purchases ?? Array.Empty<PurchaseLine>())
-            .Where(line => line.Quantity > 0)
-            .OrderBy(line => line.Store)
-            .ThenBy(line => line.ItemId, StringComparer.Ordinal)
-            .ToList()
-            .AsReadOnly();
     }
 
     public IReadOnlyList<TileAction> AllActions =>

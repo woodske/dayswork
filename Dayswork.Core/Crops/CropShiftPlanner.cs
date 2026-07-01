@@ -4,36 +4,16 @@ using Dayswork.Core.Domain;
 
 public sealed class CropShiftPlanner
 {
-    private readonly PlantingViabilityCalculator _viabilityCalculator;
-    private readonly CropSupplyPlanner _supplyPlanner;
-    private readonly StoreResolver _storeResolver;
-
-    public CropShiftPlanner()
-        : this(new PlantingViabilityCalculator(), new CropSupplyPlanner(), new StoreResolver())
-    {
-    }
-
-    public CropShiftPlanner(
-        PlantingViabilityCalculator viabilityCalculator,
-        CropSupplyPlanner supplyPlanner,
-        StoreResolver storeResolver)
-    {
-        _viabilityCalculator = viabilityCalculator;
-        _supplyPlanner = supplyPlanner;
-        _storeResolver = storeResolver;
-    }
+    private readonly PlantingViabilityCalculator _viabilityCalculator = new();
 
     public ManagedCropShiftPlan Plan(
         CropZoneAssignment assignment,
         FieldState fieldState,
-        SupplyInventory inventory,
-        IReadOnlyList<ShopStockSnapshot>? stockSnapshots,
-        bool isFestivalDay,
-        StorePreference? storePreferenceOverride = null)
+        SupplyInventory inventory)
     {
         var choice = ResolveChoice(assignment, fieldState);
         if (choice is null)
-            return new ManagedCropShiftPlan(Array.Empty<TileAction>(), Array.Empty<TileAction>(), Array.Empty<PurchaseLine>());
+            return new ManagedCropShiftPlan(Array.Empty<TileAction>(), Array.Empty<TileAction>());
 
         var zoneTiles = fieldState.Tiles
             .Where(tile => Contains(assignment.Zone, tile.Tile))
@@ -63,21 +43,7 @@ public sealed class CropShiftPlanner
         // the chest is the source of truth (no projecting in seed the worker won't have on hand).
         var supplyDependent = BuildSupplyDependentActions(fieldState.LocationName, candidates, choice.Crop, inventory);
 
-        // Purchases are unused by the planting path now (the up-front trip aggregates its own
-        // manifest); kept so the DTO shape is stable. TODO: drop with a dedicated cleanup.
-        var preFertilizedCount = choice.Crop.RequiresFertilizer
-            ? candidates.Count(tile => tile.HasFertilizer)
-            : 0;
-        var supplyTargets = _supplyPlanner.CalculatePurchaseTargets(
-            choice.Crop,
-            candidates.Count,
-            inventory,
-            storePreferenceOverride ?? choice.StorePreference,
-            stockSnapshots,
-            preFertilizedCount);
-        var purchases = _storeResolver.ResolvePurchaseLines(supplyTargets, isFestivalDay, stockSnapshots);
-
-        return new ManagedCropShiftPlan(independent, supplyDependent, purchases);
+        return new ManagedCropShiftPlan(independent, supplyDependent);
     }
 
     private static SeasonCropChoice? ResolveChoice(CropZoneAssignment assignment, FieldState fieldState)

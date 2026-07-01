@@ -79,10 +79,8 @@ internal sealed class ManagedShoppingCoordinator
     private readonly PurchaseAffordabilityCalculator _purchaseAffordability;
     private readonly ShopPurchaseService _shopPurchaseService;
 
-    private bool _attempted;
     private bool _inProgress;
     private bool _wrapAfterReturn;
-    private bool _consolidated;
     private Phase _phase;
     private readonly Queue<StorePurchaseGroup> _groups = new();
     private StorePurchaseGroup? _group;
@@ -125,10 +123,9 @@ internal sealed class ManagedShoppingCoordinator
     /// <summary>Pacing through counter purchases one beat at a time; the tick loop calls <see cref="ContinuePurchaseTick"/>.</summary>
     public bool IsPurchasing => _phase == Phase.Purchasing;
 
-    /// <summary>Re-arms the once-per-batch shopping attempt (called when a managed batch begins).</summary>
+    /// <summary>Clears per-batch shopping runtime state (called when a managed batch begins).</summary>
     public void ResetState()
     {
-        _attempted = false;
         ClearRuntime(clearCarriedItems: true);
     }
 
@@ -136,7 +133,6 @@ internal sealed class ManagedShoppingCoordinator
     {
         _inProgress = false;
         _wrapAfterReturn = false;
-        _consolidated = false;
         _phase = Phase.None;
         _groups.Clear();
         _group = null;
@@ -147,64 +143,6 @@ internal sealed class ManagedShoppingCoordinator
         if (clearCarriedItems)
             _carriedItems.Clear();
         _outcomes.Clear();
-    }
-
-    public bool TryStartIfNeeded(bool wrapAfterReturn)
-    {
-        if (_session.Worker is null || !_session.ManagedActive || _attempted || _inProgress)
-            return false;
-
-        if (!TryBuildPlan(out var affordable))
-            return false;
-
-        Start(affordable, wrapAfterReturn);
-        return true;
-    }
-
-    private bool TryBuildPlan(out AffordablePurchasePlan affordable)
-    {
-        affordable = AffordablePurchasePlan.Empty;
-        _attempted = true;
-
-        var date = ShiftOrchestrator.CurrentManagedGameDate();
-        if (Utility.isFestivalDay(date.Day, Game1.season))
-        {
-            CropHudNotifier.ShoppingFestivalSkipped();
-            return false;
-        }
-
-        var inputChest = _host.TryGetInputChest();
-        if (inputChest is null)
-        {
-            CropHudNotifier.ShoppingUnavailable();
-            return false;
-        }
-
-        var fieldLocation = _host.ResolveManagedBatchLocation(_session.ManagedBatchLocationName) ?? Game1.getFarm();
-        var fieldState = _cropFieldReader.Read(
-            fieldLocation,
-            date,
-            _session.ManagedAssignments,
-            _host.IsCurrentManagedBatchSeasonAgnostic());
-        var supply = ShiftOrchestrator.ReadSupply(inputChest);
-        var stock = _shopStockReader.ReadAll(date.Day, Game1.timeOfDay, includeClosedStock: true);
-        var storePreference = _session.Ctx.WorkScopes.ManagedCrops?.BuyFromJojaFirst == true
-            ? StorePreference.Joja : StorePreference.Pierre;
-        var manifest = _shiftSupplyAggregator.BuildManifest(
-            new CropPlan(_session.ManagedAssignments),
-            fieldState,
-            supply,
-            storePreference,
-            stock,
-            isFestivalDay: false,
-            debugLog: DevLog.Enabled ? msg => DevLog.Log($"[Dayswork][managed-crops][shopping] manifest-dbg: {msg}", LogLevel.Info) : null);
-
-        DevLog.Log(
-            $"[Dayswork][managed-crops][shopping] manifest resolved=[{string.Join(", ", manifest.Groups.SelectMany(g => g.Lines.Select(l => $"{l.ItemId}:{l.Quantity}@{g.Store}")))}]" +
-            $" unavailable=[{string.Join(", ", manifest.ChestSupplyOnlyItems)}]",
-            LogLevel.Info);
-
-        return TryFinalizeManifest(manifest, storePreference, stock, date.Day, out affordable);
     }
 
     /// <summary>
@@ -222,7 +160,6 @@ internal sealed class ManagedShoppingCoordinator
             return false;
 
         Start(affordable, wrapAfterReturn: false);
-        _consolidated = true;
         return true;
     }
 
@@ -324,7 +261,6 @@ internal sealed class ManagedShoppingCoordinator
             return;
 
         ClearRuntime(clearCarriedItems: true);
-        _attempted = true;
         _inProgress = true;
         _wrapAfterReturn = wrapAfterReturn;
         _session.CurrentManagedAction = null;
@@ -671,10 +607,8 @@ internal sealed class ManagedShoppingCoordinator
     private void CompleteReturn()
     {
         var wrapAfterReturn = _wrapAfterReturn;
-        var consolidated = _consolidated;
         SettleCarriedItems(showHud: true);
         ClearRuntime(clearCarriedItems: false);
-        _attempted = true;
         _nav.Clear();
 
         if (wrapAfterReturn || _host.ShouldWrapUpBeforeNextUnit())
@@ -683,26 +617,9 @@ internal sealed class ManagedShoppingCoordinator
             return;
         }
 
-        // The up-front consolidated trip bought for every location before any managed batch ran, so
-        // it hands straight back to the batch loop (worker is already on the farm) rather than
-        // re-entering a single batch's location.
-        if (consolidated)
-        {
-            _host.ResumeAfterConsolidatedShopping();
-            return;
-        }
-
-        // Farm batches resume in place; building batches walk back in through the door first
-        // (ManagedReentry travel), then ResumeManagedBatchAfterShopping re-plans and continues.
-        if (string.Equals(_session.ManagedBatchLocationName, "Farm", StringComparison.Ordinal))
-        {
-            _session.CurrentLocation = Game1.getFarm();
-            _host.ResumeManagedBatchAfterShopping();
-            return;
-        }
-
-        if (!_host.TryStartManagedReentryTravel())
-            _host.CompleteManagedCropBatch();
+        // The one consolidated trip bought for every location before any managed batch ran, so hand
+        // straight back to the batch loop (worker is already on the farm) to begin the first batch.
+        _host.ResumeAfterConsolidatedShopping();
     }
 
     private void AbortTrip(string reason)
