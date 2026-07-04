@@ -31,7 +31,8 @@ internal sealed partial class ShiftOrchestrator
     // at a time through the existing tick/intent loop. The queue and its state live on the session.
     //
     // Per-tile sweep: ClearDebris and Till are both queued for each tile in a single planning pass.
-    // The sort order (Y → X → ActionRank) guarantees clear precedes till for the same tile.
+    // The merged plan is ordered as one serpentine field sweep across all zones (ManagedActionSweep:
+    // sweep position → ActionRank), so clear still precedes till for the same tile.
     // IsManagedActionApplicable guards the Till if debris still remains (multi-hit case).
     // Multi-hit debris (e.g. tree → stump → gone) is handled by an inline retry in
     // HandleManagedCropAction that re-applies ClearDebris in place until the tile is fully clear.
@@ -221,7 +222,23 @@ internal sealed partial class ShiftOrchestrator
             }
         }
 
-        return actions;
+        // Execute the merged plan as ONE serpentine sweep across all zones (per-tile chains stay
+        // intact via ActionRank), instead of walking zone-by-zone in authoring order with two
+        // row-major passes per zone.
+        return ManagedActionSweep.Order(actions, WorkerSweepStart(location));
+    }
+
+    // Sweep orientation hint: the worker's tile when it is already inside the batch location
+    // (batch start / re-plan). Null from the outside-probe path (ManagedCropBatchHasReadyWork) so
+    // probing stays position-independent — it only counts actions anyway.
+    private TileCoord? WorkerSweepStart(GameLocation location)
+    {
+        if (_session?.Worker is { } worker &&
+            worker.currentLocation is { } current &&
+            SameLocation(current, location))
+            return new TileCoord(worker.TilePoint.X, worker.TilePoint.Y);
+
+        return null;
     }
 
     private void NotifyCropNotViable(CropZoneAssignment assignment, FieldState fieldState)

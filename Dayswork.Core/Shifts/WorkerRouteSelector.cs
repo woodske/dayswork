@@ -9,13 +9,16 @@ namespace Dayswork.Core.Shifts;
 public sealed class WorkerRouteSelector
 {
     // Player-ordered category priority is authoritative: pick the highest-priority category that
-    // still has reachable work, then the nearest candidate within it. Route cost breaks ties only
-    // among same-category candidates (which share a PriorityRank), giving strict ordering between
-    // categories and nearest-first within a category.
+    // still has reachable work, then order within it by SelectionKey. Callers set SelectionKey to
+    // the precomputed serpentine-sweep position (= StableOrder = queue index) for field work, and
+    // to RouteCost for AnimalCare work (moving animals, troughs, ground forage stay nearest-first).
+    // Route cost then breaks remaining ties, so strict ordering between categories holds and each
+    // category walks either its sweep or nearest-first — never a mix.
     public WorkerRouteCandidate? Select(IEnumerable<WorkerRouteCandidate> candidates) =>
         candidates
             .Where(candidate => candidate.Reachable)
             .OrderBy(candidate => candidate.PriorityRank)
+            .ThenBy(candidate => candidate.SelectionKey)
             .ThenBy(candidate => candidate.RouteCost)
             .ThenBy(candidate => candidate.StableOrder)
             .FirstOrDefault();
@@ -79,6 +82,7 @@ public sealed record WorkerRouteCandidate(
     TaskKind Task,
     int PriorityRank,
     int StableOrder,
+    int SelectionKey,
     TileCoord InteractionTile,
     bool Reachable,
     int RouteCost);

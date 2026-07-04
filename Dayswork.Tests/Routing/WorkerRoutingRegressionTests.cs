@@ -11,12 +11,27 @@ public sealed class WorkerRoutingRegressionTests
     private readonly TaskPriorityOrderer _priority = new();
 
     [Fact]
-    public void Standing_on_valid_interaction_tile_wins_with_zero_route_cost()
+    public void Field_work_sweep_position_wins_over_standing_proximity()
     {
+        // Serpentine routing: fieldwork follows the precomputed sweep (SelectionKey = queue
+        // position), so the next tile in the sweep wins even when the worker is already standing
+        // next to a later one. (Pre-sweep behavior: routeCost 0 won outright.)
         var currentSide = Candidate(1, TaskKind.ClearWeeds, routeCost: 0, stableOrder: 1);
-        var preferredTopSide = Candidate(2, TaskKind.ClearWeeds, routeCost: 6, stableOrder: 0);
+        var nextInSweep = Candidate(2, TaskKind.ClearWeeds, routeCost: 6, stableOrder: 0);
 
-        var selected = _selector.Select(new[] { preferredTopSide, currentSide });
+        var selected = _selector.Select(new[] { nextInSweep, currentSide });
+
+        Assert.Equal(nextInSweep, selected);
+    }
+
+    [Fact]
+    public void Animal_care_keeps_zero_route_cost_current_tile_preference()
+    {
+        // AnimalCare (moving animals + troughs/floor forage at the same rank) stays nearest-first.
+        var currentSide = Candidate(1, TaskKind.CollectAnimalProducts, routeCost: 0, stableOrder: 1);
+        var farther = Candidate(2, TaskKind.CollectAnimalProducts, routeCost: 6, stableOrder: 0);
+
+        var selected = _selector.Select(new[] { farther, currentSide });
 
         Assert.Equal(currentSide, selected);
     }
@@ -142,6 +157,9 @@ public sealed class WorkerRoutingRegressionTests
         Assert.Equal(preferredTargetMapProperty, selected);
     }
 
+    // Mirrors the production wiring in TryEvaluateCandidateRoute: AnimalCare candidates are
+    // nearest-first (SelectionKey = route cost), everything else follows the precomputed sweep
+    // (SelectionKey = StableOrder = queue position).
     private WorkerRouteCandidate Candidate(
         int id,
         TaskKind task,
@@ -153,6 +171,7 @@ public sealed class WorkerRoutingRegressionTests
             task,
             _priority.Rank(task),
             stableOrder,
+            TaskKindSets.CategoryOf(task) == TaskCategory.AnimalCare ? routeCost : stableOrder,
             new TileCoord(id, stableOrder),
             reachable,
             routeCost);

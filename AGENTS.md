@@ -17,6 +17,7 @@ service and the SMAPI event it hangs off is visible there.
 ## Local game/source paths
 
 - Stardew Valley install: `X:\Steam\steamapps\common\Stardew Valley`
+- SMAPI logs: `%APPDATA%\StardewValley\ErrorLogs\SMAPI-latest.txt` (resolves to `C:\Users\kwood\AppData\Roaming\StardewValley\ErrorLogs\`)
 - Stardew Valley Expanded source: `C:\Users\kwood\Repos\StardewValleyExpanded`
 
 Use `docs/game-content-search.md` for the fastest way to search/parse the base game and SVE

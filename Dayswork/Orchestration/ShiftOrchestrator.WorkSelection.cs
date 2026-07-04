@@ -3,6 +3,7 @@ using Dayswork.Compat;
 using Dayswork.Core.Compat;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
+using Dayswork.Core.Geometry;
 using Dayswork.Core.Inventory;
 using Dayswork.Core.Pricing;
 using Dayswork.Core.Shifts;
@@ -36,7 +37,7 @@ internal sealed partial class ShiftOrchestrator
     private void QueueBatchWork(WorkBatch batch, GameLocation location)
     {
         Session.Ctx.WorkList.Clear();
-        foreach (var item in batch.TileWork)
+        foreach (var item in OrderTileWorkForSweep(batch.TileWork, location))
             Session.Ctx.WorkList.Enqueue(item);
 
         Session.AnimalWork.Clear();
@@ -50,6 +51,28 @@ internal sealed partial class ShiftOrchestrator
         Session.BatchSelectionAttempts = 0;
         Session.MaxBatchSelectionAttempts = Math.Max(4, (batch.TileWork.Count + batch.AnimalWork.Count + 1) * 4);
         Session.CurrentLocation = location;
+    }
+
+    // Tile work executes as a serpentine field sweep: the queue is sorted once per batch, and
+    // WorkerRouteCandidate.SelectionKey (= StableOrder = queue position) makes the selector honor
+    // that order for non-AnimalCare categories. Same-tile ties put harvest beats before watering
+    // so a non-regrow crop isn't watered right before it's picked (wasted beat + energy).
+    private IReadOnlyList<WorkItem> OrderTileWorkForSweep(IReadOnlyList<WorkItem> tileWork, GameLocation location)
+    {
+        if (tileWork.Count <= 1)
+            return tileWork;
+
+        var start = Session.Worker is { } worker &&
+                    worker.currentLocation is { } current &&
+                    SameLocation(current, location)
+            ? new TileCoord(worker.TilePoint.X, worker.TilePoint.Y)
+            : (TileCoord?)null;
+
+        var sweep = SerpentineSweep.Rank(tileWork.Select(item => item.TaskTile), start);
+        return tileWork
+            .OrderBy(item => sweep[item.TaskTile])
+            .ThenBy(item => item.Task == TaskKind.WaterCrops ? 1 : 0)
+            .ToList();
     }
 
     private void StartNextAnimalOrTileOrAdvance()
@@ -270,6 +293,12 @@ internal sealed partial class ShiftOrchestrator
             Task: candidate.Task,
             PriorityRank: Session.PriorityOrderer.Rank(candidate.Task),
             StableOrder: candidate.StableOrder,
+            // AnimalCare work stays nearest-first (animals move; troughs/floor forage interleave
+            // with them at the same rank); every other category follows the precomputed serpentine
+            // sweep, whose position is the queue enumeration order (StableOrder).
+            SelectionKey: TaskKindSets.CategoryOf(candidate.Task) == TaskCategory.AnimalCare
+                ? bestRouteCost
+                : candidate.StableOrder,
             InteractionTile: bestTile.Value,
             Reachable: true,
             // Report the chosen tile's real travel cost (not the diagonal-biased value) so candidate

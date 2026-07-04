@@ -42,11 +42,13 @@ public static class WorkerRoutingGenerators
             from y in Gen.Choose(0, 120)
             from reachable in Arb.Generate<bool>()
             from routeCost in Gen.Choose(0, 500)
+            from selectionKey in Gen.Choose(0, 500)
             select new WorkerRouteCandidate(
                 CandidateId: 0,
                 Task: task,
                 PriorityRank: PriorityOrderer.Rank(task),
                 StableOrder: 0,
+                SelectionKey: selectionKey,
                 InteractionTile: new TileCoord(x, y),
                 Reachable: reachable,
                 RouteCost: routeCost);
