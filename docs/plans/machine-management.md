@@ -58,6 +58,12 @@ build-verified and await the in-game smoke pass per AGENTS.md):
   that group collect-only for that location (dev log) — inputs are never touched/lost. Full
   cross-location fetch trips are a follow-up (see `ManagedShoppingCoordinator` for the pattern).
   *(Remains a v1 design limit, not a bug — collect-only degrade verified in-game.)*
+- **Auto-Grabbers are valid input chests (2026-07-05).** A grabber (`(BC)165`) surfaces in the input-
+  chest picker; its `heldObject` Chest of collected animal products (wool/milk/egg/truffle) feeds
+  reload machines. Because grabbers live in a coop/barn `AnimalHouse`, the same-location rule means
+  the reload machines must be in that same building (else collect-only). See `docs/chests.md` →
+  "Auto-Grabber as an input source". Grabbers stay out of output/deposit pickers. *Awaits in-game
+  smoke pass.*
 - **Collect via `checkForAction`** credits the buffer only if the machine actually released its
   output (duplication-safe). ✓ Verified in-world: the fake worker `Farmer` cleanly collects.
 - **Load via `PlaceInMachine(probe:false)`** with the carry buffer populated on a fake `Farmer`.

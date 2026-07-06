@@ -703,15 +703,21 @@ internal sealed partial class ShiftOrchestrator
 
         Session.CarriedInputsChest = job.Chest;
 
+        // An Auto-Grabber input chest is a held object with no world Location/TileLocation of its own,
+        // so drive the audio (and the sprite reset below) from the grabber object at the ref's tile.
+        var grabber = _chestResolver.ResolveGrabberOwner(job.Chest);
+
         // The worker pulls inputs directly from the chest's item list (no ItemGrabMenu), so the
         // vanilla open + per-item pickup sounds never fire. Emit them ourselves, mirroring the
         // deposit trip's chest audio: "openChest" on open, then the inventory move cue "dwop" for
         // each item type taken — staggered, since the withdrawal is synchronous and same-frame cues
         // would overlap into one. Gated on the player being in the chest's location so off-farm
         // fetches stay silent (matches every other worker action).
-        var chestLoc = chest.Location;
+        var chestLoc = grabber?.Location ?? chest.Location;
         var playerHere = chestLoc is not null && Game1.player.currentLocation == chestLoc;
-        var chestTile = new Vector2(chest.TileLocation.X, chest.TileLocation.Y);
+        var chestTile = grabber is not null
+            ? new Vector2(job.Chest.Tile.X, job.Chest.Tile.Y)
+            : new Vector2(chest.TileLocation.X, chest.TileLocation.Y);
         if (playerHere)
         {
             chest.frameCounter.Value = 5;  // vanilla open trigger (matches DepositTripRunner)
@@ -736,6 +742,11 @@ internal sealed partial class ShiftOrchestrator
                 DelayedAction.playSoundAfterDelay("dwop", 150 + takeSoundIndex * 90, chestLoc, chestTile);
             takeSoundIndex++;
         }
+
+        // Mirror the vanilla grabItemFromAutoGrabber empties-reset so the grabber sprite returns to
+        // "empty" once the worker drains it (no-op for a plain chest).
+        if (grabber is not null && chest.isEmpty())
+            grabber.showNextIndex.Value = false;
     }
 
     // Removes up to `amount` units of `qualifiedId` from the chest, returning the real item stacks
@@ -777,13 +788,19 @@ internal sealed partial class ShiftOrchestrator
         var chest = Session.CarriedInputsChest is { } chestRef ? _chestResolver.ResolveChest(chestRef) : null;
         var chestWritable = chest is not null && !chest.GetMutex().IsLocked();
 
+        // An Auto-Grabber input chest is a held object with no world Location/TileLocation, so drive
+        // the audio (and re-fill sprite below) from the grabber object at the ref's tile.
+        var grabber = Session.CarriedInputsChest is { } grabberRef ? _chestResolver.ResolveGrabberOwner(grabberRef) : null;
+
         // Returning leftover inputs is the inverse of WithdrawInputs and writes the chest directly,
         // so emit the same hand-rolled chest audio (the menu sounds never fire): "openChest" once,
         // then "dwop" per item type actually returned (staggered, since this is synchronous). Gated
         // on the player being in the chest's location so off-farm settles stay silent.
-        var chestLoc = chestWritable ? chest!.Location : null;
+        var chestLoc = chestWritable ? (grabber?.Location ?? chest!.Location) : null;
         var playerHere = chestLoc is not null && Game1.player.currentLocation == chestLoc;
-        var chestTile = chest is not null ? new Vector2(chest.TileLocation.X, chest.TileLocation.Y) : Vector2.Zero;
+        var chestTile = grabber is not null && Session.CarriedInputsChest is { } gRef
+            ? new Vector2(gRef.Tile.X, gRef.Tile.Y)
+            : chest is not null ? new Vector2(chest.TileLocation.X, chest.TileLocation.Y) : Vector2.Zero;
         var chestOpened = false;
         var returnSoundIndex = 0;
 
@@ -825,6 +842,11 @@ internal sealed partial class ShiftOrchestrator
                 }
             }
         }
+
+        // If leftovers were returned into a grabber, restore its "full" sprite (mirrors the vanilla
+        // grab; no-op for a plain chest or when the grabber ended up empty).
+        if (grabber is not null && chest is not null && !chest.isEmpty())
+            grabber.showNextIndex.Value = true;
 
         Session.CarriedInputs.Clear();
         Session.CarriedInputsChest = null;

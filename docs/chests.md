@@ -31,6 +31,33 @@ making the office porch chests Big Chests.
 - `specialChestType` is a serialized net field (`[XmlElement("specialChestType")]`,
   `AddField(specialChestType, ...)`), so the upgrade **persists** in the save once set and saved.
 
+## Auto-Grabber as an input source
+
+Confirmed against a decompile of `X:\Steam\...\Stardew Valley.dll` (`StardewValley.Object`, 2026-07-05)
+while making auto-grabbers valid machine **input** chests.
+
+- The Auto-Grabber's qualified id is **`(BC)165`** (big-craftable). It is *not* a `Chest`; it's an
+  `Object` whose **`heldObject.Value` is a `Chest`** holding the animal products it collects (wool,
+  milk, large egg, truffle, duck feather…), with real quality/flavor intact. The inner chest is
+  created on placement (`heldObject.Value = new Chest()`).
+- It is **excluded from machine processing**: `Object.minutesElapsed` guards
+  `heldObject.Value != null && QualifiedItemId != "(BC)165"` before touching `GetMachineData()`, and
+  the grabber has no `Data/Machines` entry. So `MachineReader.EnumerateMachines`
+  (`GetMachineData() is not null`) never treats it as a machine — no double-handling.
+- Sprite state: the grabber sets `showNextIndex.Value = true` when it grabs (the "full/arrow" sprite);
+  `Object.grabItemFromAutoGrabber` resets it to `false` when the inner chest empties. The worker
+  mirrors this — after draining a grabber input chest it sets `showNextIndex = false` (and back to
+  `true` if leftovers settle back), in `ShiftOrchestrator.Machines.cs`.
+- The inner Chest is a *held object* with no world `Location`/`TileLocation`, so anything that needs a
+  location/tile (deposit-style audio) must use the grabber object's own position, not the inner
+  chest's. `ChestResolver.ResolveGrabberOwner(chestRef)` returns the grabber for exactly this.
+- Wiring: `ChestResolver` treats a grabber tile as a resolvable chest (returns `heldObject.Value`) and
+  surfaces grabbers in the chest picker **only when `includeAutoGrabbers` is set** — passed solely by
+  the machine input-chest picker (`HiringFlowCoordinator.ShowMachineInputChestPicker`), never by
+  output/deposit pickers. Subject to the Manage Machines v1 same-location rule: a grabber input chest
+  only reloads machines in the *same* location (grabbers live in a coop/barn `AnimalHouse`), else the
+  group degrades to collect-only.
+
 ## Building chests (`BuildingData.Chests`)
 
 - Declared as `BuildingChest` entries (`Id`, `Type`, optional sounds/messages, `DisplayTile`,

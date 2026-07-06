@@ -579,7 +579,9 @@ internal sealed class HiringFlowCoordinator
 
     private void ShowMachineInputChestPicker(ContractDraft draft, string groupId)
     {
-        var locations = _chestResolver.BuildChestMapLocations(Game1.getFarm(), draft.Greenhouses);
+        // Auto-grabbers are valid input sources here only — a grabber's collected animal products can
+        // feed reload machines. Output/deposit pickers stay grabber-free (includeAutoGrabbers default).
+        var locations = _chestResolver.BuildChestMapLocations(Game1.getFarm(), draft.Greenhouses, includeAutoGrabbers: true);
         draft.MachinePlan.TryGetGroup(groupId, out var current);
 
         Game1.activeClickableMenu = new ZoneDrawMenu(

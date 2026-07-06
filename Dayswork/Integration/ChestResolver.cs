@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Objects;
+using SObject = StardewValley.Object;
 
 namespace Dayswork.Integration;
 
@@ -12,13 +13,21 @@ namespace Dayswork.Integration;
 // Singleton — constructed once in ModEntry. All methods query game state fresh on each call.
 internal sealed class ChestResolver
 {
+    // Auto-Grabber (verified (BC)165 against Stardew Valley.dll, 2026-07-05; see docs/chests.md).
+    // Its collected animal products live in heldObject.Value as a Chest, so a grabber can serve as a
+    // machine input chest. Confirmed against a decompile per hard rule 7.
+    internal const string AutoGrabberQualifiedId = "(BC)165";
+
     private readonly IModHelper _helper;
 
     internal ChestResolver(IModHelper helper) => _helper = helper;
 
     // Returns all accessible chests on the farm and in buildings.
     // Called once when ZoneAndChestMenu opens — never per frame.
-    internal List<ChestEntry> GetAllChests(GameLocation farm, IReadOnlyList<GreenhouseSelection>? selectedGreenhouses = null)
+    // When includeAutoGrabbers is set, placed Auto-Grabbers are surfaced too (their heldObject Chest
+    // is a valid machine input source). Only the machine input-chest picker opts in; output/deposit
+    // pickers leave it false so you can't route deposits into a grabber.
+    internal List<ChestEntry> GetAllChests(GameLocation farm, IReadOnlyList<GreenhouseSelection>? selectedGreenhouses = null, bool includeAutoGrabbers = false)
     {
         var result = new List<ChestEntry>();
         string farmGroup = I18nHelper.Get("ui.zone_chest.group_farm");
@@ -32,14 +41,19 @@ internal sealed class ChestResolver
         // Open-farm chests
         foreach (var (tile, obj) in farm.Objects.Pairs)
         {
+            var tileX = (int)tile.X;
+            var tileY = (int)tile.Y;
             if (obj is Chest chest)
             {
-                var tileX = (int)tile.X;
-                var tileY = (int)tile.Y;
                 if (ShouldExcludeSelectableFarmChest(officeInputChestTile, officeOutputChestTile, tileX, tileY))
                     continue;
                 var chestRef = new ChestRef(farm.Name, new TileCoord(tileX, tileY));
                 result.Add(new ChestEntry(chestRef, GetDisplayName(chest, farm, tileX, tileY), farmGroup));
+            }
+            else if (includeAutoGrabbers && GetGrabberInputChest(obj) is not null)
+            {
+                var chestRef = new ChestRef(farm.Name, new TileCoord(tileX, tileY));
+                result.Add(new ChestEntry(chestRef, GetGrabberDisplayName(obj), farmGroup));
             }
         }
 
@@ -54,12 +68,17 @@ internal sealed class ChestResolver
                 string buildingName = building.buildingType.Value;
                 foreach (var (tile, obj) in indoors.Objects.Pairs)
                 {
+                    var tileX = (int)tile.X;
+                    var tileY = (int)tile.Y;
                     if (obj is Chest chest)
                     {
-                        var tileX = (int)tile.X;
-                        var tileY = (int)tile.Y;
                         var chestRef = new ChestRef(indoors.NameOrUniqueName, new TileCoord(tileX, tileY));
                         result.Add(new ChestEntry(chestRef, GetDisplayName(chest, indoors, tileX, tileY), buildingName));
+                    }
+                    else if (includeAutoGrabbers && GetGrabberInputChest(obj) is not null)
+                    {
+                        var chestRef = new ChestRef(indoors.NameOrUniqueName, new TileCoord(tileX, tileY));
+                        result.Add(new ChestEntry(chestRef, GetGrabberDisplayName(obj), buildingName));
                     }
                 }
             }
@@ -88,16 +107,21 @@ internal sealed class ChestResolver
 
                 foreach (var (tile, obj) in location.Objects.Pairs)
                 {
-                    if (obj is not Chest chest)
-                        continue;
-
                     var tileX = (int)tile.X;
                     var tileY = (int)tile.Y;
-                    var chestRef = new ChestRef(location.NameOrUniqueName, new TileCoord(tileX, tileY));
-                    result.Add(new ChestEntry(
-                        chestRef,
-                        GetDisplayName(chest, location, tileX, tileY),
-                        descriptor.DisplayName));
+                    if (obj is Chest chest)
+                    {
+                        var chestRef = new ChestRef(location.NameOrUniqueName, new TileCoord(tileX, tileY));
+                        result.Add(new ChestEntry(
+                            chestRef,
+                            GetDisplayName(chest, location, tileX, tileY),
+                            descriptor.DisplayName));
+                    }
+                    else if (includeAutoGrabbers && GetGrabberInputChest(obj) is not null)
+                    {
+                        var chestRef = new ChestRef(location.NameOrUniqueName, new TileCoord(tileX, tileY));
+                        result.Add(new ChestEntry(chestRef, GetGrabberDisplayName(obj), descriptor.DisplayName));
+                    }
                 }
             }
         }
@@ -107,8 +131,8 @@ internal sealed class ChestResolver
 
     // Groups all accessible chests into one map-view location each (only locations with ≥1 chest),
     // for the map-based chest picker. DisplayName/GroupLabel come from GetAllChests.
-    internal List<ChestMapLocation> BuildChestMapLocations(GameLocation farm, IReadOnlyList<GreenhouseSelection>? selectedGreenhouses = null) =>
-        ChestMapLocation.Group(GetAllChests(farm, selectedGreenhouses));
+    internal List<ChestMapLocation> BuildChestMapLocations(GameLocation farm, IReadOnlyList<GreenhouseSelection>? selectedGreenhouses = null, bool includeAutoGrabbers = false) =>
+        ChestMapLocation.Group(GetAllChests(farm, selectedGreenhouses, includeAutoGrabbers));
 
     // Human-readable label for a stored ChestRef, used by summary screens. Resolves the live chest
     // for its name/building; if the chest was moved or destroyed, falls back to coordinates.
@@ -116,14 +140,19 @@ internal sealed class ChestResolver
     {
         var location = Game1.getLocationFromName(chestRef.LocationName);
         if (location is not null
-            && location.Objects.TryGetValue(new Vector2(chestRef.Tile.X, chestRef.Tile.Y), out var obj)
-            && obj is Chest chest)
+            && location.Objects.TryGetValue(new Vector2(chestRef.Tile.X, chestRef.Tile.Y), out var obj))
         {
-            if (!string.IsNullOrWhiteSpace(chest.Name) && chest.Name != "Chest")
-                return chest.Name;
+            if (obj is Chest chest)
+            {
+                if (!string.IsNullOrWhiteSpace(chest.Name) && chest.Name != "Chest")
+                    return chest.Name;
 
-            return I18nHelper.Get("ui.zone_chest.chest_fallback_name",
-                new { buildingName = location.Name, x = chestRef.Tile.X, y = chestRef.Tile.Y });
+                return I18nHelper.Get("ui.zone_chest.chest_fallback_name",
+                    new { buildingName = location.Name, x = chestRef.Tile.X, y = chestRef.Tile.Y });
+            }
+
+            if (GetGrabberInputChest(obj) is not null)
+                return GetGrabberDisplayName(obj);
         }
 
         return I18nHelper.Get("ui.zone_chest.chest_missing",
@@ -131,14 +160,63 @@ internal sealed class ChestResolver
     }
 
     // Resolves a stored ChestRef to a live Chest. Returns null if the chest was moved or destroyed.
+    // An Auto-Grabber resolves to its internal heldObject Chest (so it can back a machine input chest).
     internal Chest? ResolveChest(ChestRef chestRef)
     {
         var location = Game1.getLocationFromName(chestRef.LocationName);
         if (location == null) return null;
 
         var tile = new Vector2(chestRef.Tile.X, chestRef.Tile.Y);
-        return location.Objects.TryGetValue(tile, out var obj) && obj is Chest chest ? chest : null;
+        return TryResolveChestAt(location, tile, out var chest, out _) ? chest : null;
     }
+
+    // Resolves the owning Auto-Grabber object for a ChestRef, or null when the ref is a plain Chest
+    // (or missing). Callers need the grabber itself to drive its tile-based audio and reset its
+    // full/empty sprite (showNextIndex) after the worker drains it — the inner Chest is a held object
+    // with no world Location/TileLocation of its own.
+    internal SObject? ResolveGrabberOwner(ChestRef chestRef)
+    {
+        var location = Game1.getLocationFromName(chestRef.LocationName);
+        if (location == null) return null;
+
+        var tile = new Vector2(chestRef.Tile.X, chestRef.Tile.Y);
+        return TryResolveChestAt(location, tile, out _, out var grabberOwner) ? grabberOwner : null;
+    }
+
+    // One grabber-aware lookup shared by discovery, ResolveChest, and DescribeChestRef: a plain Chest
+    // resolves to itself (grabberOwner null); an Auto-Grabber resolves to its heldObject Chest with the
+    // grabber object as the owner.
+    private static bool TryResolveChestAt(GameLocation location, Vector2 tile, out Chest? chest, out SObject? grabberOwner)
+    {
+        chest = null;
+        grabberOwner = null;
+        if (!location.Objects.TryGetValue(tile, out var obj))
+            return false;
+
+        if (obj is Chest c)
+        {
+            chest = c;
+            return true;
+        }
+
+        if (GetGrabberInputChest(obj) is { } inner)
+        {
+            chest = inner;
+            grabberOwner = obj;
+            return true;
+        }
+
+        return false;
+    }
+
+    // The Auto-Grabber's collected-products Chest (heldObject.Value), or null if obj isn't a grabber
+    // or hasn't been given its inner chest yet.
+    private static Chest? GetGrabberInputChest(SObject obj) =>
+        obj.QualifiedItemId == AutoGrabberQualifiedId && obj.heldObject.Value is Chest inner ? inner : null;
+
+    // Auto-grabbers surface under the grabber's localized item name ("Auto-Grabber"); the map picker
+    // groups them under their building/location, so tile position disambiguates multiples.
+    private static string GetGrabberDisplayName(SObject grabber) => grabber.DisplayName;
 
     // Generates i18n-aware display name.
     // Uses chest.Name if set by the player; otherwise falls back to "{building} — Chest at {x}, {y}".
