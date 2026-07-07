@@ -1,7 +1,7 @@
 # Plan — Manage Fish Ponds
 
 **Status:** implemented 2026-06-23 (Core, persistence, pricing, shift plan, execution, and UI built;
-unit-tested; builds clean). **In-game smoke pass is pending** and must be run before release.
+unit-tested; builds clean). **In-game smoke pass PASSED 2026-07-07 — release-ready.**
 **Game-content reference:** [`docs/machines.md`](../machines.md) → "Fish ponds" (verified `FishPond`
 API for SDV 1.6.15).
 
@@ -94,7 +94,7 @@ at rebuild from the captured value. Both collect sites now capture it: `CollectF
 `output.Quality`; `CollectMachine` reads the collected item's quality (so **cask-aged silver/gold/
 iridium wine & cheese keep their star** — a pre-existing gap closed 2026-06-23).
 
-## v1 limitations / open verification (do in the in-game smoke pass)
+## v1 limitations / open verification — all verified in the 2026-07-07 smoke pass ✓
 
 - **Confirm direct-null collect in-world** — that nulling `pond.output.Value` cleanly clears the
   visible output bucket sprite and the produce ends up deposited (no dupe, no leftover bucket).

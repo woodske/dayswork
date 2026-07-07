@@ -170,10 +170,11 @@ pass (milestone 8) on 2026-06-28 — release-ready**: worker collect/reload, fis
 dehydrator (×5) loads, flavored-roe round-trip, filtered loads, and the **per-group fetch-first
 single-visit** workflow (worker fetches a group's inputs in one chest trip, then visits each machine
 once to collect→reload) all verified in-world. A group's **input chest may be in any location**
-(2026-07-06): a cross-location chest triggers a fetch excursion routed through the farm hub (awaits
-smoke pass). See `docs/plans/machine-management.md` for status + limitations. **Manage Fish Ponds**
-(2026-06-23, collect-only) is built and unit-tested but **awaits
-its in-game smoke pass** — see `docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
+(2026-07-06): a cross-location chest triggers a fetch excursion routed through the farm hub
+(smoke-passed 2026-07-07, along with auto-grabbers as input chests). See
+`docs/plans/machine-management.md` for status + limitations. **Manage Fish Ponds**
+(2026-06-23, collect-only) is built, unit-tested, and **passed its in-game smoke pass on
+2026-07-07 — release-ready**; see `docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
 blueberry wine, flavored honey…) end-to-end via the per-shift `FlavorItemRegistry` +
 `BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). Dev tooling (verbose logs
 + console commands like `dayswork_end_shift`, `dayswork_debug_machines`, `dayswork_debug_leaks`) is gated behind

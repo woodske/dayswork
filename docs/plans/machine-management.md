@@ -2,7 +2,9 @@
 
 **Status:** implemented 2026-06-19 (milestones 1–7 built, unit-tested, builds clean);
 **milestone 8 (in-game smoke pass) PASSED 2026-06-28** — feature is release-ready. The per-group
-fetch-first single-visit workflow (2026-06-28) was verified in the same pass.
+fetch-first single-visit workflow (2026-06-28) was verified in the same pass. The 2026-07-05
+auto-grabber-as-input-chest and 2026-07-06 cross-location input-chest additions **passed their
+in-game smoke pass 2026-07-07**.
 **Game-content reference:** [`docs/machines.md`](../machines.md) (verified `Data/Machines`
 schema + API for SDV 1.6.15).
 
@@ -64,13 +66,13 @@ build-verified and await the in-game smoke pass per AGENTS.md):
   degrades that group to collect-only and returns the worker to the machines (inputs never lost). See
   `ShiftOrchestrator.Machines.cs` (`AdvanceMachineReload` / `OnMachineFetchEntryArrived` /
   `OnMachineFetchReturnArrived` / `TryAdvanceFetchHop`) + the `MachineFetchEntry`/`MachineFetchReturn`
-  travel purposes. *Awaits in-game smoke pass.*
+  travel purposes. ✓ Smoke pass PASSED 2026-07-07.
 - **Auto-Grabbers are valid input chests (2026-07-05).** A grabber (`(BC)165`) surfaces in the input-
   chest picker; its `heldObject` Chest of collected animal products (wool/milk/egg/truffle) feeds
   reload machines. Grabbers live in a coop/barn `AnimalHouse`; with cross-location fetch (above) the
   reload machines may now be anywhere — the worker makes the excursion into the building to withdraw.
   See `docs/chests.md` → "Auto-Grabber as an input source". Grabbers stay out of output/deposit
-  pickers. *Awaits in-game smoke pass.*
+  pickers. ✓ Smoke pass PASSED 2026-07-07.
 - **Collect via `checkForAction`** credits the buffer only if the machine actually released its
   output (duplication-safe). ✓ Verified in-world: the fake worker `Farmer` cleanly collects.
 - **Load via `PlaceInMachine(probe:false)`** with the carry buffer populated on a fake `Farmer`.
