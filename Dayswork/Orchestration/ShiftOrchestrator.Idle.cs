@@ -174,8 +174,8 @@ internal sealed partial class ShiftOrchestrator
 
     /// <summary>
     /// True when at least one managed machine can be serviced right now: a machine with output to
-    /// collect, or (for reload groups) an empty reloadable machine whose same-location input chest
-    /// actually holds a loadable recipe. Delegates to the shared per-location probe
+    /// collect, or (for reload groups) an empty reloadable machine whose input chest — in any
+    /// location — actually holds a loadable recipe. Delegates to the shared per-location probe
     /// (<see cref="GroupHasReadyMachineWork"/>, which mirrors <see cref="PlanMachineGroup"/>) so the
     /// wait never wakes up for work that the servicing pass would then find nothing to do.
     /// </summary>

@@ -15,8 +15,10 @@ batch (one per location) services its groups **one at a time, as a full collect�
 group** (not all collects across every group followed by all reloads). Within a collect-and-reload
 group the worker **fetches the group's inputs from its chest first (one trip), then visits each
 machine exactly once** — collecting its ready output and immediately reloading the now-empty machine
-— before moving on to the next group. Collect-only groups skip the chest trip. Fish ponds are a
-separate, later phase (they are **buildings**, not `Data/Machines` objects — see end).
+— before moving on to the next group. The input chest may be in **any** location: when it is not in
+the machines' location the fetch is a cross-location **excursion** routed through the farm hub (walk
+out to the chest, withdraw, walk back), 2026-07-06. Collect-only groups skip the chest trip. Fish
+ponds are a separate, later phase (they are **buildings**, not `Data/Machines` objects — see end).
 
 ## What a machine is
 

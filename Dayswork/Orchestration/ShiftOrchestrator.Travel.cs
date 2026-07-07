@@ -20,6 +20,8 @@ internal enum TravelPurpose
     ShoppingStep,    // managed shopping; sub-dispatched on the shopping phase
     ExitForDeposit,  // leave a building interior before beginning the deposit run
     IdleReturn,      // back to the office door to park between idle-loop machine rounds
+    MachineFetchEntry,  // out to a cross-location machine input chest (farm-hub hop)
+    MachineFetchReturn, // back to the machines after withdrawing inputs (farm-hub hop)
 }
 
 internal sealed partial class ShiftOrchestrator
@@ -106,6 +108,12 @@ internal sealed partial class ShiftOrchestrator
             case TravelPurpose.IdleReturn:
                 OnIdleReturnArrived();
                 break;
+            case TravelPurpose.MachineFetchEntry:
+                OnMachineFetchEntryArrived();
+                break;
+            case TravelPurpose.MachineFetchReturn:
+                OnMachineFetchReturnArrived();
+                break;
         }
     }
 
@@ -126,6 +134,14 @@ internal sealed partial class ShiftOrchestrator
                 break;
             case TravelPurpose.ShoppingStep:
                 Session.Shopping.AbortTripForNavigationFailure();
+                break;
+            case TravelPurpose.MachineFetchEntry:
+                // Couldn't reach the input chest's location — head back to the machines, collect-only.
+                StartMachineReturnExcursion();
+                break;
+            case TravelPurpose.MachineFetchReturn:
+                // Couldn't get all the way back — work from here; steps skip machines that don't resolve.
+                StartNextMachineStep();
                 break;
         }
     }

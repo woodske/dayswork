@@ -169,9 +169,10 @@ compatibility. **Manage Machines** (2026-06-19) is built, unit-tested, and **pas
 pass (milestone 8) on 2026-06-28 — release-ready**: worker collect/reload, fish-smoker (fish+coal) and
 dehydrator (×5) loads, flavored-roe round-trip, filtered loads, and the **per-group fetch-first
 single-visit** workflow (worker fetches a group's inputs in one chest trip, then visits each machine
-once to collect→reload) all verified in-world. See `docs/plans/machine-management.md` for status + v1
-limitations (notably: a group's input chest must be in the same location as its machines, else
-collect-only). **Manage Fish Ponds** (2026-06-23, collect-only) is built and unit-tested but **awaits
+once to collect→reload) all verified in-world. A group's **input chest may be in any location**
+(2026-07-06): a cross-location chest triggers a fetch excursion routed through the farm hub (awaits
+smoke pass). See `docs/plans/machine-management.md` for status + limitations. **Manage Fish Ponds**
+(2026-06-23, collect-only) is built and unit-tested but **awaits
 its in-game smoke pass** — see `docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
 blueberry wine, flavored honey…) end-to-end via the per-shift `FlavorItemRegistry` +
 `BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). Dev tooling (verbose logs

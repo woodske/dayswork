@@ -150,12 +150,21 @@ internal sealed partial class ShiftOrchestrator
             {
                 if (Session.MachineFetchPending)
                 {
-                    // Couldn't reach the input chest — fall back to collecting this group only. Its
-                    // collect→reload steps are already queued; the loads no-op with an empty carry
-                    // buffer, so nothing is withdrawn or lost.
+                    // Couldn't reach the input chest tile — collect this group only. Its collect→reload
+                    // steps are already queued; the loads no-op with an empty carry buffer, so nothing is
+                    // withdrawn or lost.
                     Session.MachineFetchPending = false;
-                    Session.CurrentMachineReload = null;
-                    StartNextMachineStep();
+                    if (Session.CurrentMachineReload is { } fetchJob
+                        && !string.Equals(fetchJob.Chest.LocationName, Session.MachineBatchLocationName, StringComparison.Ordinal))
+                    {
+                        // Walked out to a cross-location chest — return to the machines before collecting.
+                        StartMachineReturnExcursion();
+                    }
+                    else
+                    {
+                        Session.CurrentMachineReload = null;
+                        StartNextMachineStep();
+                    }
                     return;
                 }
 

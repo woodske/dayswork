@@ -54,16 +54,23 @@ build-verified and await the in-game smoke pass per AGENTS.md):
   carried inputs settled back to chest/overflow on stop (items never lost).
 
 **v1 limitations / M8 verification (smoke pass PASSED 2026-06-28):**
-- **Input chest must be in the same location as the machines.** A cross-location input chest makes
-  that group collect-only for that location (dev log) — inputs are never touched/lost. Full
-  cross-location fetch trips are a follow-up (see `ManagedShoppingCoordinator` for the pattern).
-  *(Remains a v1 design limit, not a bug — collect-only degrade verified in-game.)*
+- **Input chest in any location (2026-07-06).** The former "same location as the machines" limit is
+  lifted. When a group's input chest is in a different location than its machines, the per-group fetch
+  becomes a cross-location **excursion** routed through the farm hub via the Travel system (like a
+  deposit trip): the worker walks out to the chest's location, withdraws into the carry buffer, walks
+  back to the machines, then collects+reloads. Building↔building routes X→farm→Y (buildings connect
+  only via the farm); expansion locations route through `TryStartExpansionTravel`. Every hop uses
+  `TravelFailurePolicy.WarpToDestination` (never stranded); an unreachable/missing/busy chest still
+  degrades that group to collect-only and returns the worker to the machines (inputs never lost). See
+  `ShiftOrchestrator.Machines.cs` (`AdvanceMachineReload` / `OnMachineFetchEntryArrived` /
+  `OnMachineFetchReturnArrived` / `TryAdvanceFetchHop`) + the `MachineFetchEntry`/`MachineFetchReturn`
+  travel purposes. *Awaits in-game smoke pass.*
 - **Auto-Grabbers are valid input chests (2026-07-05).** A grabber (`(BC)165`) surfaces in the input-
   chest picker; its `heldObject` Chest of collected animal products (wool/milk/egg/truffle) feeds
-  reload machines. Because grabbers live in a coop/barn `AnimalHouse`, the same-location rule means
-  the reload machines must be in that same building (else collect-only). See `docs/chests.md` →
-  "Auto-Grabber as an input source". Grabbers stay out of output/deposit pickers. *Awaits in-game
-  smoke pass.*
+  reload machines. Grabbers live in a coop/barn `AnimalHouse`; with cross-location fetch (above) the
+  reload machines may now be anywhere — the worker makes the excursion into the building to withdraw.
+  See `docs/chests.md` → "Auto-Grabber as an input source". Grabbers stay out of output/deposit
+  pickers. *Awaits in-game smoke pass.*
 - **Collect via `checkForAction`** credits the buffer only if the machine actually released its
   output (duplication-safe). ✓ Verified in-world: the fake worker `Farmer` cleanly collects.
 - **Load via `PlaceInMachine(probe:false)`** with the carry buffer populated on a fake `Farmer`.
@@ -311,4 +318,4 @@ so no special off-screen animation handling (contrast with `Debris` tree-fall pu
 - Retrofit managed-crop seed consumption to physical fetch trips (make crops symmetric with
   machines) — deliberately deferred to avoid bloating this feature.
 - Cask phase; fish-pond phase.
-- Auto-buy machine inputs; carry-capacity realism cap; per-location input chests.
+- Auto-buy machine inputs; carry-capacity realism cap.

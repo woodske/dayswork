@@ -21,9 +21,10 @@ namespace Dayswork.Orchestration;
 /// the deposit buffer and immediately reloading the now-empty machine — before advancing to the next
 /// group. Collect-only groups skip the chest trip. Mirrors the managed-crop batch lifecycle.
 ///
-/// v1 scope: the input fetch is a within-location walk. A group whose input chest is in a different
-/// location than its machines is serviced collect-only for that location (a HUD/dev note), so the
-/// inputs are never touched and never lost — full cross-location fetch trips are a follow-up.
+/// The input chest may live in any location. When it is not in the batch location, the fetch is a
+/// cross-location excursion routed through the farm hub via the Travel system (exactly like a deposit
+/// trip): the worker walks out to the chest's location, withdraws into the carry buffer, walks back to
+/// the machines, then collects+reloads. Inputs are never touched off-plan and never lost (hard rule 4).
 /// </summary>
 internal sealed partial class ShiftOrchestrator
 {
@@ -207,10 +208,11 @@ internal sealed partial class ShiftOrchestrator
     }
 
     /// <summary>
-    /// Builds the load plan for one group's reloadable machines: validates the input chest is usable
-    /// and same-location, probes each reloadable machine for a recipe it accepts against the chest
-    /// supply, and plans withdrawals + assignments. Returns <c>(null, null)</c> for collect-only
-    /// groups, a cross-location chest, or when nothing loadable was found.
+    /// Builds the load plan for one group's reloadable machines: validates the input chest is usable,
+    /// probes each reloadable machine for a recipe it accepts against the chest supply, and plans
+    /// withdrawals + assignments. The chest may be in any location — supply is read globally and the
+    /// fetch walk is cross-location aware (see <see cref="AdvanceMachineReload"/>). Returns
+    /// <c>(null, null)</c> for collect-only groups or when nothing loadable was found.
     /// </summary>
     private (MachineLoadPlan? Plan, ChestRef? Chest) BuildGroupLoadPlan(
         MachineGroup group,
@@ -219,15 +221,6 @@ internal sealed partial class ShiftOrchestrator
     {
         if (group.Mode != MachineGroupMode.CollectAndReload || group.InputChest is not { } chestRef || reloadable.Count == 0)
             return (null, null);
-
-        if (!string.Equals(chestRef.LocationName, location.NameOrUniqueName, StringComparison.Ordinal))
-        {
-            // v1: physical fetch is within-location only; a chest elsewhere ⇒ collect-only here.
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][machines] group '{group.Id}' input chest is in '{chestRef.LocationName}', not '{location.NameOrUniqueName}'; reload skipped this location (collect-only).",
-                DevLog.WarnLevel);
-            return (null, null);
-        }
 
         var supply = ReadChestSupply(chestRef, out var samples);
         var probeFarmer = CreateWorkerActionFarmer(reloadable[0].Ref.Tile, location);
@@ -281,8 +274,8 @@ internal sealed partial class ShiftOrchestrator
 
     /// <summary>
     /// Read-only "is anything serviceable here" probe for one group at one location: a machine with
-    /// output to collect, or (reload groups) an empty reloadable machine whose same-location input
-    /// chest actually holds a loadable recipe. Mirrors <see cref="PlanMachineGroup"/> (which builds the
+    /// output to collect, or (reload groups) an empty reloadable machine whose input chest — in any
+    /// location — actually holds a loadable recipe. Mirrors <see cref="PlanMachineGroup"/> (which builds the
     /// real steps) so the entry guard and the idle-wait probe never disagree with what the batch will
     /// then find to do. Shared by <see cref="MachineBatchHasReadyWork"/> and
     /// <see cref="AnyManagedMachineReady"/>.
@@ -311,10 +304,6 @@ internal sealed partial class ShiftOrchestrator
         if (group.Mode != MachineGroupMode.CollectAndReload
             || group.InputChest is not { } chestRef
             || reloadable.Count == 0)
-            return false;
-
-        // v1: reload fetch is within-location only — a chest elsewhere is collect-only.
-        if (!string.Equals(chestRef.LocationName, location.NameOrUniqueName, StringComparison.Ordinal))
             return false;
 
         var supply = ReadChestSupply(chestRef, out var samples);
@@ -398,15 +387,51 @@ internal sealed partial class ShiftOrchestrator
         var job = Session.MachineReloads.Dequeue();
         Session.CurrentMachineReload = job;
 
+        // Input chest in another location → walk out to it (farm-hub routing), withdraw, walk back.
+        // The within-location chest walk resumes in OnMachineFetchEntryArrived once the worker arrives.
+        if (!string.Equals(job.Chest.LocationName, Session.MachineBatchLocationName, StringComparison.Ordinal))
+        {
+            if (TryAdvanceFetchHop(job.Chest.LocationName, TravelPurpose.MachineFetchEntry))
+                return;
+
+            // No route out to the chest's location — collect this group only (loads no-op vs empty buffer).
+            DevLog.Log($"[Dayswork][machines] no route to input chest in '{job.Chest.LocationName}'; collecting this group only.", DevLog.WarnLevel);
+            Session.CurrentMachineReload = null;
+            StartNextMachineStep();
+            return;
+        }
+
         var location = Session.CurrentLocation ?? ResolveMachineBatchLocation(Session.MachineBatchLocationName) ?? Game1.getFarm();
-        if (!ShiftOrchestrator.TrySelectChestDepositStandTile(job.Chest.Tile, location, Session.Worker, out var standTile))
+        StartInputChestWithdrawWalk(job, location);
+    }
+
+    /// <summary>
+    /// Walks the worker (already in <paramref name="chestLocation"/>) to the input chest's stand tile
+    /// to withdraw. If the chest can't be reached, the group degrades to collect-only — heading back to
+    /// the machines first when the chest was in another location so the queued collect steps still land.
+    /// </summary>
+    private void StartInputChestWithdrawWalk(MachineReloadJob job, GameLocation chestLocation)
+    {
+        if (_session is null || Session.Worker is null)
+            return;
+
+        if (!ShiftOrchestrator.TrySelectChestDepositStandTile(job.Chest.Tile, chestLocation, Session.Worker, out var standTile))
         {
             // Can't reach the input chest — fall back to collecting this group only. Its collect→reload
             // steps are already queued; the loads no-op against an empty carry buffer, so nothing is
             // withdrawn or lost. (StartNextMachineStep → AdvanceMachineReload advances to the next group.)
             DevLog.Log($"[Dayswork][machines] cannot reach input chest ({job.Chest.Tile.X},{job.Chest.Tile.Y}); collecting this group only.", DevLog.WarnLevel);
-            Session.CurrentMachineReload = null;
-            StartNextMachineStep();
+            Session.MachineFetchPending = false;
+            if (!string.Equals(job.Chest.LocationName, Session.MachineBatchLocationName, StringComparison.Ordinal))
+            {
+                // Walked out to reach it — return to the machines' location before collecting.
+                StartMachineReturnExcursion();
+            }
+            else
+            {
+                Session.CurrentMachineReload = null;
+                StartNextMachineStep();
+            }
             return;
         }
 
@@ -414,7 +439,7 @@ internal sealed partial class ShiftOrchestrator
         Session.PendingNavTile = standTile;
         Session.PendingTaskTile = job.Chest.Tile;
         EnsureWorkingIntent(new IntentMoveToTile(standTile));
-        _nav.StartNavigation(standTile, location, Session.Worker);
+        _nav.StartNavigation(standTile, chestLocation, Session.Worker);
     }
 
     private void OnMachineFetchArrived()
@@ -432,10 +457,147 @@ internal sealed partial class ShiftOrchestrator
 
         WithdrawInputs(job);
 
-        // The collect→reload steps for this group are already queued (interleaved per machine in
-        // PlanMachineGroup); the fetch only had to fill the carry buffer. Drain them now — each
-        // machine is collected and then reloaded in a single visit.
+        // If the chest was in another location, walk back to the machines before collect/reload;
+        // otherwise the queued (interleaved per-machine) collect→reload steps are already here — drain
+        // them now, each machine collected and then reloaded in a single visit.
+        if (!string.Equals(job.Chest.LocationName, Session.MachineBatchLocationName, StringComparison.Ordinal))
+            StartMachineReturnExcursion();
+        else
+            StartNextMachineStep();
+    }
+
+    /// <summary>
+    /// A cross-location fetch travel leg toward the input chest arrived. When the worker has reached the
+    /// chest's location, start the within-location withdraw walk; otherwise advance the next hop
+    /// (buildings/expansions route through the farm, e.g. building X → farm → chest building Y).
+    /// </summary>
+    private void OnMachineFetchEntryArrived()
+    {
+        if (_session is null || Session.Worker is null)
+            return;
+
+        if (ShouldWrapUpBeforeNextUnit())
+        {
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            return;
+        }
+
+        var job = Session.CurrentMachineReload;
+        if (job is null)
+        {
+            StartNextMachineStep();
+            return;
+        }
+
+        var here = Session.Worker.currentLocation;
+        if (here is not null && string.Equals(here.NameOrUniqueName, job.Chest.LocationName, StringComparison.Ordinal))
+        {
+            StartInputChestWithdrawWalk(job, here);
+            return;
+        }
+
+        // Not there yet — continue toward the chest's location. If no further hop can be built, bail
+        // back to the machines (collect-only) so the worker isn't stranded off-batch.
+        if (!TryAdvanceFetchHop(job.Chest.LocationName, TravelPurpose.MachineFetchEntry))
+            StartMachineReturnExcursion();
+    }
+
+    /// <summary>
+    /// A cross-location fetch travel leg back toward the machines arrived. When the worker is back in
+    /// the batch location, drain the collect→reload steps; otherwise advance the next return hop.
+    /// </summary>
+    private void OnMachineFetchReturnArrived()
+    {
+        if (_session is null || Session.Worker is null)
+            return;
+
+        if (ShouldWrapUpBeforeNextUnit())
+        {
+            QueueWrapUpNow(Session.Ctx.PendingStopReason ?? ShiftStopReason.Exhausted);
+            return;
+        }
+
+        var here = Session.Worker.currentLocation;
+        if (here is not null
+            && !string.Equals(here.NameOrUniqueName, Session.MachineBatchLocationName, StringComparison.Ordinal)
+            && TryAdvanceFetchHop(Session.MachineBatchLocationName, TravelPurpose.MachineFetchReturn))
+            return;
+
         StartNextMachineStep();
+    }
+
+    /// <summary>Starts the walk back to the batch (machines') location; if already there, collects now.</summary>
+    private void StartMachineReturnExcursion()
+    {
+        if (_session is null)
+            return;
+
+        Session.MachineFetchPending = false;
+        if (!TryAdvanceFetchHop(Session.MachineBatchLocationName, TravelPurpose.MachineFetchReturn))
+            StartNextMachineStep();
+    }
+
+    /// <summary>
+    /// Advances the worker one hop toward <paramref name="targetLocationName"/> using the Travel system,
+    /// routing cross-location trips through the farm hub (farm buildings and expansions connect via the
+    /// farm). Returns true when a travel leg was started (the matching arrival handler re-enters this to
+    /// continue); false when the worker is already at the target or no route could be built.
+    /// </summary>
+    private bool TryAdvanceFetchHop(string targetLocationName, TravelPurpose purpose)
+    {
+        if (Session.Worker is null)
+            return false;
+
+        var farm = Game1.getFarm();
+        var here = Session.Worker.currentLocation ?? Session.CurrentLocation ?? farm;
+        var hereName = here.NameOrUniqueName;
+        if (string.Equals(hereName, targetLocationName, StringComparison.Ordinal))
+            return false;
+
+        var compat = ModEntry.ExpansionCompat;
+        var hereIsFarm = here == farm || string.Equals(hereName, farm.NameOrUniqueName, StringComparison.Ordinal);
+        var hereIsExpansion = compat is not null && compat.TryGetExpansionLocationDescriptor(hereName, out _);
+        var targetIsFarm = string.Equals(targetLocationName, "Farm", StringComparison.Ordinal)
+            || string.Equals(targetLocationName, farm.NameOrUniqueName, StringComparison.Ordinal);
+        var targetIsExpansion = compat is not null && compat.TryGetExpansionLocationDescriptor(targetLocationName, out _);
+
+        // In a farm building interior → step out to the farm first; the next hop continues from there.
+        if (!hereIsFarm && !hereIsExpansion)
+        {
+            var farmArrival = _buildingNavigator.TryResolveDoorTile(hereName, out var outdoorDoor, out _)
+                ? outdoorDoor
+                : Session.FarmExitTile;
+            StartTravel(BuildBuildingExitPlan(here, farmArrival), purpose);
+            return true;
+        }
+
+        // In an expansion → route back to the farm hub first (the next hop leaves from the farm).
+        if (hereIsExpansion)
+            return TryStartExpansionTravel(
+                hereName, "Farm",
+                Dayswork.Core.Compat.ExpansionRoutePurpose.ReturnToFarm,
+                TravelFailurePolicy.WarpToDestination, purpose);
+
+        // On the farm → into the target building or expansion (a farm target needs no hop).
+        if (targetIsExpansion)
+        {
+            // Entry-side purpose visits a chest (deposit-style); return-side re-enters the work location.
+            var toExpansion = purpose == TravelPurpose.MachineFetchReturn
+                ? Dayswork.Core.Compat.ExpansionRoutePurpose.WorkEntry
+                : Dayswork.Core.Compat.ExpansionRoutePurpose.DepositEntry;
+            return TryStartExpansionTravel(
+                "Farm", targetLocationName, toExpansion,
+                TravelFailurePolicy.WarpToDestination, purpose);
+        }
+
+        if (!targetIsFarm
+            && TryBuildBuildingEntryPlan(targetLocationName, TravelFailurePolicy.WarpToDestination, out var plan))
+        {
+            StartTravel(plan, purpose);
+            return true;
+        }
+
+        return false;
     }
 
     private void HandleMachineAction(IntentPerformMachineAction intent, GameLocation location)
