@@ -9,11 +9,14 @@ namespace Dayswork.Tests.Inventory;
 
 public sealed class DepositPlannerTests
 {
-    private static readonly TileCoord BinTile = new(71, 13);
-    private static readonly TileCoord Start   = new(0, 0);
+    // Farm-space stops for the ordering seam. Manhattan ignores location, so these tile-only tests
+    // exercise exactly the pre-#6 behaviour (same-location regression); cross-location ordering is
+    // covered in CrossLocationDepositOrderingTests.
+    private static readonly DepositStop BinTile = new("Farm", new TileCoord(71, 13));
+    private static readonly DepositStop Start   = new("Farm", new TileCoord(0, 0));
 
-    private static int Manhattan(TileCoord a, TileCoord b) =>
-        Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
+    private static int Manhattan(DepositStop a, DepositStop b) =>
+        Math.Abs(a.Tile.X - b.Tile.X) + Math.Abs(a.Tile.Y - b.Tile.Y);
 
     private static DestinationKey Resolve(
         TaskKind task, IReadOnlyDictionary<TaskKind, DestinationKey> assignments) =>
@@ -149,7 +152,7 @@ public sealed class DepositPlannerTests
             [TaskKind.ClearRocks] = new ChestDestination(near),
         };
 
-        var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, new TileCoord(0, 0), Manhattan);
+        var plan = new DepositPlanner().Plan(snapshot, assignments, BinTile, Start, Manhattan);
 
         Assert.Equal(2, plan.Trips.Count);
         Assert.Equal(near.Tile, plan.Trips[0].Tile);
@@ -180,7 +183,7 @@ public sealed class DepositPlannerTests
         };
         var binTile = new TileCoord(12, 34);
 
-        var plan = new DepositPlanner().Plan(snapshot, assignments, binTile, Start, Manhattan);
+        var plan = new DepositPlanner().Plan(snapshot, assignments, new DepositStop("Farm", binTile), Start, Manhattan);
 
         var trip = Assert.Single(plan.Trips);
         Assert.IsType<ShippingBinDestination>(trip.Destination);

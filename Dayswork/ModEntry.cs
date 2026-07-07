@@ -125,6 +125,13 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.DayStarted   += (_, _) => HiringBuilding.WorkCompletedToday = false;
         helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;
         helper.Events.GameLoop.TimeChanged  += orchestrator.OnTimeChanged;
+        // Keep the per-shift passability cache in step with world changes (all no-op when no shift
+        // is active). Worker-cleared resource clumps have no event and are invalidated at the clear
+        // site; everything else rides these.
+        helper.Events.World.ObjectListChanged         += orchestrator.OnObjectListChanged;
+        helper.Events.World.TerrainFeatureListChanged += orchestrator.OnTerrainFeatureListChanged;
+        helper.Events.World.FurnitureListChanged      += orchestrator.OnFurnitureListChanged;
+        helper.Events.World.BuildingListChanged       += orchestrator.OnBuildingListChanged;
         helper.Events.Content.AssetRequested += OnAssetRequested;
         helper.Events.Input.ButtonPressed += buildingInteraction.OnButtonPressed;
         // Evening lit-windows + chimney smoke once the worker has finished for the day.

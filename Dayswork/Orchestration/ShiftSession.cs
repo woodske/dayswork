@@ -51,8 +51,21 @@ internal sealed class ShiftSession
     public readonly TileCoord FarmExitTile;
     public readonly TaskPriorityOrderer PriorityOrderer;
 
+    /// <summary>
+    /// Travel anchors for within-category nearest-neighbor batch ordering, resolved once at shift
+    /// start. Reused when the idle loop re-plans machine batches so their order stays consistent.
+    /// </summary>
+    public BatchOrderingContext? BatchOrdering;
+
     /// <summary>Replaced (with the post-teleport threshold) after the first stuck recovery.</summary>
     public StuckDetector Stuck;
+
+    /// <summary>
+    /// Per-shift passability cache backing route-cost selection. First query per location builds
+    /// the grid; later queries reuse it. A fresh session is the reset. See
+    /// <see cref="LocationPassabilityCache"/> for the staleness/invalidation contract.
+    /// </summary>
+    public readonly LocationPassabilityCache Passability = new();
 
     // ── Tick / pacing ────────────────────────────────────────────────────────
     public int TickCount;

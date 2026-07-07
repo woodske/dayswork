@@ -1,8 +1,27 @@
 # Plan — Cross-location deposit trip ordering
 
-**Status:** proposed 2026-07-07, not started. Item #6 in
-[architecture-review-index.md](architecture-review-index.md). Small, independent, pure-Core; can
-slot in anywhere.
+**Status:** **built + unit-tested 2026-07-07.** Item #6 in
+[architecture-review-index.md](architecture-review-index.md). Small, independent, pure-Core.
+
+## What was built (2026-07-07)
+
+- Core `DepositStop(string LocationName, TileCoord Tile)`; `DepositPlanner.Plan`'s seam changed from
+  `TileCoord workerStart` + `Func<TileCoord,TileCoord,int>` to `DepositStop` + `Func<DepositStop,
+  DepositStop,int>` (shipping-bin param likewise a `DepositStop`). Each trip's stop is built from its
+  `ChestRef.LocationName` (`StopFor`); shipping-bin and worker-start are farm-space by construction.
+  `OrderNearestNeighbor` chains over stops — same greedy algorithm, unchanged tie-break.
+- Orchestrator metric `DepositStopDistance` (`ShiftOrchestrator.Deposit.cs`): same-location =
+  Manhattan; cross-location = `hops * 10_000 + Manhattan(door tiles)` where the farm-side door tile
+  comes from `BuildingLocationResolver.TryResolve` (farm ↔ interior = 1 hop, interior ↔ interior = 2).
+  Unresolvable locations sort last via a large sentinel (the intended degradation for expansions
+  without a farm warp). `K = 10_000` dwarfs any intra-location Manhattan, so same-location chests
+  always group and there's no farm→interior→farm zig-zag.
+- Tests: `Dayswork.Tests/Inventory/CrossLocationDepositOrderingTests.cs` (no-zig-zag, same-interior
+  chests consecutive, determinism under permuted input); existing `DepositPlannerTests` retargeted to
+  the new seam (Manhattan ignores location ⇒ same-location regression preserved).
+
+The open question (force same-building chests adjacent) is answered by the `K` hop cost — verified by
+the "two chests in same interior are visited consecutively" test.
 
 ## Problem
 

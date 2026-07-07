@@ -11,12 +11,15 @@ using Dayswork.Core.Geometry;
 /// </summary>
 public static class ManagedActionSweep
 {
-    public static List<TileAction> Order(IReadOnlyList<TileAction> actions, TileCoord? start = null)
+    public static List<TileAction> Order(
+        IReadOnlyList<TileAction> actions,
+        TileCoord? start = null,
+        Func<TileCoord, bool>? passable = null)
     {
         if (actions.Count <= 1)
             return actions.ToList();
 
-        var sweep = SerpentineSweep.Rank(actions.Select(action => action.Tile), start);
+        var sweep = SerpentineSweep.Rank(actions.Select(action => action.Tile), start, passable);
         return actions
             .OrderBy(action => sweep[action.Tile])
             .ThenBy(action => ManagedCropShiftPlan.ActionRank(action.Kind))

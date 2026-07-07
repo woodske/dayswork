@@ -478,7 +478,7 @@ internal sealed class DepositTripRunner
         if (_session.Worker is null)
             return;
 
-        if (ShiftOrchestrator.TrySelectChestDepositStandTile(chestDest.Ref.Tile, location, _session.Worker, out var standTile))
+        if (ShiftOrchestrator.TrySelectChestDepositStandTile(chestDest.Ref.Tile, location, _session.Worker, _session.Passability, out var standTile))
         {
             _nav.StartNavigation(standTile, location, _session.Worker);
             return;

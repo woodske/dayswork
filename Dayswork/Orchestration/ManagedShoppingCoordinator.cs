@@ -593,7 +593,7 @@ internal sealed class ManagedShoppingCoordinator
         }
 
         if (HiringBuilding.TryGetInputChestTile(farm) is not { } chestPoint ||
-            !ShiftOrchestrator.TrySelectChestDepositStandTile(new TileCoord(chestPoint.X, chestPoint.Y), farm, _session.Worker, out var standTile))
+            !ShiftOrchestrator.TrySelectChestDepositStandTile(new TileCoord(chestPoint.X, chestPoint.Y), farm, _session.Worker, _session.Passability, out var standTile))
         {
             SettleCarriedItems(showHud: true);
             CompleteReturn();
@@ -911,7 +911,7 @@ internal sealed class ManagedShoppingCoordinator
                 edge => edge.ApproachTile);
 
         var source = new TileCoord(_session.Worker.TilePoint.X, _session.Worker.TilePoint.Y);
-        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
+        var routeCosts = _session.Passability.RouteCostsFrom(source, location);
         return OrderWarpEdgesByRoutePriority(
             edges,
             edge => routeCosts.TryGetValue(edge.ApproachTile, out var cost) ? cost : int.MaxValue,
@@ -952,7 +952,7 @@ internal sealed class ManagedShoppingCoordinator
         if (_session.Worker is not null)
         {
             var source = new TileCoord(_session.Worker.TilePoint.X, _session.Worker.TilePoint.Y);
-            var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, interior);
+            var routeCosts = _session.Passability.RouteCostsFrom(source, interior);
             if (WorkerRouteSelector.TrySelectNearestReachableTile(
                     FindShopStandCandidates(interior, store),
                     routeCosts,

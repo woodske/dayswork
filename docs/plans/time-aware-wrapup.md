@@ -1,9 +1,33 @@
 # Plan — Time-aware wrap-up (don't start far work near the cap)
 
-**Status:** proposed 2026-07-07, not started. Item #5 in
+**Status:** **Phase 0 (measure-only) built + unit-tested 2026-07-07.** The live skip-gate is
+deliberately *not* enabled — it awaits headroom calibration from real play (see below). Item #5 in
 [architecture-review-index.md](architecture-review-index.md). Sequence after
 [work-activity-abstraction.md](work-activity-abstraction.md) — both touch the same dispatch/gate
-code. The measurement phase (DevLog only) can start any time.
+code.
+
+## What was built (2026-07-07)
+
+- Core `ShiftClockEstimator` (pure): `EstimateWalkMinutes(tiles, walkPixelsPerTick)`,
+  `AddInGameMinutes`, `FitsBeforeCap`. Conversion constants **verified against the decompile** (700
+  real ms/in-game-minute; ~42 ticks/minute at MonoGame's 60 UPS) and recorded in
+  `docs/time-and-pacing.md`. Rounds pessimistically; location slow-down ignored (safe direction).
+- `ShiftStopReason.DayEndingSoon` added (distinct from `HardCap`) for when the live gate eventually
+  fires — no exhaustive switch consumes the enum, so the addition is inert until used.
+- Unit tests: `Dayswork.Tests/Shifts/ShiftClockEstimatorTests.cs` (conversion, ceil, hour rollover,
+  early/late/degenerate/boundary fit cases).
+- **Phase 0 measurement wired:** `ShiftOrchestrator.MeasureWrapUpFit` logs a
+  `[Dayswork][wrapup-measure]` line at every `WorkEntry` travel start — estimate + would-skip
+  decision — using the passability cache for the outbound leg and Manhattan for the homebound leg.
+  Gated by `DevLog.Enabled` (absent from release) and **behavior-neutral** (never skips).
+
+## Remaining before the gate goes live (needs in-game play)
+
+1. Collect a play-day or two of `[Dayswork][wrapup-measure]` lines; confirm `would-skip` fires only
+   for genuinely-doomed late trips (not at 6pm).
+2. Calibrate `WrapUpWorkHeadroomMinutes` (provisional 10) from that data.
+3. Replace the measurement log with the real gate: when `!fits`, `QueueWrapUpNow(DayEndingSoon)` at
+   the `WorkEntry` point (and the idle-loop re-entry point), plus the HUD/stop-reason surfacing.
 
 ## Problem
 

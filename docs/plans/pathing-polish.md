@@ -1,9 +1,37 @@
 # Plan — Pathing polish (gates, sweep segments, string-pulling)
 
-**Status:** proposed 2026-07-07, not started. Item #7 in
+**Status (2026-07-07):** (a) **built** (in-game smoke pass recommended); (b) **built + unit-tested**;
+(c) **deferred by its own condition** (see below). Item #7 in
 [architecture-review-index.md](architecture-review-index.md). Three independent sub-items;
 (a) has no dependencies and fixes a small real behavior bug, (b) and (c) need the passability
 grid from [core-pathfinding-and-passability-cache.md](core-pathfinding-and-passability-cache.md).
+
+## What was built (2026-07-07)
+
+- **(a) Gates — built.** `WorkerMovementDriver` no longer bulk-opens route gates at plan time. It
+  records the route's openable gate tiles (`RecordRouteGates`), opens each lazily as it becomes the
+  next waypoint (`OpenGateIfApproaching`), tracks the gates it opened (`_openedGates`), and closes
+  every tracked gate it hasn't walked through on `Clear()` / navigation completion / `WarpWorker`
+  (`CloseTrackedGates`, excluding the worker's own tile). Close-behind on waypoint pass is preserved.
+  `toggleGate` occupant behavior verified via `docs/fences-and-gates.md` (NPC worker isn't
+  collision-blocked; safe). Fixes the leaked-open-gate bug. In-game smoke pass (interrupt a fenced
+  route mid-walk, confirm no gate left open on/off-screen) still recommended.
+- **(b) Sweep segments — built + unit-tested.** `SerpentineSweep.Rank` takes an optional
+  `Func<TileCoord,bool>` predicate; when supplied it splits each row into contiguous-reachable
+  segments and greedy-nearest-end chains them, so an obstacle-bisected row is swept one side fully
+  then the other. No predicate ⇒ exactly today's whole-row output. Fed from the per-shift grid at
+  both sweep call sites (generic crop work `OrderTileWorkForSweep`, managed crops
+  `ManagedActionSweep.Order`). Tests: `Dayswork.Tests/Geometry/SerpentineSweepTests.cs` (all-passable
+  parity, bisected-row one-side-then-other, passable-gap stays one segment).
+
+## (c) String-pulling — deferred (by this plan's own condition)
+
+This plan already scopes (c) as "last, and only if the staircase walking actually bothers anyone once
+(a)/(b) are in" — a play-observation gate. It is purely cosmetic (vanilla NPCs also walk 4-dir
+staircases), and it would add a live-grid dependency to the movement hot path. Deferred until the
+staircase walking is observed to matter in-game; adding the supercover clearance function before then
+would be speculative code with no consumer (against the no-ceremony rule). The design below stands
+for when it's wanted.
 
 ## (a) Gates: open on approach, never leak open
 

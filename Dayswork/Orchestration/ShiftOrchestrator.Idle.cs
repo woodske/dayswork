@@ -168,7 +168,7 @@ internal sealed partial class ShiftOrchestrator
         Session.Stuck.Reset();
         Session.LastSampledGameTime = Game1.timeOfDay;
 
-        Session.Ctx.ResetBatches(new ShiftPlanBuilder().BuildMachineBatchPlan(Session.Ctx.WorkScopes));
+        Session.Ctx.ResetBatches(new ShiftPlanBuilder().BuildMachineBatchPlan(Session.Ctx.WorkScopes, Session.BatchOrdering));
         BeginCurrentBatch();
     }
 

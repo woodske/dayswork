@@ -81,6 +81,11 @@ internal sealed partial class ShiftOrchestrator
             return;
         }
 
+        // Rebuild the passability grid before choosing a recovery tile — the worker got stuck, which
+        // often means the cached grid disagrees with reality (a placed obstacle, a partially-cleared
+        // clump). A fresh grid ensures recovery never teleports based on stale reachability.
+        Session.Passability.InvalidateLocation(location);
+
         // Find the next reachable active-batch work tile.
         TileCoord? recoveryTile = TrySelectNextActiveWork(location, out _, out var selectedRoute)
             ? selectedRoute.InteractionTile
@@ -144,141 +149,22 @@ internal sealed partial class ShiftOrchestrator
 
     private void HandleMovement(GameLocation location)
     {
+        // Ordered activity dispatch (see ShiftOrchestrator.Activities.cs). Each activity mirrors the
+        // former if-chain branch: it consumes the event (returns true) or falls through to the next.
+        // BatchWorkActivity is terminal, so exactly one activity always handles the event.
         if (_nav.NavigationFailed)
         {
-            if (Session.MachinesActive)
-            {
-                if (Session.MachineFetchPending)
-                {
-                    // Couldn't reach the input chest tile — collect this group only. Its collect→reload
-                    // steps are already queued; the loads no-op with an empty carry buffer, so nothing is
-                    // withdrawn or lost.
-                    Session.MachineFetchPending = false;
-                    if (Session.CurrentMachineReload is { } fetchJob
-                        && !string.Equals(fetchJob.Chest.LocationName, Session.MachineBatchLocationName, StringComparison.Ordinal))
-                    {
-                        // Walked out to a cross-location chest — return to the machines before collecting.
-                        StartMachineReturnExcursion();
-                    }
-                    else
-                    {
-                        Session.CurrentMachineReload = null;
-                        StartNextMachineStep();
-                    }
+            foreach (var activity in WorkActivities)
+                if (activity.TryHandleNavigationFailure(location))
                     return;
-                }
-
-                if (Session.CurrentMachineStep is not null)
-                {
-                    Session.CurrentMachineStep = null;
-                    StartNextMachineStep();
-                    return;
-                }
-            }
-
-            if (Session.FishPondsActive && Session.CurrentFishPondStep is not null)
-            {
-                Session.CurrentFishPondStep = null;   // couldn't reach this pond; skip it
-                StartNextFishPondStep();
-                return;
-            }
-
-            if (Session.ManagedActive && Session.CurrentManagedAction is not null)
-            {
-                Session.CurrentManagedAction = null;
-                StartNextManagedAction();
-                return;
-            }
-
-            if (Session.CurrentAnimalWork is not null)
-            {
-//                 ModEntry.ModMonitor.Log(
-//                     $"[Dayswork][animal] navigation failed for {Session.CurrentAnimalWork.Animal.DisplayName} ({Session.CurrentAnimalWork.Task}); deferring within active batch.",
-//                     LogLevel.Trace);
-                Session.DeferredAnimalWork.Add(Session.CurrentAnimalWork);
-                Session.CurrentAnimalWork = null;
-                StartNextAnimalOrTileOrAdvance();
-                return;
-            }
-
-            if (Session.CurrentTileWork is not null)
-            {
-//                 ModEntry.ModMonitor.Log(
-//                     $"[Dayswork][nav] failed task={Session.CurrentTileWork.Task} nav=({Session.PendingNavTile.X},{Session.PendingNavTile.Y}) task=({Session.CurrentTileWork.TaskTile.X},{Session.CurrentTileWork.TaskTile.Y}); deferring within active batch.",
-//                     LogLevel.Trace);
-                Session.DeferredTileWork.Add(Session.CurrentTileWork);
-                Session.CurrentTileWork = null;
-                StartNextAnimalOrTileOrAdvance();
-                return;
-            }
-
-            ModEntry.ModMonitor.Log(
-                $"[Dayswork][nav] failed task={Session.PendingTask} nav=({Session.PendingNavTile.X},{Session.PendingNavTile.Y}) task=({Session.PendingTaskTile.X},{Session.PendingTaskTile.Y}); skipping.",
-                DevLog.WarnLevel);
-            AdvanceWorkList(location);
             return;
         }
 
         if (_nav.HasArrived)
         {
-            if (Session.MachinesActive)
-            {
-                if (Session.MachineFetchPending)
-                {
-                    OnMachineFetchArrived();
+            foreach (var activity in WorkActivities)
+                if (activity.TryHandleArrival(location))
                     return;
-                }
-
-                if (Session.CurrentMachineStep is { } machineStep)
-                {
-                    Session.Ctx.StateMachine.SetIntent(new IntentPerformMachineAction(machineStep.Machine, machineStep.Kind));
-                    Session.ActionPending = false;
-                    return;
-                }
-            }
-
-            if (Session.FishPondsActive && Session.CurrentFishPondStep is { } pondStep)
-            {
-                Session.Ctx.StateMachine.SetIntent(new IntentPerformFishPondAction(pondStep.Pond));
-                Session.ActionPending = false;
-                return;
-            }
-
-            if (Session.ManagedActive && Session.CurrentManagedAction is { } managedAction)
-            {
-                Session.Ctx.StateMachine.SetIntent(new IntentPerformManagedCropAction(managedAction));
-                Session.ActionPending = false;
-                return;
-            }
-
-            if (Session.CurrentAnimalWork is not null)
-            {
-                var animal = _animalHandler.FindLiveAnimal(location, Session.CurrentAnimalWork.Animal);
-                if (animal is null || !IsAnimalWorkActionable(Session.CurrentAnimalWork, animal))
-                {
-                    Session.CurrentAnimalWork = null;
-                    StartNextAnimalOrTileOrAdvance();
-                    return;
-                }
-
-                Session.Ctx.StateMachine.SetIntent(Session.CurrentAnimalWork.Task == TaskKind.PetAnimals
-                    ? new IntentPetAnimal(Session.CurrentAnimalWork.Animal)
-                    : new IntentCollectFromAnimal(Session.CurrentAnimalWork.Animal));
-                return;
-            }
-
-            if (Session.CurrentTileWork is not null && !IsTileWorkActionable(Session.CurrentTileWork, location))
-            {
-                Session.CurrentTileWork = null;
-                StartNextAnimalOrTileOrAdvance();
-                return;
-            }
-
-//             ModEntry.ModMonitor.Log(
-//                 $"[Dayswork][nav] arrived task={Session.PendingTask} nav=({Session.PendingNavTile.X},{Session.PendingNavTile.Y}) task=({Session.PendingTaskTile.X},{Session.PendingTaskTile.Y}) worker=({Session.Worker!.TilePoint.X},{Session.Worker.TilePoint.Y}) fallback={_nav.UsedDirectFallback}.",
-//                 LogLevel.Trace);
-            Session.Ctx.StateMachine.SetIntent(new IntentPerformTaskAt(Session.PendingTaskTile, Session.PendingTask));
-            Session.ActionPending = false;
         }
     }
 

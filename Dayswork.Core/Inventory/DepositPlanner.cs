@@ -21,14 +21,14 @@ public sealed class DepositPlanner
     public DepositPlan Plan(
         IReadOnlyList<BufferedItem> snapshot,
         IReadOnlyDictionary<TaskKind, DestinationKey> assignments,
-        TileCoord shippingBinTile,
-        TileCoord workerStart,
-        Func<TileCoord, TileCoord, int> distance) =>
+        DepositStop shippingBin,
+        DepositStop workerStart,
+        Func<DepositStop, DepositStop, int> distance) =>
         Plan(
             snapshot,
             assignments,
             new Dictionary<OutputScopeProvenance, DestinationKey>(),
-            shippingBinTile,
+            shippingBin,
             workerStart,
             distance);
 
@@ -36,9 +36,9 @@ public sealed class DepositPlanner
         IReadOnlyList<BufferedItem> snapshot,
         IReadOnlyDictionary<TaskKind, DestinationKey> taskAssignments,
         IReadOnlyDictionary<OutputScopeProvenance, DestinationKey> provenanceAssignments,
-        TileCoord shippingBinTile,
-        TileCoord workerStart,
-        Func<TileCoord, TileCoord, int> distance,
+        DepositStop shippingBin,
+        DepositStop workerStart,
+        Func<DepositStop, DepositStop, int> distance,
         bool chestDestinationsOnly = false)
     {
         // Walkable destinations grouped by key → (representative tile, item id → qty).
@@ -61,7 +61,7 @@ public sealed class DepositPlanner
                     if (chestDestinationsOnly)
                         Accumulate(retained, key, item.Quantity);
                     else
-                        AddToGroup(walkable, dest, shippingBinTile, item);
+                        AddToGroup(walkable, dest, shippingBin.Tile, item);
                     break;
                 default: // AutomaticOutputDestination or unresolved ⇒ automatic overflow (or retained, when eager)
                     if (chestDestinationsOnly)
@@ -73,7 +73,9 @@ public sealed class DepositPlanner
         }
 
         var unordered = walkable
-            .Select(kv => new DepositTrip(kv.Key, kv.Value.Tile, ToStacks(kv.Value.Items)))
+            .Select(kv => (
+                Trip: new DepositTrip(kv.Key, kv.Value.Tile, ToStacks(kv.Value.Items)),
+                Stop: StopFor(kv.Key, kv.Value.Tile, shippingBin)))
             .ToList();
 
         var ordered = OrderNearestNeighbor(unordered, workerStart, distance);
@@ -135,22 +137,32 @@ public sealed class DepositPlanner
            .Select(kv => new RoutedItemStack(kv.Key.ItemId, kv.Value, kv.Key.SourceTask, kv.Key.Provenance, kv.Key.Quality, kv.Key.FlavorId))
            .ToList();
 
+    // Representative stop (location + tile) a trip is ordered by. Chest trips carry their own
+    // location via the ChestRef; the shipping bin is farm-space (the caller's stop).
+    private static DepositStop StopFor(DestinationKey dest, TileCoord tile, DepositStop shippingBin) =>
+        dest switch
+        {
+            ChestDestination chest => new DepositStop(chest.Ref.LocationName, tile),
+            ShippingBinDestination => shippingBin,
+            _                      => new DepositStop(shippingBin.LocationName, tile),
+        };
+
     private static IReadOnlyList<DepositTrip> OrderNearestNeighbor(
-        List<DepositTrip> trips,
-        TileCoord start,
-        Func<TileCoord, TileCoord, int> distance)
+        List<(DepositTrip Trip, DepositStop Stop)> trips,
+        DepositStop start,
+        Func<DepositStop, DepositStop, int> distance)
     {
-        var remaining = new List<DepositTrip>(trips);
+        var remaining = new List<(DepositTrip Trip, DepositStop Stop)>(trips);
         var ordered   = new List<DepositTrip>(trips.Count);
         var current   = start;
 
         while (remaining.Count > 0)
         {
             int bestIdx  = 0;
-            int bestDist = distance(current, remaining[0].Tile);
+            int bestDist = distance(current, remaining[0].Stop);
             for (int i = 1; i < remaining.Count; i++)
             {
-                int d = distance(current, remaining[i].Tile);
+                int d = distance(current, remaining[i].Stop);
                 if (d < bestDist)
                 {
                     bestDist = d;
@@ -159,8 +171,8 @@ public sealed class DepositPlanner
             }
 
             var next = remaining[bestIdx];
-            ordered.Add(next);
-            current = next.Tile;
+            ordered.Add(next.Trip);
+            current = next.Stop;
             remaining.RemoveAt(bestIdx);
         }
 

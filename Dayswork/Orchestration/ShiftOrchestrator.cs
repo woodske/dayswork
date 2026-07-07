@@ -247,7 +247,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,
         // because the warp tile varies by farm type and player map edits).
         var farmExitTile = ResolveSpawnExitTile(farm);
-        var batches = BuildInitialBatches(contract, workScopes, farm, snapshot, farmExitTile, priorityOrderer);
+        var batchOrdering = BuildBatchOrdering(workScopes, farm, farmExitTile);
+        var batches = BuildInitialBatches(contract, workScopes, farm, snapshot, farmExitTile, priorityOrderer, batchOrdering);
 
         if (batches.Count == 0 ||
             batches.All(batch => batch.Kind is BatchKind.OutdoorAnimals or BatchKind.OutdoorCrops or BatchKind.OutdoorClearing or BatchKind.FarmForage or BatchKind.FarmCave &&
@@ -300,6 +301,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             LastSampledGameTime = Game1.timeOfDay,
             LastTilePos = farmhand.TilePoint,
             MorningEntranceHoldTicks = pacingProfile.EntranceHoldTicks,
+            BatchOrdering = batchOrdering,
         };
         _session.Shopping = new ManagedShoppingCoordinator(
             _session,
@@ -356,15 +358,51 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         return new ContractScopeSelection(outdoorZones, animalBuildings, greenhouses);
     }
 
+    /// <summary>
+    /// Resolve the within-category travel anchors handed to the planner: each in-scope building
+    /// interior location → its outdoor door tile (or a standalone location's farm-warp tile).
+    /// Farm-wide and unresolvable locations are omitted (planner degrades them to name order). Uses
+    /// the quiet resolver (no skip-log) since a miss here is expected, not an error.
+    /// </summary>
+    private static BatchOrderingContext BuildBatchOrdering(WorkScopeSet workScopes, Farm farm, TileCoord startAnchor)
+    {
+        var anchors = new Dictionary<string, TileCoord>(StringComparer.Ordinal);
+
+        void TryAdd(string? locationName)
+        {
+            if (string.IsNullOrWhiteSpace(locationName) ||
+                string.Equals(locationName, "Farm", StringComparison.Ordinal) ||
+                anchors.ContainsKey(locationName))
+                return;
+
+            if (BuildingLocationResolver.TryResolve(farm, locationName, out var match))
+                anchors[locationName] = match.OutdoorDoorTile;
+        }
+
+        foreach (var building in workScopes.AnimalBuildings)
+            TryAdd(building.LocationName);
+        if (workScopes.Machines is { IsEnabled: true } machines)
+            foreach (var machine in machines.AllMachines) TryAdd(machine.LocationName);
+        if (workScopes.FishPonds is { IsEnabled: true } fishPonds)
+            foreach (var pond in fishPonds.Ponds) TryAdd(pond.LocationName);
+        foreach (var greenhouse in workScopes.GreenhouseWorks)
+            TryAdd(greenhouse.LocationName);
+        if (workScopes.ManagedCrops is { IsEnabled: true } managed)
+            foreach (var assignment in managed.Assignments) TryAdd(assignment.Zone.LocationName);
+
+        return new BatchOrderingContext(anchors, startAnchor);
+    }
+
     private IReadOnlyList<WorkBatch> BuildInitialBatches(
         Contract contract,
         WorkScopeSet workScopes,
         Farm farm,
         ToolSnapshot snapshot,
         TileCoord farmExitTile,
-        TaskPriorityOrderer priorityOrderer)
+        TaskPriorityOrderer priorityOrderer,
+        BatchOrderingContext batchOrdering)
     {
-        var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks, contract.CategoryPriority);
+        var skeletons = _shiftPlanBuilder.BuildBatchPlan(workScopes, contract.EnabledTasks, contract.CategoryPriority, batchOrdering);
         var outdoorZones = workScopes.OutdoorWork?.NormalizedZones ?? Array.Empty<Zone>();
         var outdoorProvenance = OutputScopeProvenance.Outdoor();
 

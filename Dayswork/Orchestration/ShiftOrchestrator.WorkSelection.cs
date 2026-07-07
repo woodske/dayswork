@@ -68,7 +68,10 @@ internal sealed partial class ShiftOrchestrator
             ? new TileCoord(worker.TilePoint.X, worker.TilePoint.Y)
             : (TileCoord?)null;
 
-        var sweep = SerpentineSweep.Rank(tileWork.Select(item => item.TaskTile), start);
+        // Split rows around obstacles (pond/fence/building) so a bisected row is swept one side then
+        // the other, instead of detouring across the gap each row. Grid is per-shift cached.
+        var grid = Session.Passability.GetGrid(location);
+        var sweep = SerpentineSweep.Rank(tileWork.Select(item => item.TaskTile), start, tile => grid.IsPassable(tile));
         return tileWork
             .OrderBy(item => sweep[item.TaskTile])
             .ThenBy(item => item.Task == TaskKind.WaterCrops ? 1 : 0)
@@ -198,7 +201,7 @@ internal sealed partial class ShiftOrchestrator
         var candidates = BuildActiveWorkCandidates(location);
         var evaluated = new List<WorkerRouteCandidate>(candidates.Count);
         var source = new TileCoord(Session.Worker!.TilePoint.X, Session.Worker.TilePoint.Y);
-        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
+        var routeCosts = Session.Passability.RouteCostsFrom(source, location);
 
         for (var i = 0; i < candidates.Count; i++)
         {

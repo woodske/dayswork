@@ -224,8 +224,9 @@ internal sealed partial class ShiftOrchestrator
 
         // Execute the merged plan as ONE serpentine sweep across all zones (per-tile chains stay
         // intact via ActionRank), instead of walking zone-by-zone in authoring order with two
-        // row-major passes per zone.
-        return ManagedActionSweep.Order(actions, WorkerSweepStart(location));
+        // row-major passes per zone. The passability predicate splits obstacle-bisected rows.
+        var grid = Session.Passability.GetGrid(location);
+        return ManagedActionSweep.Order(actions, WorkerSweepStart(location), tile => grid.IsPassable(tile));
     }
 
     // Sweep orientation hint: the worker's tile when it is already inside the batch location

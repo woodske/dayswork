@@ -146,10 +146,15 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 3. If no applicable work exists, **no worker spawns**. Otherwise spawn `FarmhandNpc` at the farm
    entrance tile (resolved from `farm.warps`, expansion-overridable).
 
-Per `UpdateTicked` (throttled to every 4th tick), the orchestrator dispatches on the state
-machine's current intent. Phases: `WaitingForSpawn → Working → (Stuck → Recovering) → Depositing →
-Exiting → Done`. Within a batch, `WorkerRouteSelector` picks the next work item by **category
-priority first, then nearest-reachable** (route cost via BFS). Each task is one or more *beats*: a
+Per `UpdateTicked` (gated on `Game1.shouldTimePass(false)`), tool animation
+(`ToolSwapAnimator.Update`), the movement driver (`WorkerMovementDriver.Update` — so the worker
+walks smoothly pixel-by-pixel), and the debris-sweep pump run **every tick**; the higher-level
+**intent dispatch is throttled to every 4th tick** (`Session.TickCount % 4` in
+`ShiftOrchestrator.OnUpdateTicked` — a raw modulo, not SMAPI's `IsMultipleOf`). On the dispatch
+ticks the orchestrator advances on the state machine's current intent. Phases:
+`WaitingForSpawn → Working → (Stuck → Recovering) → Depositing → Exiting → Done`. Within a batch,
+`WorkerRouteSelector` picks the next work item by **category priority first, then
+nearest-reachable** (route cost via BFS). Each task is one or more *beats*: a
 beat plays the tool animation, invokes the task action, and spends energy; the next beat waits on
 `ToolSwapAnimator.IsSwinging` (so animation speed = pacing). Collected items go into the
 task-tagged `ItemBuffer`, never the player's inventory.

@@ -53,8 +53,24 @@ valid (stays open): 10, 100, 110, 500, 1000, 1500
 
 `getDrawSum()` adds `+10` (west neighbor), `+100` (east), `+500` (south), `+1000` (north) for each
 adjacent counting fence. Any sane placement — a gate within or at the end of a fence run — yields
-one of the valid sums, so an opened gate **stays open**. This is why the worker can open a gate
-once at the start of a travel leg and not be re-blocked mid-walk.
+one of the valid sums, so an opened gate **stays open**. The flip side: a gate the worker opens but
+never walks through would **stay open indefinitely** (the auto-close only runs
+`updateWhenCurrentLocation`, so off-screen it never fires) — which is why every opened gate must be
+explicitly closed.
+
+## Worker gate lifecycle (`WorkerMovementDriver`, 2026-07-07)
+
+The worker does **not** bulk-open a route's gates at plan time (that popped gates open dozens of
+tiles ahead, and any route abandoned mid-walk leaked them open forever). Instead:
+
+- `RecordRouteGates` records the route's openable gate tiles (no toggling).
+- `OpenGateIfApproaching` opens a gate lazily when it becomes the next waypoint (≤1 tile away),
+  matching how a player reads the animation, and tracks it in `_openedGates` (only gates the worker
+  itself opened — a gate the player already left open isn't force-closed later).
+- Close-behind still fires as the worker passes a gate tile (`TryCloseGate`).
+- `CloseTrackedGates` closes every still-open tracked gate on `Clear()` (new nav, stuck recovery,
+  travel cancel), navigation completion, and `WarpWorker` — **except** a gate the worker is standing
+  on (closing onto the sprite would clip it). This is the leak fix.
 
 The proximity auto-open you see for the player is driven by the player's adjacency in vanilla
 movement code; it never fires for an `NPC` worker, which is why the worker must open gates itself.

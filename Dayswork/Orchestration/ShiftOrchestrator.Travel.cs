@@ -46,7 +46,52 @@ internal sealed partial class ShiftOrchestrator
         DevLog.Log(
             $"[Dayswork][travel] start purpose={purpose} legs={plan.Legs.Count} policy={plan.OnFailure} " +
             $"destination={DescribeTravelDestination(plan)}.");
+
+        // Phase 0 (measure-only) of the time-aware wrap-up gate.
+        if (DevLog.Enabled && purpose == TravelPurpose.WorkEntry)
+            MeasureWrapUpFit(plan);
+
         _travel.Start(plan, Session.Worker);
+    }
+
+    // 8pm hard cap, in Stardew time-of-day (HHMM) form.
+    private const int DayEndHardCapTimeOfDay = 2000;
+
+    // Provisional reserve for "arrive + at least one work beat" — to be calibrated from the Phase-0
+    // measurements below before the skip-gate goes live.
+    private const int WrapUpWorkHeadroomMinutes = 10;
+
+    /// <summary>
+    /// Phase 0 (measure-only) time-aware wrap-up (architecture review #5). Logs whether this
+    /// batch-entry trip could start, be serviced, and get the worker home before the 8pm hard cap,
+    /// so the headroom constant can be calibrated from real play before the actual skip-gate is
+    /// enabled. Never changes behavior; gated by <c>DevLog.Enabled</c> so it's absent from release.
+    /// </summary>
+    private void MeasureWrapUpFit(TravelPlan plan)
+    {
+        if (_session is null || Session.Worker is null || plan.Legs.Count == 0)
+            return;
+
+        var firstLeg = plan.Legs[0];
+        var workerTile = new TileCoord(Session.Worker.TilePoint.X, Session.Worker.TilePoint.Y);
+        var target = firstLeg.WalkTarget;
+
+        var costs = Session.Passability.RouteCostsFrom(workerTile, firstLeg.WalkLocation);
+        var outboundTiles = costs.TryGetValue(target, out var cost)
+            ? cost
+            : Math.Abs(workerTile.X - target.X) + Math.Abs(workerTile.Y - target.Y);
+        var homeboundTiles = Math.Abs(target.X - Session.FarmExitTile.X) + Math.Abs(target.Y - Session.FarmExitTile.Y);
+
+        var walk = _config.WorkerWalkPixelsPerTick;
+        var outMin = ShiftClockEstimator.EstimateWalkMinutes(outboundTiles, walk);
+        var homeMin = ShiftClockEstimator.EstimateWalkMinutes(homeboundTiles, walk);
+        var fits = ShiftClockEstimator.FitsBeforeCap(
+            Game1.timeOfDay, DayEndHardCapTimeOfDay, outboundTiles, homeboundTiles, walk, WrapUpWorkHeadroomMinutes);
+
+        DevLog.Log(
+            $"[Dayswork][wrapup-measure] time={Game1.timeOfDay} out={outboundTiles}t≈{outMin}m home={homeboundTiles}t≈{homeMin}m " +
+            $"headroom={WrapUpWorkHeadroomMinutes}m fits={fits} would-skip={!fits}.",
+            LogLevel.Info);
     }
 
     private void HandleTravel()
@@ -170,7 +215,7 @@ internal sealed partial class ShiftOrchestrator
     {
         var exitCandidates = _buildingNavigator.ResolveInteriorExitApproachTiles(interior);
         var source = new TileCoord(Session.Worker!.TilePoint.X, Session.Worker.TilePoint.Y);
-        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, interior);
+        var routeCosts = Session.Passability.RouteCostsFrom(source, interior);
         var exitTile = BuildingWorkNavigator.SelectNearestReachableExitApproachTile(
             exitCandidates,
             routeCosts,

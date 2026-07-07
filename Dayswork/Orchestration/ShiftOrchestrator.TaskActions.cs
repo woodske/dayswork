@@ -533,7 +533,12 @@ internal sealed partial class ShiftOrchestrator
             CollectNewDebrisAtTile(beforeClump, loc, Session.PendingTask, clump.Tile, Session.PendingOutputProvenance);
 
             if (destroyed)
+            {
                 loc.resourceClumps.Remove(clump);
+                // Resource clumps have no SMAPI list-changed event, so the passability cache can't
+                // learn its footprint just freed up any other way — re-probe it directly.
+                Session.Passability.InvalidateArea(loc, (int)clump.Tile.X, (int)clump.Tile.Y, clump.width.Value, clump.height.Value);
+            }
             // If not destroyed, IsTaskComplete still finds the clump → action loop re-fires.
             return new LaborBeatOutcome(destroyed, destroyed);
         }
@@ -604,7 +609,11 @@ internal sealed partial class ShiftOrchestrator
             var destroyed   = clump.performToolAction(axe, 0, clump.Tile);
             CollectNewDebrisAtTile(beforeClump, loc, Session.PendingTask, clump.Tile, Session.PendingOutputProvenance);
             if (destroyed)
+            {
                 loc.resourceClumps.Remove(clump);
+                // No SMAPI event for resource-clump removal — re-probe the freed footprint directly.
+                Session.Passability.InvalidateArea(loc, (int)clump.Tile.X, (int)clump.Tile.Y, clump.width.Value, clump.height.Value);
+            }
             return new LaborBeatOutcome(destroyed, destroyed);
         }
 

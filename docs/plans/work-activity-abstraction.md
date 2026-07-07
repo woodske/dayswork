@@ -1,9 +1,37 @@
 # Plan — Work-activity abstraction (orchestrator mode dispatch)
 
-**Status:** proposed 2026-07-07, not started. Item #4 in
+**Status:** **built 2026-07-07** (dispatch-collapse phase; behavior-identical by construction; full
+unit suite green; in-game smoke pass still recommended before release). Item #4 in
 [architecture-review-index.md](architecture-review-index.md). **Gate cleared 2026-07-07:** the
 pending smoke-pass backlog (travel/orchestrator-decomposition, serpentine, machines cross-location
 fetch, fish ponds) all passed in-game. Land this **before the next "Manage X" feature**.
+
+## What was built (2026-07-07) — and a deliberate design choice
+
+`HandleMovement`'s two mirror-image if-chains (arrival + failure, over machines → fish ponds →
+managed crops → animal/tile) are replaced by an ordered `IWorkActivity` list
+(`ShiftOrchestrator.Activities.cs`). `HandleMovement` now walks the list; each activity **consumes**
+the event (returns `true`) or **defers** to the next (`false`) — exactly the return-vs-fall-through
+of the old chain, in the same order. `BatchWorkActivity` is terminal (animal work, non-actionable
+tile work, or the default "perform the pending task" / "skip"). The next "Manage X" feature adds one
+entry to that list instead of a branch in two dispatch points.
+
+**Realized as a handler list, not the single `ShiftSession.ActiveActivity` this plan sketched.**
+Rationale: the single-`ActiveActivity` form requires an activity lifecycle (set at batch begin,
+cleared at end) and assumes the modes are strictly mutually exclusive — the "no reachable step ⇒
+fall through" tail of the old chain would have to be proven dead. That proof needs in-game
+play-testing, which wasn't available in this session. The handler-list form is a **mechanical 1:1
+extraction** of the existing chain (each handler holds the former branch verbatim, order preserved),
+so it is behavior-identical *by construction* and needed no such proof. Per-shift step state stays on
+`ShiftSession`; moving it into the activities (this plan's more ambitious step) is deferred — it adds
+risk with no added verification here.
+
+**Not done (deferred per plan):** the `TravelPurpose` switch fold (explicitly a later, separate
+change) and moving step state into activities.
+
+The activities are nested private classes, so they reach the orchestrator's private step methods
+(`OnMachineFetchArrived`, `StartNextMachineStep`, `StartNextManagedAction`, …) without widening any
+surface.
 
 ## Problem
 

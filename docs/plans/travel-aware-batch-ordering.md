@@ -1,8 +1,30 @@
 # Plan — Travel-aware batch ordering
 
-**Status:** proposed 2026-07-07, not started. Item #3 in
+**Status:** **built + unit-tested 2026-07-07** (pending in-game smoke pass). Item #3 in
 [architecture-review-index.md](architecture-review-index.md). Independent of the passability-cache
 plan; likely the single largest visible reduction in in-game walking time.
+
+## What was built (2026-07-07)
+
+- Core `BatchOrderingContext` (anchors dict + start anchor) — an **optional** 4th arg to
+  `ShiftPlanBuilder.BuildBatchPlan` / `BuildMachineBatchPlan`. Null ⇒ today's alphabetical order
+  (all existing planner tests pass unchanged — the regression signal).
+- `OrderByTravel<T>` / `OrderLocationsByTravel` nearest-neighbor helper in `ShiftPlanBuilder`:
+  chained from the start anchor, Manhattan on anchors, ties break by location-name ordinal
+  (deterministic), unanchored locations sort last in name order.
+- Applied to: **animal buildings** (each interior+grazing pair moves as one unit; FarmForage stays
+  last), **machines**, **fish ponds**, and the **managed-non-farm** + **greenhouse** crop slots.
+  Category priority and the fixed Crops phase sequence are untouched.
+- Orchestrator resolves anchors at `StartShift` via `BuildingLocationResolver.TryResolve` (quiet, no
+  skip-log) → each building interior's outdoor door tile / standalone farm-warp tile; start anchor =
+  worker spawn (`farmExitTile`). Stored on `ShiftSession.BatchOrdering` so the idle-loop machine
+  re-plan reuses the same anchors.
+- Tests: `Dayswork.Tests/Shifts/BatchOrderingTests.cs` (NN reorder, pair adjacency + forage-last,
+  missing-anchor fallback, tie determinism, null-context regression).
+
+Expansion-location anchors are omitted for v1 (they fall back to name order) — matches the plan's
+"fall back if the route doesn't validate" degradation. Manhattan metric (not cached route cost) per
+the v1 scope.
 
 ## Problem
 

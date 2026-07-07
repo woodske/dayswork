@@ -1,5 +1,6 @@
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
+using Dayswork.Core.Pathing;
 using Microsoft.Xna.Framework;
 using StardewValley;
 using StardewValley.Pathfinding;
@@ -14,6 +15,14 @@ internal sealed class WorkerMovementDriver
     private readonly Queue<Vector2> _waypoints = new();
     private FarmhandNpc? _worker;
     private float _walkPixelsPerTick = 2f;
+
+    // Gate tiles on the current route (openable gates the worker will pass through), and the subset
+    // the worker has actually opened and not yet closed. Gates are opened lazily as the worker
+    // reaches them (never all at once at plan time) and every opened gate is closed — on pass, or on
+    // Clear/Warp if the route is abandoned mid-walk — so none leaks open (a leaked off-screen gate
+    // never auto-closes; see docs/fences-and-gates.md).
+    private readonly HashSet<Point> _routeGateTiles = new();
+    private readonly HashSet<Point> _openedGates = new();
 
     public bool HasArrived { get; private set; } = true;
     public bool NavigationFailed { get; private set; }
@@ -66,7 +75,7 @@ internal sealed class WorkerMovementDriver
             return;
         }
 
-        OpenGatesAlongRoute(controller.pathToEndPoint, location);
+        RecordRouteGates(controller.pathToEndPoint, location);
 
         foreach (var point in controller.pathToEndPoint)
             _waypoints.Enqueue(ToPixel(point));
@@ -109,9 +118,7 @@ internal sealed class WorkerMovementDriver
         GameLocation location,
         out int routeCost)
     {
-        var start = new Point(source.X, source.Y);
-        var end = new Point(destination.X, destination.Y);
-        if (TryFindRoute(start, end, location, out var route))
+        if (GridPathfinder.TryFindRoute(new LivePassabilityView(location), source, destination, out var route))
         {
             routeCost = route.Count;
             return true;
@@ -121,38 +128,12 @@ internal sealed class WorkerMovementDriver
         return false;
     }
 
-    public static IReadOnlyDictionary<TileCoord, int> ComputeRouteCostsFrom(TileCoord source, GameLocation location)
-    {
-        var start = new Point(source.X, source.Y);
-        var queue = new Queue<Point>();
-        var visited = new HashSet<Point> { start };
-        var routeCosts = new Dictionary<TileCoord, int>
-        {
-            [source] = 0,
-        };
-
-        queue.Enqueue(start);
-
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
-            var currentCoord = new TileCoord(current.X, current.Y);
-            var currentCost = routeCosts[currentCoord];
-
-            foreach (var next in Neighbours(current))
-            {
-                if (!visited.Add(next) ||
-                    !IsWithinMap(next, location) ||
-                    !IsTilePassableForWorker(next, location))
-                    continue;
-
-                routeCosts[new TileCoord(next.X, next.Y)] = currentCost + 1;
-                queue.Enqueue(next);
-            }
-        }
-
-        return routeCosts;
-    }
+    // Live (uncached) whole-map route-cost flood fill. The hot selection call sites route through
+    // the per-shift LocationPassabilityCache instead (which reuses one PassabilityGrid per location);
+    // this static entry point stays for the navigation fallback and one-off queries that must reflect
+    // the current world.
+    public static IReadOnlyDictionary<TileCoord, int> ComputeRouteCostsFrom(TileCoord source, GameLocation location) =>
+        GridPathfinder.ComputeRouteCosts(new LivePassabilityView(location), source);
 
     public void Update()
     {
@@ -162,6 +143,7 @@ internal sealed class WorkerMovementDriver
         while (_waypoints.Count > 0)
         {
             var target = _waypoints.Peek();
+            OpenGateIfApproaching(target); // the next waypoint is ≤1 tile away — open it as we arrive
             var delta = target - _worker.Position;
             var dist = delta.Length();
 
@@ -178,10 +160,14 @@ internal sealed class WorkerMovementDriver
 
         HasArrived = true;
         _worker.StopTaskAnimation();
+        CloseTrackedGates(); // route done — close anything opened but somehow not passed
     }
 
     public void Clear()
     {
+        // Route abandoned (new nav, stuck recovery, travel cancel, warp) — close any gate the worker
+        // opened but hasn't walked through, or it leaks open indefinitely off-screen.
+        CloseTrackedGates();
         _waypoints.Clear();
         _worker = null;
         HasArrived = true;
@@ -239,103 +225,96 @@ internal sealed class WorkerMovementDriver
                 isFarmer: false, damagesFarmer: 0, glider: false,
                 character: null, pathfinding: true,
                 ignoreCharacterRequirement: true))
-            // A closed fence gate blocks isCollidingPosition, but the worker can open it
-            // (see OpenGatesAlongRoute), so route through it as if passable.
+            // A closed fence gate blocks isCollidingPosition, but the worker opens it on approach
+            // (see OpenGateIfApproaching), so route through it as if passable.
             return HasOpenableGate(tile, location);
 
         return true;
+    }
+
+    // Record (don't open) the openable gate tiles on a freshly-planned route. They're opened lazily
+    // on approach in Update, matching how a player reads the animation, instead of all popping open
+    // the moment the path is planned.
+    private void RecordRouteGates(IEnumerable<Point> tiles, GameLocation location)
+    {
+        foreach (var tile in tiles)
+            if (HasOpenableGate(tile, location))
+                _routeGateTiles.Add(tile);
+    }
+
+    // Open the next waypoint's gate as the worker arrives at it (≤1 tile away), tracking it so it's
+    // guaranteed to be closed later. Only gates the worker actually opens are tracked — a gate the
+    // player already left open is not "owned" and isn't force-closed on route abandon.
+    private void OpenGateIfApproaching(Vector2 pixelPos)
+    {
+        var location = _worker?.currentLocation;
+        if (location is null) return;
+
+        var tile = new Point((int)(pixelPos.X / TileSize), (int)(pixelPos.Y / TileSize));
+        if (!_routeGateTiles.Contains(tile) || _openedGates.Contains(tile)) return;
+
+        if (location.objects.TryGetValue(new Vector2(tile.X, tile.Y), out var obj)
+            && obj is Fence fence && fence.isGate.Value
+            && fence.health.Value > 1f && fence.gatePosition.Value < 88)
+        {
+            fence.toggleGate(open: true);
+            _openedGates.Add(tile);
+        }
     }
 
     private void TryCloseGate(Vector2 pixelPos)
     {
         var location = _worker?.currentLocation;
         if (location is null) return;
-        var tile = new Vector2(pixelPos.X / TileSize, pixelPos.Y / TileSize);
+        var point = new Point((int)(pixelPos.X / TileSize), (int)(pixelPos.Y / TileSize));
+        var tile = new Vector2(point.X, point.Y);
         if (location.objects.TryGetValue(tile, out var obj)
             && obj is Fence fence && fence.isGate.Value
             && fence.health.Value > 1f && fence.gatePosition.Value >= 88)
             fence.toggleGate(open: false);
+        _openedGates.Remove(point); // handled (closed here, or already closed) — no longer owed a close
+    }
+
+    // Close every gate the worker opened and hasn't yet closed, except one it's currently standing on
+    // (closing a gate onto the worker would visually clip it). Clears the route-gate tracking.
+    private void CloseTrackedGates()
+    {
+        var location = _worker?.currentLocation;
+        if (location is not null && _openedGates.Count > 0)
+        {
+            var workerTile = _worker!.TilePoint;
+            foreach (var tile in _openedGates)
+            {
+                if (tile == workerTile) continue;
+                if (location.objects.TryGetValue(new Vector2(tile.X, tile.Y), out var obj)
+                    && obj is Fence fence && fence.isGate.Value
+                    && fence.health.Value > 1f && fence.gatePosition.Value >= 88)
+                    fence.toggleGate(open: false);
+            }
+        }
+
+        _openedGates.Clear();
+        _routeGateTiles.Clear();
     }
 
     private static bool HasOpenableGate(Point tile, GameLocation location) =>
         location.objects.TryGetValue(new Vector2(tile.X, tile.Y), out var obj)
         && obj is Fence fence && fence.isGate.Value && fence.health.Value > 1f;
 
-    private static void OpenGatesAlongRoute(IEnumerable<Point> tiles, GameLocation location)
-    {
-        foreach (var tile in tiles)
-        {
-            if (location.objects.TryGetValue(new Vector2(tile.X, tile.Y), out var obj)
-                && obj is Fence fence && fence.isGate.Value
-                && fence.health.Value > 1f && fence.gatePosition.Value < 88)
-                fence.toggleGate(open: true);
-        }
-    }
-
     private bool TryEnqueueFallbackRoute(TileCoord destination, GameLocation location, FarmhandNpc worker)
     {
-        var start = worker.TilePoint;
-        var end   = new Point(destination.X, destination.Y);
+        var start = new TileCoord(worker.TilePoint.X, worker.TilePoint.Y);
 
-        if (!TryFindRoute(start, end, location, out var route))
+        // Live probe — the fallback route is about to be physically walked, so it must reflect the
+        // current world, never a possibly-stale cached grid.
+        if (!GridPathfinder.TryFindRoute(new LivePassabilityView(location), start, destination, out var route))
             return false;
 
-        OpenGatesAlongRoute(route, location);
+        RecordRouteGates(route.Select(t => new Point(t.X, t.Y)), location);
 
         foreach (var tile in route)
             _waypoints.Enqueue(ToPixel(tile));
 
-        return true;
-    }
-
-    private static bool TryFindRoute(
-        Point start,
-        Point end,
-        GameLocation location,
-        out IReadOnlyList<Point> route)
-    {
-        if (start == end)
-        {
-            route = Array.Empty<Point>();
-            return true;
-        }
-
-        if (!IsWithinMap(end, location) || !IsTilePassableForWorker(end, location))
-        {
-            route = Array.Empty<Point>();
-            return false;
-        }
-
-        var queue = new Queue<Point>();
-        var cameFrom = new Dictionary<Point, Point?>();
-        queue.Enqueue(start);
-        cameFrom[start] = null;
-
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
-            if (current == end)
-                break;
-
-            foreach (var next in Neighbours(current))
-            {
-                if (cameFrom.ContainsKey(next) ||
-                    !IsWithinMap(next, location) ||
-                    !IsTilePassableForWorker(next, location))
-                    continue;
-
-                cameFrom[next] = current;
-                queue.Enqueue(next);
-            }
-        }
-
-        if (!cameFrom.ContainsKey(end))
-        {
-            route = Array.Empty<Point>();
-            return false;
-        }
-
-        route = ReconstructPath(end, cameFrom).ToList();
         return true;
     }
 
@@ -356,34 +335,4 @@ internal sealed class WorkerMovementDriver
             3 => 12,
             _ => 0,
         };
-
-    private static IEnumerable<Point> Neighbours(Point tile)
-    {
-        yield return new Point(tile.X, tile.Y - 1);
-        yield return new Point(tile.X + 1, tile.Y);
-        yield return new Point(tile.X, tile.Y + 1);
-        yield return new Point(tile.X - 1, tile.Y);
-    }
-
-    private static bool IsWithinMap(Point tile, GameLocation location)
-    {
-        var layer = location.Map.Layers[0];
-        return tile.X >= 0 &&
-               tile.Y >= 0 &&
-               tile.X < layer.LayerWidth &&
-               tile.Y < layer.LayerHeight;
-    }
-
-    private static IEnumerable<Point> ReconstructPath(Point end, Dictionary<Point, Point?> cameFrom)
-    {
-        var route = new Stack<Point>();
-        var current = end;
-        while (cameFrom[current] is { } previous)
-        {
-            route.Push(current);
-            current = previous;
-        }
-
-        return route;
-    }
 }

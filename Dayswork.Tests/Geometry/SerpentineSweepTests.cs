@@ -109,6 +109,63 @@ public sealed class SerpentineSweepTests
         Assert.Empty(SerpentineSweep.Rank(Array.Empty<TileCoord>()));
     }
 
+    // ── Segment-aware sweep (optional passability predicate) ──────────────────
+
+    [Fact]
+    public void All_passable_predicate_matches_the_whole_row_sweep()
+    {
+        var tiles = Grid(x0: 0, x1: 2, y0: 0, y1: 1);
+
+        var whole = SerpentineSweep.Rank(tiles);
+        var segmented = SerpentineSweep.Rank(tiles, start: null, passable: _ => true);
+
+        Assert.Equal(whole.Count, segmented.Count);
+        foreach (var kv in whole)
+            Assert.Equal(kv.Value, segmented[kv.Key]);
+    }
+
+    [Fact]
+    public void Row_bisected_by_impassable_gap_sweeps_one_side_fully_then_the_other()
+    {
+        // A vertical pond at x∈{2,3} bisects every row into a left pair (x0,x1) and a right pair
+        // (x4,x5). Without segmentation the worker would cross the gap on every row; with it, it
+        // sweeps the whole left side, then the whole right side.
+        var tiles = new List<TileCoord>();
+        for (var y = 0; y <= 2; y++)
+        {
+            tiles.Add(new TileCoord(0, y));
+            tiles.Add(new TileCoord(1, y));
+            tiles.Add(new TileCoord(4, y));
+            tiles.Add(new TileCoord(5, y));
+        }
+
+        bool Passable(TileCoord t) => t.X != 2 && t.X != 3; // the pond columns are impassable
+
+        var ranks = SerpentineSweep.Rank(tiles, start: null, passable: Passable);
+
+        // Every left-column tile is visited before every right-column tile — no mid-sweep crossing.
+        var maxLeft = ranks.Where(kv => kv.Key.X <= 1).Max(kv => kv.Value);
+        var minRight = ranks.Where(kv => kv.Key.X >= 4).Min(kv => kv.Value);
+        Assert.True(maxLeft < minRight, $"left max {maxLeft} should precede right min {minRight}");
+
+        // Left side starts at the top-left corner and runs down; right side runs back up.
+        Assert.Equal(0, ranks[new TileCoord(0, 0)]);
+        Assert.Equal(minRight, ranks[new TileCoord(4, 2)]); // nearest right end to where the left side ended
+    }
+
+    [Fact]
+    public void Passable_gap_between_work_tiles_keeps_them_in_one_segment()
+    {
+        // Work tiles at x0 and x3 with x1,x2 passable (just no crop there): still one segment, so the
+        // sweep runs straight across — same as the whole-row behaviour.
+        var tiles = new[] { new TileCoord(0, 0), new TileCoord(3, 0) };
+
+        var ranks = SerpentineSweep.Rank(tiles, start: null, passable: _ => true);
+
+        Assert.Equal(0, ranks[new TileCoord(0, 0)]);
+        Assert.Equal(1, ranks[new TileCoord(3, 0)]);
+    }
+
     private static List<TileCoord> Grid(int x0, int x1, int y0, int y1)
     {
         var tiles = new List<TileCoord>();

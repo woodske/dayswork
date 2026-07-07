@@ -10,17 +10,18 @@ public sealed class ShiftPlanBuilder
     public IReadOnlyList<WorkBatch> BuildBatchPlan(
         WorkScopeSet scopes,
         IReadOnlySet<TaskKind> enabledTasks,
-        IReadOnlyList<TaskCategory> categoryPriority)
+        IReadOnlyList<TaskCategory> categoryPriority,
+        BatchOrderingContext? ordering = null)
     {
         if (scopes is null) throw new ArgumentNullException(nameof(scopes));
         if (enabledTasks is null) throw new ArgumentNullException(nameof(enabledTasks));
         if (categoryPriority is null) throw new ArgumentNullException(nameof(categoryPriority));
 
-        var animalBatches  = BuildAnimalCareBatches(scopes, enabledTasks);
-        var cropBatches    = BuildCropsBatches(scopes, enabledTasks);
+        var animalBatches  = BuildAnimalCareBatches(scopes, enabledTasks, ordering);
+        var cropBatches    = BuildCropsBatches(scopes, enabledTasks, ordering);
         var fieldworkBatches = BuildFieldworkBatches(scopes, enabledTasks);
-        var machineBatches = BuildMachineBatches(scopes);
-        var fishPondBatches = BuildFishPondBatches(scopes);
+        var machineBatches = BuildMachineBatches(scopes, ordering);
+        var fishPondBatches = BuildFishPondBatches(scopes, ordering);
 
         var result = new List<WorkBatch>(
             animalBatches.Count + cropBatches.Count + fieldworkBatches.Count + machineBatches.Count + fishPondBatches.Count);
@@ -44,13 +45,13 @@ public sealed class ShiftPlanBuilder
     /// full plan would place them. Used by the idle loop to re-run machine work after first-round
     /// work is finished.
     /// </summary>
-    public IReadOnlyList<WorkBatch> BuildMachineBatchPlan(WorkScopeSet scopes)
+    public IReadOnlyList<WorkBatch> BuildMachineBatchPlan(WorkScopeSet scopes, BatchOrderingContext? ordering = null)
     {
         if (scopes is null) throw new ArgumentNullException(nameof(scopes));
-        return BuildMachineBatches(scopes);
+        return BuildMachineBatches(scopes, ordering);
     }
 
-    private static List<WorkBatch> BuildMachineBatches(WorkScopeSet scopes)
+    private static List<WorkBatch> BuildMachineBatches(WorkScopeSet scopes, BatchOrderingContext? ordering)
     {
         var batches = new List<WorkBatch>();
         if (scopes.Machines is not { IsEnabled: true } machines)
@@ -62,15 +63,17 @@ public sealed class ShiftPlanBuilder
             .Select(machine => machine.LocationName)
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(name => name, StringComparer.Ordinal);
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
 
-        foreach (var location in locations)
+        // Nearest-neighbor over per-location batches (was pure name order — the easiest travel win).
+        foreach (var location in OrderLocationsByTravel(locations, ordering))
             batches.Add(CreateSkeleton(location, BatchKind.Machines, Array.Empty<TaskKind>(), feedBuilding: false));
 
         return batches;
     }
 
-    private static List<WorkBatch> BuildFishPondBatches(WorkScopeSet scopes)
+    private static List<WorkBatch> BuildFishPondBatches(WorkScopeSet scopes, BatchOrderingContext? ordering)
     {
         var batches = new List<WorkBatch>();
         if (scopes.FishPonds is not { IsEnabled: true } fishPonds)
@@ -82,15 +85,16 @@ public sealed class ShiftPlanBuilder
             .Select(pond => pond.LocationName)
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(name => name, StringComparer.Ordinal);
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
 
-        foreach (var location in locations)
+        foreach (var location in OrderLocationsByTravel(locations, ordering))
             batches.Add(CreateSkeleton(location, BatchKind.FishPonds, Array.Empty<TaskKind>(), feedBuilding: false));
 
         return batches;
     }
 
-    private static List<WorkBatch> BuildAnimalCareBatches(WorkScopeSet scopes, IReadOnlySet<TaskKind> enabledTasks)
+    private static List<WorkBatch> BuildAnimalCareBatches(WorkScopeSet scopes, IReadOnlySet<TaskKind> enabledTasks, BatchOrderingContext? ordering)
     {
         var batches = new List<WorkBatch>();
         var animalTasks = Order(enabledTasks.Where(TaskKindSets.IsAnimalService));
@@ -106,9 +110,16 @@ public sealed class ShiftPlanBuilder
         // building (indoors + its grazing animals) before moving to the next, instead of doing
         // every interior first and then a single combined outdoor pass. Farm-wide forage
         // (truffles) is not building-owned, so it runs once at the end as a FarmForage pass.
-        foreach (var building in scopes.AnimalBuildings
-                     .OrderBy(scope => scope.LocationName, StringComparer.Ordinal)
-                     .ThenBy(scope => scope.Tier))
+        //
+        // Buildings are visited nearest-neighbor by their outdoor door tile; each building's
+        // interior+grazing pair moves together as one unit (so "fully service one building before
+        // the next" survives the reorder). No ordering context ⇒ today's name+tier order.
+        var buildings = scopes.AnimalBuildings
+            .OrderBy(scope => scope.LocationName, StringComparer.Ordinal)
+            .ThenBy(scope => scope.Tier)
+            .ToList();
+
+        foreach (var building in OrderByTravel(buildings, scope => scope.LocationName, ordering))
         {
             batches.Add(CreateSkeleton(
                 building.LocationName,
@@ -134,14 +145,19 @@ public sealed class ShiftPlanBuilder
         return batches;
     }
 
-    private static List<WorkBatch> BuildCropsBatches(WorkScopeSet scopes, IReadOnlySet<TaskKind> enabledTasks)
+    private static List<WorkBatch> BuildCropsBatches(WorkScopeSet scopes, IReadOnlySet<TaskKind> enabledTasks, BatchOrderingContext? ordering)
     {
         var batches = new List<WorkBatch>();
         var managedCropLocations = ManagedCropLocations(scopes.ManagedCrops);
 
+        // Crops-category internal *structure* is fixed: managed non-farm → greenhouses → managed
+        // farm → outdoor crops → FarmCave. Within the multi-location slots (managed non-farm,
+        // greenhouses) batches are nearest-neighbor ordered when a context is supplied.
         EmitManagedCropBatches(
             batches,
-            managedCropLocations.Where(location => !string.Equals(location, "Farm", StringComparison.Ordinal)));
+            OrderLocationsByTravel(
+                managedCropLocations.Where(location => !string.Equals(location, "Farm", StringComparison.Ordinal)).ToList(),
+                ordering));
 
         var greenhouseTasks = Order(enabledTasks.Where(TaskKindSets.IsGreenhouseService));
         if (greenhouseTasks.Count > 0)
@@ -149,7 +165,7 @@ public sealed class ShiftPlanBuilder
             // One greenhouse batch per selected greenhouse: a farm may expose the vanilla
             // greenhouse and an expansion greenhouse (e.g. SVE's Grandpa's Shed) at once; each is
             // serviced as its own batch so the worker visits both in a single shift.
-            foreach (var greenhouse in scopes.GreenhouseWorks)
+            foreach (var greenhouse in OrderByTravel(scopes.GreenhouseWorks.ToList(), g => g.LocationName, ordering))
                 batches.Add(CreateSkeleton(greenhouse.LocationName, BatchKind.Greenhouse, greenhouseTasks, feedBuilding: false));
         }
 
@@ -203,6 +219,67 @@ public sealed class ShiftPlanBuilder
         foreach (var location in locations)
             batches.Add(CreateSkeleton(location, BatchKind.ManagedCrops, Array.Empty<TaskKind>(), feedBuilding: false));
     }
+
+    private static IReadOnlyList<string> OrderLocationsByTravel(IReadOnlyList<string> locations, BatchOrderingContext? ordering) =>
+        OrderByTravel(locations, name => name, ordering);
+
+    /// <summary>
+    /// Nearest-neighbor chain <paramref name="items"/> by their location's anchor tile, starting from
+    /// the worker's spawn anchor and hopping to the nearest remaining anchor each step (Manhattan
+    /// distance; ties break by location name ordinal, so output is deterministic). Items whose
+    /// location has no anchor sort last in their incoming (name) order. With no ordering context the
+    /// input order is returned unchanged — the pre-cache alphabetical behaviour.
+    /// </summary>
+    private static IReadOnlyList<T> OrderByTravel<T>(
+        IReadOnlyList<T> items,
+        Func<T, string> locationOf,
+        BatchOrderingContext? ordering)
+    {
+        if (ordering is null || items.Count <= 1)
+            return items;
+
+        var anchored = new List<T>();
+        var unanchored = new List<T>();
+        foreach (var item in items)
+        {
+            if (ordering.Anchors.ContainsKey(locationOf(item)))
+                anchored.Add(item);
+            else
+                unanchored.Add(item);
+        }
+
+        var result = new List<T>(items.Count);
+        var current = ordering.StartAnchor;
+        while (anchored.Count > 0)
+        {
+            var bestIdx = 0;
+            var bestAnchor = ordering.Anchors[locationOf(anchored[0])];
+            var bestDist = Manhattan(current, bestAnchor);
+            for (var i = 1; i < anchored.Count; i++)
+            {
+                var anchor = ordering.Anchors[locationOf(anchored[i])];
+                var dist = Manhattan(current, anchor);
+                if (dist < bestDist ||
+                    (dist == bestDist &&
+                     string.CompareOrdinal(locationOf(anchored[i]), locationOf(anchored[bestIdx])) < 0))
+                {
+                    bestIdx = i;
+                    bestDist = dist;
+                    bestAnchor = anchor;
+                }
+            }
+
+            result.Add(anchored[bestIdx]);
+            current = bestAnchor;
+            anchored.RemoveAt(bestIdx);
+        }
+
+        result.AddRange(unanchored); // deterministic degradation: name order, after the anchored ones
+        return result;
+    }
+
+    private static int Manhattan(TileCoord a, TileCoord b) =>
+        Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y);
 
     private static WorkBatch CreateSkeleton(
         string locationName,

@@ -1,10 +1,33 @@
 # Plan — Core pathfinding extraction + per-shift passability cache
 
-**Status:** proposed 2026-07-07, not started. Item #2 in
-[architecture-review-index.md](architecture-review-index.md). This is the keystone plan: it is a
-perf fix, a testability fix, and the enabler for
-[pathing-polish.md](pathing-polish.md) items (b)/(c) and the passability snapshot required by the
-deferred [stand-coverage-routing.md](stand-coverage-routing.md).
+**Status:** phase 1 **built + unit-tested 2026-07-07** (pending in-game smoke pass on a large farm).
+Item #2 in [architecture-review-index.md](architecture-review-index.md). This is the keystone plan:
+it is a perf fix, a testability fix, and the enabler for [pathing-polish.md](pathing-polish.md)
+items (b)/(c) and the passability snapshot required by the deferred
+[stand-coverage-routing.md](stand-coverage-routing.md).
+
+## What was built (2026-07-07)
+
+- **Core** `Dayswork.Core/Pathing/`: `IPassabilityView`, `PassabilityGrid`, `GridPathfinder` (BFS
+  cost map + route reconstruction) — lifted verbatim out of `WorkerMovementDriver`, N,E,S,W order
+  preserved. Unit tests: `Dayswork.Tests/Pathing/GridPathfinderTests.cs` (12 cases: cost maps,
+  unreachable/OOB/blocked-end, start==end, tie-order, determinism, single-cell re-probe).
+- **Game side** `LivePassabilityView` (live probe) + `LocationPassabilityCache` on `ShiftSession`.
+  `WorkerMovementDriver.ComputeRouteCostsFrom`/`TryFindRoute` now delegate to `GridPathfinder` via
+  the live view; the driver's private BFS/`Neighbours`/`IsWithinMap`/`ReconstructPath` were deleted.
+- **Cached call sites** (7): `TrySelectNextActiveWork`, `ResolveReachableShiftExitTile`,
+  `BuildBuildingExitPlan`, `ResolveFishPondNavTile`, `TrySelectChestDepositStandTile` (cache threaded
+  through the static method's 4 callers), and `ManagedShoppingCoordinator` ×2.
+- **Invalidation:** clump-clear footprint re-probe (`TaskActions`), SMAPI
+  Object/TerrainFeature/Furniture/Building list-changed (`ShiftOrchestrator.Passability.cs` + wired
+  in `ModEntry`), stuck-recovery `InvalidateLocation` in `QueueStuckTeleport`.
+- **Hard rule 7:** the FarmAnimal collision question is resolved — with `character: null` the animal
+  loop is skipped entirely, so animals were never in the probe's answer and need no special handling.
+  Recorded in `docs/pathing.md`. The inset-rect `+1/62` corner math transfers unchanged (the grid is
+  built from the same `IsTilePassableForWorker` probe).
+
+Phase 2 (targeted A* for sweep categories) intentionally deferred — build only if profiling says the
+remaining cost matters.
 
 ## Problem
 

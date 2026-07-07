@@ -415,7 +415,7 @@ internal sealed partial class ShiftOrchestrator
         if (_session is null || Session.Worker is null)
             return;
 
-        if (!ShiftOrchestrator.TrySelectChestDepositStandTile(job.Chest.Tile, chestLocation, Session.Worker, out var standTile))
+        if (!ShiftOrchestrator.TrySelectChestDepositStandTile(job.Chest.Tile, chestLocation, Session.Worker, Session.Passability, out var standTile))
         {
             // Can't reach the input chest — fall back to collecting this group only. Its collect→reload
             // steps are already queued; the loads no-op against an empty carry buffer, so nothing is
@@ -1082,7 +1082,7 @@ internal sealed partial class ShiftOrchestrator
     private TileCoord ResolveMachineNavTile(TileCoord machineTile, GameLocation location)
     {
         if (Session.Worker is not null
-            && ShiftOrchestrator.TrySelectChestDepositStandTile(machineTile, location, Session.Worker, out var stand))
+            && ShiftOrchestrator.TrySelectChestDepositStandTile(machineTile, location, Session.Worker, Session.Passability, out var stand))
             return stand;
 
         return new TileCoord(machineTile.X, machineTile.Y + 1);

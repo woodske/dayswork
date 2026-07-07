@@ -175,7 +175,7 @@ internal sealed partial class ShiftOrchestrator
             return Session.FarmExitTile;
 
         var source = new TileCoord(Session.Worker.TilePoint.X, Session.Worker.TilePoint.Y);
-        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, farm);
+        var routeCosts = Session.Passability.RouteCostsFrom(source, farm);
         if (routeCosts.ContainsKey(Session.FarmExitTile))
             return Session.FarmExitTile;
 

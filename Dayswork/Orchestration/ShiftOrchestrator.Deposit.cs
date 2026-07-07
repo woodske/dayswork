@@ -128,13 +128,14 @@ internal sealed partial class ShiftOrchestrator
         // Eager mid-batch flush deposits only player-chest-bound items; the terminal/pre-idle flush
         // takes everything.
         var eager = Session.DepositResume == DepositResumeMode.ResumeBatch;
+        var workerLocation = Session.Worker?.currentLocation?.NameOrUniqueName ?? farm.Name;
         var plan = _depositPlanner.Plan(
             Session.Ctx.Buffer.Snapshot(),
             Session.Ctx.TaskDestinations,
             BuildOutputProvenanceMap(),
-            ResolveShippingBinDepositTile(farm),
-            workerTile,
-            Manhattan,
+            new DepositStop(farm.Name, ResolveShippingBinDepositTile(farm)),
+            new DepositStop(workerLocation, workerTile),
+            (a, b) => DepositStopDistance(a, b, farm),
             chestDestinationsOnly: eager);
 
         // Items resolved straight to automatic delivery are seeded into the overflow set.
@@ -259,14 +260,59 @@ internal sealed partial class ShiftOrchestrator
         BeginCurrentBatch();
     }
 
+    // Cross-location deposit-trip metric (architecture review #6). Same-location stops compare by
+    // tile (Manhattan); cross-location stops measure between the buildings' farm-side door tiles plus
+    // a hop penalty far larger than any intra-location distance — so same-location chests always group
+    // and the worker never zig-zags farm → interior → farm. Locations that don't resolve to a
+    // farm-side door (e.g. an expansion without a farm warp) sort last via a large sentinel, the
+    // right degradation.
+    private const int DepositHopCost = 10_000;
+    private const int DepositUnresolvedPenalty = 1_000_000;
+
+    private int DepositStopDistance(DepositStop a, DepositStop b, Farm farm)
+    {
+        if (string.Equals(a.LocationName, b.LocationName, StringComparison.Ordinal))
+            return Manhattan(a.Tile, b.Tile);
+
+        if (!TryFarmSideTile(a, farm, out var farmA, out var interiorA) ||
+            !TryFarmSideTile(b, farm, out var farmB, out var interiorB))
+            return DepositUnresolvedPenalty;
+
+        // farm ↔ interior = 1 hop; interior ↔ interior (different) = 2 hops via the farm.
+        var hops = interiorA && interiorB ? 2 : 1;
+        return hops * DepositHopCost + Manhattan(farmA, farmB);
+    }
+
+    private static bool TryFarmSideTile(DepositStop stop, Farm farm, out TileCoord tile, out bool isInterior)
+    {
+        if (string.Equals(stop.LocationName, farm.Name, StringComparison.Ordinal))
+        {
+            tile = stop.Tile;
+            isInterior = false;
+            return true;
+        }
+
+        if (BuildingLocationResolver.TryResolve(farm, stop.LocationName, out var match))
+        {
+            tile = match.OutdoorDoorTile;
+            isInterior = true;
+            return true;
+        }
+
+        tile = default;
+        isInterior = false;
+        return false;
+    }
+
     internal static bool TrySelectChestDepositStandTile(
         TileCoord chestTile,
         GameLocation location,
         FarmhandNpc worker,
+        LocationPassabilityCache passability,
         out TileCoord standTile)
     {
         var source = new TileCoord(worker.TilePoint.X, worker.TilePoint.Y);
-        var routeCosts = WorkerMovementDriver.ComputeRouteCostsFrom(source, location);
+        var routeCosts = passability.RouteCostsFrom(source, location);
         return WorkerRouteSelector.TrySelectPreferredStandTile(
             DepositStandTilesAround(chestTile),
             routeCosts,
