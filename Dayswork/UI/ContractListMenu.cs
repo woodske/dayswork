@@ -46,6 +46,7 @@ internal sealed class ContractListMenu : IClickableMenu
     private readonly string _cancelLabel;
     private readonly string _editLabel;
     private readonly string _upgradesLabel;
+    private readonly string _hireLabel;
     private readonly string _pausedLabel;
     private readonly string _activeLabel;
     private readonly string _oneTimeLabel;
@@ -70,6 +71,7 @@ internal sealed class ContractListMenu : IClickableMenu
         ClickableComponent EditBtn);
 
     private ClickableComponent? _upgradesBtn;
+    private ClickableComponent? _hireBtn;   // shown only while under the contract capacity
 
     internal ContractListMenu(ContractStore store, IModHelper helper)
         : base(0, 0, MenuWidth, ContractMenuLayout.Height)
@@ -83,6 +85,7 @@ internal sealed class ContractListMenu : IClickableMenu
         _cancelLabel     = I18nHelper.Get("ui.contract_list.cancel");
         _editLabel       = I18nHelper.Get("ui.contract_list.edit");
         _upgradesLabel   = I18nHelper.Get("ui.contract_list.upgrades");
+        _hireLabel       = I18nHelper.Get("ui.contract_list.hire");
         _pausedLabel     = I18nHelper.Get("ui.contract_list.paused_label");
         _activeLabel     = I18nHelper.Get("ui.contract_list.active_label");
         _oneTimeLabel    = I18nHelper.Get("ui.contract_list.schedule_one_time");
@@ -119,6 +122,18 @@ internal sealed class ContractListMenu : IClickableMenu
             .Where(c => c.Status == ContractStatus.Active || c.Status == ContractStatus.Paused)
             .ToList();
 
+        // "Hire" appears left of Upgrades while there's still worker capacity.
+        _hireBtn = contracts.Count < HiringFlowCoordinator.MaxActiveContracts
+            ? new ClickableComponent(
+                new Rectangle(
+                    xPositionOnScreen + width - UpgradesBtnWidth - 24 - (BtnWidth + 12),
+                    yPositionOnScreen + 16,
+                    BtnWidth,
+                    BtnHeight),
+                "Hire",
+                _hireLabel)
+            : null;
+
         _allRows = contracts
             .Select((contract, index) => BuildRow(contract, index))
             .ToList();
@@ -136,9 +151,11 @@ internal sealed class ContractListMenu : IClickableMenu
     private ContractRowData BuildRow(Contract contract, int index)
     {
         var textAreaWidth = _bodyRect.Width - (BtnWidth + 8) * 3 - 24;
-        string rawTaskSummary = contract.EnabledTasks.Count > 0
+        string taskList = contract.EnabledTasks.Count > 0
             ? string.Join(", ", contract.EnabledTasks.Select(TaskLabel))
             : I18nHelper.Get("ui.common.none");
+        string rawTaskSummary =
+            $"{Worker.FarmhandNpc.DisplayNameFor(contract.Preferences.WorkerName)} — {taskList}";
 
         // Wrap task text to the left text-area column (buttons occupy the right).
         string wrapped    = Game1.parseText(rawTaskSummary, Game1.smallFont, textAreaWidth);
@@ -294,6 +311,14 @@ internal sealed class ContractListMenu : IClickableMenu
         {
             Game1.playSound("smallSelect");
             ModEntry.Coordinator.ShowUpgradesFromManage();
+            return;
+        }
+
+        if (_hireBtn?.bounds.Contains(x, y) == true)
+        {
+            Game1.playSound("smallSelect");
+            exitThisMenu();
+            ModEntry.Coordinator.OpenHiringFlow();
         }
     }
 
@@ -347,7 +372,7 @@ internal sealed class ContractListMenu : IClickableMenu
 
     private void TryCancel(Contract contract)
     {
-        if (ModEntry.Orchestrator.ActiveContractId == contract.Id)
+        if (ModEntry.Fleet.IsShiftRunning(contract.Id))
         {
             Game1.addHUDMessage(new HUDMessage(_cancelBlockedMsg, HUDMessage.error_type));
             return;
@@ -365,6 +390,8 @@ internal sealed class ContractListMenu : IClickableMenu
         allClickableComponents.Clear();
         if (_upgradesBtn is not null)
             allClickableComponents.Add(_upgradesBtn);
+        if (_hireBtn is not null)
+            allClickableComponents.Add(_hireBtn);
         foreach (var row in _visibleRows)
         {
             allClickableComponents.Add(row.PauseResumeBtn);
@@ -404,6 +431,8 @@ internal sealed class ContractListMenu : IClickableMenu
 
         if (_upgradesBtn is not null)
             DrawSmallButton(b, _upgradesBtn);
+        if (_hireBtn is not null)
+            DrawSmallButton(b, _hireBtn);
 
         if (_allRows.Count == 0)
         {

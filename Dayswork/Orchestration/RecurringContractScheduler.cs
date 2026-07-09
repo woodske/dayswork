@@ -13,12 +13,12 @@ namespace Dayswork.Orchestration;
 
 // The fixed-price day-start lifecycle: recurring terms refresh at 6am, affordability/notice
 // decisions from the rebuilt terms snapshot, festival no-charge skips, and same-day HUD notices.
-// Single-active-contract invariant is enforced at hire time, so the loop processes at
-// most one contract per day.
+// Each contract scheduled for today gets its own concurrent shift via the fleet; the loop runs
+// in deterministic hire order so wallet charges and work-claim priority are stable day to day.
 internal sealed class RecurringContractScheduler
 {
     private readonly ContractStore _store;
-    private readonly ShiftOrchestrator _orchestrator;
+    private readonly ShiftFleet _fleet;
     private readonly CalendarHandlers _calendar;
     private readonly RecurringDayStartDecisionEngine _decisionEngine;
     private readonly ModConfigManager _configManager;
@@ -27,7 +27,7 @@ internal sealed class RecurringContractScheduler
 
     public RecurringContractScheduler(
         ContractStore store,
-        ShiftOrchestrator orchestrator,
+        ShiftFleet fleet,
         CalendarHandlers calendar,
         RecurringDayStartDecisionEngine decisionEngine,
         ModConfigManager configManager,
@@ -35,7 +35,7 @@ internal sealed class RecurringContractScheduler
         IShiftOutcomeDispatcher shiftOutcomes)
     {
         _store = store;
-        _orchestrator = orchestrator;
+        _fleet = fleet;
         _calendar = calendar;
         _decisionEngine = decisionEngine;
         _configManager = configManager;
@@ -50,7 +50,14 @@ internal sealed class RecurringContractScheduler
             return;
 
         var today = CurrentGameDate();
-        var contractsForToday = _store.ListActiveForDate(today.Day, today.Season, today.Year);
+        // Deterministic order (store is dictionary-backed): earliest hire first, id as tiebreak —
+        // fixes both wallet-charge order and work-claim priority for overlapping scopes.
+        var contractsForToday = _store.ListActiveForDate(today.Day, today.Season, today.Year)
+            .OrderBy(c => c.HireDate.Year)
+            .ThenBy(c => c.HireDate.Season)
+            .ThenBy(c => c.HireDate.Day)
+            .ThenBy(c => c.Id.Value)
+            .ToList();
         var config = FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, _upgradeStore.State);
         var holidaySkip = _calendar.IsFestivalToday() && !config.WorkOnHolidays;
 
@@ -71,7 +78,7 @@ internal sealed class RecurringContractScheduler
                     // One-time: fixed price already paid at hire. Mark Executed before spawning so a
                     // reload on the same day cannot re-fire.
                     _store.Update(contract.Id, contract with { Status = ContractStatus.Executed });
-                    _orchestrator.StartShift(contract, config);
+                    _fleet.StartShift(contract, config);
                 }
                 else
                 {
@@ -142,7 +149,7 @@ internal sealed class RecurringContractScheduler
             var refreshedContract = outcome.Refresh.TermsSnapshot is null
                 ? contract
                 : contract with { TermsSnapshot = outcome.Refresh.TermsSnapshot };
-            _orchestrator.StartShift(refreshedContract, config);
+            _fleet.StartShift(refreshedContract, config);
         }
     }
 

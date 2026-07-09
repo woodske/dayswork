@@ -19,7 +19,8 @@ internal static class ContractStructuralComparer
         && TermsSnapshotsEqual(left.TermsSnapshot, right.TermsSnapshot)
         && CropPlansEqual(left.CropPlan, right.CropPlan)
         && left.MachineScope.Equals(right.MachineScope)
-        && left.FishPondScope.Equals(right.FishPondScope);
+        && left.FishPondScope.Equals(right.FishPondScope)
+        && left.Preferences == right.Preferences;
 
     public static bool ScopeSelectionsEqual(ContractScopeSelection left, ContractScopeSelection right) =>
         ZonesEqual(left.OutdoorZones, right.OutdoorZones)

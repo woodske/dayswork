@@ -72,11 +72,21 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
   + resource clumps.
 
 ### Orchestration (`Dayswork/Orchestration/`) — the shift loop
+- **`ShiftFleet`** — the multi-farmhand layer: one `ShiftOrchestrator` **per active contract**,
+  created from a factory in `ModEntry` (each with its own `WorkerMovementDriver`,
+  `ToolSwapAnimator`, and `TravelRunner`). The fleet subscribes once to the game events
+  (`UpdateTicked`, `TimeChanged`, the four `World.*ListChanged`, sleep/reset hooks) and fans out
+  to every live orchestrator **sequentially** — that sequencing IS the concurrency model: each
+  worker's guarded vanilla-API beat runs synchronously inside one callback, so two workers can
+  never interleave their `Game1.player` snapshot/restore. Finished orchestrators are pruned; the
+  office "work done" overlay lights only when the **last** worker exits. **`FleetDay`** (created
+  fresh each `DayStarted`) carries the day's shared state: the `WorkClaimRegistry`, reserved
+  spawn tiles + the spawn-stagger index, and the normal-exit flag.
 - **`ShiftOrchestrator`** (partial across `.cs`, `.WorkSelection`, `.TaskActions`, `.Movement`,
   `.Routing`, `.Travel`, `.Deposit`, `.Debris`, `.ManagedCrops`) — the engine: per-tick intent
   dispatch, work-batch selection, energy spend, stuck recovery, and the state-machine
   transitions. The orchestrator itself holds only long-lived services plus one nullable
-  `ShiftSession` reference.
+  `ShiftSession` reference (one orchestrator = one shift; the fleet owns the plurality).
 - **`ShiftSession`** — all mutable per-shift state in one object (the Core `ShiftContext`, the
   worker NPC, current location, action/batch/travel/managed-crop state). Created by `StartShift`
   once spawn succeeds and discarded when the shift ends — constructing a fresh session IS the
@@ -97,9 +107,10 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
   Each plan carries a failure policy: `ReportFailure` (caller decides: skip batch, mark trip
   undelivered, abort shopping) or `WarpToDestination` (never strand the worker — warp straight to
   the destination and continue).
-- **`RecurringContractScheduler`** — `DayStarted` hook: for each contract due today, handles
+- **`RecurringContractScheduler`** — `DayStarted` hook: for each contract due today (sorted by
+  hire date then id, so wallet-charge order and work-claim priority are deterministic), handles
   festival skips, recurring-terms refresh + affordability, charges the player, and calls
-  `StartShift`.
+  `ShiftFleet.StartShift`.
 - **`CalendarHandlers`** — reads festival/weather state (fail-safe); its `Saving` hook
   (`StopForSleepAndSettle`) settles the worker **before** contracts persist.
 - **`SessionResetHandler`** — clears in-memory worker runtime on `SaveLoaded` / `ReturnedToTitle`.
@@ -113,7 +124,11 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 - **Pricing/Energy** — `ContractTermsBuilder` (validates scope×task pairs, prices the tier,
   builds the energy profile); `WorkerEnergyLedger` spends energy per beat.
 - **Shifts** — `ShiftStateMachine`, `ShiftPlanBuilder` (orders the day's batches),
-  `TaskPriorityOrderer`, `WorkerRouteSelector`, `StuckDetector`, `WorkUnitBoundaryClassifier`.
+  `TaskPriorityOrderer`, `WorkerRouteSelector`, `StuckDetector`, `WorkUnitBoundaryClassifier`,
+  `WorkClaimRegistry` (per-day claims keyed by domain — tile+task, animal+task, machine, fish
+  pond, managed dirt — so overlapping contract scopes never double-service a work item; claims
+  are taken when work is queued, are idempotent for their owner, and are never released, so a
+  claimed-but-unworked item just waits until tomorrow).
 - **Inventory** — `ItemBuffer` (task-tagged collected items), `DepositPlanner`, `OverflowCategorizer`.
 - **Domain / Persistence** — `Contract` + DTOs, `ContractStore`, value types (`TileCoord`, `Zone`,
   `GameDate`, `TaskKind`, `EnergyTier`, …).
@@ -123,8 +138,11 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 ## Hiring / contract flow
 
 1. Player action-clicks the office's bulletin board → `HiringFlowCoordinator.OpenFromBuilding`.
-   If an Active/Paused contract already exists it opens **Manage** instead (single-active-contract
-   invariant).
+   If any Active/Paused contract exists it opens **Manage** instead; the Manage list's **Hire**
+   button starts a new contract while under capacity (`HiringFlowCoordinator.MaxActiveContracts`
+   — one worker per contract; capacity progression is a deferred design decision). Workers are
+   player-nameable from the Preferences spoke (vanilla `NamingMenu`; the name persists on
+   `ContractPreferences.WorkerName`).
 2. The hub-and-spoke menus mutate a `ContractDraft`; every change re-runs
    `ContractTermsBuilder.BuildPreview` → live energy + price + validation. Confirm is gated on a
    valid chargeable scope×task pairing.
@@ -136,15 +154,21 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 
 ## Shift execution loop
 
-`DayStarted` → `RecurringContractScheduler` → `ShiftOrchestrator.StartShift`:
+`DayStarted` → `ShiftFleet.OnDayStarted` (fresh `FleetDay`) → `RecurringContractScheduler` →
+`ShiftFleet.StartShift` (one orchestrator per contract) → `ShiftOrchestrator.StartShift`:
 
 1. Snapshot player tool levels; normalize scope to live locations; classify work scopes.
 2. `ShiftPlanBuilder` orders the day into **batches**: per animal building (interior feed/pet/
    collect, then that building's grazing animals), then a farm-wide forage sweep (truffles), then
    managed-crop batches, greenhouses, outdoor crops, outdoor clearing. `WorkAreaScanner` populates
-   each batch's tile/animal work.
+   each batch's tile/animal work. When a batch is queued (`QueueBatchWork` and the feature
+   batch-start builders), each item is claimed in the day's `WorkClaimRegistry`; items another
+   contract already claimed are dropped.
 3. If no applicable work exists, **no worker spawns**. Otherwise spawn `FarmhandNpc` at the farm
-   entrance tile (resolved from `farm.warps`, expansion-overridable).
+   entrance tile (resolved from `farm.warps`, expansion-overridable). Concurrent workers each get
+   a distinct spawn tile (`FleetDay.ReservedSpawnTiles`) and a staggered morning entrance hold so
+   they file out one at a time. Workers never path-block each other (the passability probe passes
+   `character: null`).
 
 Per `UpdateTicked` (gated on `Game1.shouldTimePass(false)`), tool animation
 (`ToolSwapAnimator.Update`), the movement driver (`WorkerMovementDriver.Update` — so the worker

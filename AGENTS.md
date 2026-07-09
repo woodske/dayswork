@@ -44,8 +44,13 @@ facts under `docs/`. Update `docs/game-content-search.md` if any new search tech
    put pure logic (pricing, energy, state machine, planning, DTOs) in Core where it's unit-tested.
 2. **No Harmony.** The mod uses SMAPI events only — there are no Harmony patches and no
    `<EnableHarmony>`. Don't add one without a hard reason; prefer an event hook.
-3. **Single active contract.** At most one Active/Paused contract at a time (enforced in the hiring
-   flow and assumed by the scheduler).
+3. **Capped concurrent contracts, one worker each.** At most `HiringFlowCoordinator.MaxActiveContracts`
+   Active/Paused contracts at a time (enforced in the hiring flow); each contract runs its own
+   worker + `ShiftOrchestrator` behind `ShiftFleet`. The fleet fans events out **sequentially** —
+   that sequencing serializes the guarded vanilla-API beats (they mutate shared `Game1.player`
+   state), so never invoke two orchestrators from concurrent callbacks. Overlapping work scopes
+   are arbitrated by the per-day `WorkClaimRegistry` (claimed at queue time; a work item is never
+   double-serviced).
 4. **Items are never lost — and never degraded.** Two invariants on every collected item/material:
    - *Never lost.* Every deposit/overflow path falls back so output ends up somewhere safe
      (chest → office output chest → shipping bin). Preserve this when touching deposit or shift-stop code.
@@ -58,8 +63,9 @@ facts under `docs/`. Update `docs/game-content-search.md` if any new search tech
      `FlavorItemRegistry` + `BufferedItem.FlavorId`). Quality/flavor/etc. are also part of the
      consolidation key so distinct variants never merge. When you add a new collect path or touch the
      deposit pipeline, verify nothing silently genericizes an item.
-5. **The worker is removed before save.** `CalendarHandlers.OnSavingHook` runs before persistence
-   and despawns the `FarmhandNpc`; never let it serialize into the save.
+5. **Workers are removed before save.** `CalendarHandlers.OnSavingHook` runs before persistence
+   and despawns every live `FarmhandNpc` (via `ShiftFleet.StopForSleepAndSettle`); never let one
+   serialize into the save.
 6. **Single-player only.** Guard new entry points with `MultiplayerGuard.IsMultiplayer()`.
 7. **Verify game content — never guess.** Warp/entrance tiles, item ids, qualified ids, building
    ids, category numbers, event/data keys, animal data, etc. must be confirmed against the actual
@@ -95,14 +101,17 @@ facts under `docs/`. Update `docs/game-content-search.md` if any new search tech
 
 ## Where things live
 
-- `Dayswork/Orchestration/` — the shift engine. `ShiftOrchestrator.*` partials drive the tick
-  loop and the state-machine transitions; **all mutable per-shift state lives on `ShiftSession`**
-  (created at shift start, discarded at shift end — a fresh session is the reset), which also
-  holds the per-shift `ManagedShoppingCoordinator` (store trips) and `DepositTripRunner`
-  (chest/bin deposit trips). Day-start scheduler, work scanning, and animal handling live
-  alongside. All cross-location movement (building doors, expansion hops, store trips) runs
-  through one primitive: `Travel.cs` (`TravelPlan` + `TravelRunner`), with the completion
-  dispatch in `ShiftOrchestrator.Travel.cs`.
+- `Dayswork/Orchestration/` — the shift engine. `ShiftFleet` runs **one `ShiftOrchestrator` per
+  active contract** (each with its own movement driver / tool animator / travel runner, built by
+  the factory in `ModEntry`) and fans game events out to them sequentially; `FleetDay` carries
+  the day's shared state (work claims, spawn-tile reservations + stagger, "all done" flag).
+  `ShiftOrchestrator.*` partials drive the tick loop and the state-machine transitions; **all
+  mutable per-shift state lives on `ShiftSession`** (created at shift start, discarded at shift
+  end — a fresh session is the reset), which also holds the per-shift
+  `ManagedShoppingCoordinator` (store trips) and `DepositTripRunner` (chest/bin deposit trips).
+  Day-start scheduler, work scanning, and animal handling live alongside. All cross-location
+  movement (building doors, expansion hops, store trips) runs through one primitive: `Travel.cs`
+  (`TravelPlan` + `TravelRunner`), with the completion dispatch in `ShiftOrchestrator.Travel.cs`.
 - `Dayswork/Integration/` — building definition + interaction, persistence, config/GMCM, chest and
   shop resolution.
 - `Dayswork/UI/` — the hub-and-spoke hiring menus + a small layout toolkit (`UI/Layout/`).
@@ -178,6 +187,15 @@ once to collect→reload) all verified in-world. A group's **input chest may be 
 (2026-06-23, collect-only) is built, unit-tested, and **passed its in-game smoke pass on
 2026-07-07 — release-ready**; see `docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
 blueberry wine, flavored honey…) end-to-end via the per-shift `FlavorItemRegistry` +
-`BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). Dev tooling (verbose logs
-+ console commands like `dayswork_end_shift`, `dayswork_debug_machines`, `dayswork_debug_leaks`) is gated behind
-`DevLog.Enabled`, off for release.
+`BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). **Multiple farmhands**
+(2026-07-08) is built and unit-tested, **in-game smoke pass pending**: up to
+`HiringFlowCoordinator.MaxActiveContracts` (3, placeholder — capacity/pricing progression
+deferred) concurrent contracts, one player-nameable worker each (`ContractPreferences.WorkerName`,
+named via vanilla `NamingMenu` from the Preferences spoke; unique per-contract NPC names with
+`getTextureName()` pinned to the shared sprite), all running simultaneously through `ShiftFleet`
+(sequential fan-out serializes guarded beats), with per-day work claiming (`WorkClaimRegistry`),
+staggered distinct-tile morning spawns, a brief chest-mutex wait before overflow fallback, a
+"Hire" button on the Manage list, and office lights gated on the *last* worker finishing. Dev
+tooling (verbose logs + console commands like `dayswork_end_shift [id-prefix]`,
+`dayswork_debug_machines`, `dayswork_debug_leaks`) is gated behind `DevLog.Enabled`, off for
+release.

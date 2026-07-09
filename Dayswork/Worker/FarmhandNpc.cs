@@ -1,3 +1,4 @@
+using Dayswork.Core.Domain;
 using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -15,19 +16,34 @@ internal sealed class FarmhandNpc : NPC
     // because OnSaving removes the NPC before the save is written.
     public FarmhandNpc() { }
 
-    public FarmhandNpc(Vector2 spawnPixelPosition)
+    public FarmhandNpc(Vector2 spawnPixelPosition, ContractId contractId, string workerName)
         : base(
             new AnimatedSprite(SpritePath, 0, 16, 32),
             spawnPixelPosition,
             2,
-            InternalName)
+            // Unique per contract so N concurrent workers never collide in name-based game
+            // lookups (getCharacterFromName, net sync, serialization guards).
+            $"{InternalName}_{contractId.Value:N}")
     {
-        this.displayName = I18nHelper.Get("npc.farmhand.name");
+        this.displayName = DisplayNameFor(workerName);
         this.Portrait = Game1.content.Load<Texture2D>(PlaceholderPortraitPath);
         this.AllowDynamicAppearance = false;
         this.IsInvisible = false;
         this.HideShadow = false;
     }
+
+    /// <summary>The player-facing name for a worker: the contract's chosen name, or the generic
+    /// localized "Farmhand" when unset. Shared by the NPC display name and HUD notices.</summary>
+    internal static string DisplayNameFor(string workerName) =>
+        string.IsNullOrWhiteSpace(workerName)
+            ? I18nHelper.Get("npc.farmhand.name")
+            : workerName;
+
+    // The unique per-contract Name would otherwise drive vanilla texture resolution:
+    // getTextureName() falls back to the NPC name when there's no Data/Characters entry, and
+    // ChooseAppearance/reloadSprite build "Characters/…" + "Portraits/…" paths from it. Pin it
+    // to the shared asset name so every worker loads the one farmhand sprite/portrait.
+    public override string getTextureName() => InternalName;
 
     private int _staminaRemaining;
     private int _staminaCapacity;

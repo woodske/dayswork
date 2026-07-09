@@ -167,6 +167,9 @@ public sealed class SaveDataSerializer
             {
                 AvoidBlueGrass = contract.Preferences.AvoidBlueGrass,
                 IdleTask = contract.Preferences.IdleTask.ToString(),
+                WorkerName = string.IsNullOrEmpty(contract.Preferences.WorkerName)
+                    ? null
+                    : contract.Preferences.WorkerName,
             },
         };
 
@@ -199,7 +202,10 @@ public sealed class SaveDataSerializer
             var idleTask = Enum.TryParse<IdleTaskKind>(dto.Preferences.IdleTask, ignoreCase: true, out var parsedIdleTask)
                 ? parsedIdleTask
                 : IdleTaskKind.None;
-            preferences = new ContractPreferences(AvoidBlueGrass: avoidBlueGrass, IdleTask: idleTask);
+            preferences = new ContractPreferences(
+                AvoidBlueGrass: avoidBlueGrass,
+                IdleTask: idleTask,
+                WorkerName: dto.Preferences.WorkerName ?? "");
         }
         else
         {

@@ -32,6 +32,10 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     // Melee proximity range for hit-detection (Manhattan distance in tiles).
     private const float HitRangeTiles = 2.0f;
 
+    // Extra morning hold per already-spawned worker (~0.75s at 60 UPS) so concurrent workers
+    // file out of the office one at a time instead of scattering in a clump.
+    private const int SpawnStaggerHoldTicksPerWorker = 45;
+
     // Brief morning hold so the player sees the worker enter from the farm entrance.
     // Vanilla tree debris can spawn after the tree-fall animation, not on the axe-hit tick.
     private const int ImmediateDebrisSweepRadiusTiles = 3;
@@ -63,6 +67,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private ShiftSession? _session;
     private ShiftSession Session =>
         _session ?? throw new InvalidOperationException("No active shift session.");
+
+    // Day-scoped state shared with the other concurrent shifts (set at StartShift by the fleet).
+    private FleetDay? _day;
 
     public ShiftOrchestrator(
         ToolLevelReader toolReader,
@@ -214,7 +221,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _session = null;
     }
 
-    public void StartShift(Contract contract, ConfigSnapshot runtimeConfig)
+    public void StartShift(Contract contract, ConfigSnapshot runtimeConfig, FleetDay day)
     {
         if (_session is not null)
         {
@@ -222,6 +229,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
+        _day = day;
         _config = runtimeConfig;
         var priorityOrderer = new TaskPriorityOrderer(contract.CategoryPriority);
         var contractTerms = contract.TermsSnapshot;
@@ -245,8 +253,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             LogLevel.Info);
 
         // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,
-        // because the warp tile varies by farm type and player map edits).
-        var farmExitTile = ResolveSpawnExitTile(farm);
+        // because the warp tile varies by farm type and player map edits). Tiles already taken by
+        // workers spawned earlier this morning are excluded so each gets its own.
+        var farmExitTile = ResolveSpawnExitTile(farm, day.ReservedSpawnTiles);
         var batchOrdering = BuildBatchOrdering(workScopes, farm, farmExitTile);
         var batches = BuildInitialBatches(contract, workScopes, farm, snapshot, farmExitTile, priorityOrderer, batchOrdering);
 
@@ -264,17 +273,19 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         var spawnPos = new Vector2(farmExitTile.X, farmExitTile.Y) * 64f;
-        var farmhand = new FarmhandNpc(spawnPos);
+        var farmhand = new FarmhandNpc(spawnPos, contract.Id, contract.Preferences.WorkerName);
         farm.addCharacter(farmhand);
+        day.ReservedSpawnTiles.Add(farmExitTile);
         _toolAnimator.SetWorker(farmhand);
         _toolAnimator.SetPacingProfile(pacingProfile);
         _nav.SetPacingProfile(pacingProfile);
         farmhand.SetStamina(energyState.RemainingEnergy, energyState.Capacity);
 
-        // Reset the shift-scoped pieces that outlive a session.
+        // Reset the shift-scoped pieces that outlive a session. (CropHudNotifier is day-scoped
+        // and reset by the fleet — a per-shift reset here would re-arm the dedup flags of the
+        // other workers starting the same morning.)
         _travel.Clear();
         _shopStockReader.ResetForShift();
-        Dayswork.Integration.CropHudNotifier.ResetForShift();
 
         var ctx = new ShiftContext(
             contractId:       contract.Id,
@@ -300,7 +311,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         {
             LastSampledGameTime = Game1.timeOfDay,
             LastTilePos = farmhand.TilePoint,
-            MorningEntranceHoldTicks = pacingProfile.EntranceHoldTicks,
+            MorningEntranceHoldTicks = pacingProfile.EntranceHoldTicks
+                + day.NextSpawnIndex() * SpawnStaggerHoldTicksPerWorker,
             BatchOrdering = batchOrdering,
         };
         _session.Shopping = new ManagedShoppingCoordinator(
@@ -322,7 +334,11 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             _buildingNavigator);
 
         Game1.addHUDMessage(new HUDMessage(
-            I18nHelper.Get("notify.shift_started", new { price = contract.TermsSnapshot.Pricing.TotalPrice }),
+            I18nHelper.Get("notify.shift_started", new
+            {
+                name = FarmhandNpc.DisplayNameFor(contract.Preferences.WorkerName),
+                price = contract.TermsSnapshot.Pricing.TotalPrice,
+            }),
             HUDMessage.newQuest_type));
 
         BeginCurrentBatch();

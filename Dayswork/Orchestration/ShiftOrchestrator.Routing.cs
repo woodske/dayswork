@@ -21,16 +21,19 @@ namespace Dayswork.Orchestration;
 
 internal sealed partial class ShiftOrchestrator
 {
-    private static TileCoord ResolveSpawnExitTile(Farm farm)
+    private static TileCoord ResolveSpawnExitTile(Farm farm, ISet<TileCoord>? excludeSpawnTiles = null)
     {
         var building = HiringBuildingInteraction.FindHiringBuilding(farm);
         if (building is not null)
         {
             var door = building.getPointForHumanDoor();
-            return ResolvePassableNearby(new TileCoord(door.X, door.Y + 1), farm);
+            return ResolvePassableNearby(new TileCoord(door.X, door.Y + 1), farm, excludeSpawnTiles);
         }
 
-        return FindFarmExitTile(farm);
+        var exit = FindFarmExitTile(farm);
+        return excludeSpawnTiles?.Contains(exit) == true
+            ? ResolvePassableNearby(exit, farm, excludeSpawnTiles)
+            : exit;
     }
 
     private static TileCoord FindFarmExitTile(Farm farm)
@@ -129,7 +132,7 @@ internal sealed partial class ShiftOrchestrator
         return new TileCoord(77, 15);
     }
 
-    private static TileCoord ResolvePassableNearby(TileCoord preferred, Farm farm)
+    private static TileCoord ResolvePassableNearby(TileCoord preferred, Farm farm, ISet<TileCoord>? exclude = null)
     {
         var mapLayer = farm.Map.Layers[0];
         int w = mapLayer.LayerWidth, h = mapLayer.LayerHeight;
@@ -137,6 +140,7 @@ internal sealed partial class ShiftOrchestrator
         bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < w && y < h;
 
         if (InBounds(preferred.X, preferred.Y) &&
+            exclude?.Contains(preferred) != true &&
             WorkerMovementDriver.IsTilePassableForWorker(new Point(preferred.X, preferred.Y), farm))
             return preferred;
 
@@ -152,6 +156,8 @@ internal sealed partial class ShiftOrchestrator
 
                 int x = preferred.X + dx, y = preferred.Y + dy;
                 if (!InBounds(x, y))
+                    continue;
+                if (exclude?.Contains(new TileCoord(x, y)) == true)
                     continue;
                 if (!WorkerMovementDriver.IsTilePassableForWorker(new Point(x, y), farm))
                     continue;

@@ -46,12 +46,18 @@ internal sealed class HiringFlowCoordinator
         _helper = helper;
     }
 
+    // How many contracts may be Active/Paused at once — one worker per contract, all working the
+    // same day. Placeholder value; the final capacity progression (office upgrades / pricing) is
+    // a deferred design decision.
+    internal const int MaxActiveContracts = 3;
+
     public void OpenHiringFlow()
     {
-        if (_contractStore.List().Any(c => c.Status is ContractStatus.Active or ContractStatus.Paused))
+        var activeCount = _contractStore.List().Count(c => c.Status is ContractStatus.Active or ContractStatus.Paused);
+        if (activeCount >= MaxActiveContracts)
         {
             Game1.addHUDMessage(new HUDMessage(
-                I18nHelper.Get("ui.error.one_contract"),
+                I18nHelper.Get("ui.error.max_contracts", new { max = MaxActiveContracts }),
                 HUDMessage.error_type));
             return;
         }

@@ -36,13 +36,27 @@ internal sealed partial class ShiftOrchestrator
 
     private void QueueBatchWork(WorkBatch batch, GameLocation location)
     {
+        // Every queue path (batch begin, indoor/greenhouse arrival, refreshed grazing/forage)
+        // funnels through here, so this is where the day's work claims are taken: an item another
+        // contract already claimed is dropped. Claims are idempotent for the owner, so re-queues
+        // of this session's own work pass freely.
+        var claims = _day?.Claims;
+        var owner = Session.Ctx.ContractId;
+        var locationName = location.NameOrUniqueName;
+
         Session.Ctx.WorkList.Clear();
         foreach (var item in OrderTileWorkForSweep(batch.TileWork, location))
-            Session.Ctx.WorkList.Enqueue(item);
+        {
+            if (claims is null || claims.TryClaim(WorkClaimKey.TileTask(locationName, item.TaskTile, item.Task), owner))
+                Session.Ctx.WorkList.Enqueue(item);
+        }
 
         Session.AnimalWork.Clear();
         foreach (var item in batch.AnimalWork)
-            Session.AnimalWork.Enqueue(item);
+        {
+            if (claims is null || claims.TryClaim(WorkClaimKey.Animal(item.Animal.Id, item.Task), owner))
+                Session.AnimalWork.Enqueue(item);
+        }
 
         Session.DeferredTileWork.Clear();
         Session.DeferredAnimalWork.Clear();
@@ -177,7 +191,10 @@ internal sealed partial class ShiftOrchestrator
             // not actually removable, so re-adding them would loop forever (Bug: continuous
             // "rescan picked up 1 new tile item"). Genuinely new forage at fresh tiles still flows.
             if (!Session.RescanEnqueuedTiles.Contains(item.TaskTile) &&
-                seen.Add((item.Task, item.TaskTile)))
+                seen.Add((item.Task, item.TaskTile)) &&
+                (_day is null || _day.Claims.TryClaim(
+                    WorkClaimKey.TileTask(farm.NameOrUniqueName, item.TaskTile, item.Task),
+                    Session.Ctx.ContractId)))
             {
                 Session.Ctx.WorkList.Enqueue(item);
                 Session.RescanEnqueuedTiles.Add(item.TaskTile);
@@ -360,6 +377,13 @@ internal sealed partial class ShiftOrchestrator
 
     private bool IsTileWorkActionable(WorkItem item, GameLocation location)
     {
+        // Defense in depth: queued items were claimed at enqueue, but treat a claim held by
+        // another contract like stale work (also covers the arrival re-check).
+        if (_day is { } day && day.Claims.IsClaimedByOther(
+                WorkClaimKey.TileTask(location.NameOrUniqueName, item.TaskTile, item.Task),
+                Session.Ctx.ContractId))
+            return false;
+
         if (IsTileWorkStale(item, location))
             return false;
 
@@ -399,13 +423,20 @@ internal sealed partial class ShiftOrchestrator
                location.doesTileHaveProperty(tile.X, tile.Y, "Trough", "Back", false) is not null;
     }
 
-    private bool IsAnimalWorkActionable(AnimalWorkItem item, FarmAnimal animal) =>
-        item.Task switch
+    private bool IsAnimalWorkActionable(AnimalWorkItem item, FarmAnimal animal)
+    {
+        if (_day is { } day && day.Claims.IsClaimedByOther(
+                WorkClaimKey.Animal(item.Animal.Id, item.Task),
+                Session.Ctx.ContractId))
+            return false;
+
+        return item.Task switch
         {
             TaskKind.PetAnimals => _animalHandler.ShouldPet(animal),
             TaskKind.CollectAnimalProducts => _animalHandler.HasToolHarvestReady(animal),
             _ => false,
         };
+    }
 
     private void RecordActiveBatchProgress()
     {

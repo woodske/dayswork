@@ -2,6 +2,7 @@ using Dayswork.Core.Domain;
 using Dayswork.Integration;
 using Dayswork.UI.Layout;
 using StardewValley;
+using StardewValley.Menus;
 
 namespace Dayswork.UI;
 
@@ -48,6 +49,13 @@ internal sealed class PreferencesMenu : LayoutMenu
             title: I18nHelper.Get("ui.preferences.title"),
             onBack: BackAction!,
             content: new VStack(8,
+                new MenuButton(
+                    I18nHelper.Get("ui.preferences.worker_name", new
+                    {
+                        name = Worker.FarmhandNpc.DisplayNameFor(_draft.Preferences.WorkerName),
+                    }),
+                    OpenWorkerNamingMenu,
+                    textAlign: HAlign.Left),
                 new ToggleRow(
                     I18nHelper.Get("ui.preferences.avoid_blue_grass"),
                     _draft.Preferences.AvoidBlueGrass,
@@ -59,6 +67,21 @@ internal sealed class PreferencesMenu : LayoutMenu
                     }),
                 _dropdown,
                 new Label(I18nHelper.Get("ui.preferences.idle_task_description"))));
+    }
+
+    // Vanilla NamingMenu as a modal step (there's no text-input layout element): done-naming
+    // writes the draft and reopens this menu; its random button doubles as a name generator.
+    private void OpenWorkerNamingMenu()
+    {
+        Game1.activeClickableMenu = new NamingMenu(
+            name =>
+            {
+                _draft.Preferences = _draft.Preferences with { WorkerName = name?.Trim() ?? "" };
+                _draft.MarkDirty();
+                Game1.activeClickableMenu = new PreferencesMenu(_draft, _onBack);
+            },
+            I18nHelper.Get("ui.preferences.worker_name_prompt"),
+            string.IsNullOrWhiteSpace(_draft.Preferences.WorkerName) ? null : _draft.Preferences.WorkerName);
     }
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)

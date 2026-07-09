@@ -7,8 +7,9 @@ namespace Dayswork.Integration;
 
 /// <summary>
 /// i18n-backed HUD notices for managed-crop shift behavior, including purchase / store-fallback /
-/// festival notices. Notices are deduplicated per shift so a repeated cause
-/// (e.g. the same missing tool across many tiles) only surfaces once.
+/// festival notices. Notices are deduplicated per day — shared across all concurrent workers, so
+/// a repeated cause (e.g. the same missing tool across many tiles, on any worker) only surfaces
+/// once.
 /// </summary>
 internal static class CropHudNotifier
 {
@@ -31,8 +32,8 @@ internal static class CropHudNotifier
     private static readonly HashSet<string> _zoneSkippedNoSeedShownCrops = new(StringComparer.Ordinal);
     private static readonly HashSet<string> _zoneSkippedNoFertShownCrops = new(StringComparer.Ordinal);
 
-    /// <summary>Reset the per-shift dedup flags. Call at shift start.</summary>
-    internal static void ResetForShift()
+    /// <summary>Reset the dedup flags. Called once per day by the fleet, before any shift starts.</summary>
+    internal static void ResetForDay()
     {
         _cannotTillZonesShown = false;
         _toolSkipShown = false;

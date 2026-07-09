@@ -42,6 +42,14 @@ internal sealed class DepositTripRunner
     private GameLocation? _location;
     private bool          _chestAnimated;   // we triggered the open-lid animation
 
+    // Brief-wait budget when the player has the destination chest's UI open on arrival: hold at
+    // the stand tile for ~3s of deposit ticks (throttled to every 4th game tick) before deferring
+    // the trip to overflow. -1 = not currently waiting. Workers never hold the mutex themselves —
+    // their chest writes are serialized by the fleet's sequential tick fan-out — so this only
+    // ever waits on the player.
+    private const int ChestMutexWaitTicks = 45;
+    private int _mutexWaitTicksRemaining = -1;
+
     public DepositTripRunner(
         ShiftSession session,
         ShiftOrchestrator host,
@@ -76,6 +84,7 @@ internal sealed class DepositTripRunner
         _chest = null;
         _location = null;
         _chestAnimated = false;
+        _mutexWaitTicksRemaining = -1;
     }
 
     /// <summary>Dequeues the next trip and makes it the in-flight one.</summary>
@@ -111,6 +120,11 @@ internal sealed class DepositTripRunner
         // already route the items to overflow inside BeginTripExecution and return false so we skip the loop.
         if (!_executionStarted)
         {
+            // Player has the chest UI open: wait in place briefly before giving up — they
+            // usually close it within a moment, and the intended chest beats the overflow chain.
+            if (ShouldWaitForChestMutex())
+                return;
+
             if (!BeginTripExecution(_current, _session.CurrentLocation ?? farm))
             {
                 FinalizeAndAdvanceTrip(farm);
@@ -190,6 +204,7 @@ internal sealed class DepositTripRunner
         _chest = null;
         _location = null;
         _chestAnimated = false;
+        _mutexWaitTicksRemaining = -1;
 
         if (_trips.Count > 0)
         {
@@ -233,6 +248,35 @@ internal sealed class DepositTripRunner
         if (_current is not null)
             MarkTripUndelivered(_current);
         FinalizeAndAdvanceTrip(farm);
+    }
+
+    private bool ShouldWaitForChestMutex()
+    {
+        if (_current is not { Destination: ChestDestination chestDest })
+            return false;
+
+        var chest = _chestResolver.ResolveChest(chestDest.Ref);
+        if (chest is null || !chest.GetMutex().IsLocked())
+        {
+            _mutexWaitTicksRemaining = -1;
+            return false;
+        }
+
+        if (_mutexWaitTicksRemaining < 0)
+        {
+            _mutexWaitTicksRemaining = ChestMutexWaitTicks;
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork][deposit] chest busy at ({chestDest.Ref.Tile.X},{chestDest.Ref.Tile.Y}) — waiting briefly for the player to close it.",
+                LogLevel.Trace);
+        }
+
+        if (_mutexWaitTicksRemaining-- > 0)
+            return true;
+
+        // Budget exhausted: fall through to BeginTripExecution, whose locked branch routes the
+        // trip to the existing overflow chain.
+        _mutexWaitTicksRemaining = -1;
+        return false;
     }
 
     private bool BeginTripExecution(DepositTrip trip, GameLocation location)

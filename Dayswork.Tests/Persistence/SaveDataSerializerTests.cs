@@ -311,6 +311,46 @@ public sealed class SaveDataSerializerTests
     }
 
     [Fact]
+    public void Deserialize_WorkerNamePreference_RoundTrips()
+    {
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract()
+            with { Preferences = new ContractPreferences(AvoidBlueGrass: true, WorkerName: "Hazel") };
+
+        var result = _serializer.Deserialize(_serializer.Serialize(new[] { contract }, "0.2.0"));
+
+        var hydrated = Assert.Single(result);
+        Assert.Equal("Hazel", hydrated.Preferences.WorkerName);
+    }
+
+    [Fact]
+    public void Deserialize_MissingWorkerName_DefaultsToEmpty()
+    {
+        // Migration: a contract authored before worker naming has a Preferences object with no
+        // WorkerName field; it must default to "" (unnamed → generic farmhand display name).
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract()
+            with { Preferences = new ContractPreferences(AvoidBlueGrass: true, WorkerName: "Hazel") };
+        var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
+        ((JObject)payload["Contracts"]!.Single()!["Preferences"]!).Remove("WorkerName");
+
+        var result = _serializer.Deserialize(payload.ToString(Formatting.None));
+
+        var hydrated = Assert.Single(result);
+        Assert.Equal("", hydrated.Preferences.WorkerName);
+    }
+
+    [Fact]
+    public void Serialize_EmptyWorkerName_OmitsField()
+    {
+        // An unset name is omitted on write (not stored as ""), matching the nullable-DTO pattern.
+        var contract = PersistenceGenerators.CreateExampleCurrentSchemaContract()
+            with { Preferences = new ContractPreferences(AvoidBlueGrass: true) };
+        var payload = JObject.Parse(_serializer.Serialize(new[] { contract }, "0.2.0"));
+
+        var preferences = (JObject)payload["Contracts"]!.Single()!["Preferences"]!;
+        Assert.Null(preferences["WorkerName"]);
+    }
+
+    [Fact]
     public void Deserialize_FishPondScope_RoundTrips()
     {
         var contract = ContractWithFishPondScope();

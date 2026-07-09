@@ -55,10 +55,9 @@ internal sealed partial class ShiftOrchestrator
         // One settlement letter next morning for overflow items only; refunds are not settled here.
         DispatchShiftOverflow();
 
-        // The worker has finished and left for the day — light the office windows/lantern and
-        // start the chimney smoke (gated by the Bindicle.Dayswork_WORKER_DONE GameStateQuery).
-        // Reset next morning on DayStarted (ModEntry).
-        HiringBuilding.WorkCompletedToday = true;
+        // The worker has finished and left for the day. The fleet lights the office windows /
+        // chimney smoke (HiringBuilding.WorkCompletedToday) once the LAST live shift has exited.
+        _day?.ReportNormalExit();
 
         var session = Session;
         DespawnWorker();
@@ -192,7 +191,10 @@ internal sealed partial class ShiftOrchestrator
         var stopReason = Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed;
         Session.Ctx.PendingStopReason = null;
         if (stopReason == ShiftStopReason.Exhausted)
-            Game1.addHUDMessage(new HUDMessage(I18nHelper.Get("notify.farmhand_exhausted"), HUDMessage.newQuest_type));
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("notify.farmhand_exhausted",
+                    new { name = FarmhandNpc.DisplayNameFor(Session.Ctx.Preferences.WorkerName) }),
+                HUDMessage.newQuest_type));
         if (!Session.Deposits.HasPending)
         {
             Session.Ctx.StateMachine.BeginWrapUp(new IntentDepositInShippingBin(), stopReason);

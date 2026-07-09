@@ -214,9 +214,9 @@
     "notify.items_deposited_chest": "Your farmhand left some items in the cabin chest.",
     "notify.items_deposited_bin": "Your farmhand left some items in the shipping bin.",
     "notify.items_deposited_chest_overflow": "Your farmhand left some items in the shipping bin — the cabin chest was full.",
-    "notify.shift_started": "Shift started. Fee charged: {{price}}g",
+    "notify.shift_started": "{{name}}'s shift started. Fee charged: {{price}}g",
     "notify.upgrade_purchased": "{{name}} purchased.",
-    "notify.farmhand_exhausted": "Your farmhand ran out of energy and is heading home.",
+    "notify.farmhand_exhausted": "{{name}} ran out of energy and is heading home.",
     "notify.cannot_afford": "Your farmhand didn't work today: you couldn't afford the {{price}}g fee (short {{shortfall}}g).",
     "notify.needs_attention": "Your farmhand contract needs attention before it can run again.",
     "notify.festival": "Your farmhand took the festival day off.",
@@ -268,7 +268,7 @@
     "ui.confirm_cancel_contract.confirm_btn": "Cancel Contract",
 
     "ui.error.cant_afford": "You can't afford this contract.",
-    "ui.error.one_contract": "You already have a farmhand contract. Edit or cancel it from Manage Contracts before hiring another.",
+    "ui.error.max_contracts": "All {{max}} farmhand positions are filled. Edit or cancel a contract from Manage Contracts before hiring another.",
 
     "ui.zone_chest.title": "Work Scope",
     "ui.zone_chest.draw_zone_btn": "Draw Zone",
@@ -318,6 +318,8 @@
     "ui.schedule.back_btn": "Back",
 
     "ui.preferences.title": "Preferences",
+    "ui.preferences.worker_name": "Worker name: {{name}}",
+    "ui.preferences.worker_name_prompt": "Name your farmhand",
     "ui.preferences.avoid_blue_grass": "Avoid Blue Grass",
     "ui.preferences.idle_task_label": "When work is done",
     "ui.preferences.idle_task_description": "Repeats until energy runs out.",
@@ -331,6 +333,7 @@
     "ui.contract_list.cancel": "Cancel",
     "ui.contract_list.edit": "Edit",
     "ui.contract_list.upgrades": "Upgrades",
+    "ui.contract_list.hire": "Hire",
     "ui.contract_list.paused_label": "(Paused)",
     "ui.contract_list.active_label": "(Active)",
     "ui.contract_list.cancel_blocked": "Cannot cancel — shift already started",
