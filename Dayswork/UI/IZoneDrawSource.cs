@@ -9,6 +9,13 @@ internal interface IZoneDrawSource
 {
     IReadOnlyList<Zone>           CompletedZones    { get; }
     IReadOnlyList<Zone>           ProtectedZones    { get; }
+
+    // Other farmhands' (other contracts') managed-crop zones — an informational light-purple wash so
+    // the player can see where another worker already grows crops. Unlike ProtectedZones, these stay
+    // selectable (the per-day WorkClaimRegistry arbitrates any tile two farmhands both claim). Empty
+    // outside the managed-crop draw layer.
+    IReadOnlyList<Zone>           OtherWorkerZones  { get; }
+
     IReadOnlyList<BuildingOutline> SelectedBuildings { get; }
     bool       IsInZoneDrawMode { get; }
     TileCoord? DragStart        { get; }
