@@ -23,9 +23,14 @@ internal sealed class ContractListMenu : IClickableMenu
     private const int FooterHeight = 28;
     private const int RowPadTop      = 10;
     private const int RowPadBottom   = 8;
-    private const int RowMetaHeight  = 32; // schedule + status line below task text
+    private const int RowMetaHeight  = 32; // schedule + tier + status line below task text
     private const int RowBtnHeight   = BtnHeight + 8;
     private const int BodySidePadding = 16;
+    private const float NameScale = 1.15f; // worker name draws slightly larger than body text
+
+    private static readonly Color NameColor = new(80, 60, 40);
+    private static readonly Color ActiveStatusColor = Color.DarkGreen;
+    private static readonly Color PausedStatusColor = Color.Gray;
 
     private readonly ContractStore _store;
 
@@ -55,13 +60,17 @@ internal sealed class ContractListMenu : IClickableMenu
 
     private sealed record ContractRowData(
         Contract Contract,
-        string  WrappedTaskText,   // pre-wrapped to TextAreaWidth
-        int     TextHeight,        // pixel height of WrappedTaskText
-        string? ManagedCropsLine,  // null → omit; non-null → render below task text
-        int     CropLineHeight,    // 0 when ManagedCropsLine is null
+        string  WrappedNameText,      // worker name, pre-wrapped for NameScale
+        int     NameHeight,           // pixel height of WrappedNameText at NameScale
+        string  WrappedTaskText,      // pre-wrapped to TextAreaWidth
+        int     TextHeight,           // pixel height of WrappedTaskText
+        IReadOnlyList<string> InfoLines, // pre-wrapped managed-crops/machines/fish-pond summary lines
+        int     InfoLinesHeight,      // total pixel height of InfoLines (0 when empty)
         string  ScheduleLabel,
+        string  TierLabel,
         string  StatusLabel,
-        int     RowHeight);        // computed from text height
+        Color   StatusColor,
+        int     RowHeight);           // computed from text height
 
     private sealed record VisibleContractRow(
         ContractRowData Data,
@@ -151,39 +160,83 @@ internal sealed class ContractListMenu : IClickableMenu
     private ContractRowData BuildRow(Contract contract, int index)
     {
         var textAreaWidth = _bodyRect.Width - (BtnWidth + 8) * 3 - 24;
+
+        // Worker name gets its own line, drawn at NameScale — the row's visual header.
+        string rawName = Worker.FarmhandNpc.DisplayNameFor(contract.Preferences.WorkerName);
+        string wrappedName = Game1.parseText(rawName, Game1.smallFont, (int)(textAreaWidth / NameScale));
+        int nameHeight = (int)(Game1.smallFont.MeasureString(wrappedName).Y * NameScale) + 4;
+
         string taskList = contract.EnabledTasks.Count > 0
             ? string.Join(", ", contract.EnabledTasks.Select(TaskLabel))
             : I18nHelper.Get("ui.common.none");
-        string rawTaskSummary =
-            $"{Worker.FarmhandNpc.DisplayNameFor(contract.Preferences.WorkerName)} — {taskList}";
 
         // Wrap task text to the left text-area column (buttons occupy the right).
-        string wrapped    = Game1.parseText(rawTaskSummary, Game1.smallFont, textAreaWidth);
+        string wrapped    = Game1.parseText(taskList, Game1.smallFont, textAreaWidth);
         int    textHeight = (int)Game1.smallFont.MeasureString(wrapped).Y;
 
-        string? managedCropsLine = null;
-        int cropLineHeight = 0;
+        var infoLines = new List<string>();
+
         if (contract.CropPlan.IsEnabled)
         {
             int groupCount = contract.CropPlan.Assignments
                 .Select(a => a.GroupId ?? $"{a.Zone.LocationName}|{a.Mode}")
                 .Distinct()
                 .Count();
-            managedCropsLine = I18nHelper.Get("ui.contract_list.managed_crops_groups",
-                new { count = groupCount });
-            cropLineHeight = (int)Game1.smallFont.MeasureString(managedCropsLine).Y + 4;
+            infoLines.Add(I18nHelper.Get("ui.contract_list.managed_crops_groups",
+                new { count = groupCount }));
         }
 
-        // Row height: padding + wrapped text + optional crop line + meta line + button strip
-        int rowHeight = RowPadTop + textHeight + cropLineHeight + RowMetaHeight + RowBtnHeight + RowPadBottom;
+        if (contract.MachineScope.IsEnabled)
+        {
+            string groups = string.Join(", ", contract.MachineScope.Groups
+                .Select(group => $"{MachineTypeDisplayName(group.MachineType)} ×{group.Machines.Count}"));
+            infoLines.Add(I18nHelper.Get("ui.contract_list.managed_machines_groups", new { groups }));
+        }
+
+        if (contract.FishPondScope.IsEnabled)
+        {
+            infoLines.Add(I18nHelper.Get("ui.contract_list.managed_fish_ponds",
+                new { count = contract.FishPondScope.Ponds.Count }));
+        }
+
+        var wrappedInfoLines = new List<string>(infoLines.Count);
+        int infoLinesHeight = 0;
+        foreach (var line in infoLines)
+        {
+            string wrappedLine = Game1.parseText(line, Game1.smallFont, textAreaWidth);
+            wrappedInfoLines.Add(wrappedLine);
+            infoLinesHeight += (int)Game1.smallFont.MeasureString(wrappedLine).Y + 4;
+        }
+
+        // Row height: padding + name line + wrapped text + optional info lines + meta line + button strip
+        int rowHeight = RowPadTop + nameHeight + textHeight + infoLinesHeight + RowMetaHeight + RowBtnHeight + RowPadBottom;
 
         string scheduleLabel = contract.Schedule == ContractSchedule.Recurring
             ? _recurringLabel : _oneTimeLabel;
 
-        string statusLabel = contract.Status == ContractStatus.Paused
-            ? _pausedLabel : _activeLabel;
-        return new ContractRowData(contract, wrapped, textHeight, managedCropsLine, cropLineHeight, scheduleLabel, statusLabel, rowHeight);
+        string tierLabel = I18nHelper.Get($"ui.summary.tier.{TierKey(contract.Tier)}");
+
+        bool isPaused = contract.Status == ContractStatus.Paused;
+        string statusLabel = isPaused ? _pausedLabel : _activeLabel;
+        Color statusColor = isPaused ? PausedStatusColor : ActiveStatusColor;
+
+        return new ContractRowData(
+            contract, wrappedName, nameHeight, wrapped, textHeight, wrappedInfoLines, infoLinesHeight,
+            scheduleLabel, tierLabel, statusLabel, statusColor, rowHeight);
     }
+
+    private static string MachineTypeDisplayName(string? machineType) =>
+        machineType is not null
+            ? ItemRegistry.GetData(machineType)?.DisplayName ?? machineType
+            : "?";
+
+    private static string TierKey(EnergyTier tier) => tier switch
+    {
+        EnergyTier.HalfDay => "half_day",
+        EnergyTier.FullDay => "full_day",
+        EnergyTier.Overtime => "overtime",
+        _ => tier.ToString(),
+    };
 
     private void BuildVisibleRows()
     {
@@ -461,22 +514,28 @@ internal sealed class ContractListMenu : IClickableMenu
             new Rectangle(row.RowBounds.X, rowY, row.RowBounds.Width, 1),
             Color.LightGray * 0.5f);
 
-        // Task summary + optional managed-crops line + schedule + status
-        Utility.drawTextWithShadow(b, row.Data.WrappedTaskText, Game1.smallFont,
-            new Vector2(row.RowBounds.X + 8, rowY + RowPadTop), Game1.textColor);
+        // Worker name (header line) + task summary + optional info lines + schedule/tier/status
+        Utility.drawTextWithShadow(b, row.Data.WrappedNameText, Game1.smallFont,
+            new Vector2(row.RowBounds.X + 8, rowY + RowPadTop), NameColor, NameScale);
 
-        if (row.Data.ManagedCropsLine != null)
+        var taskY = rowY + RowPadTop + row.Data.NameHeight;
+        Utility.drawTextWithShadow(b, row.Data.WrappedTaskText, Game1.smallFont,
+            new Vector2(row.RowBounds.X + 8, taskY), Game1.textColor);
+
+        var infoLineY = taskY + row.Data.TextHeight + 4;
+        foreach (var line in row.Data.InfoLines)
         {
-            Utility.drawTextWithShadow(b, row.Data.ManagedCropsLine, Game1.smallFont,
-                new Vector2(row.RowBounds.X + 8, rowY + RowPadTop + row.Data.TextHeight + 4),
-                Color.DimGray);
+            Utility.drawTextWithShadow(b, line, Game1.smallFont,
+                new Vector2(row.RowBounds.X + 8, infoLineY), Color.DimGray);
+            infoLineY += (int)Game1.smallFont.MeasureString(line).Y + 4;
         }
 
-        Utility.drawTextWithShadow(b,
-            $"{row.Data.ScheduleLabel}  {row.Data.StatusLabel}",
-            Game1.smallFont,
-            new Vector2(row.RowBounds.X + 8, rowY + RowPadTop + row.Data.TextHeight + row.Data.CropLineHeight + 4),
-            Color.DimGray);
+        var metaPos = new Vector2(row.RowBounds.X + 8, infoLineY);
+        string metaPrefix = $"{row.Data.ScheduleLabel}  {row.Data.TierLabel}  ";
+        Utility.drawTextWithShadow(b, metaPrefix, Game1.smallFont, metaPos, Color.DimGray);
+        var statusX = metaPos.X + Game1.smallFont.MeasureString(metaPrefix).X;
+        Utility.drawTextWithShadow(b, row.Data.StatusLabel, Game1.smallFont,
+            new Vector2(statusX, metaPos.Y), row.Data.StatusColor);
 
         // Action buttons
         DrawSmallButton(b, row.PauseResumeBtn);

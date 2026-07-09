@@ -340,6 +340,8 @@
     "ui.contract_list.schedule_one_time": "One-time",
     "ui.contract_list.schedule_recurring": "Recurring",
     "ui.contract_list.managed_crops_groups": "Managed crops: {{count}} groups",
+    "ui.contract_list.managed_machines_groups": "Machines: {{groups}}",
+    "ui.contract_list.managed_fish_ponds": "Fish ponds: {{count}}",
 
     "log.festival.skipped": "Festival today — the farmhand is taking the day off.",
     "log.building.entering": "Farmhand entering {{location}}.",
