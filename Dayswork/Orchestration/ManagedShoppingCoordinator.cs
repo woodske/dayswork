@@ -239,7 +239,11 @@ internal sealed class ManagedShoppingCoordinator
 
         ShiftOrchestrator.NotifyFallbackStoreIfUsed(manifest, storePreference, stock);
 
-        var walletClamped = _purchaseAffordability.ClampToWallet(manifest, Game1.player.Money);
+        // Subtract gold other farmhands have already committed to their own shopping trips this day,
+        // so only workers who can actually afford seeds travel (the shared wallet isn't debited until
+        // a worker reaches the counter — the reservation stands in for that pending spend).
+        var available = Math.Max(0, Game1.player.Money - _host.OtherWorkersReservedShoppingBudget());
+        var walletClamped = _purchaseAffordability.ClampToWallet(manifest, available);
 
         var groups = walletClamped.Groups
             .Where(group => StoreCanStillOpenToday(group.Store, dayOfMonth))
@@ -271,6 +275,10 @@ internal sealed class ManagedShoppingCoordinator
 
         foreach (var group in affordable.Groups)
             _groups.Enqueue(group);
+
+        // Reserve this trip's planned spend so a second farmhand doesn't also travel for gold this
+        // worker is on its way to spend. Released in CompleteReturn once the trip is home/aborted.
+        _host.ReserveShoppingBudget(affordable.TotalCost);
 
         CropHudNotifier.ShoppingDeparture();
         DevLog.Log(
@@ -606,6 +614,9 @@ internal sealed class ManagedShoppingCoordinator
 
     private void CompleteReturn()
     {
+        // Trip is over (returned or aborted) — free the wallet reservation for other farmhands.
+        _host.ReleaseShoppingBudget();
+
         var wrapAfterReturn = _wrapAfterReturn;
         SettleCarriedItems(showHud: true);
         ClearRuntime(clearCarriedItems: false);

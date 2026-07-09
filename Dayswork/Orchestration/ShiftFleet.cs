@@ -17,6 +17,10 @@ internal sealed class FleetDay
     /// never double-service a work item.</summary>
     public WorkClaimRegistry Claims { get; } = new();
 
+    /// <summary>Gold each concurrent shift has committed to a managed-crop shopping trip, so a
+    /// second farmhand doesn't also travel to buy seeds the first is already on its way to buy.</summary>
+    public ShoppingBudgetLedger ShoppingBudget { get; } = new();
+
     /// <summary>Spawn tiles already taken this morning, so each worker appears on its own tile
     /// near the office door. Reserved only when a worker actually spawns.</summary>
     public HashSet<TileCoord> ReservedSpawnTiles { get; } = new();

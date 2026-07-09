@@ -180,6 +180,25 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     public ContractId? ActiveContractId => _session?.Ctx.ContractId;
 
+    /// <summary>Gold other concurrent farmhands have committed to their own managed-crop shopping
+    /// trips this day — subtracted from the shared wallet before this worker decides to shop.</summary>
+    internal int OtherWorkersReservedShoppingBudget() =>
+        _day is { } day && ActiveContractId is { } id ? day.ShoppingBudget.ReservedByOthers(id) : 0;
+
+    /// <summary>Commits this worker's planned managed-crop spend so other farmhands account for it.</summary>
+    internal void ReserveShoppingBudget(int amount)
+    {
+        if (_day is { } day && ActiveContractId is { } id)
+            day.ShoppingBudget.Reserve(id, amount);
+    }
+
+    /// <summary>Releases this worker's shopping reservation once its trip has returned or aborted.</summary>
+    internal void ReleaseShoppingBudget()
+    {
+        if (_day is { } day && ActiveContractId is { } id)
+            day.ShoppingBudget.Release(id);
+    }
+
     public void EndShiftEarly()
     {
         if (_session is null)
