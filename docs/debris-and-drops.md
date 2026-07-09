@@ -46,7 +46,19 @@ lands at the same tile coordinates **in the player's current location** and is s
 
 - `Tree.performTreeFall` and `Tree.performToolAction` — all drops use the tree's `Location`
   (incl. the offscreen-fall path driven by `AdvanceOffscreenTreeFall`). Felled-tree wood is safe.
-- `FruitTree` fruit shake and chop-down — all use `Location`.
+- `FruitTree` fruit shake and chop-down — all use `Location` (the drop routing is safe). **But**
+  `FruitTree.shake(tile, doEvenIfStillShaking)` only runs the fruit-drop block when
+  `maxShake == 0f || doEvenIfStillShaking`. `maxShake` is a plain transient field (not a
+  `NetField`, not serialized) that decays back to `0f` **only** in `FruitTree.tickUpdate`, which is
+  called solely from `GameLocation.UpdateWhenCurrentLocation` — i.e. only for the location the
+  player is standing in. `updateEvenIfFarmerIsntHere` does NOT tick `terrainFeatures`, and
+  `dayUpdate` never resets `maxShake`. So when the worker shakes a fruit tree in a location the
+  player isn't in (e.g. the greenhouse), the first shake sets `maxShake > 0` and it never decays;
+  it persists on the live tree object across in-game days (sleep/save doesn't reconstruct it), and
+  every subsequent `shake(tile, false)` is a no-op that replays the leaf animation but never clears
+  the fruit. `InvokeCollectFruit` (`ShiftOrchestrator.TaskActions.cs`) therefore passes
+  `doEvenIfStillShaking: true` to force the drop regardless of the frozen `maxShake`. Confirmed
+  against a decompile 2026-07-09.
 - `Object.performToolAction` (normal stones/forage/ore objects) — uses `Location`. (Plain stones
   are also covered by `TryGetRemovedStandardStoneDrop`'s 1-stone fallback in `InvokeClearRock`.)
 
