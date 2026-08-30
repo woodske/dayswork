@@ -76,11 +76,6 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
     private string _targetLocationName;
     private readonly List<Zone> _protectedZones = new();
 
-    // Managed-crop zones owned by OTHER contracts (other farmhands) at the target location. Rendered as
-    // an informational light-purple wash but left out of the overlap/protection checks so they stay
-    // selectable. Only populated by the managed-crop draw path; empty everywhere else.
-    private readonly List<Zone> _otherWorkerZones = new();
-
     // Managed-crop draw layer: zones are flattened to the fewest rectangles and the count of valid
     // (tillable/plantable, non-sprinkler) tiles is shown on screen. Note _overlapToggles is also true
     // in machine mode, so crop mode must exclude the special modes.
@@ -93,7 +88,6 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         _fishPondMode ? FishPondZones() : _machineMode ? MachineZones(_selectedMachines) : _chestMode ? SelectedChestZones() : _completedZones;
     IReadOnlyList<Zone>            IZoneDrawSource.ProtectedZones    =>
         _machineMode ? MachineZones(_protectedMachines) : _chestMode ? Array.Empty<Zone>() : _protectedZones;
-    IReadOnlyList<Zone>            IZoneDrawSource.OtherWorkerZones  => _otherWorkerZones;
     IReadOnlyList<BuildingOutline> IZoneDrawSource.SelectedBuildings => _selectedBuildings;
     bool       IZoneDrawSource.IsInZoneDrawMode => true;          // grid always visible during the session
     TileCoord? IZoneDrawSource.DragStart        => _dragStart;
@@ -145,7 +139,6 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         bool allowBuildingSelection = true,
         bool overlapTogglesSelection = false,
         IReadOnlyList<Zone>? protectedZones = null,
-        IReadOnlyList<Zone>? otherWorkerZones = null,
         Color? zoneFillColor = null,
         string targetLocationName = "Farm")
         : base(0, 0, 0, 0)
@@ -162,9 +155,6 @@ internal sealed class ZoneDrawMenu : IClickableMenu, IZoneDrawSource
         _targetLocationName = drawLocation.NameOrUniqueName;
         _protectedZones.AddRange((protectedZones ?? Array.Empty<Zone>())
             .Where(zone => string.Equals(zone.LocationName, _targetLocationName, StringComparison.Ordinal)));
-        _otherWorkerZones.AddRange((otherWorkerZones ?? Array.Empty<Zone>())
-            .Where(zone => string.Equals(zone.LocationName, _targetLocationName, StringComparison.Ordinal)));
-
         // Restore prior selections (for the active layer only) so navigating back preserves work.
         _completedZones.AddRange((initialZones ?? draft.OutdoorZones)
             .Where(zone => string.Equals(zone.LocationName, _targetLocationName, StringComparison.Ordinal)));

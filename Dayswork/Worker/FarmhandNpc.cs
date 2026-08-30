@@ -1,4 +1,3 @@
-using Dayswork.Core.Domain;
 using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -16,14 +15,12 @@ internal sealed class FarmhandNpc : NPC
     // because OnSaving removes the NPC before the save is written.
     public FarmhandNpc() { }
 
-    public FarmhandNpc(Vector2 spawnPixelPosition, ContractId contractId, string workerName)
+    public FarmhandNpc(Vector2 spawnPixelPosition, string workerName)
         : base(
             new AnimatedSprite(SpritePath, 0, 16, 32),
             spawnPixelPosition,
             2,
-            // Unique per contract so N concurrent workers never collide in name-based game
-            // lookups (getCharacterFromName, net sync, serialization guards).
-            $"{InternalName}_{contractId.Value:N}")
+            InternalName)
     {
         this.displayName = DisplayNameFor(workerName);
         this.Portrait = Game1.content.Load<Texture2D>(PlaceholderPortraitPath);
@@ -38,12 +35,6 @@ internal sealed class FarmhandNpc : NPC
         string.IsNullOrWhiteSpace(workerName)
             ? I18nHelper.Get("npc.farmhand.name")
             : workerName;
-
-    // The unique per-contract Name would otherwise drive vanilla texture resolution:
-    // getTextureName() falls back to the NPC name when there's no Data/Characters entry, and
-    // ChooseAppearance/reloadSprite build "Characters/…" + "Portraits/…" paths from it. Pin it
-    // to the shared asset name so every worker loads the one farmhand sprite/portrait.
-    public override string getTextureName() => InternalName;
 
     private int _staminaRemaining;
     private int _staminaCapacity;

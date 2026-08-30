@@ -59,7 +59,7 @@ Full write-ups — why, and what was decided — are in the archive.
 | Manage Fish Ponds, and the flavored/quality preservation pipeline | 2026-06-23 | [archive/machine-and-pond-management.md](archive/machine-and-pond-management.md) |
 
 Work shipped without its own plan file (tracked in `AGENTS.md` → "Current state"): serpentine sweep
-routing (2026-07-03) and multiple farmhands (2026-07-08).
+routing (2026-07-03).
 
 ## Maintenance protocol
 

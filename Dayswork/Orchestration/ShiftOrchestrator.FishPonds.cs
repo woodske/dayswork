@@ -72,21 +72,10 @@ internal sealed partial class ShiftOrchestrator
                 continue;
             }
 
-            if (!FishPondReader.HasOutput(live))
-            {
+            if (FishPondReader.HasOutput(live))
+                Session.FishPondSteps.Enqueue(new FishPondStep(pondRef));
+            else
                 DevLog.Log($"[Dayswork][fishponds] skip ({pondRef.Tile.X},{pondRef.Tile.Y}) — no output ready.", LogLevel.Debug);
-                continue;
-            }
-
-            if (_day is not null && !_day.Claims.TryClaim(
-                    WorkClaimKey.FishPond(pondRef.LocationName, pondRef.Tile),
-                    Session.Ctx.ContractId))
-            {
-                DevLog.Log($"[Dayswork][fishponds] skip ({pondRef.Tile.X},{pondRef.Tile.Y}) — claimed by another worker today.", LogLevel.Debug);
-                continue;
-            }
-
-            Session.FishPondSteps.Enqueue(new FishPondStep(pondRef));
         }
 
         DevLog.Log(

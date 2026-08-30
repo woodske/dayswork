@@ -46,18 +46,12 @@ internal sealed class HiringFlowCoordinator
         _helper = helper;
     }
 
-    // How many contracts may be Active/Paused at once — one worker per contract, all working the
-    // same day. Placeholder value; the final capacity progression (office upgrades / pricing) is
-    // a deferred design decision.
-    internal const int MaxActiveContracts = 3;
-
     public void OpenHiringFlow()
     {
-        var activeCount = _contractStore.List().Count(c => c.Status is ContractStatus.Active or ContractStatus.Paused);
-        if (activeCount >= MaxActiveContracts)
+        if (_contractStore.List().Any(c => c.Status is ContractStatus.Active or ContractStatus.Paused))
         {
             Game1.addHUDMessage(new HUDMessage(
-                I18nHelper.Get("ui.error.max_contracts", new { max = MaxActiveContracts }),
+                I18nHelper.Get("ui.error.one_contract"),
                 HUDMessage.error_type));
             return;
         }
@@ -461,25 +455,9 @@ internal sealed class HiringFlowCoordinator
             allowBuildingSelection: false,
             overlapTogglesSelection: true,
             protectedZones: draft.CropPlan.ProtectedZones(groupId, group.LocationName),
-            otherWorkerZones: OtherContractCropZones(draft, group.LocationName),
             zoneFillColor: Color.LimeGreen * 0.5f,
             targetLocationName: group.LocationName);
     }
-
-    // Managed-crop zones owned by OTHER live contracts (other farmhands) at the given location. Surfaced
-    // in the crop draw session as a light-purple overlay so the player can see where another farmhand
-    // already grows crops — informational only; the tiles stay selectable (the per-day WorkClaimRegistry
-    // arbitrates any tile two farmhands both claim). Excludes the contract currently being edited, and
-    // Cancelled/Executed contracts (no live worker tending their crops).
-    private IReadOnlyList<Zone> OtherContractCropZones(ContractDraft draft, string locationName) =>
-        _contractStore.List()
-            .Where(contract => contract.Status is ContractStatus.Active or ContractStatus.Paused)
-            .Where(contract => draft.EditingId != contract.Id)
-            .SelectMany(contract => contract.CropPlan.Assignments)
-            .Select(assignment => assignment.Zone)
-            .Where(zone => string.Equals(zone.LocationName, locationName, StringComparison.Ordinal))
-            .ToList()
-            .AsReadOnly();
 
     private CropCatalogProvider EnsureCropCatalog() =>
         _cropCatalog ??= new CropCatalogProvider(ModEntry.ModMonitor);
