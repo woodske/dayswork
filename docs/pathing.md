@@ -2,7 +2,7 @@
 
 How the worker's route graph is built, cached, and searched. Backs the per-shift
 `LocationPassabilityCache` + Core `GridPathfinder` (built 2026-07-07; item #2 of the architecture
-review — see `docs/plans/core-pathfinding-and-passability-cache.md`).
+review — see `docs/plans/archive/architecture-review-2026-07-07.md`).
 
 ## The passability probe
 

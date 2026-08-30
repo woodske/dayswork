@@ -259,7 +259,7 @@ by decompiling `Stardew Valley.dll` (1.6.15) → `StardewValley.Buildings.FishPo
   `checkForAction`). Duplication-safe: only credit the buffer after `output.Value` is nulled.
   Pond roe is usually a flavored `ColoredObject` (Sturgeon Roe etc.); its identity/price is preserved
   through deposit by the per-shift `FlavorItemRegistry` (capture-and-clone keyed by `BufferedItem.FlavorId`)
-  rather than reconstructed from `(O)812` — see `docs/plans/fish-ponds.md` → "Flavored roe is preserved".
+  rather than reconstructed from `(O)812` — see `docs/plans/archive/machine-and-pond-management.md` → "Flavored + quality preservation".
 - **Nav/facing:** footprint is `tilesWide`×`tilesHigh` (5×5) and the interior tiles are water
   (impassable). `GetItemBucketTile()` = `(tileX+4, tileY+4)` is where the output bucket visually sits;
   worker should stand on a walkable tile adjacent to the footprint (not on water) — pick a stand tile

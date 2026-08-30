@@ -1,10 +1,9 @@
 # Plan — Time-aware wrap-up (don't start far work near the cap)
 
-**Status:** **Phase 0 (measure-only) built + unit-tested 2026-07-07.** The live skip-gate is
-deliberately *not* enabled — it awaits headroom calibration from real play (see below). Item #5 in
-[architecture-review-index.md](architecture-review-index.md). Sequence after
-[work-activity-abstraction.md](work-activity-abstraction.md) — both touch the same dispatch/gate
-code.
+Item #5 of the 2026-07-07 architecture review. Status is tracked in [index.md](index.md), not here.
+The work-activity abstraction it sequences after has shipped (see
+[archive/architecture-review-2026-07-07.md](archive/architecture-review-2026-07-07.md)) — both touch
+the same dispatch/gate code.
 
 ## What was built (2026-07-07)
 

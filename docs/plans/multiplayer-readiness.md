@@ -1,6 +1,8 @@
 # Multiplayer Readiness Analysis
 
-**Status:** analysis only. Dayswork is **not multiplayer-ready today**. The current implementation is
+Analysis only — status is tracked in [index.md](index.md), not here.
+
+Dayswork is **not multiplayer-ready today**. The current implementation is
 intentionally single-player: key player entry points return early in multiplayer, and the shift
 engine was built around one local player, one contract store, one worker NPC, and one mutable shift
 session.

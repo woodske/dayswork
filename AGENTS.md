@@ -14,6 +14,10 @@ See **`docs/architecture.md`** for the full subsystem map and the shift loop. St
 from **`Dayswork/ModEntry.cs`** — it's the hand-wired composition root (no DI container); every
 service and the SMAPI event it hangs off is visible there.
 
+Planned work is tracked in **`docs/plans/index.md`** — plan status lives *only* there, never in the
+plan files. Completed plans are summarised in `docs/plans/archive/` (why the work was done and what
+was decided) and their plan files deleted; archiving is done by the `archive-plans` skill.
+
 ## Local game/source paths
 
 - Stardew Valley install: `X:\Steam\steamapps\common\Stardew Valley`
@@ -131,7 +135,7 @@ data or a decompile, and note where you confirmed it.
 - `docs/game-content-search.md` — local Stardew/SVE paths, folder maps, and search/parsing tips for
   base `.xnb`/DLL content, SVE Content Patcher packs, C# source, and `.tmx` maps.
 - `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
-- `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); plan + status in `docs/plans/machine-management.md`. Its "Fish ponds" section verifies the `StardewValley.Buildings.FishPond` API (`output` NetRef, `tileX/tileY` identity, direct-null collect, 5×5 footprint) backing Manage Fish Ponds (built 2026-06-23; reader = `Dayswork/Orchestration/FishPondReader.cs`); plan + status in `docs/plans/fish-ponds.md`.
+- `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); archived plan in `docs/plans/archive/machine-and-pond-management.md`. Its "Fish ponds" section verifies the `StardewValley.Buildings.FishPond` API (`output` NetRef, `tileX/tileY` identity, direct-null collect, 5×5 footprint) backing Manage Fish Ponds (built 2026-06-23; reader = `Dayswork/Orchestration/FishPondReader.cs`); archived plan in the same file.
 - `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
 - `docs/fences-and-gates.md` — `StardewValley.Fence` gate API (`isGate`, `gatePosition` 0/88, `health > 1f`, `isPassable`, `toggleGate`, `updateWhenCurrentLocation` auto-close rule) backing the worker's open-gates-while-pathing logic in `Dayswork/Worker/WorkerMovementDriver.cs`.
 - `docs/debris-and-drops.md` — which `Game1.create*Debris` overloads route loot to `Game1.currentLocation` vs the passed `location`; the `ResourceClump.destroy()` leak (hardwood/stone spawn at the *player's* location, not the clump's) and the `InvokeTaskActionGuarded` sweep that recovers it.
@@ -183,9 +187,9 @@ single-visit** workflow (worker fetches a group's inputs in one chest trip, then
 once to collect→reload) all verified in-world. A group's **input chest may be in any location**
 (2026-07-06): a cross-location chest triggers a fetch excursion routed through the farm hub
 (smoke-passed 2026-07-07, along with auto-grabbers as input chests). See
-`docs/plans/machine-management.md` for status + limitations. **Manage Fish Ponds**
+`docs/plans/archive/machine-and-pond-management.md` for the decisions + limitations. **Manage Fish Ponds**
 (2026-06-23, collect-only) is built, unit-tested, and **passed its in-game smoke pass on
-2026-07-07 — release-ready**; see `docs/plans/fish-ponds.md`. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
+2026-07-07 — release-ready**; see the same archive file. Collected output keeps its **flavored/colored identity** (Sturgeon Roe,
 blueberry wine, flavored honey…) end-to-end via the per-shift `FlavorItemRegistry` +
 `BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). **Multiple farmhands**
 (2026-07-08) is built and unit-tested, **in-game smoke pass pending**: up to

@@ -1,12 +1,13 @@
 # Plan — Multi-target stand coverage ("Option D")
 
-**Status:** proposed 2026-07-03, **deferred — not started.** Prerequisite **met 2026-07-07**: the
-managed-crop serpentine ordering fix ("Option A") shipped 2026-07-03 and passed its in-game smoke
-pass 2026-07-07 — this plan is now eligible for the re-measure (is coverage planning still worth
-building on top of the sweep?). Note: the passability snapshot this plan requires as input is
-being planned in
-[core-pathfinding-and-passability-cache.md](core-pathfinding-and-passability-cache.md). This
-document records the design discussion so the idea isn't re-derived later.
+Proposed 2026-07-03; status is tracked in [index.md](index.md), not here. This document records the
+design discussion so the idea isn't re-derived later.
+
+Both prerequisites are met. The managed-crop serpentine ordering fix ("Option A") shipped
+2026-07-03 and passed its smoke pass 2026-07-07, so this plan is eligible for its re-measure — *is
+coverage planning still worth building on top of the sweep?* And the passability snapshot it
+requires as input shipped with the 2026-07-07 review (see
+[archive/architecture-review-2026-07-07.md](archive/architecture-review-2026-07-07.md) → #2).
 
 ## Problem
 
