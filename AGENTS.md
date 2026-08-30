@@ -18,6 +18,12 @@ Planned work is tracked in **`docs/plans/index.md`** — plan status lives *only
 plan files. Completed plans are summarised in `docs/plans/archive/` (why the work was done and what
 was decided) and their plan files deleted; archiving is done by the `archive-plans` skill.
 
+**Update `CHANGELOG.md` whenever a change lands that a player would notice** — a new feature, a
+behavior change, or a bug fix. Add it to the `## Unreleased` section under `Added` / `Changed` /
+`Fixed`. These entries are **public-facing**: one or two plain sentences describing what changed for
+the player, no type or file names, no internal rationale. Refactors, docs, tests, and anything that
+never shipped in a release get no entry.
+
 ## Local game/source paths
 
 - Stardew Valley install: `X:\Steam\steamapps\common\Stardew Valley`
