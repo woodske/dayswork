@@ -2,7 +2,7 @@ namespace Dayswork.Core.Domain;
 
 public sealed record ContractPreferences(
     bool AvoidBlueGrass = true,
-    IdleTaskKind IdleTask = IdleTaskKind.None,
+    IdleTaskKind IdleTask = IdleTaskKind.ManageMachines,
     string WorkerName = "")
 {
     public static readonly ContractPreferences Default = new();
