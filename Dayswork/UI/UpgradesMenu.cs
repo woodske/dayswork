@@ -69,7 +69,7 @@ internal sealed class UpgradesMenu : LayoutMenu
                 HStack.Auto(new MenuButton(
                     I18nHelper.Get("ui.upgrades.purchase_btn"),
                     () => _onPurchase(definition.Kind),
-                    enabled: !purchased && !locked && Game1.player.Money >= definition.Price,
+                    enabled: !purchased && !locked && Sponsor.Money(Game1.player.UniqueMultiplayerID) >= definition.Price,
                     fixedWidth: ButtonWidth,
                     height: 52))),
             RowHeight);

@@ -326,6 +326,10 @@
     "ui.preferences.idle_task_description": "Repeats until energy runs out.",
     "ui.preferences.idle_task.none": "None",
     "ui.preferences.idle_task.manage_machines": "Manage machines",
+    "ui.preferences.grant_experience": "Earn experience",
+    "ui.preferences.grant_experience_description": "Your farmhand's work counts toward your skills.",
+    "ui.preferences.run_while_offline": "Work while you're away",
+    "ui.preferences.run_while_offline_description": "In co-op, your farmhand keeps working if you leave.",
 
     "ui.contract.title": "Contract",
     "ui.contract.no_contract": "No contract",

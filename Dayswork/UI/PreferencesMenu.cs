@@ -66,7 +66,27 @@ internal sealed class PreferencesMenu : LayoutMenu
                         Rebuild();
                     }),
                 _dropdown,
-                new Label(I18nHelper.Get("ui.preferences.idle_task_description"))));
+                new Label(I18nHelper.Get("ui.preferences.idle_task_description")),
+                new ToggleRow(
+                    I18nHelper.Get("ui.preferences.grant_experience"),
+                    _draft.Preferences.GrantExperience,
+                    () =>
+                    {
+                        _draft.Preferences = _draft.Preferences with { GrantExperience = !_draft.Preferences.GrantExperience };
+                        _draft.MarkDirty();
+                        Rebuild();
+                    }),
+                new Label(I18nHelper.Get("ui.preferences.grant_experience_description")),
+                new ToggleRow(
+                    I18nHelper.Get("ui.preferences.run_while_offline"),
+                    _draft.Preferences.RunWhileOwnerOffline,
+                    () =>
+                    {
+                        _draft.Preferences = _draft.Preferences with { RunWhileOwnerOffline = !_draft.Preferences.RunWhileOwnerOffline };
+                        _draft.MarkDirty();
+                        Rebuild();
+                    }),
+                new Label(I18nHelper.Get("ui.preferences.run_while_offline_description"))));
     }
 
     // Vanilla NamingMenu as a modal step (there's no text-input layout element): done-naming

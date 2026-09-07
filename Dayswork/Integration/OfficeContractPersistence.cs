@@ -100,14 +100,15 @@ internal sealed class OfficeContractPersistence
                 break;
 
             case ContractAdoptionOutcome.DroppedNoOffice:
-                _shiftOutcomes.ShowContractLostNotice();
+                // A 1.x contract had no owner field; the host is the only sensible addressee.
+                _shiftOutcomes.ShowContractLostNotice(Game1.MasterPlayer.UniqueMultiplayerID);
                 ModEntry.ModMonitor.Log(
                     "[Dayswork] The save's 1.x contract could not be adopted: the farm has no office. It has been dropped (no refund).",
                     DevLog.WarnLevel);
                 break;
 
             case ContractAdoptionOutcome.DroppedAmbiguous:
-                _shiftOutcomes.ShowContractLostNotice();
+                _shiftOutcomes.ShowContractLostNotice(Game1.MasterPlayer.UniqueMultiplayerID);
                 ModEntry.ModMonitor.Log(
                     "[Dayswork] The save's 1.x contract could not be adopted: several offices exist and there is no way to tell which one it belonged to. It has been dropped (no refund).",
                     DevLog.WarnLevel);

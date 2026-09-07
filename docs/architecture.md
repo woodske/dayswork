@@ -7,16 +7,18 @@ Dayswork is a single-player SMAPI mod that lets the player construct farm buildi
 each. A farmhand spawns just outside its own office's human door each morning, **physically walks** the farm performing the contract's configured
 tasks (water/harvest crops, collect fruit, animal care, clear rocks/weeds/grass/trees, plus full
 "managed crop" lifecycle), deposits output into the player's designated chests, and returns to that
-same door tile to clock out. The player pays **upfront** for a block of worker energy (labor
-capacity). The mod is
-**progression-aware** (the worker inherits the player's tool upgrade levels), **safe** (items are
-never lost — anything undelivered is mailed back via the building's output chest / shipping bin),
-and uses **zero Harmony patches** — everything is driven by SMAPI events.
+same door tile to clock out. The office's **owner sponsors** it: their wallet pays upfront for a
+block of worker energy (labor capacity), their tool levels the worker inherits, their shipping bin
+receives output, and their skills earn the experience the worker generates. The mod is
+**progression-aware**, **safe** (items are never lost — anything undelivered is mailed back via the
+building's output chest / shipping bin), and uses **zero Harmony patches** — everything is driven by
+SMAPI events.
 
-*Single-player* is a current property, not a permanent one. The one-office / one-worker
-assumptions are gone (2.0 Phase 1); `Game1.player`-is-the-sponsor is what
-[`plans/dayswork-2.0.md`](plans/dayswork-2.0.md) replaces next. Until its Phase 4 lands, every
-statement here about "the player" means the local, only player.
+*Single-player* is a current property, not a permanent one. The one-office / one-worker assumptions
+are gone (2.0 Phase 1) and sponsor identity now flows through **`Sponsor`** (2.0 Phase 2); the
+remaining work is the host/client authority split in
+[`plans/dayswork-2.0.md`](plans/dayswork-2.0.md) Phase 4. Until it lands, every statement here about
+"the player" means the local, only player — who is also every office's owner.
 
 ## Project structure & the Core-purity rule
 
@@ -52,8 +54,12 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
   version.
 - **`ContractPersistenceAdapter`** — `Helper.Data.Read/WriteSaveData` under key `Dayswork.Contracts`;
   versioned via `SaveDataSerializer` (v1→v2).
-- **`ToolLevelReader`** — snapshots the player's axe/pickaxe levels into a `ToolSnapshot` at shift
-  start (the progression-inheritance source).
+- **`Sponsor`** — the single seam through which owner identity enters the engine: wallet
+  (`team.GetMoney(owner)`), shipping bin, owner lookup, and XP grants. The worker's fake action
+  farmer deliberately keeps the **host's** identity forever, because vanilla gates machine collect
+  and tree XP on `Farmer.IsLocalPlayer`.
+- **`ToolLevelReader`** — snapshots the **sponsor's** axe/pickaxe levels into a `ToolSnapshot` at
+  shift start (the progression-inheritance source).
 - **`ModConfigManager` / `GMCMRegistrar`** — config + optional GMCM page (changes apply next shift,
   read live). `ChestResolver`, `OfficeChestService`, `ShopStockReader`, `ShopPurchaseService`,
   `CropCatalogProvider`, `CropHudNotifier` support deposits and managed-crop shopping.
@@ -155,7 +161,7 @@ item — tile+task, animal, machine, pond, managed dirt — to the first shift t
 idempotent for their owner and are never released, so a claimed-but-unworked item simply waits until
 tomorrow. Per shift:
 
-1. Snapshot player tool levels; normalize scope to live locations; classify work scopes.
+1. Snapshot the sponsor's tool levels; normalize scope to live locations; classify work scopes.
 2. `ShiftPlanBuilder` orders the day into **batches**: per animal building (interior feed/pet/
    collect, then that building's grazing animals), then a farm-wide forage sweep (truffles), then
    managed-crop batches, greenhouses, outdoor crops, outdoor clearing. `WorkAreaScanner` populates
@@ -242,6 +248,13 @@ Skip rules confirmed in code:
   tree breaks add items to the *player's* inventory and enqueue HUD messages even though the worker
   acted. `InvokeTaskActionGuarded` snapshots/restores transient player action state, redirects
   gained items from the player into the worker buffer, and trims the HUD-message queue.
+- **Vanilla never asks whose XP an action earned.** It credits whichever farmer it has in hand —
+  `Game1.player` for `Crop.harvest`, the tool's last user (the fake action farmer) for tree/rock
+  work. The guard therefore captures XP as a **difference**: it restores the host's experience,
+  levels, pending level-ups and mastery progress, reads what the fresh action farmers accumulated,
+  and banks the total in the shift's `XpLedger` for the sponsor. Flushed at batch boundaries and
+  shift end; dropped entirely when the contract's `GrantExperience` preference is off, or when the
+  owner is not connected (an offline farmer's message queue is never flushed).
 - **`crop.harvest()` doesn't clean up `dirt.crop`** — the caller must `dirt.destroyCrop(false)` for
   non-regrowable crops; regrowable crops are left in place to regrow naturally.
 - **`ResourceClump.performToolAction` calls `destroy()` internally** when health reaches 0 and

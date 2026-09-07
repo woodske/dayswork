@@ -88,6 +88,14 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
    game data or a decompile before use — not recalled from memory. When you investigate and confirm
    a piece of content, **record it in `docs/` so it never has to be looked up again** (see
    "Verified game-content references"). Treat anything not yet confirmed as unknown.
+8. **The office's owner sponsors its farmhand.** Money, tools, shipping, notices and XP follow
+   `Contract.OwnerId`, never `Game1.player`, and they go through **one seam**:
+   `Dayswork/Integration/Sponsor.cs`. Nothing else in `Dayswork/` may read or write `Farmer.Money`
+   or call `getShippingBin`/`shipItem` — `SponsorSeamLintTests` fails the test run if it does. The
+   one deliberate exception is the worker's fake action farmer (`CreateWorkerActionFarmer`), which
+   keeps the **host's** `UniqueMultiplayerID` forever: vanilla gates machine collect and tree XP on
+   `Farmer.IsLocalPlayer`, which is identity-based, so a sponsor-identity action farmer would break
+   Manage Machines outright.
 
 ## Code conventions
 
@@ -131,7 +139,8 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
   through one primitive: `Travel.cs` (`TravelPlan` + `TravelRunner`), with the completion
   dispatch in `ShiftOrchestrator.Travel.cs`.
 - `Dayswork/Integration/` — building definition + interaction, persistence, config/GMCM, chest and
-  shop resolution. `OfficeResolver` finds offices (by id, by tile, or all of them); `OfficeModData`
+  shop resolution. `Sponsor` is the owner-identity seam (hard rule 8) — wallet, tools, shipping,
+  XP. `OfficeResolver` finds offices (by id, by tile, or all of them); `OfficeModData`
   owns the office's `modData` keys and `OfficeContractPersistence` is the only thing that writes
   them — including the one-time 1.x → 2.0 contract adoption.
 - `Dayswork/UI/` — the hub-and-spoke hiring menus + a small layout toolkit (`UI/Layout/`).
@@ -169,8 +178,10 @@ The load-bearing ones are called out below.
   (silently dropped) farmers; `Building.owner` is set in `buildStructure`; `Building.id` is a
   serialized, synced per-instance `NetGuid` (survives a move, dies with demolition) and
   `BuildingData.BuildCondition` defaults to always-available — together the basis for keying a
-  contract to its office; painting needs a `Data/PaintData` entry, not just a `_PaintMask`. Backs
-  `docs/plans/dayswork-2.0.md`. Confirmed 2026-09-07.
+  contract to its office; the exact `experiencePoints` / skill-level / `newLevels` / `MasteryExp`
+  fields a worker-beat guard has to restore, and that `CreateFakeEventFarmer` copies **no** XP (so a
+  fresh action farmer's totals are the beat's delta); painting needs a `Data/PaintData` entry, not
+  just a `_PaintMask`. Backs `docs/plans/dayswork-2.0.md`. Confirmed 2026-09-07.
 - `docs/game-data/pathing.md` — the worker passability probe (`IsTilePassableForWorker`, inset `+1/62` rect), the verified `isCollidingPosition(character: null, …)` block table (**FarmAnimals do NOT block** — the animal loop is skipped when `character` is null), the Core `GridPathfinder`/`PassabilityGrid` BFS extraction (N,E,S,W tie-break is load-bearing), and the per-shift `LocationPassabilityCache` (which call sites are cached vs. live, the staleness contract, and the three invalidation mechanisms). Built 2026-07-07.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
@@ -203,14 +214,29 @@ ids in `HiringBuilding.BuildData`.
 
 ## Current state
 
-Builds clean and runs. **2.0 Phase 1 landed 2026-09-07** (branch `dayswork-2.0`, in-game smoke
-pass still owed): the farm may hold **any number of offices, one farmhand each**. A contract belongs
-to its office — stored in that building's `modData` under schema v4, keyed by `Building.id`, carrying
-an `OwnerId`/`OfficeId`/`Revision`. `ShiftFleet` runs one `ShiftOrchestrator` per live shift, fanned
-out sequentially, with a per-day `WorkClaimRegistry` arbitrating overlapping scopes and a
+Builds clean and runs. **2.0 Phases 1 and 2 landed 2026-09-07** (branch `dayswork-2.0`; both owe
+their in-game smoke passes, deferred until every phase is built).
+
+*Phase 1* — the farm may hold **any number of offices, one farmhand each**. A contract belongs to its
+office — stored in that building's `modData` under schema v4, keyed by `Building.id`, carrying an
+`OwnerId`/`OfficeId`/`Revision`. `ShiftFleet` runs one `ShiftOrchestrator` per live shift, fanned out
+sequentially, with a per-day `WorkClaimRegistry` arbitrating overlapping scopes and a
 `ShoppingBudgetLedger` per wallet keeping two workers from spending the same gold. A 1.x save's
 contract is adopted onto its office on first load. Demolishing an office ends its shift and takes its
 contract (no refund). Everything below still holds, now per office.
+
+*Phase 2* — the office's **owner sponsors** its farmhand, through one seam:
+`Dayswork/Integration/Sponsor.cs`. Wallet (`team.GetMoney(owner)` — one code path for shared and
+separate wallets), tools (`ToolLevelReader.ReadSnapshot(Sponsor.ResolveOrHost(ownerId))`), shipping
+(`Sponsor.ShipItem` / `ShippingBin`), notices, and XP all follow the contract's `OwnerId`. **Nothing
+outside `Sponsor` may touch `Farmer.Money`, `getShippingBin` or `shipItem`** — enforced by
+`Dayswork.Tests/Lint/SponsorSeamLintTests.cs`. XP is harvested as a **difference** around each
+guarded beat (host restore + fresh action-farmer read, see `WorkerBeatXpSnapshot`), banked in the
+per-shift `XpLedger`, and flushed at batch boundaries and shift end; it is dropped when the
+contract's `GrantExperience` preference is off or the owner is not connected. Fieldwork XP
+(tree/rock) now reaches the owner — it never did before. The worker's fake action farmer keeps the
+**host's** identity forever; see hard rule 8 below. In single-player the owner is always the local
+player, so all of this is behaviour-preserving except the new fieldwork XP.
 
 Working today: build an office and hire from its bulletin board; the
 hiring flow (tasks, zone-draw work scope, output chests, energy tier, task priority, one-time vs

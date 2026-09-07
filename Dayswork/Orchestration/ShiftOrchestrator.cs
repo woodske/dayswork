@@ -204,8 +204,8 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             ledger.Release(id);
     }
 
-    // Phase 1 is single-player, so every contract draws on the one wallet; Phase 2 keys this on
-    // the sponsor's wallet identity instead.
+    // Keyed on the sponsor's wallet identity, so two offices sharing a wallet share one ledger and
+    // two owners with separate wallets never constrain each other.
     private ShoppingBudgetLedger? ShoppingBudget =>
         _day is { } day && _session is { } session ? day.ShoppingBudgetFor(session.WalletId) : null;
 
@@ -282,7 +282,10 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         var energyState = _energyLedger.StartShift(contractTerms.Energy);
         var pacingProfile = WorkerPacingProfile.FromConfig(runtimeConfig);
 
-        var snapshot = _toolReader.ReadSnapshot(Game1.player);
+        // The worker inherits its SPONSOR's tool levels, not the local player's. For an owner who
+        // is not connected that is the Farmer from farmhandData — their tools as of their last
+        // disconnect, which is the best the save has.
+        var snapshot = _toolReader.ReadSnapshot(Sponsor.ResolveOrHost(contract.OwnerId));
         var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
         var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks, contract.CropPlan, contract.MachineScope, contract.FishPondScope);
 
@@ -973,6 +976,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         }
         if (++Session.TickCount % 4 != 0) return; // tick throttle
 
+        // Hand the sponsor whatever the worker earned in the batch just finished.
+        FlushEarnedExperienceOnBatchBoundary();
+
         var farm  = Game1.getFarm();
         var currentLocation = Session.CurrentLocation ?? farm;
         var phase = Session.Ctx.StateMachine.Phase;
@@ -1090,6 +1096,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _session.Deposits.AppendUndeliveredToOverflow();
 
         ctx.StateMachine.RegisterStopReason(ShiftStopReason.Sleep);
+        FlushEarnedExperience();
         DispatchShiftOverflow();
 
         DespawnWorker();

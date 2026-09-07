@@ -25,7 +25,8 @@ internal sealed class FleetDay
     /// way to spend. Keyed by wallet rather than by contract because that is the resource actually
     /// contended: under a shared wallet every office draws on one ledger, and under separate
     /// wallets each owner gets their own and never constrains anyone else. (In single-player, and
-    /// under the co-op shared-wallet setting, there is exactly one.)
+    /// under the co-op shared-wallet setting, there is exactly one — see
+    /// <see cref="Sponsor.WalletId"/>, which collapses every owner onto one id in that mode.)
     /// </summary>
     public ShoppingBudgetLedger ShoppingBudgetFor(long walletId)
     {

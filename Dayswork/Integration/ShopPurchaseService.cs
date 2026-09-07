@@ -1,6 +1,7 @@
 namespace Dayswork.Integration;
 
 using Dayswork.Core.Crops;
+using Netcode;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Objects;
@@ -10,6 +11,10 @@ using StardewValley.Objects;
 /// item stack, deposit as much as the input chest accepts, then deduct gold only for the accepted
 /// quantity. Any bind/create failure returns <see cref="PurchaseResult.BindFailure"/> without
 /// mutating gold.
+/// <para>
+/// The <c>wallet</c> is the sponsor's, from <see cref="Sponsor.Wallet"/> — the worker spends its
+/// own owner's money, never whoever happens to be at the keyboard.
+/// </para>
 /// </summary>
 internal sealed class ShopPurchaseService
 {
@@ -17,7 +22,7 @@ internal sealed class ShopPurchaseService
 
     public ShopPurchaseService(IMonitor? monitor = null) => _monitor = monitor;
 
-    public PurchaseResult BuyToInputChest(StorePurchaseGroup group, Chest inputChest, Farmer farmer)
+    public PurchaseResult BuyToInputChest(StorePurchaseGroup group, Chest inputChest, NetIntDelta wallet)
     {
         var outcomes = new List<PurchaseLineOutcome>();
 
@@ -33,7 +38,7 @@ internal sealed class ShopPurchaseService
                 return PurchaseResult.BindFailure;
             }
 
-            var maxAffordable = Math.Min(line.Quantity, farmer.Money / unitCost);
+            var maxAffordable = Math.Min(line.Quantity, wallet.Value / unitCost);
             if (maxAffordable <= 0)
             {
                 outcomes.Add(BuildOutcome(group.Store, line, 0, unitCost, PurchaseOutcomeKind.Insufficient));
@@ -50,7 +55,7 @@ internal sealed class ShopPurchaseService
             var leftover = inputChest.addItem(item);
             var accepted = maxAffordable - Math.Max(0, leftover?.Stack ?? 0);
             if (accepted > 0)
-                farmer.Money -= accepted * unitCost;
+                wallet.Value -= accepted * unitCost;
 
             var kind = accepted switch
             {
@@ -64,7 +69,7 @@ internal sealed class ShopPurchaseService
         return new PurchaseResult(outcomes, bindFailed: false);
     }
 
-    public PurchaseResult BuyToCarriedItems(StorePurchaseGroup group, Farmer farmer, IList<Item> carriedItems)
+    public PurchaseResult BuyToCarriedItems(StorePurchaseGroup group, NetIntDelta wallet, IList<Item> carriedItems)
     {
         var outcomes = new List<PurchaseLineOutcome>();
 
@@ -73,7 +78,7 @@ internal sealed class ShopPurchaseService
             if (line.Quantity <= 0)
                 continue;
 
-            var outcome = BuyLineToCarriedItems(group.Store, line, farmer, carriedItems);
+            var outcome = BuyLineToCarriedItems(group.Store, line, wallet, carriedItems);
             if (outcome is null)
                 return PurchaseResult.BindFailure;
             outcomes.Add(outcome);
@@ -83,7 +88,7 @@ internal sealed class ShopPurchaseService
     }
 
     /// <summary>Buys a single line item. Returns null on bind/create failure (caller should abort).</summary>
-    public PurchaseLineOutcome? BuyLineToCarriedItems(Store store, ManifestLine line, Farmer farmer, IList<Item> carriedItems)
+    public PurchaseLineOutcome? BuyLineToCarriedItems(Store store, ManifestLine line, NetIntDelta wallet, IList<Item> carriedItems)
     {
         var unitCost = ResolveUnitCost(store, line);
         if (unitCost <= 0)
@@ -92,7 +97,7 @@ internal sealed class ShopPurchaseService
             return null;
         }
 
-        var maxAffordable = Math.Min(line.Quantity, farmer.Money / unitCost);
+        var maxAffordable = Math.Min(line.Quantity, wallet.Value / unitCost);
         if (maxAffordable <= 0)
             return BuildOutcome(store, line, 0, unitCost, PurchaseOutcomeKind.Insufficient);
 
@@ -104,7 +109,7 @@ internal sealed class ShopPurchaseService
         }
 
         carriedItems.Add(item);
-        farmer.Money -= maxAffordable * unitCost;
+        wallet.Value -= maxAffordable * unitCost;
         var kind = maxAffordable < line.Quantity
             ? PurchaseOutcomeKind.Partial
             : PurchaseOutcomeKind.Full;

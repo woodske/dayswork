@@ -2,6 +2,7 @@ using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Machines;
 using Dayswork.Core.Shifts;
+using Dayswork.Integration;
 using Dayswork.Worker;
 using Microsoft.Xna.Framework;
 using StardewValley;
@@ -49,13 +50,13 @@ internal sealed class ShiftSession
     /// chests, and evening lights all resolve through it, never through "the farm's office".</summary>
     public readonly Guid OfficeId;
 
-    /// <summary>The contract's sponsor. Phase 1 always runs single-player, so this is the local
-    /// player; Phase 2 makes it the identity behind the wallet, tools, shipping, and XP.</summary>
+    /// <summary>The contract's sponsor: the identity behind this shift's wallet, tool levels,
+    /// shipping bin, notices, and experience. In single-player it is always the local player.</summary>
     public readonly long OwnerId;
 
     /// <summary>Which wallet this shift spends from. One wallet in single-player and under co-op's
     /// shared-money setting; keyed per owner otherwise.</summary>
-    public long WalletId => OwnerId;
+    public long WalletId => Sponsor.WalletId(OwnerId);
 
     /// <summary>The pure-Core shift context: state machine, energy, batches, buffer, overflow.</summary>
     public ShiftContext Ctx { get; }
@@ -82,6 +83,17 @@ internal sealed class ShiftSession
     /// <see cref="LocationPassabilityCache"/> for the staleness/invalidation contract.
     /// </summary>
     public readonly LocationPassabilityCache Passability = new();
+
+    /// <summary>
+    /// Experience this worker has earned but not yet handed to its sponsor. Harvested as a
+    /// difference around each guarded beat and flushed at batch boundaries and shift end, so the
+    /// owner sees one level-up notice per batch rather than one per swing.
+    /// </summary>
+    public readonly XpLedger Xp = new();
+
+    /// <summary>The batch index the XP ledger was last flushed at — a change means a batch
+    /// boundary was crossed.</summary>
+    public int LastXpFlushBatchIndex;
 
     // ── Tick / pacing ────────────────────────────────────────────────────────
     public int TickCount;

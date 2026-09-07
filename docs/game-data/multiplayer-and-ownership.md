@@ -64,6 +64,29 @@ experiencePoints[which] += howMuch;
   `newLevels.Count`, and `Game1.stats["MasteryExp"]` around the beat, then trimming the HUD queue
   (the level-up message lands in `Game1.hudMessages`, which the existing guard already trims).
 
+### The XP fields a beat guard has to put back
+
+Confirmed 2026-09-07 while building 2.0 Phase 2 (`WorkerBeatXpSnapshot`), so the restore list never
+has to be re-derived:
+
+- `Farmer.experiencePoints` is a `NetArray<int, NetInt>(6)` (`Farmer.cs:211`) — skills 0-4 plus
+  luck at 5. Index order matches `gainExperience`'s switch: 0 farming, 1 fishing, 2 foraging,
+  3 mining, 4 combat, 5 luck.
+- The skill levels are six separate `NetInt` fields (`Farmer.cs:581-596`): `farmingLevel`,
+  `miningLevel`, `combatLevel`, `foragingLevel`, `fishingLevel`, `luckLevel`. `gainExperience`
+  writes the one matching `which` on a level gain.
+- `Farmer.newLevels` is a `NetList<Point, NetPoint>` (`Farmer.cs:203`); each level gain appends
+  `(which, level)`, and the **first** append shows a `Game1.showGlobalMessage` textbox (which lands
+  in `Game1.hudMessages`, so an existing HUD trim removes it). Truncating the list back to its
+  pre-beat count undoes the gain.
+- Mastery progress is a stat, not a field: `Game1.stats.Increment("MasteryExp", …)` when
+  `Level >= 25`. `Stats.Get(string) → uint` (`Stats.cs:840`) and `Stats.Set(string, uint)`
+  (`Stats.cs:852`) read and write it directly.
+- `Farmer.CreateFakeEventFarmer()` (`Farmer.cs:9189`) builds a **brand-new** `Farmer` and copies
+  only name, appearance and `UniqueMultiplayerID` — never experience or levels. So whatever a fresh
+  action farmer holds after one beat *is* that beat's XP delta, and its own level is 0 (no mastery
+  branch, no level-up for ordinary amounts).
+
 ## `Building.owner`
 
 - `Building.owner` is a `NetLong` (`Building.cs:141`), added to `NetFields` (`Building.cs:398`),

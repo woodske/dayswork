@@ -19,8 +19,16 @@
   into your machines.
 - The contract screen now shows your farmhand's name, the machines and fish ponds it
   tends, and its energy tier, with a colour-coded status.
+- Chopping trees and breaking rocks now earns you foraging and mining experience, the same as
+  harvesting always has. The Preferences screen has a toggle to turn a contract's experience off.
+- Preferences also gained a "Work while you're away" toggle, so you can say whether your farmhand
+  should keep working when you aren't around.
 
 ### Changed
+
+- Everything about a contract — the fee, the seeds and fertiliser your farmhand buys, the tool
+  levels it works with, and where its output is shipped — now follows the player who owns the
+  office, rather than whoever happens to be playing.
 
 - Farmhands no longer plan a shopping trip for gold another farmhand is already on the way to
   spend, so two workers can't both set out and leave one arriving at an empty till.

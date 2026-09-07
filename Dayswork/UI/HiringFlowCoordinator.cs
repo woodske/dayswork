@@ -159,11 +159,13 @@ internal sealed class HiringFlowCoordinator
 
     private bool TryPurchaseUpgrade(FarmhandUpgradeKind kind)
     {
-        var result = FarmhandUpgradePurchaser.TryPurchase(kind, _upgradeStore.State, Game1.player.Money);
+        // Upgrades are bought by whoever is standing at the menu, out of their own wallet.
+        var buyerWallet = Sponsor.Wallet(Game1.player.UniqueMultiplayerID);
+        var result = FarmhandUpgradePurchaser.TryPurchase(kind, _upgradeStore.State, buyerWallet.Value);
         switch (result.Status)
         {
             case FarmhandUpgradePurchaseStatus.Purchased:
-                Game1.player.Money = result.RemainingGold;
+                buyerWallet.Value = result.RemainingGold;
                 _upgradeStore.Replace(result.State);
                 if (kind == FarmhandUpgradeKind.Energy)
                     ApplyEnergyUpgradeToOpenContracts();
@@ -1101,8 +1103,10 @@ internal sealed class HiringFlowCoordinator
 
         if (!draft.IsEditing && draft.Schedule == ContractSchedule.OneTime)
         {
+            // The office's owner sponsors the contract, so the up-front price comes out of their
+            // wallet — the same wallet the shift's daily charges and shopping will draw on.
             var totalPrice = proposedTerms.Pricing.TotalPrice;
-            if (Game1.player.Money < totalPrice)
+            if (Sponsor.Money(draft.OwnerId) < totalPrice)
             {
                 Game1.addHUDMessage(new HUDMessage(
                     I18nHelper.Get("ui.error.cant_afford"),
@@ -1110,7 +1114,7 @@ internal sealed class HiringFlowCoordinator
                 return;
             }
 
-            Game1.player.Money -= totalPrice;
+            Sponsor.Charge(draft.OwnerId, totalPrice);
         }
 
         var builtContract = BuildContract(draft, proposedTerms);

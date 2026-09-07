@@ -242,7 +242,7 @@ internal sealed class ManagedShoppingCoordinator
         // Subtract gold other farmhands have already committed to their own shopping trips this day,
         // so only workers who can actually afford seeds travel (the shared wallet isn't debited until
         // a worker reaches the counter — the reservation stands in for that pending spend).
-        var available = Math.Max(0, Game1.player.Money - _host.OtherWorkersReservedShoppingBudget());
+        var available = Math.Max(0, Sponsor.Money(_session.OwnerId) - _host.OtherWorkersReservedShoppingBudget());
         var walletClamped = _purchaseAffordability.ClampToWallet(manifest, available);
 
         var groups = walletClamped.Groups
@@ -507,7 +507,7 @@ internal sealed class ManagedShoppingCoordinator
         }
 
         var outcome = _shopPurchaseService.BuyLineToCarriedItems(
-            _group.Store, lines[_purchaseLineIndex], Game1.player, _carriedItems);
+            _group.Store, lines[_purchaseLineIndex], Sponsor.Wallet(_session.OwnerId), _carriedItems);
         if (outcome is null)
         {
             AbortTrip("purchase_bind_failed");
@@ -554,7 +554,7 @@ internal sealed class ManagedShoppingCoordinator
             CropHudNotifier.InsufficientFunds();
 
         DevLog.Log(
-            $"[Dayswork][managed-crops][shopping] store={_group?.Store} bought={outcomes.Sum(o => o.BoughtQty)} spent={outcomes.Sum(o => o.SpentGold)} goldRemaining={Game1.player.Money}.",
+            $"[Dayswork][managed-crops][shopping] store={_group?.Store} bought={outcomes.Sum(o => o.BoughtQty)} spent={outcomes.Sum(o => o.SpentGold)} goldRemaining={Sponsor.Money(_session.OwnerId)}.",
             LogLevel.Info);
 
         _group = null;

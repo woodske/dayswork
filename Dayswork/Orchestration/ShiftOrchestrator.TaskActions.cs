@@ -198,6 +198,13 @@ internal sealed partial class ShiftOrchestrator
         var savedPlayerLocation = Game1.player.currentLocation;
         Game1.player.currentLocation = location;
 
+        // XP the beat generates lands on whichever farmer vanilla had in hand — the host for
+        // Crop.harvest (which hardcodes Game1.player), the throwaway action farmer for tree/rock
+        // work. Snapshot the host's share so it can be put back, and collect the action farmers
+        // created during the beat so their (fresh, therefore delta-shaped) totals can be read.
+        var hostXp = WorkerBeatXpSnapshot.Capture(Game1.player);
+        var beatActionFarmers = _beatActionFarmers = new List<Farmer>();
+
         try
         {
             return body();
@@ -205,6 +212,8 @@ internal sealed partial class ShiftOrchestrator
         finally
         {
             Game1.player.currentLocation = savedPlayerLocation;
+            _beatActionFarmers = null;
+            HarvestBeatExperience(hostXp, beatActionFarmers);
 
             if (leakDebrisBefore is not null)
             {
@@ -236,6 +245,46 @@ internal sealed partial class ShiftOrchestrator
             if (playerStateChanged)
                 LogWorkerActionPlayerStateRestore(task, tile, location, savedState.Describe(), changedStateDescription, restoredStateDescription);
         }
+    }
+
+    // Puts the host's experience back and banks what the beat earned for the sponsor. The restore
+    // is unconditional — with the XP preference off, a shift must leave the host's skills exactly
+    // as it found them, which is the same restore with nothing banked afterwards.
+    private void HarvestBeatExperience(WorkerBeatXpSnapshot hostXp, List<Farmer> beatActionFarmers)
+    {
+        var earnedByHost = hostXp.RestoreAndDiff(Game1.player);
+
+        if (_session is null || !Session.Ctx.Preferences.GrantExperience)
+            return;
+
+        Session.Xp.Add(earnedByHost);
+
+        // Each action farmer is built fresh for the beat, so whatever it holds now IS the delta.
+        foreach (var actionFarmer in beatActionFarmers)
+        {
+            for (var skill = 0; skill < XpLedger.SkillCount; skill++)
+                Session.Xp.Add(skill, actionFarmer.experiencePoints[skill]);
+        }
+    }
+
+    /// <summary>Grants what the worker has earned so far to its sponsor once the shift crosses a
+    /// batch boundary — chunking the level-up notices instead of one per swing.</summary>
+    private void FlushEarnedExperienceOnBatchBoundary()
+    {
+        if (Session.Ctx.CurrentBatchIndex != Session.LastXpFlushBatchIndex)
+            FlushEarnedExperience();
+    }
+
+    /// <summary>Hands every banked skill amount to the sponsor and clears the ledger. A sponsor who
+    /// is not connected earns nothing (see <see cref="Sponsor.GrantExperience"/>).</summary>
+    private void FlushEarnedExperience()
+    {
+        if (_session is null)
+            return;
+
+        Session.LastXpFlushBatchIndex = Session.Ctx.CurrentBatchIndex;
+        foreach (var grant in Session.Xp.Flush())
+            Sponsor.GrantExperience(Session.OwnerId, grant.Skill, grant.Amount);
     }
 
     private static void LogWorkerActionPlayerStateRestore(
@@ -636,9 +685,21 @@ internal sealed partial class ShiftOrchestrator
         return new LaborBeatOutcome(true, true);
     }
 
+    /// <summary>Action farmers created during the current guarded beat, so their earned XP can be
+    /// harvested when it ends. Null outside a beat (the machine paths build action farmers too, and
+    /// their XP-free actions must not spill into the next beat's harvest).</summary>
+    private List<Farmer>? _beatActionFarmers;
+
+    // The worker's stand-in for vanilla APIs that need a Farmer. It keeps the HOST's
+    // UniqueMultiplayerID deliberately and forever: Farmer.IsLocalPlayer is identity-based, and
+    // vanilla gates machine collection (Object.cs:4626) and tree XP/stats (Tree.cs:1498/1514) on
+    // it — building this from a remote sponsor would flip the flag and break Manage Machines.
+    // Sponsor identity enters through Sponsor's four channels instead (wallet, tools, shipping,
+    // XP routing), never through this farmer. See docs/game-data/multiplayer-and-ownership.md.
     private Farmer CreateWorkerActionFarmer(TileCoord taskTile, GameLocation location)
     {
         var actionFarmer = Game1.player.CreateFakeEventFarmer();
+        _beatActionFarmers?.Add(actionFarmer);
         actionFarmer.currentLocation = location;
         actionFarmer.Position = Session.Worker?.Position ?? Game1.player.Position;
         actionFarmer.faceDirection(

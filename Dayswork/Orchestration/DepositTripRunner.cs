@@ -407,10 +407,11 @@ internal sealed class DepositTripRunner
             return;
         }
 
-        if (animateWhenPlayerHere && Game1.player.currentLocation == farm)
-            farm.shipItem(item, Game1.player);           // vanilla lid animation + backpackIN + delayed "Ship"
-        else
-            farm.getShippingBin(Game1.player).Add(item); // silent fallback
+        // The bin is the SPONSOR's: their personal bin under separate wallets, the shared one
+        // otherwise. The lid animation only makes sense when the player can see it.
+        Sponsor.ShipItem(
+            farm, item, _session.OwnerId,
+            animate: animateWhenPlayerHere && Game1.player.currentLocation == farm);
     }
 
     private void EndTripExecution()

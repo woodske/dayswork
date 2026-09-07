@@ -9,13 +9,15 @@ using SObject = StardewValley.Object;
 
 namespace Dayswork.Integration;
 
-// Missed/overflow items are deposited into the hiring building's static output chest
-// (falling back to the shipping bin so nothing is ever lost), and text notices are shown as
-// in-game HUD messages. Festival one-time refunds are credited directly to the player's gold.
+// Missed/overflow items are deposited into the hiring building's static output chest (falling back
+// to the SPONSOR's shipping bin so nothing is ever lost). Money and notices follow the sponsor too:
+// festival one-time refunds are credited to the owner's wallet, and a notice is a HUD message when
+// the owner is the player at this screen and a log line otherwise.
 internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
 {
     public void DispatchOverflowDelivery(
         StardewValley.Buildings.Building? office,
+        long ownerId,
         IReadOnlyList<ItemStack> items,
         IReadOnlyList<OverflowCategory> categories,
         IReadOnlyDictionary<string, SObject> flavorTemplates)
@@ -25,7 +27,7 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         var built = BuildItems(items, flavorTemplates);
         if (built.Count == 0) return;
 
-        var deposited = DepositToBuildingChestOrBin(office, built, out var usedChest, out var chestWasFull);
+        var deposited = DepositToBuildingChestOrBin(office, ownerId, built, out var usedChest, out var chestWasFull);
 
         var destination = usedChest && !chestWasFull ? "the farmhand office chest"
                         : chestWasFull               ? "the farmhand office chest (partial) + shipping bin"
@@ -37,43 +39,44 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         var notifyKey = usedChest && !chestWasFull ? "notify.items_deposited_chest"
                       : chestWasFull               ? "notify.items_deposited_chest_overflow"
                       :                              "notify.items_deposited_bin";
-        Game1.addHUDMessage(new HUDMessage(I18nHelper.Get(notifyKey), HUDMessage.newQuest_type));
+        ShowInfo(ownerId, I18nHelper.Get(notifyKey));
     }
 
     public void ShowCannotAffordNotice(Contract contract, int dailyPrice, int shortfall)
     {
-        ShowError(I18nHelper.Get("notify.cannot_afford", new { price = dailyPrice, shortfall }));
+        ShowError(contract.OwnerId, I18nHelper.Get("notify.cannot_afford", new { price = dailyPrice, shortfall }));
     }
 
-    public void ShowContractLostNotice()
+    public void ShowContractLostNotice(long ownerId)
     {
-        ShowError(I18nHelper.Get("notify.contract_lost"));
+        ShowError(ownerId, I18nHelper.Get("notify.contract_lost"));
     }
 
     public void ShowNeedsAttentionNotice(Contract contract)
     {
-        ShowError(I18nHelper.Get("notify.needs_attention"));
+        ShowError(contract.OwnerId, I18nHelper.Get("notify.needs_attention"));
     }
 
     public void ShowFestivalNotice(Contract contract, int refundGold)
     {
-        if (refundGold > 0 && Game1.player is not null)
+        if (refundGold > 0)
         {
-            Game1.player.Money += refundGold;
-            ShowInfo(I18nHelper.Get("notify.festival_refund", new { refund = refundGold }));
+            Sponsor.Credit(contract.OwnerId, refundGold);
+            ShowInfo(contract.OwnerId, I18nHelper.Get("notify.festival_refund", new { refund = refundGold }));
         }
         else
         {
-            ShowInfo(I18nHelper.Get("notify.festival"));
+            ShowInfo(contract.OwnerId, I18nHelper.Get("notify.festival"));
         }
     }
 
     // Deposits each item stack into the building output chest; any leftover (chest full or missing)
-    // goes to the shipping bin. Returns the number of stacks handled and whether the chest was used.
-    // chestWasFull is set when the chest was present but addItem returned a remainder, so the caller
-    // can show a fallback-to-bin notice distinct from the "no chest assigned" case.
+    // goes to the sponsor's shipping bin. Returns the number of stacks handled and whether the chest
+    // was used. chestWasFull is set when the chest was present but addItem returned a remainder, so
+    // the caller can show a fallback-to-bin notice distinct from the "no chest assigned" case.
     private static int DepositToBuildingChestOrBin(
         StardewValley.Buildings.Building? office,
+        long ownerId,
         List<Item> items,
         out bool usedChest,
         out bool chestWasFull)
@@ -81,7 +84,7 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         usedChest = false;
         chestWasFull = false;
         var chest = office?.GetBuildingChest(HiringBuilding.OutputChestId);
-        var bin = Game1.getFarm()?.getShippingBin(Game1.player);
+        var bin = Sponsor.ShippingBin(Game1.getFarm(), ownerId);
 
         var count = 0;
         foreach (var item in items)
@@ -105,11 +108,24 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         return count;
     }
 
-    private static void ShowInfo(string text) =>
-        Game1.addHUDMessage(new HUDMessage(text, HUDMessage.newQuest_type));
+    private static void ShowInfo(long ownerId, string text) =>
+        Show(ownerId, text, HUDMessage.newQuest_type);
 
-    private static void ShowError(string text) =>
-        Game1.addHUDMessage(new HUDMessage(text, HUDMessage.error_type));
+    private static void ShowError(long ownerId, string text) =>
+        Show(ownerId, text, HUDMessage.error_type);
+
+    // A notice belongs to the contract's owner. Shown on the HUD when that is the player at this
+    // screen; logged otherwise, until Phase 4 adds delivery to a remote owner.
+    private static void Show(long ownerId, string text, int hudType)
+    {
+        if (Sponsor.IsLocal(ownerId))
+        {
+            Game1.addHUDMessage(new HUDMessage(text, hudType));
+            return;
+        }
+
+        ModEntry.ModMonitor.Log($"[Dayswork] Notice for owner {ownerId}: {text}", DevLog.WarnLevel);
+    }
 
     private static List<Item> BuildItems(IReadOnlyList<ItemStack> stacks, IReadOnlyDictionary<string, SObject> flavorTemplates)
     {

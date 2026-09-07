@@ -464,15 +464,49 @@ which becomes deliberate.
 not connected; the XP toggle is a **per-contract preference** (it travels with the draft, persists,
 and is "the owner's toggle" without a config-sync channel).
 
+**Changed while building (2026-09-07):**
+- `Sponsor` gained `ResolveOrHost`. Owner resolution deliberately splits in two: `Resolve` returns
+  null for an unknown id (a deleted farmhand slot), while wallet, shipping and tools fall back to
+  the host rather than taking a shift down over a missing owner. XP still uses the strict lookup —
+  a missing owner earns nothing.
+- The XP toggle is honoured at **harvest** time, not at flush: with it off, the host's experience is
+  still restored (that is the point of the toggle) but nothing is banked, so the ledger never holds
+  XP that can't be granted.
+- The batch-boundary flush is a **batch-index change detected in the tick loop**, not a call at each
+  of the 27 `CurrentBatchIndex++` sites.
+- `ShiftOutcomeDispatcher`'s per-contract notices keep taking the `Contract` (which carries
+  `OwnerId`); only `ShowContractLostNotice` and `DispatchOverflowDelivery`, which have no contract
+  in hand, gained an explicit `ownerId`.
+- The source-lint test covers the **shipping** seam as well as money — `getShippingBin`/`shipItem`
+  outside `Sponsor` are the same class of mistake, and the check costs one more regex.
+- Farmhand upgrades stay **global** (still `Game1.player`'s purchase against their own wallet).
+  Per-owner upgrade state is D9, which the phasing table puts in Phase 4.
+- `ShiftSession.WalletId` was a Phase-1 placeholder returning `OwnerId`; it now asks
+  `Sponsor.WalletId`, which collapses every owner onto one id when `useSeparateWallets` is false.
+  Without that, two owners under co-op's shared money would have got a `ShoppingBudgetLedger` each
+  and could both plan to spend the same gold — the exact bug D5 asks the ledger to prevent.
+
 **Tests (required).** `XpLedger` accumulate/flush;
 wallet accessor used for every charge/refund path (a test double for `NetIntDelta` is not possible
 in Core — test the Core decision engines with owner money as input, and add a source-lint test that
 no `Game1.player.Money` remains in `Dayswork/`).
 
-**Acceptance.** Single-player regression unchanged for money and items; with the toggle on, one
-harvest beat grants the same farming XP as before and fieldwork now grants foraging/mining XP; with
-the toggle off, no skill changes during a shift (verify with the skills page before/after); machine
-collect still works (guards correction 1); no `Game1.player.Money` in the mod assembly.
+**Acceptance.** Built 2026-09-07; code-complete with the unit tests the plan asked for. Every item
+marked *(smoke)* still owes an in-game pass (deferred with Phase 1's, per the 2.0 smoke matrix).
+
+- [x] Wallet: no `Game1.player.Money` (nor any `Farmer.Money`) anywhere in `Dayswork/` — enforced by
+  `SponsorSeamLintTests`; every charge, refund and affordability read goes through `Sponsor`.
+- [x] Shipping: no `getShippingBin`/`shipItem` outside `Sponsor` — same lint.
+- [x] Tools: the shift snapshots `Sponsor.ResolveOrHost(contract.OwnerId)`'s tool levels.
+- [x] XP: harvested as a host + action-farmer delta per guarded beat, banked in the per-shift
+  `XpLedger`, flushed at batch boundaries and shift end through `Sponsor.GrantExperience`.
+- [x] Action farmer unchanged (host identity), with the comment saying why (correction 1).
+- [x] `GrantExperience` and `RunWhileOwnerOffline` on the Preferences spoke.
+- [ ] *(smoke)* Single-player regression unchanged for money and items.
+- [ ] *(smoke)* With the toggle on, one harvest beat grants the same farming XP as before and
+  fieldwork now grants foraging/mining XP.
+- [ ] *(smoke)* With the toggle off, no skill changes during a shift (skills page before/after).
+- [ ] *(smoke)* Machine collect still works (guards correction 1).
 
 ## Phase 3 — Worker appearance
 

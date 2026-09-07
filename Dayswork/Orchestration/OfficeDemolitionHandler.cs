@@ -51,7 +51,7 @@ internal sealed class OfficeDemolitionHandler
             if (contract is null)
                 continue;
 
-            _shiftOutcomes.ShowContractLostNotice();
+            _shiftOutcomes.ShowContractLostNotice(contract.OwnerId);
             ModEntry.ModMonitor.Log(
                 $"[Dayswork] Office {officeId:N} was demolished — contract {contract.Id.Value} is gone with it (no refund).",
                 DevLog.WarnLevel);

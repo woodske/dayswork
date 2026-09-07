@@ -89,7 +89,7 @@ internal sealed class RecurringContractScheduler
         if (OfficeResolver.TryGet(contract.OfficeId) is null)
         {
             _store.RemoveOffice(contract.OfficeId);
-            _shiftOutcomes.ShowContractLostNotice();
+            _shiftOutcomes.ShowContractLostNotice(contract.OwnerId);
             ModEntry.ModMonitor.Log(
                 $"[Dayswork] Contract {contract.Id.Value}'s office no longer exists — the contract has been dropped with no charge.",
                 DevLog.WarnLevel);
@@ -138,7 +138,9 @@ internal sealed class RecurringContractScheduler
     // the festival / needs-attention / cannot-afford / start-shift path from the same rebuilt terms.
     private void StartRecurring(Contract contract, ConfigSnapshot config, bool festivalToday)
     {
-        var outcome = _decisionEngine.Evaluate(contract, config, festivalToday, Game1.player.Money);
+        // Affordability and the charge are both the contract owner's — their wallet, which under
+        // co-op's shared-money setting (and in single-player) is the one everybody draws on.
+        var outcome = _decisionEngine.Evaluate(contract, config, festivalToday, Sponsor.Money(contract.OwnerId));
         if (outcome.ShouldPersistTermsSnapshot && outcome.Refresh.TermsSnapshot is not null)
             _store.ReplaceTermsSnapshot(contract.OfficeId, outcome.Refresh.TermsSnapshot);
 
@@ -165,7 +167,7 @@ internal sealed class RecurringContractScheduler
         }
 
         if (outcome.ShouldChargePlayer)
-            Game1.player.Money -= outcome.DailyPrice;
+            Sponsor.Charge(contract.OwnerId, outcome.DailyPrice);
 
         if (outcome.ShouldStartShift)
         {

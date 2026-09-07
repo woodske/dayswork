@@ -52,6 +52,9 @@ internal sealed partial class ShiftOrchestrator
             $"[Dayswork] Shift complete. StopReason={Session.Ctx.StateMachine.StopReason}. Remaining stamina={Session.Ctx.EnergyState.RemainingEnergy}/{Session.Ctx.EnergyState.Capacity}.",
             LogLevel.Trace);
 
+        // Anything the worker earned since the last batch boundary goes to the sponsor now.
+        FlushEarnedExperience();
+
         // One settlement letter next morning for overflow items only; refunds are not settled here.
         DispatchShiftOverflow();
 
@@ -465,7 +468,8 @@ internal sealed partial class ShiftOrchestrator
             : Array.Empty<ItemStack>();
         var categories = _overflowCategorizer.Categorize(Session.Ctx.Overflow);
 
-        _shiftOutcomeDispatcher.DispatchOverflowDelivery(ActiveOffice, items, categories, Session.Flavors.Templates);
+        _shiftOutcomeDispatcher.DispatchOverflowDelivery(
+            ActiveOffice, Session.OwnerId, items, categories, Session.Flavors.Templates);
         Session.Ctx.Overflow.Clear();
     }
 }
