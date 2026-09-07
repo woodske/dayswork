@@ -71,7 +71,7 @@ internal sealed class HiringFlowCoordinator
 
     public void OpenManageFlow()
     {
-        Game1.activeClickableMenu = new ContractListMenu(_contractStore, _helper);
+        Game1.activeClickableMenu = new ContractMenu(_contractStore);
     }
 
     /// <summary>Entry point from the hiring building's tile action: manage an existing contract, else hire.</summary>

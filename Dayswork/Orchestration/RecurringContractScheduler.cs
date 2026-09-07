@@ -50,40 +50,40 @@ internal sealed class RecurringContractScheduler
             return;
 
         var today = CurrentGameDate();
-        var contractsForToday = _store.ListActiveForDate(today.Day, today.Season, today.Year);
+        var contract = _store.GetScheduledForDate(today.Day, today.Season, today.Year);
+        if (contract is null)
+            return;
+
         var config = FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, _upgradeStore.State);
         var holidaySkip = _calendar.IsFestivalToday() && !config.WorkOnHolidays;
 
-        foreach (var contract in contractsForToday)
+        try
         {
-            try
+            // Festival gate for one-time contracts: the contract is consumed and the already-paid
+            // fixed price is returned by direct refund plus a same-day HUD notice.
+            if (holidaySkip && contract.Schedule == ContractSchedule.OneTime)
             {
-                // Festival gate for one-time contracts: the contract is consumed and the already-paid
-                // fixed price is returned by direct refund plus a same-day HUD notice.
-                if (holidaySkip && contract.Schedule == ContractSchedule.OneTime)
-                {
-                    HandleFestival(contract);
-                    continue;
-                }
+                HandleFestival(contract);
+                return;
+            }
 
-                if (contract.Schedule == ContractSchedule.OneTime)
-                {
-                    // One-time: fixed price already paid at hire. Mark Executed before spawning so a
-                    // reload on the same day cannot re-fire.
-                    _store.Update(contract.Id, contract with { Status = ContractStatus.Executed });
-                    _orchestrator.StartShift(contract, config);
-                }
-                else
-                {
-                    StartRecurring(contract, config, holidaySkip);
-                }
-            }
-            catch (Exception ex)
+            if (contract.Schedule == ContractSchedule.OneTime)
             {
-                ModEntry.ModMonitor.Log(
-                    $"[Dayswork] Recurring day-start evaluation failed for contract {contract.Id.Value}: {ex.Message}",
-                    DevLog.WarnLevel);
+                // One-time: fixed price already paid at hire. Mark Executed before spawning so a
+                // reload on the same day cannot re-fire.
+                _store.Update(contract.Id, contract with { Status = ContractStatus.Executed });
+                _orchestrator.StartShift(contract, config);
             }
+            else
+            {
+                StartRecurring(contract, config, holidaySkip);
+            }
+        }
+        catch (Exception ex)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Recurring day-start evaluation failed for contract {contract.Id.Value}: {ex.Message}",
+                DevLog.WarnLevel);
         }
     }
 

@@ -225,10 +225,10 @@ public sealed class ContractStoreTests
         Assert.Contains("Duplicate ContractId", _warnings[0]);
     }
 
-    // ── ListActiveForDate ──────────────────────────────────────────────────
+    // ── GetScheduledForDate / GetPrimaryOpen ───────────────────────────────
 
     [Fact]
-    public void ListActiveForDate_ReturnsActiveContractScheduledForTomorrow()
+    public void GetScheduledForDate_ReturnsActiveContractScheduledForTomorrow()
     {
         // A OneTime contract hired Spring 1 Yr1 is scheduled for the next game day, Spring 2 Yr1.
         var contract = MakeContract(ContractStatus.Active) with
@@ -238,14 +238,14 @@ public sealed class ContractStoreTests
         };
         _store.Add(contract);
 
-        var result = _store.ListActiveForDate(2, Season.Spring, 1);
+        var result = _store.GetScheduledForDate(2, Season.Spring, 1);
 
-        Assert.Single(result);
-        Assert.Equal(contract.Id, result[0].Id);
+        Assert.NotNull(result);
+        Assert.Equal(contract.Id, result!.Id);
     }
 
     [Fact]
-    public void ListActiveForDate_ExcludesContractNotScheduledForDate()
+    public void GetScheduledForDate_ExcludesContractNotScheduledForDate()
     {
         var contract = MakeContract(ContractStatus.Active) with
         {
@@ -255,8 +255,59 @@ public sealed class ContractStoreTests
         _store.Add(contract);
 
         // Spring 3 is not the day after Spring 1 — should not be returned.
-        var result = _store.ListActiveForDate(3, Season.Spring, 1);
+        Assert.Null(_store.GetScheduledForDate(3, Season.Spring, 1));
+    }
 
-        Assert.Empty(result);
+    [Fact]
+    public void GetScheduledForDate_ReturnsOnlyOneContract_WhenResidualExtrasExist()
+    {
+        // Saves from the reverted multi-farmhand build can still hold several Active contracts;
+        // only one may run (and be charged for) per day.
+        for (var i = 0; i < 3; i++)
+        {
+            _store.Add(MakeContract(ContractStatus.Active) with
+            {
+                Schedule = ContractSchedule.Recurring,
+                HireDate = new GameDate(1, Season.Spring, 1),
+            });
+        }
+
+        Assert.NotNull(_store.GetScheduledForDate(5, Season.Spring, 1));
+    }
+
+    [Fact]
+    public void GetPrimaryOpen_PrefersActiveOverPaused()
+    {
+        var paused = MakeContract(ContractStatus.Paused);
+        var active = MakeContract(ContractStatus.Active);
+        _store.Add(paused);
+        _store.Add(active);
+
+        Assert.Equal(active.Id, _store.GetPrimaryOpen()!.Id);
+    }
+
+    [Fact]
+    public void Hydrate_CancelsResidualOpenContracts_KeepingOnlyTheActiveOne()
+    {
+        var paused  = MakeContract(ContractStatus.Paused);
+        var active  = MakeContract(ContractStatus.Active);
+        var extra   = MakeContract(ContractStatus.Active);
+        var done    = MakeContract(ContractStatus.Executed);
+
+        _store.Hydrate(new[] { paused, active, extra, done });
+
+        Assert.Equal(active.Id, _store.GetPrimaryOpen()!.Id);
+        Assert.Equal(ContractStatus.Active,    _store.Get(active.Id).Status);
+        Assert.Equal(ContractStatus.Cancelled, _store.Get(extra.Id).Status);
+        Assert.Equal(ContractStatus.Cancelled, _store.Get(paused.Id).Status);
+        Assert.Equal(ContractStatus.Executed,  _store.Get(done.Id).Status);
+    }
+
+    [Fact]
+    public void GetPrimaryOpen_ReturnsNull_WhenNoOpenContract()
+    {
+        _store.Add(MakeContract(ContractStatus.Cancelled));
+
+        Assert.Null(_store.GetPrimaryOpen());
     }
 }

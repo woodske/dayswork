@@ -73,13 +73,24 @@ public sealed class ContractStore
     public IReadOnlyList<Contract> List() =>
         _contracts.Values.ToList().AsReadOnly();
 
-    public IReadOnlyList<Contract> ListActiveForDate(int day, Season season, int year)
+    /// <summary>
+    /// The single open contract (hard rule 3: at most one Active/Paused contract at a time).
+    /// Active wins over Paused so residual contracts left by older saves can never shadow the one
+    /// the shift engine actually runs; returns null when nothing is open.
+    /// </summary>
+    public Contract? GetPrimaryOpen() =>
+        _contracts.Values.FirstOrDefault(c => c.Status == ContractStatus.Active)
+        ?? _contracts.Values.FirstOrDefault(c => c.Status == ContractStatus.Paused);
+
+    /// <summary>
+    /// The one Active contract due to run on the given date, or null. Single-contract by design
+    /// (hard rule 3) — residual extras from older saves are ignored rather than charged for.
+    /// </summary>
+    public Contract? GetScheduledForDate(int day, Season season, int year)
     {
         var target = new GameDate(day, season, year);
         return _contracts.Values
-            .Where(c => c.Status == ContractStatus.Active && IsScheduledForDate(c, target))
-            .ToList()
-            .AsReadOnly();
+            .FirstOrDefault(c => c.Status == ContractStatus.Active && IsScheduledForDate(c, target));
     }
 
     private static bool IsScheduledForDate(Contract contract, GameDate date) =>
@@ -113,6 +124,29 @@ public sealed class ContractStore
                 continue;
             }
             _contracts[contract.Id] = contract;
+        }
+
+        CancelResidualOpenContracts();
+    }
+
+    // Saves written by the reverted multi-farmhand build can hold several open contracts. Only one
+    // is reachable (hard rule 3), so the extras are cancelled on load: they were invisible in the
+    // UI yet still billed the player at day start.
+    private void CancelResidualOpenContracts()
+    {
+        var primary = GetPrimaryOpen();
+        if (primary is null)
+            return;
+
+        foreach (var contract in _contracts.Values.ToList())
+        {
+            if (contract.Id == primary.Id)
+                continue;
+            if (contract.Status is not (ContractStatus.Active or ContractStatus.Paused))
+                continue;
+
+            _contracts[contract.Id] = contract with { Status = ContractStatus.Cancelled };
+            _logWarning($"Cancelled residual open contract {contract.Id} — only one contract is supported.");
         }
     }
 }

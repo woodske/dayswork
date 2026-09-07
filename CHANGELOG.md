@@ -5,16 +5,18 @@
 ### Added
 
 - You can now name your farmhand from the contract's Preferences screen. The name shows up in
-  notifications and on the Active Contracts screen.
+  notifications and on the contract screen.
 - A machine group's input chest can now live in any location — the farmhand makes a trip to fetch
   the inputs before working the machines.
 - Auto-grabbers can be picked as a machine input chest, so coop and barn products feed straight
   into your machines.
-- The Active Contracts screen now shows your farmhand's name, the machines and fish ponds it
+- The contract screen now shows your farmhand's name, the machines and fish ponds it
   tends, and its energy tier, with a colour-coded status.
 
 ### Changed
 
+- The office screen is now a single "Contract" page showing the one contract you have, instead of
+  a scrollable list of contracts.
 - New contracts now default to managing machines when they finish their assigned work early,
   instead of going straight home. Existing contracts keep whatever you set.
 - The farmhand works crop fields row by row instead of always heading for the nearest tile, which
@@ -27,6 +29,8 @@
 
 ### Fixed
 
+- Saves made with an older build could keep extra hidden contracts that were charged for every
+  morning without a farmhand ever showing up. They are now cancelled when the save loads.
 - Fruit trees the player isn't standing next to — greenhouse trees especially — stopped dropping
   fruit after the first shake of the save.
 - Gates could be left hanging open when the farmhand's route changed partway through a walk.

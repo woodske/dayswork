@@ -4,16 +4,16 @@ using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
 
 namespace Dayswork.UI;
 
 // Contract management menu — opened from the hiring building's "Manage" action.
-// Lists Active and Paused contracts with Pause/Resume/Cancel/Edit actions.
-// All display strings are pre-computed in BuildRows(); draw() reads fields only.
-internal sealed class ContractListMenu : IClickableMenu
+// Single-contract by design (hard rule 3): shows the one open contract with
+// Pause/Resume/Cancel/Edit actions. All display strings are pre-computed in Refresh();
+// draw() reads fields only.
+internal sealed class ContractMenu : IClickableMenu
 {
     private const int MenuWidth    = 800;
     private const int BtnWidth     = 112; // text + 32px padding (16px each side for box border)
@@ -21,11 +21,9 @@ internal sealed class ContractListMenu : IClickableMenu
     private const int BtnHeight    = 48;
     private const int HeaderHeight = 70;
     private const int FooterHeight = 28;
-    private const int RowPadTop      = 10;
-    private const int RowPadBottom   = 8;
-    private const int RowMetaHeight  = 32; // schedule + tier + status line below task text
-    private const int RowBtnHeight   = BtnHeight + 8;
+    private const int BodyPadTop      = 10;
     private const int BodySidePadding = 16;
+    private const int MetaGap      = 12; // gap between the meta line and the button strip
     private const float NameScale = 1.15f; // worker name draws slightly larger than body text
 
     private static readonly Color NameColor = new(80, 60, 40);
@@ -34,18 +32,12 @@ internal sealed class ContractListMenu : IClickableMenu
 
     private readonly ContractStore _store;
 
-    private List<ContractRowData> _allRows = new();
-    private List<VisibleContractRow> _visibleRows = new();
+    private ContractView? _view;
     private Rectangle _bodyRect;
-    private int _scrollIndex;
-    private int _visibleRowCount;
-    private int _maxScrollIndex;
-    private bool _draggingScrollBar;
-    private int _scrollDragOffset;
 
     // i18n strings resolved once in ctor
     private readonly string _titleText;
-    private readonly string _noContractsText;
+    private readonly string _noContractText;
     private readonly string _pauseLabel;
     private readonly string _resumeLabel;
     private readonly string _cancelLabel;
@@ -57,46 +49,40 @@ internal sealed class ContractListMenu : IClickableMenu
     private readonly string _recurringLabel;
     private readonly string _cancelBlockedMsg;
 
-    private sealed record ContractRowData(
+    private sealed record ContractView(
         Contract Contract,
         string  WrappedNameText,      // worker name, pre-wrapped for NameScale
         int     NameHeight,           // pixel height of WrappedNameText at NameScale
-        string  WrappedTaskText,      // pre-wrapped to TextAreaWidth
+        string  WrappedTaskText,      // pre-wrapped to the text-area width
         int     TextHeight,           // pixel height of WrappedTaskText
         IReadOnlyList<string> InfoLines, // pre-wrapped managed-crops/machines/fish-pond summary lines
-        int     InfoLinesHeight,      // total pixel height of InfoLines (0 when empty)
         string  ScheduleLabel,
         string  TierLabel,
         string  StatusLabel,
         Color   StatusColor,
-        int     RowHeight);           // computed from text height
-
-    private sealed record VisibleContractRow(
-        ContractRowData Data,
-        Rectangle RowBounds,
         ClickableComponent PauseResumeBtn,
         ClickableComponent CancelBtn,
         ClickableComponent EditBtn);
 
     private ClickableComponent? _upgradesBtn;
 
-    internal ContractListMenu(ContractStore store, IModHelper helper)
+    internal ContractMenu(ContractStore store)
         : base(0, 0, MenuWidth, ContractMenuLayout.Height)
     {
         _store = store;
 
-        _titleText       = I18nHelper.Get("ui.contract_list.title");
-        _noContractsText = I18nHelper.Get("ui.contract_list.no_contracts");
-        _pauseLabel      = I18nHelper.Get("ui.contract_list.pause");
-        _resumeLabel     = I18nHelper.Get("ui.contract_list.resume");
-        _cancelLabel     = I18nHelper.Get("ui.contract_list.cancel");
-        _editLabel       = I18nHelper.Get("ui.contract_list.edit");
-        _upgradesLabel   = I18nHelper.Get("ui.contract_list.upgrades");
-        _pausedLabel     = I18nHelper.Get("ui.contract_list.paused_label");
-        _activeLabel     = I18nHelper.Get("ui.contract_list.active_label");
-        _oneTimeLabel    = I18nHelper.Get("ui.contract_list.schedule_one_time");
-        _recurringLabel  = I18nHelper.Get("ui.contract_list.schedule_recurring");
-        _cancelBlockedMsg = I18nHelper.Get("ui.contract_list.cancel_blocked");
+        _titleText       = I18nHelper.Get("ui.contract.title");
+        _noContractText  = I18nHelper.Get("ui.contract.no_contract");
+        _pauseLabel      = I18nHelper.Get("ui.contract.pause");
+        _resumeLabel     = I18nHelper.Get("ui.contract.resume");
+        _cancelLabel     = I18nHelper.Get("ui.contract.cancel");
+        _editLabel       = I18nHelper.Get("ui.contract.edit");
+        _upgradesLabel   = I18nHelper.Get("ui.contract.upgrades");
+        _pausedLabel     = I18nHelper.Get("ui.contract.paused_label");
+        _activeLabel     = I18nHelper.Get("ui.contract.active_label");
+        _oneTimeLabel    = I18nHelper.Get("ui.contract.schedule_one_time");
+        _recurringLabel  = I18nHelper.Get("ui.contract.schedule_recurring");
+        _cancelBlockedMsg = I18nHelper.Get("ui.contract.cancel_blocked");
 
         Refresh();
     }
@@ -112,7 +98,7 @@ internal sealed class ContractListMenu : IClickableMenu
         _bodyRect = new Rectangle(
             xPositionOnScreen + BodySidePadding,
             yPositionOnScreen + HeaderHeight,
-            width - BodySidePadding * 2 - MenuScrollBar.ReservedWidth,
+            width - BodySidePadding * 2,
             height - HeaderHeight - FooterHeight);
 
         _upgradesBtn = new ClickableComponent(
@@ -122,31 +108,23 @@ internal sealed class ContractListMenu : IClickableMenu
                 UpgradesBtnWidth,
                 BtnHeight),
             "Upgrades",
-            _upgradesLabel);
+            _upgradesLabel)
+        {
+            myID = 100,
+            downNeighborID = 200,
+        };
 
-        var contracts = _store.List()
-            .Where(c => c.Status == ContractStatus.Active || c.Status == ContractStatus.Paused)
-            .ToList();
-
-        _allRows = contracts
-            .Select((contract, index) => BuildRow(contract, index))
-            .ToList();
-        _maxScrollIndex = Math.Max(0, _allRows.Count - 1);
-        _scrollIndex = Math.Clamp(_scrollIndex, 0, _maxScrollIndex);
-        _visibleRowCount = ContractMenuViewport.GetVisibleVariableCount(
-            _allRows.Select(row => row.RowHeight).ToList(),
-            _scrollIndex,
-            _bodyRect.Height);
-        BuildVisibleRows();
+        var contract = _store.GetPrimaryOpen();
+        _view = contract is null ? null : BuildView(contract);
 
         populateClickableComponentList();
     }
 
-    private ContractRowData BuildRow(Contract contract, int index)
+    private ContractView BuildView(Contract contract)
     {
-        var textAreaWidth = _bodyRect.Width - (BtnWidth + 8) * 3 - 24;
+        var textAreaWidth = _bodyRect.Width - 16;
 
-        // Worker name gets its own line, drawn at NameScale — the row's visual header.
+        // Worker name gets its own line, drawn at NameScale — the page's visual header.
         string rawName = Worker.FarmhandNpc.DisplayNameFor(contract.Preferences.WorkerName);
         string wrappedName = Game1.parseText(rawName, Game1.smallFont, (int)(textAreaWidth / NameScale));
         int nameHeight = (int)(Game1.smallFont.MeasureString(wrappedName).Y * NameScale) + 4;
@@ -155,7 +133,6 @@ internal sealed class ContractListMenu : IClickableMenu
             ? string.Join(", ", contract.EnabledTasks.Select(TaskLabel))
             : I18nHelper.Get("ui.common.none");
 
-        // Wrap task text to the left text-area column (buttons occupy the right).
         string wrapped    = Game1.parseText(taskList, Game1.smallFont, textAreaWidth);
         int    textHeight = (int)Game1.smallFont.MeasureString(wrapped).Y;
 
@@ -167,7 +144,7 @@ internal sealed class ContractListMenu : IClickableMenu
                 .Select(a => a.GroupId ?? $"{a.Zone.LocationName}|{a.Mode}")
                 .Distinct()
                 .Count();
-            infoLines.Add(I18nHelper.Get("ui.contract_list.managed_crops_groups",
+            infoLines.Add(I18nHelper.Get("ui.contract.managed_crops_groups",
                 new { count = groupCount }));
         }
 
@@ -175,12 +152,12 @@ internal sealed class ContractListMenu : IClickableMenu
         {
             string groups = string.Join(", ", contract.MachineScope.Groups
                 .Select(group => $"{MachineTypeDisplayName(group.MachineType)} ×{group.Machines.Count}"));
-            infoLines.Add(I18nHelper.Get("ui.contract_list.managed_machines_groups", new { groups }));
+            infoLines.Add(I18nHelper.Get("ui.contract.managed_machines_groups", new { groups }));
         }
 
         if (contract.FishPondScope.IsEnabled)
         {
-            infoLines.Add(I18nHelper.Get("ui.contract_list.managed_fish_ponds",
+            infoLines.Add(I18nHelper.Get("ui.contract.managed_fish_ponds",
                 new { count = contract.FishPondScope.Ponds.Count }));
         }
 
@@ -193,9 +170,6 @@ internal sealed class ContractListMenu : IClickableMenu
             infoLinesHeight += (int)Game1.smallFont.MeasureString(wrappedLine).Y + 4;
         }
 
-        // Row height: padding + name line + wrapped text + optional info lines + meta line + button strip
-        int rowHeight = RowPadTop + nameHeight + textHeight + infoLinesHeight + RowMetaHeight + RowBtnHeight + RowPadBottom;
-
         string scheduleLabel = contract.Schedule == ContractSchedule.Recurring
             ? _recurringLabel : _oneTimeLabel;
 
@@ -205,9 +179,48 @@ internal sealed class ContractListMenu : IClickableMenu
         string statusLabel = isPaused ? _pausedLabel : _activeLabel;
         Color statusColor = isPaused ? PausedStatusColor : ActiveStatusColor;
 
-        return new ContractRowData(
-            contract, wrappedName, nameHeight, wrapped, textHeight, wrappedInfoLines, infoLinesHeight,
-            scheduleLabel, tierLabel, statusLabel, statusColor, rowHeight);
+        // Buttons sit just below the content block; a single contract's summary always fits the
+        // fixed page height, so there is nothing to scroll. Clamped to the body bottom regardless.
+        int metaHeight = (int)Game1.smallFont.MeasureString(scheduleLabel).Y + 4;
+        int btnY = Math.Min(
+            _bodyRect.Y + BodyPadTop + nameHeight + textHeight + infoLinesHeight + metaHeight + MetaGap,
+            _bodyRect.Bottom - BtnHeight);
+        int btnX = _bodyRect.Right - (BtnWidth + 8) * 3;
+
+        var pause = new ClickableComponent(
+            new Rectangle(btnX, btnY, BtnWidth, BtnHeight),
+            "PauseResume",
+            isPaused ? _resumeLabel : _pauseLabel)
+        {
+            myID = 200,
+            rightNeighborID = 201,
+            upNeighborID = 100,
+        };
+
+        var cancel = new ClickableComponent(
+            new Rectangle(btnX + BtnWidth + 8, btnY, BtnWidth, BtnHeight),
+            "Cancel",
+            _cancelLabel)
+        {
+            myID = 201,
+            leftNeighborID = 200,
+            rightNeighborID = 202,
+            upNeighborID = 100,
+        };
+
+        var edit = new ClickableComponent(
+            new Rectangle(btnX + (BtnWidth + 8) * 2, btnY, BtnWidth, BtnHeight),
+            "Edit",
+            _editLabel)
+        {
+            myID = 202,
+            leftNeighborID = 201,
+            upNeighborID = 100,
+        };
+
+        return new ContractView(
+            contract, wrappedName, nameHeight, wrapped, textHeight, wrappedInfoLines,
+            scheduleLabel, tierLabel, statusLabel, statusColor, pause, cancel, edit);
     }
 
     private static string MachineTypeDisplayName(string? machineType) =>
@@ -223,124 +236,27 @@ internal sealed class ContractListMenu : IClickableMenu
         _ => tier.ToString(),
     };
 
-    private void BuildVisibleRows()
-    {
-        _visibleRows.Clear();
-        if (_allRows.Count == 0)
-            return;
-
-        var rowY = _bodyRect.Y;
-        for (var i = _scrollIndex; i < _allRows.Count && rowY < _bodyRect.Bottom; i++)
-        {
-            var row = _allRows[i];
-            var rowHeight = i == _scrollIndex
-                ? Math.Min(row.RowHeight, _bodyRect.Height)
-                : row.RowHeight;
-
-            if (i > _scrollIndex && rowY + rowHeight > _bodyRect.Bottom)
-                break;
-
-            var rowBounds = new Rectangle(_bodyRect.X, rowY, _bodyRect.Width, rowHeight);
-            var btnY = rowY + rowHeight - RowBtnHeight;
-            var btnX = rowBounds.Right - (BtnWidth + 8) * 3;
-            var baseId = 200 + i * 10;
-
-            var pause = new ClickableComponent(
-                new Rectangle(btnX, btnY, BtnWidth, BtnHeight),
-                $"PauseResume_{i}",
-                row.Contract.Status == ContractStatus.Paused ? _resumeLabel : _pauseLabel)
-            {
-                myID = baseId,
-                rightNeighborID = baseId + 1,
-                upNeighborID = i > 0 ? baseId - 10 : -1,
-                downNeighborID = i < _allRows.Count - 1 ? baseId + 10 : -1,
-            };
-
-            var cancel = new ClickableComponent(
-                new Rectangle(btnX + BtnWidth + 8, btnY, BtnWidth, BtnHeight),
-                $"Cancel_{i}",
-                _cancelLabel)
-            {
-                myID = baseId + 1,
-                leftNeighborID = baseId,
-                rightNeighborID = baseId + 2,
-                upNeighborID = i > 0 ? baseId - 9 : -1,
-                downNeighborID = i < _allRows.Count - 1 ? baseId + 11 : -1,
-            };
-
-            var edit = new ClickableComponent(
-                new Rectangle(btnX + (BtnWidth + 8) * 2, btnY, BtnWidth, BtnHeight),
-                $"Edit_{i}",
-                _editLabel)
-            {
-                myID = baseId + 2,
-                leftNeighborID = baseId + 1,
-                upNeighborID = i > 0 ? baseId - 8 : -1,
-                downNeighborID = i < _allRows.Count - 1 ? baseId + 12 : -1,
-            };
-
-            _visibleRows.Add(new VisibleContractRow(row, rowBounds, pause, cancel, edit));
-            rowY += rowHeight;
-        }
-    }
-
     // ── Input ────────────────────────────────────────────────────────────────
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
-        if (MenuScrollBar.TryBeginDrag(
-                _bodyRect,
-                _visibleRowCount,
-                _allRows.Count,
-                _scrollIndex,
-                x,
-                y,
-                out _scrollDragOffset))
+        if (_view is not null)
         {
-            _draggingScrollBar = true;
-            return;
-        }
-
-        if (MenuScrollBar.UpArrowContains(_bodyRect, _allRows.Count, _visibleRowCount, x, y))
-        {
-            ScrollRows(-1);
-            return;
-        }
-
-        if (MenuScrollBar.DownArrowContains(_bodyRect, _allRows.Count, _visibleRowCount, x, y))
-        {
-            ScrollRows(1);
-            return;
-        }
-
-        if (MenuScrollBar.TrackContains(_bodyRect, _visibleRowCount, _allRows.Count, x, y))
-        {
-            _scrollIndex = MenuScrollBar.GetTrackClickScrollIndex(
-                _bodyRect,
-                _visibleRowCount,
-                _allRows.Count,
-                _scrollIndex,
-                y);
-            Refresh();
-            return;
-        }
-
-        foreach (var row in _visibleRows)
-        {
-            if (row.PauseResumeBtn.bounds.Contains(x, y))
+            if (_view.PauseResumeBtn.bounds.Contains(x, y))
             {
-                TogglePause(row.Data.Contract);
+                TogglePause(_view.Contract);
                 return;
             }
-            if (row.CancelBtn.bounds.Contains(x, y))
+            if (_view.CancelBtn.bounds.Contains(x, y))
             {
-                TryCancel(row.Data.Contract);
+                TryCancel(_view.Contract);
                 return;
             }
-            if (row.EditBtn.bounds.Contains(x, y))
+            if (_view.EditBtn.bounds.Contains(x, y))
             {
+                var id = _view.Contract.Id;
                 exitThisMenu();
-                ModEntry.Coordinator.OpenEditFlow(row.Data.Contract.Id);
+                ModEntry.Coordinator.OpenEditFlow(id);
                 return;
             }
         }
@@ -352,41 +268,10 @@ internal sealed class ContractListMenu : IClickableMenu
         }
     }
 
-    public override void leftClickHeld(int x, int y)
-    {
-        if (!_draggingScrollBar)
-            return;
-
-        var next = MenuScrollBar.GetDragScrollIndex(
-            _bodyRect,
-            _visibleRowCount,
-            _allRows.Count,
-            _scrollDragOffset,
-            y);
-
-        if (next == _scrollIndex)
-            return;
-
-        _scrollIndex = next;
-        Refresh();
-    }
-
-    public override void releaseLeftClick(int x, int y)
-    {
-        _draggingScrollBar = false;
-        base.releaseLeftClick(x, y);
-    }
-
     public override void receiveGamePadButton(Buttons b)
     {
         if (b == Buttons.B) { exitThisMenu(); return; }
         base.receiveGamePadButton(b);
-    }
-
-    public override void receiveScrollWheelAction(int direction)
-    {
-        if (direction != 0)
-            ScrollRows(direction > 0 ? -1 : 1);
     }
 
     // ── Actions ──────────────────────────────────────────────────────────────
@@ -420,28 +305,23 @@ internal sealed class ContractListMenu : IClickableMenu
         allClickableComponents.Clear();
         if (_upgradesBtn is not null)
             allClickableComponents.Add(_upgradesBtn);
-        foreach (var row in _visibleRows)
+        if (_view is not null)
         {
-            allClickableComponents.Add(row.PauseResumeBtn);
-            allClickableComponents.Add(row.CancelBtn);
-            allClickableComponents.Add(row.EditBtn);
+            allClickableComponents.Add(_view.PauseResumeBtn);
+            allClickableComponents.Add(_view.CancelBtn);
+            allClickableComponents.Add(_view.EditBtn);
         }
     }
 
     public override void snapToDefaultClickableComponent()
     {
-        if (_visibleRows.Count > 0)
-        {
-            currentlySnappedComponent = _visibleRows[0].PauseResumeBtn;
+        currentlySnappedComponent = _view?.PauseResumeBtn ?? _upgradesBtn;
+        if (currentlySnappedComponent is not null)
             snapCursorToCurrentSnappedComponent();
-        }
     }
 
     public override void setCurrentlySnappedComponentTo(int id)
     {
-        if (id >= 200 && _allRows.Count > 0)
-            EnsureRowVisible((id - 200) / 10);
-
         currentlySnappedComponent = getComponentWithID(id);
         snapCursorToCurrentSnappedComponent();
     }
@@ -460,87 +340,50 @@ internal sealed class ContractListMenu : IClickableMenu
         if (_upgradesBtn is not null)
             DrawSmallButton(b, _upgradesBtn);
 
-        if (_allRows.Count == 0)
+        if (_view is null)
         {
             Utility.drawTextWithShadow(
-                b, _noContractsText, Game1.smallFont,
+                b, _noContractText, Game1.smallFont,
                 new Vector2(xPositionOnScreen + 24, yPositionOnScreen + HeaderHeight + 24),
                 Game1.textColor);
         }
         else
         {
-            foreach (var row in _visibleRows)
-                DrawRow(b, row);
+            DrawContract(b, _view);
         }
-
-        MenuScrollBar.Draw(b, _bodyRect, _visibleRowCount, _allRows.Count, _scrollIndex);
 
         drawMouse(b);
     }
 
-    private void DrawRow(SpriteBatch b, VisibleContractRow row)
+    private void DrawContract(SpriteBatch b, ContractView view)
     {
-        int rowY = row.RowBounds.Y;
-
-        // Row separator
-        b.Draw(Game1.staminaRect,
-            new Rectangle(row.RowBounds.X, rowY, row.RowBounds.Width, 1),
-            Color.LightGray * 0.5f);
-
         // Worker name (header line) + task summary + optional info lines + schedule/tier/status
-        Utility.drawTextWithShadow(b, row.Data.WrappedNameText, Game1.smallFont,
-            new Vector2(row.RowBounds.X + 8, rowY + RowPadTop), NameColor, NameScale);
+        Utility.drawTextWithShadow(b, view.WrappedNameText, Game1.smallFont,
+            new Vector2(_bodyRect.X + 8, _bodyRect.Y + BodyPadTop), NameColor, NameScale);
 
-        var taskY = rowY + RowPadTop + row.Data.NameHeight;
-        Utility.drawTextWithShadow(b, row.Data.WrappedTaskText, Game1.smallFont,
-            new Vector2(row.RowBounds.X + 8, taskY), Game1.textColor);
+        var taskY = _bodyRect.Y + BodyPadTop + view.NameHeight;
+        Utility.drawTextWithShadow(b, view.WrappedTaskText, Game1.smallFont,
+            new Vector2(_bodyRect.X + 8, taskY), Game1.textColor);
 
-        var infoLineY = taskY + row.Data.TextHeight + 4;
-        foreach (var line in row.Data.InfoLines)
+        var infoLineY = taskY + view.TextHeight + 4;
+        foreach (var line in view.InfoLines)
         {
             Utility.drawTextWithShadow(b, line, Game1.smallFont,
-                new Vector2(row.RowBounds.X + 8, infoLineY), Color.DimGray);
+                new Vector2(_bodyRect.X + 8, infoLineY), Color.DimGray);
             infoLineY += (int)Game1.smallFont.MeasureString(line).Y + 4;
         }
 
-        var metaPos = new Vector2(row.RowBounds.X + 8, infoLineY);
-        string metaPrefix = $"{row.Data.ScheduleLabel}  {row.Data.TierLabel}  ";
+        var metaPos = new Vector2(_bodyRect.X + 8, infoLineY);
+        string metaPrefix = $"{view.ScheduleLabel}  {view.TierLabel}  ";
         Utility.drawTextWithShadow(b, metaPrefix, Game1.smallFont, metaPos, Color.DimGray);
         var statusX = metaPos.X + Game1.smallFont.MeasureString(metaPrefix).X;
-        Utility.drawTextWithShadow(b, row.Data.StatusLabel, Game1.smallFont,
-            new Vector2(statusX, metaPos.Y), row.Data.StatusColor);
+        Utility.drawTextWithShadow(b, view.StatusLabel, Game1.smallFont,
+            new Vector2(statusX, metaPos.Y), view.StatusColor);
 
         // Action buttons
-        DrawSmallButton(b, row.PauseResumeBtn);
-        DrawSmallButton(b, row.CancelBtn);
-        DrawSmallButton(b, row.EditBtn);
-    }
-
-    private void ScrollRows(int delta)
-    {
-        var next = Math.Clamp(_scrollIndex + delta, 0, _maxScrollIndex);
-        if (next != _scrollIndex)
-        {
-            _scrollIndex = next;
-            Refresh();
-        }
-    }
-
-    private void EnsureRowVisible(int rowIndex)
-    {
-        if (rowIndex < _scrollIndex)
-        {
-            _scrollIndex = rowIndex;
-            Refresh();
-            return;
-        }
-
-        var lastVisibleIndex = _scrollIndex + Math.Max(0, _visibleRowCount - 1);
-        if (rowIndex <= lastVisibleIndex)
-            return;
-
-        _scrollIndex = Math.Clamp(rowIndex, 0, _maxScrollIndex);
-        Refresh();
+        DrawSmallButton(b, view.PauseResumeBtn);
+        DrawSmallButton(b, view.CancelBtn);
+        DrawSmallButton(b, view.EditBtn);
     }
 
     private static void DrawSmallButton(SpriteBatch b, ClickableComponent btn)
