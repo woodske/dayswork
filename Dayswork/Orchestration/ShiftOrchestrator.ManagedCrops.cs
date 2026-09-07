@@ -1026,19 +1026,19 @@ internal sealed partial class ShiftOrchestrator
 
     // ── Input-chest supply ───────────────────────────────────────────────────
 
-    internal Chest? TryGetInputChest()
-    {
-        var farm = Game1.getFarm();
-        foreach (var building in farm.buildings)
-        {
-            if (!string.Equals(building.buildingType.Value, HiringBuilding.BuildingType, StringComparison.Ordinal))
-                continue;
+    /// <summary>
+    /// The supply chest this shift draws from: its OWN office's porch input chest. Each office
+    /// stocks its own farmhand, so a second office's supplies are none of this worker's business.
+    /// </summary>
+    internal Chest? TryGetInputChest() =>
+        ActiveOffice is { } office ? _officeChests.EnsureInputChest(office) : null;
 
-            return _officeChests.EnsureInputChest(building);
-        }
-
-        return null;
-    }
+    /// <summary>Farm tile of this shift's own office input chest, for the shopping trip's
+    /// unload stop. Null when the office is gone (the trip settles its items instead).</summary>
+    internal Microsoft.Xna.Framework.Point? TryGetOwnOfficeInputChestTile() =>
+        ActiveOffice is { } office
+            ? OfficeResolver.ChestTile(office, HiringBuilding.InputChestDisplayTile)
+            : null;
 
     internal static SupplyInventory ReadSupply(Chest? chest)
     {

@@ -64,6 +64,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     private ShiftSession Session =>
         _session ?? throw new InvalidOperationException("No active shift session.");
 
+    // Day-scoped state shared with the other concurrent shifts (set at StartShift by the fleet).
+    private FleetDay? _day;
+
     public ShiftOrchestrator(
         ToolLevelReader toolReader,
         ConfigSnapshot config,
@@ -173,6 +176,43 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     public ContractId? ActiveContractId => _session?.Ctx.ContractId;
 
+    /// <summary>The office this shift works out of — its spawn/return door, porch chests, and
+    /// evening lights. Null when no shift is running.</summary>
+    public Guid? ActiveOfficeId => _session?.OfficeId;
+
+    /// <summary>The office building itself, or null once it has been demolished mid-shift.</summary>
+    private Building? ActiveOffice =>
+        _session is { } session ? OfficeResolver.TryGet(Game1.getFarm(), session.OfficeId) : null;
+
+    /// <summary>Gold other concurrent farmhands drawing on the same wallet have committed to their
+    /// own managed-crop shopping trips today — subtracted from the wallet before this worker
+    /// decides to shop.</summary>
+    internal int OtherWorkersReservedShoppingBudget() =>
+        ShoppingBudget is { } ledger && ActiveContractId is { } id ? ledger.ReservedByOthers(id) : 0;
+
+    /// <summary>Commits this worker's planned managed-crop spend so other farmhands account for it.</summary>
+    internal void ReserveShoppingBudget(int amount)
+    {
+        if (ShoppingBudget is { } ledger && ActiveContractId is { } id)
+            ledger.Reserve(id, amount);
+    }
+
+    /// <summary>Releases this worker's shopping reservation once its trip has returned or aborted.</summary>
+    internal void ReleaseShoppingBudget()
+    {
+        if (ShoppingBudget is { } ledger && ActiveContractId is { } id)
+            ledger.Release(id);
+    }
+
+    // Phase 1 is single-player, so every contract draws on the one wallet; Phase 2 keys this on
+    // the sponsor's wallet identity instead.
+    private ShoppingBudgetLedger? ShoppingBudget =>
+        _day is { } day && _session is { } session ? day.ShoppingBudgetFor(session.WalletId) : null;
+
+    /// <summary>Shared per-day work claims, so two overlapping contracts never service the same
+    /// work item twice. Null outside a shift.</summary>
+    private WorkClaimRegistry? Claims => _day?.Claims;
+
     public void EndShiftEarly()
     {
         if (_session is null)
@@ -201,6 +241,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
     public void ResetForSessionBoundary(SessionResetBoundary boundary)
     {
+        _day = null;
         var hadRuntimeState = _session is not null;
 
         if (hadRuntimeState)
@@ -214,7 +255,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         _session = null;
     }
 
-    public void StartShift(Contract contract, ConfigSnapshot runtimeConfig)
+    public void StartShift(Contract contract, ConfigSnapshot runtimeConfig, FleetDay day)
     {
         if (_session is not null)
         {
@@ -222,13 +263,25 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
+        var farm = Game1.getFarm();
+        var office = OfficeResolver.TryGet(farm, contract.OfficeId);
+        if (office is null)
+        {
+            // The scheduler checks this too; reaching here means the office went away between the
+            // check and the spawn. Nothing has been charged for a recurring contract at this point.
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Contract {contract.Id.Value}'s office is gone — no worker spawned.",
+                DevLog.WarnLevel);
+            return;
+        }
+
+        _day = day;
         _config = runtimeConfig;
         var priorityOrderer = new TaskPriorityOrderer(contract.CategoryPriority);
         var contractTerms = contract.TermsSnapshot;
         var energyState = _energyLedger.StartShift(contractTerms.Energy);
         var pacingProfile = WorkerPacingProfile.FromConfig(runtimeConfig);
 
-        var farm     = Game1.getFarm();
         var snapshot = _toolReader.ReadSnapshot(Game1.player);
         var runtimeScopeSelection = NormalizeRuntimeScopeSelection(contract.ScopeSelection, farm);
         var workScopes = _scopeClassifier.Classify(runtimeScopeSelection, contract.EnabledTasks, contract.CropPlan, contract.MachineScope, contract.FishPondScope);
@@ -244,9 +297,11 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             $"[Dayswork][fishponds] StartShift fishPondScope enabled={contract.FishPondScope?.IsEnabled ?? false} ponds={contract.FishPondScope?.Ponds.Count ?? 0}.",
             LogLevel.Info);
 
-        // Farm exit warp tile — computed once per shift from farm.warps (not a static constant,
-        // because the warp tile varies by farm type and player map edits).
-        var farmExitTile = ResolveSpawnExitTile(farm);
+        // Spawn/return tile: just outside this office's own human door. (The farm-warp heuristic
+        // behind ResolveSpawnExitTile is only the no-office fallback, kept because the tile varies
+        // by farm type and player map edits.) Two adjacent offices need no reservation scheme —
+        // each has its own door, and ResolvePassableNearby disambiguates.
+        var farmExitTile = ResolveSpawnExitTile(farm, office);
         var batchOrdering = BuildBatchOrdering(workScopes, farm, farmExitTile);
         var batches = BuildInitialBatches(contract, workScopes, farm, snapshot, farmExitTile, priorityOrderer, batchOrdering);
 
@@ -264,17 +319,18 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         var spawnPos = new Vector2(farmExitTile.X, farmExitTile.Y) * 64f;
-        var farmhand = new FarmhandNpc(spawnPos, contract.Preferences.WorkerName);
+        var farmhand = new FarmhandNpc(spawnPos, contract.OfficeId, contract.Preferences.WorkerName);
         farm.addCharacter(farmhand);
         _toolAnimator.SetWorker(farmhand);
         _toolAnimator.SetPacingProfile(pacingProfile);
         _nav.SetPacingProfile(pacingProfile);
         farmhand.SetStamina(energyState.RemainingEnergy, energyState.Capacity);
 
-        // Reset the shift-scoped pieces that outlive a session.
+        // Reset the shift-scoped pieces that outlive a session. (CropHudNotifier is day-scoped
+        // and reset by the fleet — a per-shift reset here would re-arm the dedup flags of the
+        // other workers starting the same morning.)
         _travel.Clear();
         _shopStockReader.ResetForShift();
-        Dayswork.Integration.CropHudNotifier.ResetForShift();
 
         var ctx = new ShiftContext(
             contractId:       contract.Id,
@@ -296,7 +352,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             farm,
             farmExitTile,
             priorityOrderer,
-            new StuckDetector(_config.StuckInitialWaitMinutes))
+            new StuckDetector(_config.StuckInitialWaitMinutes),
+            contract.OfficeId,
+            contract.OwnerId)
         {
             LastSampledGameTime = Game1.timeOfDay,
             LastTilePos = farmhand.TilePoint,

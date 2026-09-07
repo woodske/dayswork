@@ -55,13 +55,13 @@ public sealed class SaveDataSerializerTests
     [Fact]
     public void Deserialize_FutureSchemaVersion_ReturnsEmptyAndWarns()
     {
-        var result = _serializer.Deserialize(@"{""SchemaVersion"":4,""ModVersion"":""9.9.9"",""Contracts"":[]}");
+        var result = _serializer.Deserialize(@"{""SchemaVersion"":5,""ModVersion"":""9.9.9"",""Contracts"":[]}");
         Assert.Empty(result);
         Assert.Single(_warnings);
     }
 
     [Fact]
-    public void Deserialize_MalformedCurrentSchemaContract_SkipsItAndWarns()
+    public void Deserialize_MalformedLegacySchemaContract_SkipsItAndWarns()
     {
         var json = @"{
   ""SchemaVersion"": 3,
@@ -147,10 +147,10 @@ public sealed class SaveDataSerializerTests
     }
 
     [Fact]
-    public void Serialize_ProducesSchemaVersion3()
+    public void Serialize_ProducesSchemaVersion4()
     {
         var json = _serializer.Serialize(Array.Empty<Contract>(), "0.2.0");
-        Assert.Contains(@"""SchemaVersion"": 3", json);
+        Assert.Contains(@"""SchemaVersion"": 4", json);
     }
 
     [Fact]
@@ -263,7 +263,7 @@ public sealed class SaveDataSerializerTests
         var hydrated = Assert.Single(result);
         Assert.True(ContractStructuralComparer.ContractsEqual(validContract, hydrated));
         Assert.Single(_warnings);
-        Assert.Contains("Skipping schema v3 contract", _warnings[0]);
+        Assert.Contains("Skipping schema v4 contract", _warnings[0]);
     }
 
     [Theory]
@@ -415,7 +415,7 @@ public sealed class SaveDataSerializerTests
         var hydrated = Assert.Single(result);
         Assert.True(ContractStructuralComparer.ContractsEqual(validContract, hydrated));
         Assert.Single(_warnings);
-        Assert.Contains("Skipping schema v3 contract", _warnings[0]);
+        Assert.Contains("Skipping schema v4 contract", _warnings[0]);
     }
 
     private static Contract ContractWithFishPondScope()
@@ -487,6 +487,6 @@ public sealed class SaveDataSerializerTests
         var hydrated = Assert.Single(result);
         Assert.True(ContractStructuralComparer.ContractsEqual(validContract, hydrated));
         Assert.Single(_warnings);
-        Assert.Contains("Skipping schema v3 contract", _warnings[0]);
+        Assert.Contains("Skipping schema v4 contract", _warnings[0]);
     }
 }

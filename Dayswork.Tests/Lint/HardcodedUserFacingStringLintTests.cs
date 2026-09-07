@@ -46,6 +46,9 @@ public class HardcodedUserFacingStringLintTests
         new(@"Guid\.NewGuid", RegexOptions.Compiled),
         new(@"TaskKind\.", RegexOptions.Compiled),
         new(@"BUILDINGS_CONSTRUCTED", RegexOptions.Compiled),
+        // Stardew's displayNameFormat control token — it names an i18n key rather than being
+        // display text itself, so it is the opposite of a hardcoded user-facing string.
+        new(@"LOCALIZED_TEXT", RegexOptions.Compiled),
         new(@"build=", RegexOptions.Compiled),
         new(@"\.Append\(", RegexOptions.Compiled),
     };

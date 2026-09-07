@@ -23,7 +23,7 @@ public sealed class HiringFlowCoordinatorTests
             },
         };
 
-        var draft = HiringFlowCoordinator.CreateEditDraft(id, contract);
+        var draft = HiringFlowCoordinator.CreateEditDraft(contract);
 
         Assert.Equal(id, draft.EditingId);
         Assert.Equal(ContractSchedule.Recurring, draft.Schedule);

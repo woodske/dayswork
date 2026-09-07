@@ -25,7 +25,8 @@ public sealed class ModEntry : Mod
     // invoke coordinator methods without constructor injection.
     internal static IMonitor ModMonitor { get; private set; } = null!;
     internal static HiringFlowCoordinator Coordinator { get; private set; } = null!;
-    internal static ShiftOrchestrator Orchestrator { get; private set; } = null!;
+    /// <summary>Every live shift — one per office with a farmhand out today.</summary>
+    internal static ShiftFleet Fleet { get; private set; } = null!;
     // Expansion-compatibility seam. Vanilla-by-default; active profile resolved at GameLaunched.
     internal static ExpansionCompatService ExpansionCompat { get; private set; } = null!;
 
@@ -45,7 +46,7 @@ public sealed class ModEntry : Mod
             new WorkerEnergyProfileBuilder(configResolver),
             configResolver);
         var recurringDecisionEngine = new RecurringDayStartDecisionEngine(contractTermsBuilder);
-        var store       = new ContractStore(logWarning);
+        var store       = new OfficeContractStore(logWarning);
         var serializer  = new SaveDataSerializer(logWarning);
         var upgradeStore = new FarmhandUpgradeStore();
         var upgradeSerializer = new FarmhandUpgradeSaveDataSerializer(logWarning);
@@ -56,39 +57,42 @@ public sealed class ModEntry : Mod
         Coordinator = new HiringFlowCoordinator(contractTermsBuilder, configManager, store, upgradeStore, chestResolver, Helper);
         var buildingInteraction = new HiringBuildingInteraction(helper);
         var buildingOverlay = new HiringBuildingOverlayRenderer();
-        var persistAdapter  = new ContractPersistenceAdapter(
-            store, serializer, helper.Data, this.ModManifest.Version.ToString());
+        // Missed/overflow items are deposited into the shift's own office chest and notices are
+        // shown as HUD messages — no Mail Framework Mod, no mailbox delivery.
+        var shiftOutcomeDispatcher = new ShiftOutcomeDispatcher();
+        var contractPersistence = new OfficeContractPersistence(
+            store, serializer, helper.Data, this.ModManifest.Version.ToString(), shiftOutcomeDispatcher);
         var upgradePersistAdapter = new FarmhandUpgradePersistenceAdapter(
             upgradeStore, upgradeSerializer, helper.Data);
         var toolReader      = new ToolLevelReader();
-        var toolAnimator    = new ToolSwapAnimator();
-        var movementDriver  = new WorkerMovementDriver();
         var workAreaScanner = new WorkAreaScanner();
         var indoorScanner   = new IndoorWorkScanner(workAreaScanner);
         var animalHandler   = new AnimalTaskHandler(this.Monitor);
         var buildingNavigator = new BuildingWorkNavigator(this.Monitor);
         var depositPlanner  = new DepositPlanner();
-        // Missed/overflow items are deposited into the hiring building's static chest and
-        // notices are shown as HUD messages — no Mail Framework Mod, no mailbox delivery.
-        var shiftOutcomeDispatcher = new ShiftOutcomeDispatcher();
-        var orchestrator    = new ShiftOrchestrator(
+
+        // One orchestrator per live shift, each with its own movement driver, tool animator, and
+        // travel runner — those hold per-worker state and cannot be shared. Everything above is
+        // stateless (or shared by design) and is captured once.
+        var fleet = new ShiftFleet(() => new ShiftOrchestrator(
             toolReader,
             config,
             workScopeClassifier,
-            toolAnimator,
-            movementDriver,
+            new ToolSwapAnimator(),
+            new WorkerMovementDriver(),
             workAreaScanner,
             indoorScanner,
             animalHandler,
             buildingNavigator,
             chestResolver,
             depositPlanner,
-            shiftOutcomeDispatcher);
-        Orchestrator = orchestrator;
-        var sessionResetHandler = new SessionResetHandler(orchestrator);
-        var calendarHandlers = new CalendarHandlers(orchestrator);
+            shiftOutcomeDispatcher));
+        Fleet = fleet;
+        var officeDemolition = new OfficeDemolitionHandler(store, fleet, shiftOutcomeDispatcher);
+        var sessionResetHandler = new SessionResetHandler(fleet);
+        var calendarHandlers = new CalendarHandlers(fleet);
         var scheduler       = new RecurringContractScheduler(
-            store, orchestrator, calendarHandlers, recurringDecisionEngine, configManager, upgradeStore, shiftOutcomeDispatcher);
+            store, fleet, calendarHandlers, recurringDecisionEngine, configManager, upgradeStore, shiftOutcomeDispatcher);
         var gmcmRegistrar = new GMCMRegistrar(helper, this.ModManifest, configManager);
 
         // ── Expansion compatibility ───────────────────────────────
@@ -111,27 +115,32 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.ReturnedToTitle += sessionResetHandler.OnReturnedToTitle;
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += officeChestService.OnSaveLoaded;
-        helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
+        // Office chests are ensured first, so a contract hydrated from an office always finds
+        // its porch chests in place.
+        helper.Events.GameLoop.SaveLoaded   += contractPersistence.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += upgradePersistAdapter.OnSaveLoaded;
-        // Stop and settle any in-flight shift (sleep-stop + overflow delivery) BEFORE contracts
-        // persist and before the day rolls over — handler order is authoritative. Refund
-        // settlement is not part of this path.
+        // Stop and settle every in-flight shift (sleep-stop + overflow delivery) BEFORE the day
+        // rolls over — handler order is authoritative. Contracts need no save hook of their own:
+        // they live on their office building, written the moment they change. Refund settlement is
+        // not part of this path.
         helper.Events.GameLoop.Saving       += calendarHandlers.OnSavingHook;
-        helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
         helper.Events.GameLoop.Saving       += upgradePersistAdapter.OnSaving;
+        // The fleet's day reset (work claims, shopping ledgers, HUD dedup) must run before the
+        // scheduler starts today's shifts.
+        helper.Events.GameLoop.DayStarted   += fleet.OnDayStarted;
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
         helper.Events.GameLoop.DayStarted   += officeChestService.OnDayStarted;
-        // Reset the "worker done for the day" animation flag each morning (office goes dark again).
-        helper.Events.GameLoop.DayStarted   += (_, _) => HiringBuilding.WorkCompletedToday = false;
-        helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;
-        helper.Events.GameLoop.TimeChanged  += orchestrator.OnTimeChanged;
-        // Keep the per-shift passability cache in step with world changes (all no-op when no shift
+        helper.Events.GameLoop.UpdateTicked += fleet.OnUpdateTicked;
+        helper.Events.GameLoop.TimeChanged  += fleet.OnTimeChanged;
+        // Keep each shift's passability cache in step with world changes (all no-op when no shift
         // is active). Worker-cleared resource clumps have no event and are invalidated at the clear
         // site; everything else rides these.
-        helper.Events.World.ObjectListChanged         += orchestrator.OnObjectListChanged;
-        helper.Events.World.TerrainFeatureListChanged += orchestrator.OnTerrainFeatureListChanged;
-        helper.Events.World.FurnitureListChanged      += orchestrator.OnFurnitureListChanged;
-        helper.Events.World.BuildingListChanged       += orchestrator.OnBuildingListChanged;
+        helper.Events.World.ObjectListChanged         += fleet.OnObjectListChanged;
+        helper.Events.World.TerrainFeatureListChanged += fleet.OnTerrainFeatureListChanged;
+        helper.Events.World.FurnitureListChanged      += fleet.OnFurnitureListChanged;
+        helper.Events.World.BuildingListChanged       += fleet.OnBuildingListChanged;
+        // Demolishing an office ends its shift and takes its contract with it.
+        helper.Events.World.BuildingListChanged       += officeDemolition.OnBuildingListChanged;
         helper.Events.Content.AssetRequested += OnAssetRequested;
         helper.Events.Input.ButtonPressed += buildingInteraction.OnButtonPressed;
         // Evening lit-windows + chimney smoke once the worker has finished for the day.
@@ -167,7 +176,7 @@ public sealed class ModEntry : Mod
     }
 
     // Dev-only debug commands — registered from Entry only when DevLog.Enabled (off for release).
-    private void RegisterDebugCommands(IModHelper helper, ContractStore store, PlayerTileStepLogger playerTileStepLogger)
+    private void RegisterDebugCommands(IModHelper helper, OfficeContractStore store, PlayerTileStepLogger playerTileStepLogger)
     {
         helper.ConsoleCommands.Add(
             "dayswork_list",
@@ -183,7 +192,8 @@ public sealed class ModEntry : Mod
                 foreach (var c in contracts)
                 {
                     this.Monitor.Log(
-                        $"[{c.Id.Value}] status={c.Status} tasks={string.Join(",", c.EnabledTasks)} " +
+                        $"[{c.Id.Value}] office={c.OfficeId:N} owner={c.OwnerId} rev={c.Revision} " +
+                        $"status={c.Status} tasks={string.Join(",", c.EnabledTasks)} " +
                         $"hired={c.HireDate.Day} {c.HireDate.Season} Y{c.HireDate.Year} " +
                         $"price={c.TermsSnapshot.Pricing.TotalPrice}g",
                         LogLevel.Info);
@@ -192,8 +202,8 @@ public sealed class ModEntry : Mod
 
         helper.ConsoleCommands.Add(
             "dayswork_end_shift",
-            "Ends the current worker shift immediately. Worker deposits buffered items and exits.",
-            (_, _) => Orchestrator.EndShiftEarly());
+            "Ends worker shifts immediately (deposit buffered items and exit). With no argument every live shift ends; pass a contract-id prefix to end just one.",
+            (_, args) => Fleet.EndShiftEarly(args.Length > 0 ? args[0] : null));
 
         helper.ConsoleCommands.Add(
             "dayswork_debug_buildings",
@@ -246,7 +256,7 @@ public sealed class ModEntry : Mod
         helper.ConsoleCommands.Add(
             "dayswork_debug_leaks",
             "Reports the current shift's worker-action leak audit: item-debris vanilla mis-routed into the player's location, how much was recovered, and how much was stranded (stranded > 0 means loot escaped the recovery sweep).",
-            (_, _) => Orchestrator.LogLeakAudit(LogLevel.Info));
+            (_, _) => Fleet.LogLeakAudit(LogLevel.Info));
     }
 
     private void LogMachinesInCurrentLocation()

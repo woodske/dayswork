@@ -592,7 +592,7 @@ internal sealed class ManagedShoppingCoordinator
             return;
         }
 
-        if (HiringBuilding.TryGetInputChestTile(farm) is not { } chestPoint ||
+        if (_host.TryGetOwnOfficeInputChestTile() is not { } chestPoint ||
             !ShiftOrchestrator.TrySelectChestDepositStandTile(new TileCoord(chestPoint.X, chestPoint.Y), farm, _session.Worker, _session.Passability, out var standTile))
         {
             SettleCarriedItems(showHud: true);

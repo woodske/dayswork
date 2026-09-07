@@ -15,12 +15,14 @@ internal sealed class FarmhandNpc : NPC
     // because OnSaving removes the NPC before the save is written.
     public FarmhandNpc() { }
 
-    public FarmhandNpc(Vector2 spawnPixelPosition, string workerName)
+    public FarmhandNpc(Vector2 spawnPixelPosition, Guid officeId, string workerName)
         : base(
             new AnimatedSprite(SpritePath, 0, 16, 32),
             spawnPixelPosition,
             2,
-            InternalName)
+            // Unique per office so N concurrent workers never collide in the game's name-based
+            // lookups (getCharacterFromName, net sync, serialization guards).
+            NameFor(officeId))
     {
         this.displayName = DisplayNameFor(workerName);
         this.Portrait = Game1.content.Load<Texture2D>(PlaceholderPortraitPath);
@@ -29,12 +31,22 @@ internal sealed class FarmhandNpc : NPC
         this.HideShadow = false;
     }
 
+    /// <summary>The internal NPC name for the worker of a given office.</summary>
+    internal static string NameFor(Guid officeId) => $"{InternalName}_{officeId:N}";
+
     /// <summary>The player-facing name for a worker: the contract's chosen name, or the generic
     /// localized "Farmhand" when unset. Shared by the NPC display name and HUD notices.</summary>
     internal static string DisplayNameFor(string workerName) =>
         string.IsNullOrWhiteSpace(workerName)
             ? I18nHelper.Get("npc.farmhand.name")
             : workerName;
+
+    // The unique per-office Name would otherwise drive vanilla texture resolution:
+    // getTextureName() falls back to the NPC name when there's no Data/Characters entry, and
+    // ChooseAppearance/reloadSprite build "Characters/…" + "Portraits/…" paths from it. Pin it
+    // to the shared asset name so every worker loads the one farmhand sprite/portrait.
+    // (Phase 3 makes this variant-aware.)
+    public override string getTextureName() => InternalName;
 
     private int _staminaRemaining;
     private int _staminaCapacity;

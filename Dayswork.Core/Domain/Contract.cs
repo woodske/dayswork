@@ -4,8 +4,19 @@ using Dayswork.Core.Crops;
 using Dayswork.Core.FishPonds;
 using Dayswork.Core.Machines;
 
+/// <summary>
+/// One farmhand contract. Since 2.0 a contract belongs to exactly one office building
+/// (<paramref name="OfficeId"/> = that <c>Building.id</c>) and is sponsored by one player
+/// (<paramref name="OwnerId"/> = that <c>Building.owner</c>, i.e. a
+/// <c>Farmer.UniqueMultiplayerID</c>). The pair is the contract's identity in the world;
+/// <paramref name="Id"/> stays the stable identity across edits.
+/// </summary>
+/// <param name="Revision">Edit counter, bumped on every committed mutation. Phase 4 uses it to
+/// reject a client commit built against a contract the host has since changed.</param>
 public sealed record Contract(
     ContractId Id,
+    long OwnerId,
+    Guid OfficeId,
     IReadOnlySet<TaskKind> EnabledTasks,
     IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations,
     ContractSchedule Schedule,
@@ -18,129 +29,6 @@ public sealed record Contract(
     CropPlan CropPlan,
     MachineWorkScope MachineScope,
     FishPondWorkScope FishPondScope,
-    ContractPreferences Preferences
-)
-{
-    // Back-compat overload: contracts built without a fish-pond scope default to an empty scope.
-    public Contract(
-        ContractId Id,
-        IReadOnlySet<TaskKind> EnabledTasks,
-        IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations,
-        ContractSchedule Schedule,
-        ContractStatus Status,
-        GameDate HireDate,
-        ContractScopeSelection ScopeSelection,
-        ContractTermsSnapshot TermsSnapshot,
-        EnergyTier Tier,
-        IReadOnlyList<TaskCategory> CategoryPriority,
-        CropPlan CropPlan,
-        MachineWorkScope MachineScope,
-        ContractPreferences Preferences)
-        : this(
-            Id,
-            EnabledTasks,
-            TaskDestinations,
-            Schedule,
-            Status,
-            HireDate,
-            ScopeSelection,
-            TermsSnapshot,
-            Tier,
-            CategoryPriority,
-            CropPlan,
-            MachineScope,
-            FishPondWorkScope.Empty,
-            Preferences)
-    {
-    }
-
-    // Back-compat overload: contracts built without preferences default to Legacy (preserve old behavior).
-    public Contract(
-        ContractId Id,
-        IReadOnlySet<TaskKind> EnabledTasks,
-        IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations,
-        ContractSchedule Schedule,
-        ContractStatus Status,
-        GameDate HireDate,
-        ContractScopeSelection ScopeSelection,
-        ContractTermsSnapshot TermsSnapshot,
-        EnergyTier Tier,
-        IReadOnlyList<TaskCategory> CategoryPriority,
-        CropPlan CropPlan,
-        MachineWorkScope MachineScope)
-        : this(
-            Id,
-            EnabledTasks,
-            TaskDestinations,
-            Schedule,
-            Status,
-            HireDate,
-            ScopeSelection,
-            TermsSnapshot,
-            Tier,
-            CategoryPriority,
-            CropPlan,
-            MachineScope,
-            ContractPreferences.Legacy)
-    {
-    }
-
-    // Back-compat overload: contracts built without a machine scope default to an empty scope.
-    public Contract(
-        ContractId Id,
-        IReadOnlySet<TaskKind> EnabledTasks,
-        IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations,
-        ContractSchedule Schedule,
-        ContractStatus Status,
-        GameDate HireDate,
-        ContractScopeSelection ScopeSelection,
-        ContractTermsSnapshot TermsSnapshot,
-        EnergyTier Tier,
-        IReadOnlyList<TaskCategory> CategoryPriority,
-        CropPlan CropPlan)
-        : this(
-            Id,
-            EnabledTasks,
-            TaskDestinations,
-            Schedule,
-            Status,
-            HireDate,
-            ScopeSelection,
-            TermsSnapshot,
-            Tier,
-            CategoryPriority,
-            CropPlan,
-            MachineWorkScope.Empty,
-            ContractPreferences.Legacy)
-    {
-    }
-
-    // Back-compat overload predating managed crops: no crop plan, no machine scope.
-    public Contract(
-        ContractId Id,
-        IReadOnlySet<TaskKind> EnabledTasks,
-        IReadOnlyDictionary<TaskKind, DestinationKey> TaskDestinations,
-        ContractSchedule Schedule,
-        ContractStatus Status,
-        GameDate HireDate,
-        ContractScopeSelection ScopeSelection,
-        ContractTermsSnapshot TermsSnapshot,
-        EnergyTier Tier,
-        IReadOnlyList<TaskCategory> CategoryPriority)
-        : this(
-            Id,
-            EnabledTasks,
-            TaskDestinations,
-            Schedule,
-            Status,
-            HireDate,
-            ScopeSelection,
-            TermsSnapshot,
-            Tier,
-            CategoryPriority,
-            CropPlan.Empty,
-            MachineWorkScope.Empty,
-            ContractPreferences.Legacy)
-    {
-    }
-}
+    ContractPreferences Preferences,
+    int Revision = 0
+);

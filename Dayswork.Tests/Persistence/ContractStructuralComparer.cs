@@ -8,6 +8,9 @@ internal static class ContractStructuralComparer
 {
     public static bool ContractsEqual(Contract left, Contract right) =>
         left.Id == right.Id
+        && left.OwnerId == right.OwnerId
+        && left.OfficeId == right.OfficeId
+        && left.Revision == right.Revision
         && left.EnabledTasks.SetEquals(right.EnabledTasks)
         && DestinationMapsEqual(left.TaskDestinations, right.TaskDestinations)
         && left.Schedule == right.Schedule

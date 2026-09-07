@@ -6,21 +6,19 @@ namespace Dayswork.Tests.Integration;
 public sealed class HiringBuildingTests
 {
     [Fact]
-    public void BuildData_hides_office_when_one_already_exists_or_is_under_construction()
+    public void BuildData_places_no_cap_on_how_many_offices_the_farm_may_have()
     {
+        // 2.0 allows any number of offices, one farmhand each. A leftover BuildCondition would
+        // silently cap the farm at one and there would be nothing in the UI explaining why. Asserted
+        // against the source because BuildData() reads i18n, which needs a live SMAPI helper.
         var source = File.ReadAllText(Path.Combine(
             FindWorkspaceRoot(),
             "Dayswork",
             "Integration",
             "HiringBuilding.cs"));
 
-        Assert.Equal(
-            "!BUILDINGS_CONSTRUCTED All Bindicle.Dayswork_Office 1 2147483647 true",
-            HiringBuilding.OnePerFarmBuildCondition);
-        Assert.EndsWith(" true", HiringBuilding.OnePerFarmBuildCondition);
-        Assert.Contains(
-            $"BuildCondition = {nameof(HiringBuilding.OnePerFarmBuildCondition)}",
-            source);
+        Assert.DoesNotContain("BuildCondition =", source);
+        Assert.DoesNotContain("BUILDINGS_CONSTRUCTED", source);
     }
 
     [Fact]

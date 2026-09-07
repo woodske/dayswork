@@ -30,7 +30,8 @@ internal sealed class ContractMenu : IClickableMenu
     private static readonly Color ActiveStatusColor = Color.DarkGreen;
     private static readonly Color PausedStatusColor = Color.Gray;
 
-    private readonly ContractStore _store;
+    private readonly OfficeContractStore _store;
+    private readonly Guid _officeId;
 
     private ContractView? _view;
     private Rectangle _bodyRect;
@@ -66,10 +67,11 @@ internal sealed class ContractMenu : IClickableMenu
 
     private ClickableComponent? _upgradesBtn;
 
-    internal ContractMenu(ContractStore store)
+    internal ContractMenu(OfficeContractStore store, Guid officeId)
         : base(0, 0, MenuWidth, ContractMenuLayout.Height)
     {
         _store = store;
+        _officeId = officeId;
 
         _titleText       = I18nHelper.Get("ui.contract.title");
         _noContractText  = I18nHelper.Get("ui.contract.no_contract");
@@ -114,8 +116,13 @@ internal sealed class ContractMenu : IClickableMenu
             downNeighborID = 200,
         };
 
-        var contract = _store.GetPrimaryOpen();
-        _view = contract is null ? null : BuildView(contract);
+        // This office's contract, not "the farm's" — each office has its own page. A contract
+        // that has run its course (Executed) or been cancelled reads as "no contract", exactly as
+        // it did in 1.x, so the page offers hiring again.
+        var contract = _store.ForOffice(_officeId);
+        _view = contract is { Status: ContractStatus.Active or ContractStatus.Paused }
+            ? BuildView(contract)
+            : null;
 
         populateClickableComponentList();
     }
@@ -254,9 +261,8 @@ internal sealed class ContractMenu : IClickableMenu
             }
             if (_view.EditBtn.bounds.Contains(x, y))
             {
-                var id = _view.Contract.Id;
                 exitThisMenu();
-                ModEntry.Coordinator.OpenEditFlow(id);
+                ModEntry.Coordinator.OpenEditFlow(_officeId);
                 return;
             }
         }
@@ -264,7 +270,7 @@ internal sealed class ContractMenu : IClickableMenu
         if (_upgradesBtn?.bounds.Contains(x, y) == true)
         {
             Game1.playSound("smallSelect");
-            ModEntry.Coordinator.ShowUpgradesFromManage();
+            ModEntry.Coordinator.ShowUpgradesFromManage(_officeId);
         }
     }
 
@@ -279,22 +285,22 @@ internal sealed class ContractMenu : IClickableMenu
     private void TogglePause(Contract contract)
     {
         if (contract.Status == ContractStatus.Paused)
-            _store.Resume(contract.Id);
+            _store.Resume(_officeId);
         else
-            _store.Pause(contract.Id);
+            _store.Pause(_officeId);
         Refresh();
     }
 
     private void TryCancel(Contract contract)
     {
-        if (ModEntry.Orchestrator.ActiveContractId == contract.Id)
+        if (ModEntry.Fleet.IsShiftRunning(contract.Id))
         {
             Game1.addHUDMessage(new HUDMessage(_cancelBlockedMsg, HUDMessage.error_type));
             return;
         }
         Game1.activeClickableMenu = new ConfirmCancelContractMenu(
             onGoBack:  () => Game1.activeClickableMenu = this,
-            onConfirm: () => { _store.Cancel(contract.Id); Game1.activeClickableMenu = this; Refresh(); });
+            onConfirm: () => { _store.Cancel(_officeId); Game1.activeClickableMenu = this; Refresh(); });
     }
 
     // ── Gamepad snapping ─────────────────────────────────────────────────────

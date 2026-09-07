@@ -15,6 +15,7 @@ namespace Dayswork.Integration;
 internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
 {
     public void DispatchOverflowDelivery(
+        StardewValley.Buildings.Building? office,
         IReadOnlyList<ItemStack> items,
         IReadOnlyList<OverflowCategory> categories,
         IReadOnlyDictionary<string, SObject> flavorTemplates)
@@ -24,7 +25,7 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         var built = BuildItems(items, flavorTemplates);
         if (built.Count == 0) return;
 
-        var deposited = DepositToBuildingChestOrBin(built, out var usedChest, out var chestWasFull);
+        var deposited = DepositToBuildingChestOrBin(office, built, out var usedChest, out var chestWasFull);
 
         var destination = usedChest && !chestWasFull ? "the farmhand office chest"
                         : chestWasFull               ? "the farmhand office chest (partial) + shipping bin"
@@ -42,6 +43,11 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
     public void ShowCannotAffordNotice(Contract contract, int dailyPrice, int shortfall)
     {
         ShowError(I18nHelper.Get("notify.cannot_afford", new { price = dailyPrice, shortfall }));
+    }
+
+    public void ShowContractLostNotice()
+    {
+        ShowError(I18nHelper.Get("notify.contract_lost"));
     }
 
     public void ShowNeedsAttentionNotice(Contract contract)
@@ -66,11 +72,15 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
     // goes to the shipping bin. Returns the number of stacks handled and whether the chest was used.
     // chestWasFull is set when the chest was present but addItem returned a remainder, so the caller
     // can show a fallback-to-bin notice distinct from the "no chest assigned" case.
-    private static int DepositToBuildingChestOrBin(List<Item> items, out bool usedChest, out bool chestWasFull)
+    private static int DepositToBuildingChestOrBin(
+        StardewValley.Buildings.Building? office,
+        List<Item> items,
+        out bool usedChest,
+        out bool chestWasFull)
     {
         usedChest = false;
         chestWasFull = false;
-        var chest = Game1.getFarm() is { } farm ? HiringBuilding.TryGetOutputChest(farm) : null;
+        var chest = office?.GetBuildingChest(HiringBuilding.OutputChestId);
         var bin = Game1.getFarm()?.getShippingBin(Game1.player);
 
         var count = 0;

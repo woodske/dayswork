@@ -12,8 +12,12 @@ namespace Dayswork.Integration;
 ///
 /// This is done in C# rather than via Data/Buildings <c>DrawLayers</c> because BuildingDrawLayer
 /// has no GameStateQuery condition in this game version (layers always draw), so there is no
-/// data-driven way to gate the overlay on <see cref="HiringBuilding.WorkCompletedToday"/>.
-/// Single-player only (the flag is not synced/persisted).
+/// data-driven way to gate the overlay on "this office's worker is done".
+///
+/// Each office lights independently: the flag is the building's own
+/// <see cref="OfficeModData.DoneOnKey"/> day stamp, so three offices whose workers finish at
+/// different times light one by one — and, being modData, every connected player sees the same
+/// thing.
 /// </summary>
 internal sealed class HiringBuildingOverlayRenderer
 {
@@ -21,22 +25,26 @@ internal sealed class HiringBuildingOverlayRenderer
 
     public void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
     {
-        if (!HiringBuilding.WorkCompletedToday)
-            return;
         if (Game1.currentLocation is not Farm farm)
             return;
 
-        var building = HiringBuildingInteraction.FindHiringBuilding(farm);
-        if (building is null)
-            return;
+        Texture2D? texture = null;
+        foreach (var office in OfficeResolver.EnumerateOffices(farm))
+        {
+            if (!OfficeModData.IsDoneToday(office))
+                continue;
 
-        var texture = _texture ??= Game1.content.Load<Texture2D>(HiringBuilding.TextureAsset);
-        var b = e.SpriteBatch;
+            texture ??= _texture ??= Game1.content.Load<Texture2D>(HiringBuilding.TextureAsset);
+            DrawDoneForTheDay(e.SpriteBatch, texture, office);
+        }
+    }
 
+    private static void DrawDoneForTheDay(SpriteBatch b, Texture2D texture, StardewValley.Buildings.Building office)
+    {
         // Top-left of the base sprite in world pixels: the sprite's bottom aligns with the bottom
         // of the footprint, drawn at the game's 4x pixel zoom.
-        float worldX = building.tileX.Value * 64f;
-        float worldY = (building.tileY.Value + HiringBuilding.TilesHigh) * 64f
+        float worldX = office.tileX.Value * 64f;
+        float worldY = (office.tileY.Value + HiringBuilding.TilesHigh) * 64f
                        - HiringBuilding.SpriteHeightPx * 4f;
         var origin = Game1.GlobalToLocal(Game1.viewport, new Vector2(worldX, worldY));
 

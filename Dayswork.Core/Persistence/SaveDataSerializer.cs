@@ -12,7 +12,11 @@ namespace Dayswork.Core.Persistence;
 
 public sealed class SaveDataSerializer
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
+    /// <summary>Oldest schema this serializer can read. v3 payloads carry contracts without an
+    /// owner or office and are upgraded in memory; binding them to a building is
+    /// <see cref="ContractAdoption"/>'s job, not the serializer's.</summary>
+    private const int MinimumReadableSchemaVersion = 3;
 
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
@@ -29,17 +33,73 @@ public sealed class SaveDataSerializer
 
     public string Serialize(IReadOnlyList<Contract> contracts, string modVersion)
     {
-        var envelope = new DaysworkSaveDataV2
+        var envelope = new DaysworkSaveDataV3
         {
             SchemaVersion = CurrentSchemaVersion,
             ModVersion = modVersion,
             Contracts = contracts
                 .OrderBy(contract => contract.Id.Value)
-                .Select(MapDomainToDtoV2)
+                .Select(MapDomainToDtoV3)
                 .ToList(),
         };
 
         return JsonConvert.SerializeObject(envelope, SerializerSettings);
+    }
+
+    /// <summary>
+    /// One contract, wrapped in the same envelope, for storage in an office's
+    /// <c>Building.modData</c>. Reusing the envelope keeps the schema check, the version gate, and
+    /// the malformed-skip in one place, and makes each office's string self-describing — which is
+    /// what lets a differently-versioned client read it.
+    /// </summary>
+    public string SerializeOne(Contract contract, string modVersion) =>
+        Serialize(new[] { contract }, modVersion);
+
+    /// <summary>The single contract in an office's modData string, or null when it is absent,
+    /// malformed, or written by a newer schema.</summary>
+    public Contract? DeserializeOne(string? json)
+    {
+        var contracts = Deserialize(json);
+        if (contracts.Count <= 1)
+            return contracts.Count == 1 ? contracts[0] : null;
+
+        _logWarning($"An office held {contracts.Count} contracts — using the first and dropping the rest.");
+        return contracts[0];
+    }
+
+    /// <summary>
+    /// The envelope written to the legacy <c>Dayswork.Contracts</c> save key once contracts have
+    /// moved into building modData: current schema, no contracts. A 1.x mod reading it sees a
+    /// newer schema, loads nothing, and so cannot bill for a contract it can no longer show.
+    /// </summary>
+    public string SerializeMigrationMarker(string modVersion) =>
+        JsonConvert.SerializeObject(
+            new DaysworkSaveDataV3
+            {
+                SchemaVersion = CurrentSchemaVersion,
+                ModVersion = modVersion,
+                Contracts = new List<ContractDtoV3>(),
+                MigratedToBuildingModData = true,
+            },
+            SerializerSettings);
+
+    /// <summary>True when the legacy save key already holds the marker — the 1.x contracts have
+    /// been adopted onto offices and must not be adopted a second time.</summary>
+    public bool IsMigrationMarker(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+
+        try
+        {
+            return JToken.Parse(json) is JObject envelope
+                && envelope["MigratedToBuildingModData"]?.Type == JTokenType.Boolean
+                && envelope["MigratedToBuildingModData"]!.Value<bool>();
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     public IReadOnlyList<Contract> Deserialize(string? json)
@@ -80,40 +140,40 @@ public sealed class SaveDataSerializer
             return Array.Empty<Contract>();
         }
 
-        if (schemaVersion.Value != CurrentSchemaVersion)
+        if (schemaVersion.Value < MinimumReadableSchemaVersion)
         {
             _logWarning($"Dayswork save data schema version {schemaVersion.Value} is invalid for this mod version — starting fresh.");
             return Array.Empty<Contract>();
         }
 
-        DaysworkSaveDataV2? envelope;
+        DaysworkSaveDataV3? envelope;
         try
         {
-            envelope = envelopeObject.ToObject<DaysworkSaveDataV2>(JsonSerializer.Create(SerializerSettings));
+            envelope = envelopeObject.ToObject<DaysworkSaveDataV3>(JsonSerializer.Create(SerializerSettings));
         }
         catch (JsonException ex)
         {
-            _logWarning($"Dayswork save data schema v3 payload could not be mapped — starting fresh. ({ex.Message})");
+            _logWarning($"Dayswork save data schema v{schemaVersion.Value} payload could not be mapped — starting fresh. ({ex.Message})");
             return Array.Empty<Contract>();
         }
 
         if (envelope is null)
         {
-            _logWarning("Dayswork save data schema v2 payload mapped to null — starting fresh.");
+            _logWarning($"Dayswork save data schema v{schemaVersion.Value} payload mapped to null — starting fresh.");
             return Array.Empty<Contract>();
         }
 
         var results = new List<Contract>();
-        foreach (var dto in envelope.Contracts ?? new List<ContractDtoV2>())
+        foreach (var dto in envelope.Contracts ?? new List<ContractDtoV3>())
         {
             try
             {
-                results.Add(MapDtoV2ToDomain(dto));
+                results.Add(MapDtoV3ToDomain(dto));
             }
             catch (Exception ex)
             {
                 var contractId = string.IsNullOrWhiteSpace(dto?.Id) ? "<unknown>" : dto.Id;
-                _logWarning($"Skipping schema v3 contract '{contractId}': {ex.Message}");
+                _logWarning($"Skipping schema v{schemaVersion.Value} contract '{contractId}': {ex.Message}");
             }
         }
 
@@ -138,10 +198,13 @@ public sealed class SaveDataSerializer
         return schemaToken.Value<int>();
     }
 
-    private static ContractDtoV2 MapDomainToDtoV2(Contract contract) =>
+    private static ContractDtoV3 MapDomainToDtoV3(Contract contract) =>
         new()
         {
             Id = contract.Id.Value.ToString(),
+            OwnerId = contract.OwnerId,
+            OfficeId = contract.OfficeId.ToString(),
+            Revision = contract.Revision,
             EnabledTasks = contract.EnabledTasks
                 .OrderBy(task => task.ToString(), StringComparer.Ordinal)
                 .Select(task => task.ToString())
@@ -170,10 +233,15 @@ public sealed class SaveDataSerializer
                 WorkerName = string.IsNullOrEmpty(contract.Preferences.WorkerName)
                     ? null
                     : contract.Preferences.WorkerName,
+                RunWhileOwnerOffline = contract.Preferences.RunWhileOwnerOffline,
+                GrantExperience = contract.Preferences.GrantExperience,
+                Appearance = string.IsNullOrEmpty(contract.Preferences.Appearance)
+                    ? null
+                    : contract.Preferences.Appearance,
             },
         };
 
-    private static Contract MapDtoV2ToDomain(ContractDtoV2 dto)
+    private static Contract MapDtoV3ToDomain(ContractDtoV3 dto)
     {
         var id = new ContractId(Guid.Parse(dto.Id));
         var enabledTasks = (dto.EnabledTasks ?? throw new JsonException("EnabledTasks was null."))
@@ -205,7 +273,11 @@ public sealed class SaveDataSerializer
             preferences = new ContractPreferences(
                 AvoidBlueGrass: avoidBlueGrass,
                 IdleTask: idleTask,
-                WorkerName: dto.Preferences.WorkerName ?? "");
+                WorkerName: dto.Preferences.WorkerName ?? "",
+                // Absent on schema v3: take the domain defaults rather than false/false.
+                RunWhileOwnerOffline: dto.Preferences.RunWhileOwnerOffline ?? ContractPreferences.Default.RunWhileOwnerOffline,
+                GrantExperience: dto.Preferences.GrantExperience ?? ContractPreferences.Default.GrantExperience,
+                Appearance: dto.Preferences.Appearance ?? "");
         }
         else
         {
@@ -214,6 +286,10 @@ public sealed class SaveDataSerializer
 
         return new Contract(
             Id: id,
+            // Schema v3 predates ownership: an unbound contract loads with owner 0 / office
+            // Guid.Empty and is bound by ContractAdoption on the host's first 2.0 SaveLoaded.
+            OwnerId: dto.OwnerId ?? 0L,
+            OfficeId: ParseOfficeId(dto.OfficeId),
             EnabledTasks: enabledTasks,
             TaskDestinations: destinations,
             Schedule: Enum.Parse<ContractSchedule>(dto.Schedule),
@@ -226,8 +302,16 @@ public sealed class SaveDataSerializer
             CropPlan: cropPlan,
             MachineScope: machineScope,
             FishPondScope: fishPondScope,
-            Preferences: preferences);
+            Preferences: preferences,
+            Revision: dto.Revision ?? 0);
     }
+
+    // A missing OfficeId is a v3 contract (unbound). A malformed one is a corrupt contract and
+    // throws, so the per-contract catch skips it rather than binding it to the wrong office.
+    private static Guid ParseOfficeId(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? Guid.Empty
+            : Guid.Parse(value);
 
     // Player category priority. Parse the saved order, dropping unknown/duplicate entries, then
     // append any categories the save omitted (in default order) so the result always covers every

@@ -115,11 +115,11 @@ internal sealed partial class ShiftOrchestrator
     /// <summary>The worker faces away from the office human door (so the music note reads as "idle").</summary>
     private int ResolveIdleWaitFacing()
     {
-        var building = HiringBuildingInteraction.FindHiringBuilding(Game1.getFarm());
-        if (building is null)
+        var office = ActiveOffice;
+        if (office is null)
             return 2; // default: face down (away from a door to the north)
 
-        var door = building.getPointForHumanDoor();
+        var door = office.getPointForHumanDoor();
         // Direction pointing from the door toward the stand tile = away from the building.
         return FacingToward(new Point(door.X, door.Y), Session.FarmExitTile, fallback: 2);
     }

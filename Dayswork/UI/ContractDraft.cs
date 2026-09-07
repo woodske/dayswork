@@ -11,6 +11,13 @@ internal sealed class ContractDraft
     public Dictionary<TaskKind, DestinationKey> Destinations { get; } = new();
     public ContractSchedule Schedule { get; set; } = ContractSchedule.Recurring;
     public ContractId? EditingId { get; set; }
+
+    /// <summary>The office this contract is being written for (its Building.id) — set when the
+    /// flow opens from a building and carried through to the committed contract.</summary>
+    public Guid OfficeId { get; set; }
+
+    /// <summary>The office's owner, who sponsors the contract (Building.owner).</summary>
+    public long OwnerId { get; set; }
     public List<GreenhouseSelection> Greenhouses { get; } = new();
     public DraftPreviewState PreviewState { get; set; } = DraftPreviewState.Empty;
 

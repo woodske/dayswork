@@ -6,12 +6,17 @@ using FsCheck.Xunit;
 
 namespace Dayswork.Tests.Persistence;
 
-// FsCheck invariants for ContractStore state transitions (Pause / Resume / Cancel).
-// The xUnit facts in ContractStoreTests cover the specific behaviors; these properties
+// FsCheck invariants for OfficeContractStore state transitions (Pause / Resume / Cancel).
+// The xUnit facts in OfficeContractStoreTests cover the specific behaviors; these properties
 // verify the same invariants hold across the full space of randomly generated contracts.
-public sealed class ContractStoreStateTests
+public sealed class OfficeContractStoreStateTests
 {
-    private static ContractStore MakeStore() => new ContractStore(_ => { });
+    private static readonly Guid Office = Guid.Parse("0a0a0a0a-0000-0000-0000-000000000001");
+
+    private static OfficeContractStore MakeStore() => new OfficeContractStore(_ => { });
+
+    // Generated contracts predate ownership, so bind each to the one office under test.
+    private static Contract AtOffice(Contract contract) => contract with { OfficeId = Office };
 
     // Pause(id) → Resume(id) is a round-trip: contract is Active after both operations.
     [Property]
@@ -21,10 +26,10 @@ public sealed class ContractStoreStateTests
             contract =>
             {
                 var store = MakeStore();
-                store.Add(contract);
-                store.Pause(contract.Id);
-                store.Resume(contract.Id);
-                return store.Get(contract.Id).Status == ContractStatus.Active;
+                store.Add(AtOffice(contract));
+                store.Pause(Office);
+                store.Resume(Office);
+                return store.ForOffice(Office)!.Status == ContractStatus.Active;
             });
 
     // Pause(id) on an Active contract always sets status to Paused.
@@ -35,9 +40,9 @@ public sealed class ContractStoreStateTests
             contract =>
             {
                 var store = MakeStore();
-                store.Add(contract);
-                store.Pause(contract.Id);
-                return store.Get(contract.Id).Status == ContractStatus.Paused;
+                store.Add(AtOffice(contract));
+                store.Pause(Office);
+                return store.ForOffice(Office)!.Status == ContractStatus.Paused;
             });
 
     // Resume(id) on a Paused contract always sets status to Active.
@@ -48,9 +53,9 @@ public sealed class ContractStoreStateTests
             contract =>
             {
                 var store = MakeStore();
-                store.Add(contract);
-                store.Resume(contract.Id);
-                return store.Get(contract.Id).Status == ContractStatus.Active;
+                store.Add(AtOffice(contract));
+                store.Resume(Office);
+                return store.ForOffice(Office)!.Status == ContractStatus.Active;
             });
 
     // Cancel(id) on an Active or Paused contract always sets status to Cancelled
@@ -63,9 +68,9 @@ public sealed class ContractStoreStateTests
             contract =>
             {
                 var store = MakeStore();
-                store.Add(contract);
-                store.Cancel(contract.Id);
-                var stored = store.Get(contract.Id);
+                store.Add(AtOffice(contract));
+                store.Cancel(Office);
+                var stored = store.ForOffice(Office)!;
                 return stored.Status == ContractStatus.Cancelled && stored.Id == contract.Id;
             });
 
@@ -77,10 +82,10 @@ public sealed class ContractStoreStateTests
             contract =>
             {
                 var store = MakeStore();
-                store.Add(contract);
-                store.Pause(contract.Id);
-                store.Cancel(contract.Id);
-                return store.Get(contract.Id).Status == ContractStatus.Cancelled;
+                store.Add(AtOffice(contract));
+                store.Pause(Office);
+                store.Cancel(Office);
+                return store.ForOffice(Office)!.Status == ContractStatus.Cancelled;
             });
 
     [Property(Arbitrary = new[] { typeof(PersistenceGenerators) }, MaxTest = 300)]
@@ -91,11 +96,13 @@ public sealed class ContractStoreStateTests
             (contract, replacementTerms) =>
             {
                 var store = MakeStore();
-                store.Add(contract);
-                store.ReplaceTermsSnapshot(contract.Id, replacementTerms);
-                var stored = store.Get(contract.Id);
+                store.Add(AtOffice(contract));
+                store.ReplaceTermsSnapshot(Office, replacementTerms);
+                var stored = store.ForOffice(Office)!;
+                // Revision is the store's own bookkeeping and advances on every commit; every
+                // other field must survive a terms refresh untouched.
                 return ContractStructuralComparer.ContractsEqual(
-                    contract with { TermsSnapshot = replacementTerms },
+                    AtOffice(contract) with { TermsSnapshot = replacementTerms, Revision = stored.Revision },
                     stored);
             });
 }

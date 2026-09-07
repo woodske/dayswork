@@ -21,12 +21,17 @@ namespace Dayswork.Orchestration;
 
 internal sealed partial class ShiftOrchestrator
 {
-    private static TileCoord ResolveSpawnExitTile(Farm farm)
+    /// <summary>
+    /// Where this shift's worker appears in the morning and stands when it clocks out: the tile
+    /// just outside its own office's human door. The farm-entrance heuristic below is only the
+    /// fallback for a contract with no office building (which the shift engine no longer produces,
+    /// but stuck-recovery and legacy callers still lean on).
+    /// </summary>
+    private static TileCoord ResolveSpawnExitTile(Farm farm, Building? office)
     {
-        var building = HiringBuildingInteraction.FindHiringBuilding(farm);
-        if (building is not null)
+        if (office is not null)
         {
-            var door = building.getPointForHumanDoor();
+            var door = office.getPointForHumanDoor();
             return ResolvePassableNearby(new TileCoord(door.X, door.Y + 1), farm);
         }
 

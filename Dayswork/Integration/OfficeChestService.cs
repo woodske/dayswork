@@ -20,11 +20,8 @@ internal sealed class OfficeChestService
         if (farm is null)
             return;
 
-        foreach (var building in farm.buildings)
+        foreach (var building in OfficeResolver.EnumerateOffices(farm))
         {
-            if (!IsHiringBuilding(building))
-                continue;
-
             EnsureInputChest(building);
             ApplyBigChest(building.GetBuildingChest(HiringBuilding.InputChestId));
             ApplyBigChest(building.GetBuildingChest(HiringBuilding.OutputChestId));
@@ -34,7 +31,7 @@ internal sealed class OfficeChestService
 
     internal Chest? EnsureInputChest(Building office)
     {
-        if (!IsHiringBuilding(office))
+        if (!OfficeResolver.IsOffice(office))
             return null;
 
         var chest = office.GetBuildingChest(HiringBuilding.InputChestId);
@@ -65,7 +62,7 @@ internal sealed class OfficeChestService
 
     internal void ApplyDisplayNameFormats(Building office)
     {
-        if (!IsHiringBuilding(office))
+        if (!OfficeResolver.IsOffice(office))
             return;
 
         ApplyDisplayNameFormat(office.GetBuildingChest(HiringBuilding.InputChestId), InputChestNameKey);
@@ -73,16 +70,10 @@ internal sealed class OfficeChestService
     }
 
     internal Chest? TryGetInputChest(Building office) =>
-        IsHiringBuilding(office) ? office.GetBuildingChest(HiringBuilding.InputChestId) : null;
+        OfficeResolver.IsOffice(office) ? office.GetBuildingChest(HiringBuilding.InputChestId) : null;
 
     internal Chest? TryGetOutputChest(Building office) =>
-        IsHiringBuilding(office) ? office.GetBuildingChest(HiringBuilding.OutputChestId) : null;
-
-    internal bool IsBuiltInInputChestTile(Farm? farm, int x, int y) =>
-        HiringBuilding.TryGetInputChestTile(farm) is { } tile && tile.X == x && tile.Y == y;
-
-    internal bool IsBuiltInOutputChestTile(Farm? farm, int x, int y) =>
-        HiringBuilding.TryGetOutputChestTile(farm) is { } tile && tile.X == x && tile.Y == y;
+        OfficeResolver.IsOffice(office) ? office.GetBuildingChest(HiringBuilding.OutputChestId) : null;
 
     internal static bool IsInputDisplayTile(int localX, int localY) =>
         HiringBuilding.IsInputChestDisplayTile(localX, localY);
@@ -91,10 +82,7 @@ internal sealed class OfficeChestService
         HiringBuilding.IsOutputChestDisplayTile(localX, localY);
 
     internal static Point ToAbsoluteTile(Building building, Point displayTile) =>
-        new(building.tileX.Value + displayTile.X, building.tileY.Value + displayTile.Y);
-
-    private static bool IsHiringBuilding(Building building) =>
-        string.Equals(building.buildingType.Value, HiringBuilding.BuildingType, StringComparison.Ordinal);
+        OfficeResolver.ChestTile(building, displayTile);
 
     internal static string ToLocalizedTextToken(string key) => $"[LOCALIZED_TEXT {key}]";
 

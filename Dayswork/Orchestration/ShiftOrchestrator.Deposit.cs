@@ -55,10 +55,11 @@ internal sealed partial class ShiftOrchestrator
         // One settlement letter next morning for overflow items only; refunds are not settled here.
         DispatchShiftOverflow();
 
-        // The worker has finished and left for the day — light the office windows/lantern and
-        // start the chimney smoke (gated by the Bindicle.Dayswork_WORKER_DONE GameStateQuery).
-        // Reset next morning on DayStarted (ModEntry).
-        HiringBuilding.WorkCompletedToday = true;
+        // This worker has finished and left for the day — light ITS office's windows/lantern and
+        // start its chimney smoke. Stamped on the building, so N offices light independently and
+        // the stamp self-clears when the date rolls over (see OfficeModData).
+        if (ActiveOffice is { } office)
+            OfficeModData.MarkDoneToday(office);
 
         var session = Session;
         DespawnWorker();
@@ -464,7 +465,7 @@ internal sealed partial class ShiftOrchestrator
             : Array.Empty<ItemStack>();
         var categories = _overflowCategorizer.Categorize(Session.Ctx.Overflow);
 
-        _shiftOutcomeDispatcher.DispatchOverflowDelivery(items, categories, Session.Flavors.Templates);
+        _shiftOutcomeDispatcher.DispatchOverflowDelivery(ActiveOffice, items, categories, Session.Flavors.Templates);
         Session.Ctx.Overflow.Clear();
     }
 }

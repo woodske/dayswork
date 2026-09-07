@@ -2,6 +2,8 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Energy;
+using Dayswork.Core.FishPonds;
+using Dayswork.Core.Machines;
 using Dayswork.Tests.Generators;
 using Dayswork.Tests.Pricing;
 using FsCheck;
@@ -29,6 +31,8 @@ public static class PersistenceGenerators
          let preview = ContractTermsBuilderFactory.CreateTermsBuilder().BuildPreview(canonicalScope, enabledTasks, tier, config)
          where preview.IsValid && preview.ProposedTerms is not null
          from id in Arb.Generate<Guid>().Where(guid => guid != Guid.Empty)
+         from ownerId in Gen.Choose(1, 4).Select(n => (long)n * 1_000_000_000L)
+         from officeId in Arb.Generate<Guid>().Where(guid => guid != Guid.Empty)
          from schedule in Gen.Elements(ContractSchedule.OneTime, ContractSchedule.Recurring)
          from status in Gen.Elements(ContractStatus.Active, ContractStatus.Paused, ContractStatus.Cancelled)
          from hireDate in GameDateGen()
@@ -36,6 +40,8 @@ public static class PersistenceGenerators
          from categoryPriority in CategoryPriorityGen()
          select new Contract(
              Id: new ContractId(id),
+             OwnerId: ownerId,
+             OfficeId: officeId,
              EnabledTasks: enabledTasks,
              TaskDestinations: taskDestinations,
              Schedule: schedule,
@@ -45,7 +51,10 @@ public static class PersistenceGenerators
              TermsSnapshot: preview.ProposedTerms!,
              Tier: tier,
              CategoryPriority: categoryPriority,
-             CropPlan: CropPlan.Empty))
+             CropPlan: CropPlan.Empty,
+             MachineScope: MachineWorkScope.Empty,
+             FishPondScope: FishPondWorkScope.Empty,
+             Preferences: ContractPreferences.Default))
         .ToArbitrary();
 
     public static Arbitrary<ContractTermsSnapshot> TermsSnapshot() =>
@@ -90,6 +99,8 @@ public static class PersistenceGenerators
 
         return new Contract(
             Id: new ContractId(Guid.Parse("11111111-2222-3333-4444-555555555555")),
+            OwnerId: 76561190000000000L,
+            OfficeId: Guid.Parse("66666666-7777-8888-9999-aaaaaaaaaaaa"),
             EnabledTasks: enabledTasks,
             TaskDestinations: taskDestinations,
             Schedule: ContractSchedule.Recurring,
@@ -99,7 +110,10 @@ public static class PersistenceGenerators
             TermsSnapshot: BuildTerms(scope, enabledTasks, EnergyTier.FullDay),
             Tier: EnergyTier.FullDay,
             CategoryPriority: TaskKindSets.DefaultCategoryPriority,
-            CropPlan: CropPlan.Empty);
+            CropPlan: CropPlan.Empty,
+            MachineScope: MachineWorkScope.Empty,
+            FishPondScope: FishPondWorkScope.Empty,
+            Preferences: ContractPreferences.Default);
     }
 
     public static ContractTermsSnapshot CreateAlternateTermsSnapshot()

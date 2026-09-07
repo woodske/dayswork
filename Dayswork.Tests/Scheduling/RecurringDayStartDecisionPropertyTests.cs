@@ -55,18 +55,20 @@ public sealed class RecurringDayStartDecisionPropertyTests
     [Property(Arbitrary = new[] { typeof(RecurringDecisionGenerators) }, MaxTest = 300)]
     public Property Successful_refreshes_only_mutate_terms_snapshot(U23RecurringDecisionCase input)
     {
-        var store = new ContractStore(_ => { });
-        store.Add(input.Contract);
+        var officeId = Guid.Parse("0a0a0a0a-0000-0000-0000-000000000001");
+        var contract = input.Contract with { OfficeId = officeId };
+        var store = new OfficeContractStore(_ => { });
+        store.Add(contract);
 
-        var outcome = _engine.Evaluate(input.Contract, input.Config, input.FestivalToday, input.AvailableGold);
+        var outcome = _engine.Evaluate(contract, input.Config, input.FestivalToday, input.AvailableGold);
         if (!outcome.ShouldPersistTermsSnapshot || outcome.Refresh.TermsSnapshot is null)
             return true.ToProperty();
 
-        store.ReplaceTermsSnapshot(input.Contract.Id, outcome.Refresh.TermsSnapshot);
-        var stored = store.Get(input.Contract.Id);
+        store.ReplaceTermsSnapshot(officeId, outcome.Refresh.TermsSnapshot);
+        var stored = store.ForOffice(officeId)!;
 
         return ContractStructuralComparer.ContractsEqual(
-                input.Contract with { TermsSnapshot = outcome.Refresh.TermsSnapshot },
+                contract with { TermsSnapshot = outcome.Refresh.TermsSnapshot, Revision = stored.Revision },
                 stored)
             .ToProperty()
             .Label($"price={outcome.DailyPrice} notice={outcome.NoticeKind}");

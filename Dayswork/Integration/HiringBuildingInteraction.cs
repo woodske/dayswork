@@ -8,8 +8,9 @@ using StardewValley.Buildings;
 namespace Dayswork.Integration;
 
 /// <summary>
-/// Handles action-clicks on the hiring building. Clicking anywhere on the building footprint opens
-/// the hire/manage flow, except the two porch chests which open their own UI. Single-player only.
+/// Handles action-clicks on a farmhand office. Clicking anywhere on an office's footprint opens
+/// the hire/manage flow <b>for that office</b>, except the two porch chests which open their own
+/// UI. Single-player only until the 2.0 plan's Phase 4.
 /// </summary>
 internal sealed class HiringBuildingInteraction
 {
@@ -36,11 +37,11 @@ internal sealed class HiringBuildingInteraction
         var gx = (int)grab.X;
         var gy = (int)grab.Y;
 
-        // Only when the action-clicked tile is within our building's footprint and the player is
-        // standing next to the building (the board sits high on the wall, so we check proximity to
-        // the whole footprint rather than to the clicked tile).
-        var building = FindHiringBuilding(farm);
-        if (building is null || !FootprintContains(building, gx, gy))
+        // The office the player actually clicked — not "the farm's office", which stopped being a
+        // single building in 2.0. They must also be standing next to it (the board sits high on the
+        // wall, so proximity is to the whole footprint rather than to the clicked tile).
+        var building = OfficeResolver.AtTile(farm, gx, gy);
+        if (building is null)
             return;
         if (!PlayerNextToFootprint(building, Game1.player.TilePoint))
             return;
@@ -65,25 +66,8 @@ internal sealed class HiringBuildingInteraction
 
         // Any non-chest tile on the building opens the hire/manage flow.
         _helper.Input.Suppress(e.Button);
-        ModEntry.Coordinator.OpenFromBuilding();
+        ModEntry.Coordinator.OpenFromBuilding(building);
     }
-
-    internal static Building? FindHiringBuilding(Farm farm)
-    {
-        foreach (var building in farm.buildings)
-        {
-            if (string.Equals(building.buildingType.Value, HiringBuilding.BuildingType, StringComparison.Ordinal))
-                return building;
-        }
-
-        return null;
-    }
-
-    private static bool FootprintContains(Building building, int x, int y) =>
-        x >= building.tileX.Value
-        && x < building.tileX.Value + building.tilesWide.Value
-        && y >= building.tileY.Value
-        && y < building.tileY.Value + building.tilesHigh.Value;
 
     private static bool IsOutputChestDisplayTile(Building building, int x, int y) =>
         x == building.tileX.Value + HiringBuilding.OutputChestDisplayTile.X

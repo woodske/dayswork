@@ -10,6 +10,7 @@ using Dayswork.Orchestration;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.Buildings;
 using StardewValley.Menus;
 using StardewValley.Objects;
 using Season = Dayswork.Core.Domain.Season;
@@ -21,7 +22,7 @@ internal sealed class HiringFlowCoordinator
 {
     private readonly ContractTermsBuilder _termsBuilder;
     private readonly ModConfigManager _configManager;
-    private readonly ContractStore _contractStore;
+    private readonly OfficeContractStore _contractStore;
     private readonly FarmhandUpgradeStore _upgradeStore;
     private readonly ChestResolver _chestResolver;
     private readonly IModHelper _helper;
@@ -33,7 +34,7 @@ internal sealed class HiringFlowCoordinator
     public HiringFlowCoordinator(
         ContractTermsBuilder termsBuilder,
         ModConfigManager configManager,
-        ContractStore contractStore,
+        OfficeContractStore contractStore,
         FarmhandUpgradeStore upgradeStore,
         ChestResolver chestResolver,
         IModHelper helper)
@@ -46,9 +47,11 @@ internal sealed class HiringFlowCoordinator
         _helper = helper;
     }
 
-    public void OpenHiringFlow()
+    /// <summary>Hire for one office. The guard is per office now — a second office is free to
+    /// hire while the first has a farmhand out.</summary>
+    public void OpenHiringFlow(Building office)
     {
-        if (_contractStore.List().Any(c => c.Status is ContractStatus.Active or ContractStatus.Paused))
+        if (_contractStore.HasOpenContract(office.id.Value))
         {
             Game1.addHUDMessage(new HUDMessage(
                 I18nHelper.Get("ui.error.one_contract"),
@@ -57,31 +60,44 @@ internal sealed class HiringFlowCoordinator
         }
 
         _cropCatalog = null;
-        var draft = new ContractDraft();
+        var draft = new ContractDraft
+        {
+            OfficeId = office.id.Value,
+            OwnerId = ResolveOwner(office),
+        };
         ShowHub(draft);
     }
 
-    public void OpenEditFlow(ContractId existing)
+    public void OpenEditFlow(Guid officeId)
     {
+        var contract = _contractStore.ForOffice(officeId);
+        if (contract is null)
+            return;
+
         _cropCatalog = null;
-        var contract = _contractStore.Get(existing);
-        var draft = CreateEditDraft(existing, contract);
-        ShowHub(draft);
+        ShowHub(CreateEditDraft(contract));
     }
 
-    public void OpenManageFlow()
+    public void OpenManageFlow(Guid officeId)
     {
-        Game1.activeClickableMenu = new ContractMenu(_contractStore);
+        Game1.activeClickableMenu = new ContractMenu(_contractStore, officeId);
     }
 
-    /// <summary>Entry point from the hiring building's tile action: manage an existing contract, else hire.</summary>
-    public void OpenFromBuilding()
+    /// <summary>Entry point from an office's tile action: manage that office's contract, else hire
+    /// a farmhand for it.</summary>
+    public void OpenFromBuilding(Building office)
     {
-        if (_contractStore.List().Any(c => c.Status is ContractStatus.Active or ContractStatus.Paused))
-            OpenManageFlow();
+        if (_contractStore.HasOpenContract(office.id.Value))
+            OpenManageFlow(office.id.Value);
         else
-            OpenHiringFlow();
+            OpenHiringFlow(office);
     }
+
+    // Building.owner is set by buildStructure, so a carpenter-built office carries its builder's
+    // id. A 0 means the building predates ownership (or was placed by a path that bypasses
+    // buildStructure) — treat it as the host's, matching the 1.x → 2.0 adoption rule.
+    private static long ResolveOwner(Building office) =>
+        office.owner.Value != 0 ? office.owner.Value : Game1.MasterPlayer.UniqueMultiplayerID;
 
     // Hub-and-spoke navigation: the hub is the home page and every spoke returns to it. RefreshPreview
     // here keeps the hub's per-section status and the Confirm gate current after any change.
@@ -111,12 +127,12 @@ internal sealed class HiringFlowCoordinator
         Game1.activeClickableMenu = new PreferencesMenu(draft, onBack: ShowHub);
     }
 
-    public void ShowUpgradesFromManage()
+    public void ShowUpgradesFromManage(Guid officeId)
     {
         Game1.activeClickableMenu = new UpgradesMenu(
             _upgradeStore.State,
-            onPurchase: PurchaseUpgradeFromManage,
-            onBack: OpenManageFlow);
+            onPurchase: kind => PurchaseUpgradeFromManage(officeId, kind),
+            onBack: () => OpenManageFlow(officeId));
     }
 
     private void ShowUpgrades(ContractDraft draft)
@@ -135,10 +151,10 @@ internal sealed class HiringFlowCoordinator
         ShowUpgrades(draft);
     }
 
-    private void PurchaseUpgradeFromManage(FarmhandUpgradeKind kind)
+    private void PurchaseUpgradeFromManage(Guid officeId, FarmhandUpgradeKind kind)
     {
         TryPurchaseUpgrade(kind);
-        ShowUpgradesFromManage();
+        ShowUpgradesFromManage(officeId);
     }
 
     private bool TryPurchaseUpgrade(FarmhandUpgradeKind kind)
@@ -179,11 +195,10 @@ internal sealed class HiringFlowCoordinator
 
     private void ApplyEnergyUpgradeToOpenContracts()
     {
-        foreach (var contract in _contractStore.List()
-                     .Where(c => c.Status is ContractStatus.Active or ContractStatus.Paused))
+        foreach (var contract in _contractStore.OpenContracts())
         {
             _contractStore.Update(
-                contract.Id,
+                contract.OfficeId,
                 contract with
                 {
                     TermsSnapshot = FarmhandUpgradeEffects.AddEnergyBonus(contract.TermsSnapshot),
@@ -1087,15 +1102,17 @@ internal sealed class HiringFlowCoordinator
 
         if (draft.EditingId.HasValue)
         {
-            var original = _contractStore.Get(draft.EditingId.Value);
+            var original = _contractStore.ForOffice(draft.OfficeId)
+                ?? throw new InvalidOperationException($"Office {draft.OfficeId} no longer has a contract to edit.");
             var updated = builtContract with
             {
-                Id = draft.EditingId.Value,
+                Id = original.Id,
                 Status = original.Status,
                 HireDate = original.HireDate,
+                Revision = original.Revision,
             };
 
-            _contractStore.Update(draft.EditingId.Value, updated);
+            _contractStore.Update(draft.OfficeId, updated);
         }
         else
         {
@@ -1111,6 +1128,8 @@ internal sealed class HiringFlowCoordinator
     {
         return new Contract(
             Id: ContractId.New(),
+            OwnerId: draft.OwnerId,
+            OfficeId: draft.OfficeId,
             EnabledTasks: draft.EnabledTasks.ToHashSet(),
             TaskDestinations: draft.Destinations.Count > 0
                 ? new Dictionary<TaskKind, DestinationKey>(draft.Destinations)
@@ -1131,11 +1150,13 @@ internal sealed class HiringFlowCoordinator
             Preferences: draft.Preferences);
     }
 
-    internal static ContractDraft CreateEditDraft(ContractId existing, Contract contract)
+    internal static ContractDraft CreateEditDraft(Contract contract)
     {
         var draft = new ContractDraft
         {
-            EditingId = existing,
+            EditingId = contract.Id,
+            OfficeId = contract.OfficeId,
+            OwnerId = contract.OwnerId,
             Schedule = contract.Schedule,
             Tier = contract.Tier,
         };

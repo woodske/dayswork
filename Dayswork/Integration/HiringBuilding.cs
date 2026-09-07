@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Buildings;
 using StardewValley.GameData.Buildings;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -18,22 +19,12 @@ internal static class HiringBuilding
 {
     public const string BuildingType = "Bindicle.Dayswork_Office";
     public const string TextureAsset = "Mods/Bindicle.Dayswork/Building";
-    internal const string OnePerFarmBuildCondition = "!BUILDINGS_CONSTRUCTED All Bindicle.Dayswork_Office 1 2147483647 true";
     private const string TextureFile = "assets/farmhand_office.png";
 
     /// <summary>Id of the building's built-in output chest where missed/overflow items are deposited.</summary>
     public const string OutputChestId = "Bindicle.Dayswork_Output";
     /// <summary>Id of the building's built-in input chest where crop-management supplies are stored.</summary>
     public const string InputChestId = "Bindicle.Dayswork_Input";
-
-    /// <summary>
-    /// True once the worker has finished and left for the day (set in ShiftOrchestrator.HandleExit,
-    /// reset each morning on DayStarted). Drives the evening lit-windows/lantern glow and chimney
-    /// smoke, drawn by <see cref="HiringBuildingOverlayRenderer"/>. Single-player only; not persisted.
-    /// (Data/Buildings draw layers can't be conditioned in this game version, so the overlay is
-    /// rendered in C# instead.)
-    /// </summary>
-    public static bool WorkCompletedToday { get; set; }
 
     // Footprint, in tiles, modeled after the Log Cabin. The base building sprite occupies the
     // (0,0,80,106) region of the sheet (5 tiles wide; 106px tall so the roof + chimney overhang
@@ -87,7 +78,7 @@ internal static class HiringBuilding
         Description = I18nHelper.Get("building.office.description"),
         Texture = TextureAsset,
         Builder = "Robin",
-        BuildCondition = OnePerFarmBuildCondition,
+        // No build condition: 2.0 allows any number of offices, one farmhand each.
         BuildCost = 1000,
         BuildMaterials = new List<BuildingMaterial>
         {
@@ -127,56 +118,24 @@ internal static class HiringBuilding
         };
 
     /// <summary>
-    /// Resolves the building's built-in output chest, if the building is present on the farm.
-    /// Returns null when no building exists (callers must fall back so items are never lost).
+    /// One office's built-in output chest — the overflow sink that keeps hard rule 4 (items are
+    /// never lost). Null when the office has been demolished, in which case callers fall back to
+    /// the shipping bin. Always ask for a specific office: "the farm's office" stopped being a
+    /// meaningful question in 2.0.
     /// </summary>
-    public static StardewValley.Objects.Chest? TryGetOutputChest(Farm farm)
-    {
-        var building = HiringBuildingInteraction.FindHiringBuilding(farm);
-        return building?.GetBuildingChest(OutputChestId);
-    }
+    public static StardewValley.Objects.Chest? TryGetOutputChest(Building? office) =>
+        office?.GetBuildingChest(OutputChestId);
 
     /// <summary>
-    /// Resolves the building's built-in input chest, if the building is present on the farm.
-    /// Returns null when no building exists or the chest has not been backfilled yet.
+    /// One office's built-in input chest (the managed-crop supply reservoir). Null when the office
+    /// is gone or the chest has not been backfilled yet.
     /// </summary>
-    public static StardewValley.Objects.Chest? TryGetInputChest(Farm farm)
-    {
-        var building = HiringBuildingInteraction.FindHiringBuilding(farm);
-        return building?.GetBuildingChest(InputChestId);
-    }
-
-    /// <summary>
-    /// Absolute farm tile of the building's built-in output chest (the game places the building
-    /// chest as a farm object at the display tile). Null when no building exists.
-    /// </summary>
-    public static Point? TryGetOutputChestTile(Farm? farm)
-        => TryGetBuiltInChestTile(farm, OutputChestDisplayTile);
-
-    /// <summary>
-    /// Absolute farm tile of the building's built-in input chest. Null when no building exists.
-    /// Used to exclude the supply chest from selectable output destinations.
-    /// </summary>
-    public static Point? TryGetInputChestTile(Farm? farm)
-        => TryGetBuiltInChestTile(farm, InputChestDisplayTile);
+    public static StardewValley.Objects.Chest? TryGetInputChest(Building? office) =>
+        office?.GetBuildingChest(InputChestId);
 
     internal static bool IsInputChestDisplayTile(int localX, int localY) =>
         InputChestDisplayTile.X == localX && InputChestDisplayTile.Y == localY;
 
     internal static bool IsOutputChestDisplayTile(int localX, int localY) =>
         OutputChestDisplayTile.X == localX && OutputChestDisplayTile.Y == localY;
-
-    private static Point? TryGetBuiltInChestTile(Farm? farm, Point displayTile)
-    {
-        if (farm is null)
-            return null;
-
-        var building = HiringBuildingInteraction.FindHiringBuilding(farm);
-        if (building is null)
-            return null;
-
-        return new Point(
-            building.tileX.Value + displayTile.X,
-            building.tileY.Value + displayTile.Y);
-    }
 }

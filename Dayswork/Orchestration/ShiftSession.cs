@@ -31,7 +31,9 @@ internal sealed class ShiftSession
         GameLocation currentLocation,
         TileCoord farmExitTile,
         TaskPriorityOrderer priorityOrderer,
-        StuckDetector stuck)
+        StuckDetector stuck,
+        Guid officeId,
+        long ownerId)
     {
         Ctx = ctx;
         Worker = worker;
@@ -39,7 +41,21 @@ internal sealed class ShiftSession
         FarmExitTile = farmExitTile;
         PriorityOrderer = priorityOrderer;
         Stuck = stuck;
+        OfficeId = officeId;
+        OwnerId = ownerId;
     }
+
+    /// <summary>The office this shift belongs to (its Building.id): spawn/return door, porch
+    /// chests, and evening lights all resolve through it, never through "the farm's office".</summary>
+    public readonly Guid OfficeId;
+
+    /// <summary>The contract's sponsor. Phase 1 always runs single-player, so this is the local
+    /// player; Phase 2 makes it the identity behind the wallet, tools, shipping, and XP.</summary>
+    public readonly long OwnerId;
+
+    /// <summary>Which wallet this shift spends from. One wallet in single-player and under co-op's
+    /// shared-money setting; keyed per owner otherwise.</summary>
+    public long WalletId => OwnerId;
 
     /// <summary>The pure-Core shift context: state machine, energy, batches, buffer, overflow.</summary>
     public ShiftContext Ctx { get; }

@@ -7,10 +7,13 @@ namespace Dayswork.Integration;
 // Dispatches shift-end overflow delivery plus same-day HUD notices for contract lifecycle events.
 internal interface IShiftOutcomeDispatcher
 {
-    // Delivers every overflow item to the farmhand office chest, with a shipping-bin fallback.
-    // Sends nothing when there are no items. flavorTemplates clones captured flavored/colored items
-    // (roe, wine…) back faithfully — keyed by RoutedItemStack.FlavorId; pass an empty map for none.
+    // Delivers every overflow item to the shift's OWN office chest, with a shipping-bin fallback.
+    // Sends nothing when there are no items. office is the contract's office building; a null
+    // office (demolished mid-shift) still routes everything to the bin, so nothing is lost.
+    // flavorTemplates clones captured flavored/colored items (roe, wine…) back faithfully —
+    // keyed by RoutedItemStack.FlavorId; pass an empty map for none.
     void DispatchOverflowDelivery(
+        StardewValley.Buildings.Building? office,
         IReadOnlyList<ItemStack> items,
         IReadOnlyList<OverflowCategory> categories,
         IReadOnlyDictionary<string, StardewValley.Object> flavorTemplates);
@@ -23,4 +26,8 @@ internal interface IShiftOutcomeDispatcher
 
     // Same-day festival HUD notice; one-time contract prices are refunded directly to player gold.
     void ShowFestivalNotice(Contract contract, int refundGold);
+
+    // A contract could not be kept: its office is gone, or (on a 1.x save) there is no way to tell
+    // which office it belonged to. The contract is dropped and its price is forfeited.
+    void ShowContractLostNotice();
 }

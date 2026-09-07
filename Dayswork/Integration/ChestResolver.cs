@@ -32,11 +32,10 @@ internal sealed class ChestResolver
         var result = new List<ChestEntry>();
         string farmGroup = I18nHelper.Get("ui.zone_chest.group_farm");
 
-        // Built-in office chests are reserved system chests. The input chest is a crop-supply
-        // reservoir; the output chest remains the automatic fallback, but is not an explicit
-        // selectable destination.
-        var officeInputChestTile = HiringBuilding.TryGetInputChestTile(farm as Farm);
-        var officeOutputChestTile = HiringBuilding.TryGetOutputChestTile(farm as Farm);
+        // Built-in office chests are reserved system chests — every office's, not just the first
+        // one's. The input chest is a crop-supply reservoir; the output chest remains the automatic
+        // fallback, but is not an explicit selectable destination.
+        var reservedOfficeChestTiles = ReservedOfficeChestTiles(farm as Farm);
 
         // Open-farm chests
         foreach (var (tile, obj) in farm.Objects.Pairs)
@@ -45,7 +44,7 @@ internal sealed class ChestResolver
             var tileY = (int)tile.Y;
             if (obj is Chest chest)
             {
-                if (ShouldExcludeSelectableFarmChest(officeInputChestTile, officeOutputChestTile, tileX, tileY))
+                if (reservedOfficeChestTiles.Contains(new Point(tileX, tileY)))
                     continue;
                 var chestRef = new ChestRef(farm.Name, new TileCoord(tileX, tileY));
                 result.Add(new ChestEntry(chestRef, GetDisplayName(chest, farm, tileX, tileY), farmGroup));
@@ -276,35 +275,20 @@ internal sealed class ChestResolver
         return result;
     }
 
-    internal static bool ShouldExcludeSelectableFarmChest(
-        Point? officeInputChestTile,
-        Point? officeOutputChestTile,
-        int tileX,
-        int tileY) =>
-        ShouldExcludeSelectableFarmChest(
-            officeInputChestTile?.X,
-            officeInputChestTile?.Y,
-            officeOutputChestTile?.X,
-            officeOutputChestTile?.Y,
-            tileX,
-            tileY);
+    /// <summary>
+    /// The porch-chest tiles of every office on the farm. They are the mod's own system chests
+    /// (crop-supply reservoir and automatic-output fallback), so they never appear in a chest
+    /// picker — and with N offices that is N pairs of tiles, not one.
+    /// </summary>
+    internal static HashSet<Point> ReservedOfficeChestTiles(Farm? farm)
+    {
+        var tiles = new HashSet<Point>();
+        foreach (var office in OfficeResolver.EnumerateOffices(farm))
+        {
+            tiles.Add(OfficeResolver.ChestTile(office, HiringBuilding.InputChestDisplayTile));
+            tiles.Add(OfficeResolver.ChestTile(office, HiringBuilding.OutputChestDisplayTile));
+        }
 
-    internal static bool ShouldExcludeSelectableFarmChest(int? officeInputChestTileX, int? officeInputChestTileY, int tileX, int tileY) =>
-        ShouldExcludeSelectableFarmChest(officeInputChestTileX, officeInputChestTileY, null, null, tileX, tileY);
-
-    internal static bool ShouldExcludeSelectableFarmChest(
-        int? officeInputChestTileX,
-        int? officeInputChestTileY,
-        int? officeOutputChestTileX,
-        int? officeOutputChestTileY,
-        int tileX,
-        int tileY) =>
-        officeInputChestTileX.HasValue
-        && officeInputChestTileY.HasValue
-        && tileX == officeInputChestTileX.Value
-        && tileY == officeInputChestTileY.Value
-        || officeOutputChestTileX.HasValue
-        && officeOutputChestTileY.HasValue
-        && tileX == officeOutputChestTileX.Value
-        && tileY == officeOutputChestTileY.Value;
+        return tiles;
+    }
 }
