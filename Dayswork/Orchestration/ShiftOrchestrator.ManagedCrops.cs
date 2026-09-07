@@ -119,8 +119,7 @@ internal sealed partial class ShiftOrchestrator
         }
 
         var actions = BuildManagedActions(logDetail: true);
-        foreach (var action in actions)
-            Session.ManagedActions.Enqueue(action);
+        EnqueueManagedActionsClaimed(actions);
         Session.LastManagedSignature = Signature(actions);
 
         DevLog.Log($"[Dayswork][managed-crops] batch={batch.LocationName} zones={Session.ManagedAssignments.Count} actions={Session.ManagedActions.Count}.", LogLevel.Info);
@@ -329,11 +328,28 @@ internal sealed partial class ShiftOrchestrator
 
         Session.LastManagedSignature = signature;
         Session.ManagedReplanCount++;
-        foreach (var action in actions)
-            Session.ManagedActions.Enqueue(action);
+        EnqueueManagedActionsClaimed(actions);
 
         DevLog.Log($"[Dayswork][managed-crops] re-plan pass={Session.ManagedReplanCount} actions={actions.Count}.", LogLevel.Info);
         return true;
+    }
+
+    // Managed dirt tiles are claimed per (location, tile): overlapping managed plans from two
+    // contracts resolve to whichever batch begins first. Own claims are idempotent, so replans
+    // re-enqueue freely; the plan/replan signature stays computed over the UNFILTERED action list
+    // so a claim race can never masquerade as a field change. (The losing contract may end up
+    // slightly over-bought on seeds for the overlap; carried surplus settles back through the
+    // normal safety chain.)
+    private void EnqueueManagedActionsClaimed(List<TileAction> actions)
+    {
+        foreach (var action in actions)
+        {
+            if (_day is not null && !_day.Claims.TryClaim(
+                    WorkClaimKey.ManagedDirt(action.LocationName, action.Tile),
+                    Session.Ctx.ContractId))
+                continue;
+            Session.ManagedActions.Enqueue(action);
+        }
     }
 
     private static string Signature(IReadOnlyList<TileAction> actions) =>

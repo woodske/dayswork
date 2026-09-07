@@ -470,9 +470,24 @@ internal sealed class HiringFlowCoordinator
             allowBuildingSelection: false,
             overlapTogglesSelection: true,
             protectedZones: draft.CropPlan.ProtectedZones(groupId, group.LocationName),
+            otherWorkerZones: OtherContractCropZones(draft, group.LocationName),
             zoneFillColor: Color.LimeGreen * 0.5f,
             targetLocationName: group.LocationName);
     }
+
+    // Managed-crop zones owned by OTHER offices' contracts at the given location. Surfaced in the
+    // crop draw session as a light-purple overlay so the player can see where another farmhand
+    // already grows crops — informational only; the tiles stay selectable (the per-day
+    // WorkClaimRegistry arbitrates any tile two farmhands both claim). Excludes the contract being
+    // edited, and Cancelled/Executed contracts, which have no live worker tending their crops.
+    private IReadOnlyList<Zone> OtherContractCropZones(ContractDraft draft, string locationName) =>
+        _contractStore.OpenContracts()
+            .Where(contract => contract.OfficeId != draft.OfficeId)
+            .SelectMany(contract => contract.CropPlan.Assignments)
+            .Select(assignment => assignment.Zone)
+            .Where(zone => string.Equals(zone.LocationName, locationName, StringComparison.Ordinal))
+            .ToList()
+            .AsReadOnly();
 
     private CropCatalogProvider EnsureCropCatalog() =>
         _cropCatalog ??= new CropCatalogProvider(ModEntry.ModMonitor);

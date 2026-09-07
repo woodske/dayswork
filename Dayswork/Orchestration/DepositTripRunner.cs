@@ -44,8 +44,9 @@ internal sealed class DepositTripRunner
 
     // Brief-wait budget when the player has the destination chest's UI open on arrival: hold at
     // the stand tile for ~3s of deposit ticks (throttled to every 4th game tick) before deferring
-    // the trip to overflow. -1 = not currently waiting. The worker never holds the mutex itself,
-    // so this only ever waits on the player.
+    // the trip to overflow. -1 = not currently waiting. Workers never hold the mutex themselves —
+    // their chest writes are serialized by the fleet's sequential tick fan-out — so this only
+    // ever waits on the player.
     private const int ChestMutexWaitTicks = 45;
     private int _mutexWaitTicksRemaining = -1;
 

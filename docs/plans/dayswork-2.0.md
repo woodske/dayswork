@@ -94,8 +94,11 @@ These change the design and are called out first so nobody builds the brief's ve
 Each office holds its own contract as one JSON string under
 `modData["Bindicle.Dayswork/Contract"]` (the existing DTO serializer, schema v4). Per-day volatile
 state that other players should *see* also lives in modData, written on change, never per tick:
-`…/DoneOn` (day stamp, drives the evening overlay), `…/Live` (a shift is running),
-`…/Revision` (edit counter for optimistic commits).
+`…/DoneOn` (day stamp, drives the evening overlay), and `…/Live` (a shift is running).
+`…/Revision` was **not** given a key of its own (changed while building Phase 1): the revision is a
+field on the serialized contract, so anyone who can read the contract already has it and a second
+key would be a copy that can disagree with the first. `…/Live` is deferred to Phase 4, which is the
+first phase with a client that needs it.
 Per-worker cosmetic/status state lives in the NPC's `Character.modData` (`…/Name`, `…/Variant`,
 `…/Stamina` throttled to ~5 % steps).
 
@@ -392,23 +395,37 @@ majority of the risk and is fully testable offline.
 **Decisions.** Contracts in modData from day one (D1) so Phase 4 gets client visibility free;
 `WorkClaimRegistry` and `ShoppingBudgetLedger` return as Core types; spawn stagger does not return.
 
+**Changed while building (2026-09-07):**
+- `…/Revision` is a field on the stored contract, not a modData key of its own (see D1).
+- `…/Live` is deferred to Phase 4; nothing in single-player reads it.
+- The v4 DTO carries the Phase-2/3 owner preferences (`RunWhileOwnerOffline`, `GrantExperience`,
+  `Appearance`) already, so those phases are behaviour-only and there is no second schema bump.
+- `ChestResolver`'s three `ShouldExcludeSelectableFarmChest` overloads collapsed into one
+  `ReservedOfficeChestTiles(farm)` set — "the office's two tiles" became "every office's tiles",
+  and a tile set says that more plainly than six nullable coordinates.
+- Adoption gained a third outcome, `DroppedAmbiguous`: a save from the reverted multi-farmhand
+  build can have several offices *and* a legacy contract, and which office it belonged to is not
+  recoverable. It is dropped with a notice rather than bound to an arbitrary office.
+
 **Tests (required).** v4 round trip + v3→v4 upgrade + malformed-skip; the pure adoption/binding
 function (one office / zero offices / owner 0 / residual extras); `OfficeContractStore` invariants
 (one contract per office, revision increments, hydrate from N offices); `WorkClaimRegistry`;
 `ShoppingBudgetLedger` keyed by wallet.
 
-**Acceptance.**
-- Two or three offices, each with its own contract, run concurrent shifts; each worker spawns at
-  and returns to its own door; deposits and overflow go to its own office chest; each office lights
-  independently.
-- Overlapping zones between two contracts are serviced once (claims), and the zone-draw menu shows
-  the other contract's zones.
-- Under one wallet, two managed-crop shopping trips never over-spend (ledger).
-- Save/load with several active contracts round-trips through modData; a 1.x save adopts its
-  contract onto its office with the host as owner; the old save key holds the v4 marker.
-- Demolishing an office with a live worker ends the shift safely (items to shipping bin), shows
-  the forfeit notice, and leaves no contract behind.
-- Single-player regression: everything in the "SP regression" matrix row.
+**Acceptance.** Built 2026-09-07; every item below is code-complete with unit tests where the
+plan asked for them, and every one marked *(smoke)* still owes an in-game pass.
+
+- [x] *(smoke)* Two or three offices, each with its own contract, run concurrent shifts; each worker
+  spawns at and returns to its own door; deposits and overflow go to its own office chest; each
+  office lights independently.
+- [x] *(smoke)* Overlapping zones between two contracts are serviced once (claims), and the
+  zone-draw menu shows the other contract's zones.
+- [x] *(smoke)* Under one wallet, two managed-crop shopping trips never over-spend (ledger).
+- [x] *(smoke)* Save/load with several active contracts round-trips through modData; a 1.x save
+  adopts its contract onto its office with the host as owner; the old save key holds the v4 marker.
+- [x] *(smoke)* Demolishing an office with a live worker ends the shift safely (items to shipping
+  bin), shows the forfeit notice, and leaves no contract behind.
+- [ ] *(smoke)* Single-player regression: everything in the "SP regression" matrix row.
 
 ## Phase 2 — Sponsor model: wallet, tools, shipping, XP, offline flag
 

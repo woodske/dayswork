@@ -1,11 +1,11 @@
 # Dayswork — AI context
 
-Single-player Stardew Valley SMAPI mod. The player builds a farm office
-(`Bindicle.Dayswork_Office`) and hires an NPC farmhand from it. The worker spawns at the farmhand office
-entrance each morning, **walks** the farm doing the contract's configured work (water/harvest
-crops, collect fruit, animal care, clear rocks/weeds/grass/trees, plus a full managed-crop
-lifecycle), deposits output into the player's chests, and return to the office. Payment is **upfront** for a block
-of worker energy. Constraints baked into the design: progression-aware (worker inherits the
+Single-player Stardew Valley SMAPI mod. The player builds farm offices
+(`Bindicle.Dayswork_Office`) — **any number of them, one farmhand each** — and hires an NPC farmhand
+from each. A worker spawns just outside its own office's door each morning, **walks** the farm doing
+that contract's configured work (water/harvest crops, collect fruit, animal care, clear
+rocks/weeds/grass/trees, plus a full managed-crop lifecycle), deposits output into the player's
+chests, and returns to its office. Payment is **upfront** for a block of worker energy. Constraints baked into the design: progression-aware (worker inherits the
 player's tool levels), safe (items are never lost — undelivered output goes to the office output
 chest / shipping bin), single-player only, and the worker must physically walk (no warping except
 stuck-recovery and building doors).
@@ -60,8 +60,11 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
    put pure logic (pricing, energy, state machine, planning, DTOs) in Core where it's unit-tested.
 2. **No Harmony.** The mod uses SMAPI events only — there are no Harmony patches and no
    `<EnableHarmony>`. Don't add one without a hard reason; prefer an event hook.
-3. **Single active contract.** At most one Active/Paused contract at a time (enforced in the hiring
-   flow and assumed by the scheduler).
+3. **One contract per office; N offices ⇒ N contracts.** An office holds at most one
+   Active/Paused contract and runs at most one live shift; the farm may have any number of offices.
+   The contract belongs to its office — it lives in that building's `modData`, is keyed by
+   `Building.id` (`Contract.OfficeId`), and is destroyed with the building. Never resolve "the
+   farm's office": ask `OfficeResolver` for a specific one, by id or by the clicked tile.
 4. **Items are never lost — and never degraded.** Two invariants on every collected item/material:
    - *Never lost.* Every deposit/overflow path falls back so output ends up somewhere safe
      (chest → office output chest → shipping bin). Preserve this when touching deposit or shift-stop code.
@@ -77,7 +80,9 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
 5. **The worker is removed before save.** `CalendarHandlers.OnSavingHook` runs before persistence
    and despawns the live `FarmhandNpc` (via `ShiftOrchestrator.StopForSleepAndSettle`); never let one
    serialize into the save.
-6. **Single-player only.** Guard new entry points with `MultiplayerGuard.IsMultiplayer()`.
+6. **Single-player only (until 2.0 Phase 4).** Guard new entry points with
+   `MultiplayerGuard.IsMultiplayer()`. `docs/plans/dayswork-2.0.md` replaces this rule with a
+   host/client `Authority` split; until it lands, treat multiplayer as unsupported.
 7. **Verify game content — never guess.** Warp/entrance tiles, item ids, qualified ids, building
    ids, category numbers, event/data keys, animal data, etc. must be confirmed against the actual
    game data or a decompile before use — not recalled from memory. When you investigate and confirm
@@ -112,16 +117,23 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
 
 ## Where things live
 
-- `Dayswork/Orchestration/` — the shift engine. `ShiftOrchestrator.*` partials drive the tick
-  loop and the state-machine transitions; **all mutable per-shift state lives on `ShiftSession`**
-  (created at shift start, discarded at shift end — a fresh session is the reset), which also
-  holds the per-shift `ManagedShoppingCoordinator` (store trips) and `DepositTripRunner`
-  (chest/bin deposit trips). Day-start scheduler, work scanning, and animal handling live
-  alongside. All cross-location movement (building doors, expansion hops, store trips) runs
+- `Dayswork/Orchestration/` — the shift engine. `ShiftFleet` owns **one `ShiftOrchestrator` per
+  live shift** and is the single subscriber to the game events, fanning out to each orchestrator
+  **sequentially** — that sequencing is the concurrency model, since each worker's guarded
+  vanilla-API beat runs synchronously inside one callback and two workers must never interleave
+  their `Game1.player` snapshot/restore. `FleetDay` holds the state shared by the day's shifts
+  (`WorkClaimRegistry`, a `ShoppingBudgetLedger` per wallet, the crop-HUD dedup reset).
+  `ShiftOrchestrator.*` partials drive the tick loop and the state-machine transitions; **all
+  mutable per-shift state lives on `ShiftSession`** (created at shift start, discarded at shift end
+  — a fresh session is the reset), which also carries the shift's `OfficeId`/`OwnerId` and holds the
+  per-shift `ManagedShoppingCoordinator` (store trips) and `DepositTripRunner` (chest/bin deposit
+  trips). Day-start scheduler, work scanning, and animal handling live alongside. All cross-location movement (building doors, expansion hops, store trips) runs
   through one primitive: `Travel.cs` (`TravelPlan` + `TravelRunner`), with the completion
   dispatch in `ShiftOrchestrator.Travel.cs`.
 - `Dayswork/Integration/` — building definition + interaction, persistence, config/GMCM, chest and
-  shop resolution.
+  shop resolution. `OfficeResolver` finds offices (by id, by tile, or all of them); `OfficeModData`
+  owns the office's `modData` keys and `OfficeContractPersistence` is the only thing that writes
+  them — including the one-time 1.x → 2.0 contract adoption.
 - `Dayswork/UI/` — the hub-and-spoke hiring menus + a small layout toolkit (`UI/Layout/`).
 - `Dayswork/Worker/` — the NPC, movement driver, tool animation.
 - `Dayswork/Compat/` — SVE / farm-expansion support (vanilla path is a no-op).
@@ -154,9 +166,11 @@ The load-bearing ones are called out below.
   (`UniqueMultiplayerID == Game1.player`'s) and vanilla gates machine collect (`Object.cs:4626`) and
   tree XP/stats (`Tree.cs:1498/1514`) on it, so the worker's fake action farmer must keep the
   host's id; where `gainExperience` routes XP for local / remote-online (game message 17) / offline
-  (silently dropped) farmers; `Building.owner` is set in `buildStructure`; painting needs a
-  `Data/PaintData` entry, not just a `_PaintMask`. Backs `docs/plans/dayswork-2.0.md`. Confirmed
-  2026-09-07.
+  (silently dropped) farmers; `Building.owner` is set in `buildStructure`; `Building.id` is a
+  serialized, synced per-instance `NetGuid` (survives a move, dies with demolition) and
+  `BuildingData.BuildCondition` defaults to always-available — together the basis for keying a
+  contract to its office; painting needs a `Data/PaintData` entry, not just a `_PaintMask`. Backs
+  `docs/plans/dayswork-2.0.md`. Confirmed 2026-09-07.
 - `docs/game-data/pathing.md` — the worker passability probe (`IsTilePassableForWorker`, inset `+1/62` rect), the verified `isCollidingPosition(character: null, …)` block table (**FarmAnimals do NOT block** — the animal loop is skipped when `character` is null), the Core `GridPathfinder`/`PassabilityGrid` BFS extraction (N,E,S,W tie-break is load-bearing), and the per-shift `LocationPassabilityCache` (which call sites are cached vs. live, the staleness contract, and the three invalidation mechanisms). Built 2026-07-07.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
@@ -189,12 +203,21 @@ ids in `HiringBuilding.BuildData`.
 
 ## Current state
 
-Builds clean and runs. Working today: build the office and hire from its bulletin board; the
+Builds clean and runs. **2.0 Phase 1 landed 2026-09-07** (branch `dayswork-2.0`, in-game smoke
+pass still owed): the farm may hold **any number of offices, one farmhand each**. A contract belongs
+to its office — stored in that building's `modData` under schema v4, keyed by `Building.id`, carrying
+an `OwnerId`/`OfficeId`/`Revision`. `ShiftFleet` runs one `ShiftOrchestrator` per live shift, fanned
+out sequentially, with a per-day `WorkClaimRegistry` arbitrating overlapping scopes and a
+`ShoppingBudgetLedger` per wallet keeping two workers from spending the same gold. A 1.x save's
+contract is adopted onto its office on first load. Demolishing an office ends its shift and takes its
+contract (no refund). Everything below still holds, now per office.
+
+Working today: build an office and hire from its bulletin board; the
 hiring flow (tasks, zone-draw work scope, output chests, energy tier, task priority, one-time vs
 recurring schedule, managed crops, **Manage Machines**, **Manage Fish Ponds**); the full shift loop
 (animal care, crops, fieldwork, managed-crop planting with auto-buy, **machine collect/reload**,
 **fish-pond collect**, multi-trip deposits, overflow safety, stuck recovery, 8pm cap, sleep settle);
-save/load persistence; evening office lighting/smoke; optional GMCM config; and SVE expansion
+save/load persistence; per-office evening lighting/smoke; optional GMCM config; and SVE expansion
 compatibility. **Manage Machines** (2026-06-19) is built, unit-tested, and **passed its in-game smoke
 pass (milestone 8) on 2026-06-28 — release-ready**: worker collect/reload, fish-smoker (fish+coal) and
 dehydrator (×5) loads, flavored-roe round-trip, filtered loads, and the **per-group fetch-first

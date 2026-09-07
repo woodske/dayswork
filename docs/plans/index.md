@@ -35,7 +35,7 @@ live in [`../analysis/`](../analysis/index.md) and carry no status. Verified gam
 
 | Plan | Status | Depends on | Verify (state of the code, not the doc) |
 |---|---|---|---|
-| [dayswork-2.0](dayswork-2.0.md) — N offices, ownership, multiplayer, appearance, painting (six phases) | `IN PROGRESS 2026-09-07` — **Phase 0 done**; Phases 1–5 not started | — | Phase 0: `grep -rni cabin Dayswork Dayswork.Tests` → only the footprint comment. Phase 1: `grep -rn "class ShiftFleet\|class OfficeContractStore" Dayswork/` hits and `grep -rn OnePerFarmBuildCondition Dayswork/` is empty. Phase 2: `grep -rn "Game1\.player\.Money" Dayswork/` is empty. Phase 3: `ls Dayswork/assets/farmhand_PaintMask.png`. Phase 4: `grep -rn "class MultiplayerGuard" Dayswork/` is empty and `grep -rn "PeerContextReceived" Dayswork/` hits. Phase 5: `grep -rn "Data/PaintData" Dayswork/` hits. |
+| [dayswork-2.0](dayswork-2.0.md) — N offices, ownership, multiplayer, appearance, painting (six phases) | `IN PROGRESS 2026-09-07` — **Phases 0 and 1 built** on branch `dayswork-2.0`, build + 693 tests green; Phase 1 owes its in-game smoke pass (see its acceptance list). Phases 2–5 not started | — | Phase 0: `grep -rni cabin Dayswork Dayswork.Tests` → only the footprint comment. Phase 1: `grep -rn "class ShiftFleet\|class OfficeContractStore" Dayswork/` hits and `grep -rn OnePerFarmBuildCondition Dayswork/` is empty. Phase 2: `grep -rn "Game1\.player\.Money" Dayswork/` is empty. Phase 3: `ls Dayswork/assets/farmhand_PaintMask.png`. Phase 4: `grep -rn "class MultiplayerGuard" Dayswork/` is empty and `grep -rn "PeerContextReceived" Dayswork/` hits. Phase 5: `grep -rn "Data/PaintData" Dayswork/` hits. |
 
 ### Notes
 

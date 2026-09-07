@@ -4,6 +4,13 @@
 
 ### Added
 
+- You can now build more than one Farmhand Office, and hire a farmhand from each. Every office has
+  its own contract, its own worker, and its own porch chests; each worker starts and finishes at its
+  own office door, and each office lights up in the evening when its own farmhand is done.
+- When two contracts cover the same crops, animals, machines or fish ponds, the work is only done
+  once — whichever farmhand gets there first takes it.
+- The crop zone drawing screen now shades the crop areas already claimed by another office's
+  farmhand, so you can see where someone is already working. Those tiles stay selectable.
 - You can now name your farmhand from the contract's Preferences screen. The name shows up in
   notifications and on the contract screen.
 - A machine group's input chest can now live in any location — the farmhand makes a trip to fetch
@@ -15,11 +22,13 @@
 
 ### Changed
 
+- Farmhands no longer plan a shopping trip for gold another farmhand is already on the way to
+  spend, so two workers can't both set out and leave one arriving at an empty till.
 - The farmhand building is now called the Farmhand Office everywhere, instead of the Farmhand
   Cabin. Its two porch chests are named "Farmhand Office - Input" and "Farmhand Office - Output",
   and the menus and notices that mention them were reworded to match.
-- The office screen is now a single "Contract" page showing the one contract you have, instead of
-  a scrollable list of contracts.
+- Clicking an office opens a single "Contract" page for that office's own contract, instead of a
+  scrollable list of every contract on the farm.
 - New contracts now default to managing machines when they finish their assigned work early,
   instead of going straight home. Existing contracts keep whatever you set.
 - The farmhand works crop fields row by row instead of always heading for the nearest tile, which
@@ -32,8 +41,12 @@
 
 ### Fixed
 
+- Demolishing a Farmhand Office now ends that farmhand's shift safely — anything it was carrying is
+  delivered or shipped rather than lost. The office's contract goes with the building, and its fee
+  is not refunded.
 - Saves made with an older build could keep extra hidden contracts that were charged for every
-  morning without a farmhand ever showing up. They are now cancelled when the save loads.
+  morning without a farmhand ever showing up. Loading such a save now keeps only the contract you
+  could actually see and attaches it to your office; the rest are dropped.
 - Fruit trees the player isn't standing next to — greenhouse trees especially — stopped dropping
   fruit after the first shake of the save.
 - Gates could be left hanging open when the farmhand's route changed partway through a walk.

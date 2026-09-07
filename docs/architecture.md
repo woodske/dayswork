@@ -2,9 +2,9 @@
 
 ## Overview
 
-Dayswork is a single-player SMAPI mod that lets the player construct a farm building
-(`Bindicle.Dayswork_Office`) and hire an NPC farmhand from it. The farmhand spawns just outside the
-office's human door each morning, **physically walks** the farm performing the contract's configured
+Dayswork is a single-player SMAPI mod that lets the player construct farm buildings
+(`Bindicle.Dayswork_Office`) — any number of them, one farmhand each — and hire an NPC farmhand from
+each. A farmhand spawns just outside its own office's human door each morning, **physically walks** the farm performing the contract's configured
 tasks (water/harvest crops, collect fruit, animal care, clear rocks/weeds/grass/trees, plus full
 "managed crop" lifecycle), deposits output into the player's designated chests, and returns to that
 same door tile to clock out. The player pays **upfront** for a block of worker energy (labor
@@ -13,9 +13,9 @@ capacity). The mod is
 never lost — anything undelivered is mailed back via the building's output chest / shipping bin),
 and uses **zero Harmony patches** — everything is driven by SMAPI events.
 
-*Single-player* is a current property, not a permanent one: the one-office / one-worker /
-`Game1.player`-is-the-sponsor assumptions described below are what
-[`plans/dayswork-2.0.md`](plans/dayswork-2.0.md) sets out to replace. Until that plan lands, every
+*Single-player* is a current property, not a permanent one. The one-office / one-worker
+assumptions are gone (2.0 Phase 1); `Game1.player`-is-the-sponsor is what
+[`plans/dayswork-2.0.md`](plans/dayswork-2.0.md) replaces next. Until its Phase 4 lands, every
 statement here about "the player" means the local, only player.
 
 ## Project structure & the Core-purity rule
@@ -145,7 +145,15 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 
 ## Shift execution loop
 
-`DayStarted` → `RecurringContractScheduler` → `ShiftOrchestrator.StartShift`:
+`DayStarted` → `RecurringContractScheduler` → `ShiftFleet.StartShift` → `ShiftOrchestrator.StartShift`.
+The scheduler starts **every office whose contract is due today**, in deterministic hire order
+(earliest hire first, contract id as tiebreak) so wallet charges and work-claim priority are stable
+day to day, and each contract is evaluated inside its own try/catch so one bad contract cannot stop
+the other offices' farmhands. The fleet then fans every game event out to the live orchestrators
+sequentially. Where two contracts' scopes overlap, the day's `WorkClaimRegistry` gives each work
+item — tile+task, animal, machine, pond, managed dirt — to the first shift to queue it; claims are
+idempotent for their owner and are never released, so a claimed-but-unworked item simply waits until
+tomorrow. Per shift:
 
 1. Snapshot player tool levels; normalize scope to live locations; classify work scopes.
 2. `ShiftPlanBuilder` orders the day into **batches**: per animal building (interior feed/pet/
@@ -153,8 +161,10 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
    managed-crop batches, greenhouses, outdoor crops, outdoor clearing. `WorkAreaScanner` populates
    each batch's tile/animal work.
 3. If no applicable work exists, **no worker spawns**. Otherwise spawn `FarmhandNpc` just outside
-   the office's human door (`ResolveSpawnExitTile` → `FindHiringBuilding` +
-   `getPointForHumanDoor()`); the same tile is the return point at shift end. The farm-entrance
+   **this contract's own** office's human door (`ResolveSpawnExitTile` → `OfficeResolver.TryGet` +
+   `getPointForHumanDoor()`); the same tile is the return point at shift end. Each worker's NPC name
+   is per office (`DaysworkFarmhand_<office id>`) so N of them never collide in the game's
+   name-based lookups, with `getTextureName()` pinned to the shared sheet. The farm-entrance
    heuristic (`FindFarmExitTile`, from `farm.warps`, expansion-overridable) is only the fallback
    when no office exists.
 

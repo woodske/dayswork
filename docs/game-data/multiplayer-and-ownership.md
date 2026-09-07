@@ -77,6 +77,25 @@ experiencePoints[which] += howMuch;
 - The game uses it for `Building.hasCarpenterPermissions()` (`Building.cs:364`): host always,
   otherwise `owner == Game1.player.UniqueMultiplayerID`.
 
+## `Building.id` — the stable per-building identity
+
+Confirmed 2026-09-07 while building Dayswork 2.0 Phase 1, which keys each contract to its office by
+this value.
+
+- `Building.id` is a `NetGuid` (`Building.cs`, `[XmlElement("id")]`), documented as "A unique
+  identifier for this specific building instance", added to `NetFields` alongside `owner` and
+  `modData`.
+- The parameterless `Building()` constructor assigns `id.Value = Guid.NewGuid()`. It is
+  XML-serialized, so a building keeps the same id across saves, and it is a net field, so clients
+  see the host's value.
+- Consequences for keying data to a building: the id survives **moving** the building (the same
+  instance is repositioned) and dies with **demolition** (the instance leaves `farm.buildings`),
+  which is exactly the lifetime a per-building contract wants. A rebuilt building is a new instance
+  and gets a new id — it does not inherit the old one's data.
+- `Building.BuildCondition` (`StardewValley.GameData.Buildings.BuildingData`) is optional and
+  documented as "Defaults to always available" — omitting it places no cap on how many of the
+  building the farm may have.
+
 ## Player lookup on the host
 
 - `Game1.GetPlayer(long id, bool onlyOnline = false)` (`Game1.cs:10937`) returns the master player,

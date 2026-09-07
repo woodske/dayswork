@@ -13,6 +13,9 @@ internal sealed class ZoneDrawOverlay : IDisposable
 {
     private static readonly Color DragPreviewFillColor = new(144, 238, 144, 255);
 
+    // Other farmhands' managed crops — light-purple informational wash (already alpha-scaled).
+    private static readonly Color OtherWorkerZoneFillColor = new Color(178, 132, 235) * 0.4f;
+
     private readonly IZoneDrawSource _source;
     private Texture2D? _pixelTexture;
     private bool _disposed;
@@ -33,6 +36,12 @@ internal sealed class ZoneDrawOverlay : IDisposable
         // Tile grid — rendered beneath zone fills; only shown while actively drawing (user requested)
         if (_source.IsInZoneDrawMode)
             DrawTileGrid(e.SpriteBatch);
+
+        // Other farmhands' managed-crop zones — informational only, still selectable. Drawn first so
+        // this session's own green selection / red protection layers render on top where they overlap.
+        // Highlights valid plantable tiles only (crop layer), matching how the worker would work them.
+        foreach (var zone in _source.OtherWorkerZones)
+            DrawZoneOrTiles(e.SpriteBatch, zone.TopLeft, zone.BottomRight, OtherWorkerZoneFillColor);
 
         // Completed zones — semi-transparent fill in the layer's color. General scope fills the whole
         // rectangle (O(zone count)); the managed-crop layer highlights only valid plantable tiles.

@@ -170,12 +170,22 @@ internal sealed partial class ShiftOrchestrator
 
             if (state == MachineReadyState.ReadyToCollect)
             {
+                if (!TryClaimMachine(machineRef))
+                {
+                    DevLog.Log($"[Dayswork][machines] skip ({machineRef.Tile.X},{machineRef.Tile.Y}) — claimed by another worker today.", LogLevel.Debug);
+                    continue;
+                }
                 readyToCollect.Add(machineRef.Tile);
                 if (wantsReload && live.GetMachineData() is { } collectData)
                     reloadable.Add((machineRef, live, collectData));
             }
             else if (state == MachineReadyState.Empty && wantsReload && live.GetMachineData() is { } emptyData)
             {
+                if (!TryClaimMachine(machineRef))
+                {
+                    DevLog.Log($"[Dayswork][machines] skip ({machineRef.Tile.X},{machineRef.Tile.Y}) — claimed by another worker today.", LogLevel.Debug);
+                    continue;
+                }
                 reloadable.Add((machineRef, live, emptyData));
             }
             else
@@ -206,6 +216,24 @@ internal sealed partial class ShiftOrchestrator
         if (plan is not null && chestRef is not null && plan.HasWork)
             Session.MachineReloads.Enqueue(new MachineReloadJob(group, chestRef, plan));
     }
+
+    // Machines are claimed only when they'd actually produce a step (ready to collect, or empty
+    // and reloadable) — a busy machine stays unclaimed so whichever contract reaches it after it
+    // finishes gets it.
+    private bool TryClaimMachine(MachineRef machineRef) =>
+        _day is null || _day.Claims.TryClaim(
+            WorkClaimKey.Machine(machineRef.LocationName, machineRef.Tile),
+            Session.Ctx.ContractId);
+
+    // A machine another contract has already claimed today can never produce a step for this worker
+    // (PlanMachineGroup's TryClaimMachine gate skips it). The read-only "is anything serviceable"
+    // probes must mirror that gate, or a machine claimed by another farmhand reads as "ready"
+    // forever: the idle-wait probe wakes, the planner finds it claimed and queues nothing, the batch
+    // completes, we run off the end, re-enter idle, and spin every tick (log spam + framerate drop).
+    private bool IsMachineClaimedByOther(MachineRef machineRef) =>
+        _day is not null && _day.Claims.IsClaimedByOther(
+            WorkClaimKey.Machine(machineRef.LocationName, machineRef.Tile),
+            Session.Ctx.ContractId);
 
     /// <summary>
     /// Builds the load plan for one group's reloadable machines: validates the input chest is usable,
@@ -288,6 +316,11 @@ internal sealed partial class ShiftOrchestrator
         {
             var live = _machineReader.Resolve(location, machineRef.Tile, machineRef.ExpectedQualifiedId);
             if (live is null)
+                continue;
+
+            // Mirror PlanMachineGroup's claim gate: a machine owned by another contract yields no
+            // step for us, so it must not count as ready (else the idle-wait probe spins forever).
+            if (IsMachineClaimedByOther(machineRef))
                 continue;
 
             var state = _machineReader.Classify(live);
