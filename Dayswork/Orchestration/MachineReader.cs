@@ -40,7 +40,7 @@ internal enum MachineReadyState
 /// input chest's contents — produces the pure <see cref="MachineLoadCandidate"/>s the
 /// <see cref="MachineInputPlanner"/> consumes. Performs no mutation (every API call is probe-only).
 ///
-/// Schema/API verified in <c>docs/machines.md</c>; per-entry recipe facts (fish-smoker coal,
+/// Schema/API verified in <c>docs/game-data/machines.md</c>; per-entry recipe facts (fish-smoker coal,
 /// dehydrator ×5, keg flavoring) are read live here rather than hard-coded.
 /// </summary>
 internal sealed class MachineReader

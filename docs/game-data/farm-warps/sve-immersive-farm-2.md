@@ -5,7 +5,7 @@
 - **Size:** 163 × 156 (largest farm map)
 - **Farm signature in code:** `FarmMapSignature(163, 156)` —
   **no entrance override currently set** in
-  [`SveExpansionProfile.cs`](../../Dayswork.Core/Compat/SveExpansionProfile.cs).
+  [`SveExpansionProfile.cs`](../../../Dayswork.Core/Compat/SveExpansionProfile.cs).
   If one is ever needed, the main bus entrance is **`(128,30)`** (see below).
 
 > IF2R is a big multi-zone map with many *internal* `Farm → Farm` warps that move

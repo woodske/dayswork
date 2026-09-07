@@ -108,7 +108,7 @@ internal sealed class ShiftSession
 
     // ── Dev-only worker-action leak audit (gated by DevLog.Enabled) ───────────
     // Counts worker-created item-debris that vanilla mis-routed into the player's location instead
-    // of the work location (see InvokeTaskActionGuarded + docs/debris-and-drops.md). Recovered =
+    // of the work location (see InvokeTaskActionGuarded + docs/game-data/debris-and-drops.md). Recovered =
     // caught by the guard's foreign sweep; stranded = survived recovery — the real tripwire, which
     // should stay 0. Surfaced via dayswork_debug_leaks and the shift-end summary.
     public int LeakBeatsObserved;

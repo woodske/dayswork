@@ -66,6 +66,9 @@ internal sealed partial class ShiftOrchestrator
     /// batch-entry trip could start, be serviced, and get the worker home before the 8pm hard cap,
     /// so the headroom constant can be calibrated from real play before the actual skip-gate is
     /// enabled. Never changes behavior; gated by <c>DevLog.Enabled</c> so it's absent from release.
+    /// <para>The plan was parked incomplete on 2026-09-07 and the skip-gate was never enabled —
+    /// this measurement code is the resume point, not dead code. See
+    /// <c>docs/plans/archive/time-aware-wrapup.md</c>.</para>
     /// </summary>
     private void MeasureWrapUpFit(TravelPlan plan)
     {

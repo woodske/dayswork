@@ -13,7 +13,7 @@ namespace Dayswork.Integration;
 // Singleton — constructed once in ModEntry. All methods query game state fresh on each call.
 internal sealed class ChestResolver
 {
-    // Auto-Grabber (verified (BC)165 against Stardew Valley.dll, 2026-07-05; see docs/chests.md).
+    // Auto-Grabber (verified (BC)165 against Stardew Valley.dll, 2026-07-05; see docs/game-data/chests.md).
     // Its collected animal products live in heldObject.Value as a Chest, so a grabber can serve as a
     // machine input chest. Confirmed against a decompile per hard rule 7.
     internal const string AutoGrabberQualifiedId = "(BC)165";

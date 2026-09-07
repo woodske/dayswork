@@ -1,13 +1,14 @@
-# Plan — Multi-target stand coverage ("Option D")
+# Design record — Multi-target stand coverage ("Option D")
 
-Proposed 2026-07-03; status is tracked in [index.md](index.md), not here. This document records the
-design discussion so the idea isn't re-derived later.
+Proposed 2026-07-03; deferred. Indexed in [index.md](index.md). This document records the design
+discussion so the idea isn't re-derived later — if it is ever scheduled, it gets a plan file in
+[`../plans/`](../plans/index.md).
 
 Both prerequisites are met. The managed-crop serpentine ordering fix ("Option A") shipped
 2026-07-03 and passed its smoke pass 2026-07-07, so this plan is eligible for its re-measure — *is
 coverage planning still worth building on top of the sweep?* And the passability snapshot it
 requires as input shipped with the 2026-07-07 review (see
-[archive/architecture-review-2026-07-07.md](archive/architecture-review-2026-07-07.md) → #2).
+[../plans/archive/architecture-review-2026-07-07.md](../plans/archive/architecture-review-2026-07-07.md) → #2).
 
 ## Problem
 
@@ -73,7 +74,7 @@ visits.
 actions. Per action within a visit: re-check `IsManagedActionApplicable`, face the target
 (`FacingToward` already handles diagonal targets), play the tool swing, run the beat through
 `RunGuardedWorkerBeat` (sound-location redirect + leak sweep, unchanged — see
-`docs/sound-cues.md`), spend stamina. The visit advances to its next action when the swing
+`docs/game-data/sound-cues.md`), spend stamina. The visit advances to its next action when the swing
 completes; the existing tick/`ActionPending` machinery generalizes from "one action then move" to
 "next action in visit, else move".
 

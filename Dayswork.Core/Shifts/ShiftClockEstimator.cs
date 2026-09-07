@@ -11,7 +11,7 @@ namespace Dayswork.Core.Shifts;
 /// 60 UPS (~16.667 ms/tick) → ~42 ticks per in-game minute. A location can only *slow* time (via
 /// <c>ExtraMillisecondsPerInGameMinute</c>), never speed it up, so ignoring it makes the estimate
 /// more pessimistic — which is the safe direction for a "will it fit" gate. See
-/// <c>docs/time-and-pacing.md</c>.</para>
+/// <c>docs/game-data/time-and-pacing.md</c>.</para>
 /// </summary>
 public static class ShiftClockEstimator
 {

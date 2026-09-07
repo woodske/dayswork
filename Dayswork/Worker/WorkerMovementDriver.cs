@@ -20,7 +20,7 @@ internal sealed class WorkerMovementDriver
     // the worker has actually opened and not yet closed. Gates are opened lazily as the worker
     // reaches them (never all at once at plan time) and every opened gate is closed — on pass, or on
     // Clear/Warp if the route is abandoned mid-walk — so none leaks open (a leaked off-screen gate
-    // never auto-closes; see docs/fences-and-gates.md).
+    // never auto-closes; see docs/game-data/fences-and-gates.md).
     private readonly HashSet<Point> _routeGateTiles = new();
     private readonly HashSet<Point> _openedGates = new();
 

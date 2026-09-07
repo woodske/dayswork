@@ -417,7 +417,7 @@ internal sealed partial class ShiftOrchestrator
         // FruitTree.tickUpdate, which runs only for Game1.currentLocation. When the player isn't in
         // this location (e.g. greenhouse) it never ticks, so a prior shake's maxShake stays > 0 and
         // every later shake(tile, false) is a no-op — the animation replays but fruit never clears.
-        // Forcing the shake bypasses the frozen guard. See docs/debris-and-drops.md.
+        // Forcing the shake bypasses the frozen guard. See docs/game-data/debris-and-drops.md.
         tree.shake(tileVec, doEvenIfStillShaking: true);
         if (hadFruit && Game1.player.currentLocation == loc)
             loc.playSound("leafrustle", tileVec);

@@ -7,6 +7,10 @@ one place to keep current and one place that can go stale.
 Completed plans are summarised in [`archive/index.md`](archive/index.md) and their plan files
 deleted. Archiving is done by the **`archive-plans` skill** — see the maintenance protocol below.
 
+Research, feasibility studies, and weighed-but-unscheduled design records are **not** plans — they
+live in [`../analysis/`](../analysis/index.md) and carry no status. Verified game content lives in
+[`../game-data/`](../game-data/index.md).
+
 > **Never trust a plan doc's claims about the codebase.** Run the **Verify** command in the table
 > below before starting or resuming any plan. The code is ground truth; this index is a map. The
 > 2026-07-07 review learned this the hard way — item #0's premise ("no tick throttle exists") was
@@ -22,41 +26,48 @@ deleted. Archiving is done by the **`archive-plans` skill** — see the maintena
 | `PARTIAL <date>` | Some phases shipped, the headline deliverable has not |
 | `BLOCKED (→ plan)` | Waiting on another plan or a decision |
 | `DEFERRED <date>` | Designed and consciously not scheduled; the condition to revisit is in the plan |
-| `ANALYSIS` | Research/decision record, not itself implementable |
 | `DONE <date>` | All acceptance criteria met — archive it |
 | `SUPERSEDED (→ plan)` | Made unnecessary by other work; note why |
 
 ## Active plans
 
-*Last verified against code: 2026-08-30.*
+*Last verified against code: 2026-09-07.*
+
+**None.** No plan is currently scheduled or in flight.
 
 | Plan | Status | Depends on | Verify (state of the code, not the doc) |
 |---|---|---|---|
-| [time-aware-wrapup.md](time-aware-wrapup.md) | `PARTIAL 2026-07-07` — Phase 0 (measure-only) shipped; the live skip-gate is **not** enabled, awaiting headroom calibration from real play | — | `grep -rn "MeasureWrapUpFit" Dayswork/Orchestration/` hits (Phase 0 present). The gate is live when `DayEndingSoon` is passed to `QueueWrapUpNow` — not just declared on `ShiftStopReason` |
-| [stand-coverage-routing.md](stand-coverage-routing.md) | `DEFERRED 2026-07-03` — prerequisite met 2026-07-07; awaiting a re-measure against real shift timings | passability grid (shipped) | `grep -rn "StandCoveragePlanner" Dayswork.Core/` — no hits means not started |
-| [multiplayer-readiness.md](multiplayer-readiness.md) | `ANALYSIS` — Dayswork is single-player by design; this is the effort estimate and support model, not scheduled work | — | `Dayswork/Guards/MultiplayerGuard.cs` still returns a blanket `Context.IsMultiplayer`, and no host-authority layer exists |
+| — | — | — | — |
 
-### Notes on the active three
+### Notes
 
-- **time-aware-wrapup** is the only one with code in flight. What remains is not a build task first:
-  collect a play-day or two of `[Dayswork][wrapup-measure]` lines, confirm `would-skip` fires only
-  for genuinely-doomed late trips (not at 6pm), calibrate `WrapUpWorkHeadroomMinutes` (provisional
-  10) from that data, *then* replace the measurement log with the real gate.
-- **stand-coverage-routing** is a design record kept so the idea isn't re-derived. Its gate is a
-  measurement, not a dependency — the serpentine ordering fix it was to be measured against shipped
-  2026-07-03 and passed its smoke pass 2026-07-07.
-- **multiplayer-readiness** stays here rather than in `docs/` because it describes work that could be
-  scheduled; nothing in it has been implemented. Do not advertise the mod as multiplayer-ready.
+**time-aware-wrapup** was parked and archived on 2026-09-07 without being completed — see
+[archive/time-aware-wrapup.md](archive/time-aware-wrapup.md). Its Phase-0 code (`ShiftClockEstimator`,
+its tests, and the DevLog-gated `MeasureWrapUpFit`) is **still live in the tree and
+behavior-neutral**; it is the resume point, not dead code. Pull the plan back out of the archive if
+the work is picked up again.
 
-## Recently completed
+Two further entries moved to [`../analysis/`](../analysis/index.md) — neither is scheduled work, so
+neither carries a status any more:
 
-Full write-ups — why, and what was decided — are in the archive.
+- **[stand-coverage-routing](../analysis/stand-coverage-routing.md)** — a design record kept so the
+  idea isn't re-derived. Its gate is a measurement, not a dependency; the serpentine ordering fix it
+  was to be measured against shipped 2026-07-03 and passed its smoke pass 2026-07-07. Verify with
+  `grep -rn "StandCoveragePlanner" Dayswork.Core/` — no hits means not started.
+- **[multiplayer-readiness](../analysis/multiplayer-readiness.md)** — a feasibility study, not a
+  plan. Nothing in it has been implemented; do not advertise the mod as multiplayer-ready.
+
+## Recently archived
+
+Full write-ups — why, and what was decided — are in the archive. Everything below **shipped**,
+except the parked entry, which is called out as such.
 
 | Work | Landed | Archived in |
 |---|---|---|
 | Architecture review items #0–#7 (pathfinding/passability cache, batch ordering, work-activity list, deposit ordering, pathing polish) | 2026-07-07 | [archive/architecture-review-2026-07-07.md](archive/architecture-review-2026-07-07.md) |
 | Manage Machines (+ auto-grabber and cross-location input chests) | 2026-06-19 → 2026-07-06 | [archive/machine-and-pond-management.md](archive/machine-and-pond-management.md) |
 | Manage Fish Ponds, and the flavored/quality preservation pipeline | 2026-06-23 | [archive/machine-and-pond-management.md](archive/machine-and-pond-management.md) |
+| Time-aware wrap-up (#5) — **parked, not completed**; only the measure-only Phase 0 shipped | Phase 0: 2026-07-07; parked 2026-09-07 | [archive/time-aware-wrapup.md](archive/time-aware-wrapup.md) |
 
 Work shipped without its own plan file (tracked in `AGENTS.md` → "Current state"): serpentine sweep
 routing (2026-07-03).
@@ -80,9 +91,13 @@ routing (2026-07-03).
    verified* date.
 
 **When adding a new plan:**
-6. Add a row with a **Verify** command that detects its done-state from the code alone.
+6. Add a row with a **Verify** command that detects its done-state from the code alone. If the
+   document is research or a tradeoff record rather than schedulable work, it belongs in
+   [`../analysis/`](../analysis/index.md) instead — index it there and give it no status.
 
 **When archiving:**
 7. Run the **`archive-plans` skill**. It folds `DONE` plans into an artifact under `archive/`,
    updates both indexes, repoints cross-references, and deletes the plan file. Do not archive by
-   hand, and do not archive a plan whose headline deliverable has not shipped.
+   hand, and do not archive a plan whose headline deliverable has not shipped **unless the user
+   explicitly parks it** — a parked plan's artifact must say so at the top, keep the design sketch
+   (there is no code to serve as the record), and state what is still live in the tree.

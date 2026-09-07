@@ -19,7 +19,7 @@ namespace Dayswork.Orchestration;
 ///
 /// Collection is a direct field write (capture <c>pond.output.Value</c>, null it, credit the buffer),
 /// which avoids the player-inventory/HUD/xp entanglement of <c>FishPond.doAction</c> — so no fake
-/// worker <c>Farmer</c> or action guard is needed (see <c>docs/machines.md</c> → "Fish ponds").
+/// worker <c>Farmer</c> or action guard is needed (see <c>docs/game-data/machines.md</c> → "Fish ponds").
 /// </summary>
 internal sealed partial class ShiftOrchestrator
 {

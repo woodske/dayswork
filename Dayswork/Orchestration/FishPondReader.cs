@@ -12,7 +12,7 @@ namespace Dayswork.Orchestration;
 ///
 /// Fish ponds are <c>Building</c>s (in <c>location.buildings</c>), not <c>Data/Machines</c> objects,
 /// so identity is purely <c>(location, tileX/tileY)</c> — there is no qualified item id. Collect-only:
-/// the player stocks the fish and supplies any capacity-quest item. See <c>docs/machines.md</c> →
+/// the player stocks the fish and supplies any capacity-quest item. See <c>docs/game-data/machines.md</c> →
 /// "Fish ponds" for the verified API.
 /// </summary>
 internal sealed class FishPondReader

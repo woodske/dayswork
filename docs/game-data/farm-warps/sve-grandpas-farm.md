@@ -4,7 +4,7 @@
 - **Map asset:** `Maps/Farm` ← loaded from `assets/Maps/GrandpasFarm.tbin`
 - **Size:** 140 × 93
 - **Farm signature in code:** `FarmMapSignature(140, 93)` → entrance override `(112,51)`
-  in [`SveExpansionProfile.cs`](../../Dayswork.Core/Compat/SveExpansionProfile.cs)
+  in [`SveExpansionProfile.cs`](../../../Dayswork.Core/Compat/SveExpansionProfile.cs)
 
 > This farm relies on **`TouchAction: LoadMap` pedestrian tiles** for almost every
 > real exit. The `Warp` edge property only covers the cave, an unused tunnel, a

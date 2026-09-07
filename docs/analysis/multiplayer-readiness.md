@@ -1,6 +1,7 @@
 # Multiplayer Readiness Analysis
 
-Analysis only — status is tracked in [index.md](index.md), not here.
+Research record — indexed in [index.md](index.md). Not a scheduled plan; if this work is ever
+scheduled it gets its own file in [`../plans/`](../plans/index.md).
 
 Dayswork is **not multiplayer-ready today**. The current implementation is
 intentionally single-player: key player entry points return early in multiplayer, and the shift

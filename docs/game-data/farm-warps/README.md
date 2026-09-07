@@ -57,7 +57,7 @@ across all vanilla farm types. Their return warps point at fixed `Farm` tiles:
 
 ## Regenerating this data
 
-Tooling lives in [`.tools/MapWarpDump/`](../../.tools/MapWarpDump). It loads maps
+Tooling lives in [`.tools/MapWarpDump/`](../../../.tools/MapWarpDump). It loads maps
 with the game's own `xTile.dll` (for `.tbin`) / MonoGame `ContentManager` (for
 compiled `.xnb`) and a small Python parser for Tiled `.tmx`, then dumps warp
 JSON. See that folder for the exact commands. Requires the game installed and

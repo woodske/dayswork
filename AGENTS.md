@@ -14,9 +14,15 @@ See **`docs/architecture.md`** for the full subsystem map and the shift loop. St
 from **`Dayswork/ModEntry.cs`** — it's the hand-wired composition root (no DI container); every
 service and the SMAPI event it hangs off is visible there.
 
-Planned work is tracked in **`docs/plans/index.md`** — plan status lives *only* there, never in the
-plan files. Completed plans are summarised in `docs/plans/archive/` (why the work was done and what
-was decided) and their plan files deleted; archiving is done by the `archive-plans` skill.
+`docs/` is split three ways, each folder with its own index:
+
+- **`docs/plans/`** — implementation plans. Status lives *only* in `docs/plans/index.md`, never in
+  the plan files. Completed plans are summarised in `docs/plans/archive/` (why the work was done and
+  what was decided) and their plan files deleted; archiving is done by the `archive-plans` skill.
+- **`docs/analysis/`** — research, feasibility studies, and weighed design tradeoffs. No status; the
+  value is the reasoning. Indexed in `docs/analysis/index.md`.
+- **`docs/game-data/`** — verified Stardew/SVE content (see "Verified game-content references"
+  below). Indexed in `docs/game-data/index.md`.
 
 **Update `CHANGELOG.md` whenever a change lands that a player would notice** — a new feature, a
 behavior change, or a bug fix. Add it to the `## Unreleased` section under `Added` / `Changed` /
@@ -30,10 +36,10 @@ never shipped in a release get no entry.
 - SMAPI logs: `%APPDATA%\StardewValley\ErrorLogs\SMAPI-latest.txt` (resolves to `C:\Users\kwood\AppData\Roaming\StardewValley\ErrorLogs\`)
 - Stardew Valley Expanded source: `C:\Users\kwood\Repos\StardewValleyExpanded`
 
-Use `docs/game-content-search.md` for the fastest way to search/parse the base game and SVE
+Use `docs/game-data/game-content-search.md` for the fastest way to search/parse the base game and SVE
 trees. Per hard rule 7, verify ids, tiles, qualified ids, event keys, data fields, and runtime API
 behavior against these local files, runtime data, or a decompile; then record any newly confirmed
-facts under `docs/`. Update `docs/game-content-search.md` if any new search techniques are used.
+facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game-data/game-content-search.md` if any new search techniques are used.
 
 ## Build / deploy
 
@@ -121,26 +127,30 @@ facts under `docs/`. Update `docs/game-content-search.md` if any new search tech
 - `Dayswork/Compat/` — SVE / farm-expansion support (vanilla path is a no-op).
 - `Dayswork.Core/` — domain, capabilities, pricing, energy, shift state machine + planner,
   inventory/deposit, persistence DTOs.
-- `docs/farm-warps/` — per-farm entrance/warp tile reference (vanilla + SVE).
+- `docs/game-data/` — verified game content, indexed in `docs/game-data/index.md`; includes
+  `farm-warps/` (per-farm entrance/warp tiles, vanilla + SVE).
+- `docs/analysis/` — research and design-decision records; `docs/plans/` — implementation plans.
 
 ## Verified game-content references
 
-Confirmed game content lives under `docs/` so it's looked up once, not re-derived each session
-(per hard rule 7). Add to these (or start a new file) whenever you confirm content against game
-data or a decompile, and note where you confirmed it.
+Confirmed game content lives under `docs/game-data/` so it's looked up once, not re-derived each
+session (per hard rule 7). **`docs/game-data/index.md` lists every file with a one-line summary —
+read it before assuming something is unverified.** Add to these (or start a new file) whenever you
+confirm content against game data or a decompile, note where you confirmed it, and add an index row.
+The load-bearing ones are called out below.
 
-- `docs/farm-warps/` — farm entrance/warp + interior-door tiles, vanilla and SVE.
-- `docs/game-content-search.md` — local Stardew/SVE paths, folder maps, and search/parsing tips for
+- `docs/game-data/farm-warps/` — farm entrance/warp + interior-door tiles, vanilla and SVE.
+- `docs/game-data/game-content-search.md` — local Stardew/SVE paths, folder maps, and search/parsing tips for
   base `.xnb`/DLL content, SVE Content Patcher packs, C# source, and `.tmx` maps.
-- `docs/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
-- `docs/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); archived plan in `docs/plans/archive/machine-and-pond-management.md`. Its "Fish ponds" section verifies the `StardewValley.Buildings.FishPond` API (`output` NetRef, `tileX/tileY` identity, direct-null collect, 5×5 footprint) backing Manage Fish Ponds (built 2026-06-23; reader = `Dayswork/Orchestration/FishPondReader.cs`); archived plan in the same file.
-- `docs/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
-- `docs/fences-and-gates.md` — `StardewValley.Fence` gate API (`isGate`, `gatePosition` 0/88, `health > 1f`, `isPassable`, `toggleGate`, `updateWhenCurrentLocation` auto-close rule) backing the worker's open-gates-while-pathing logic in `Dayswork/Worker/WorkerMovementDriver.cs`.
-- `docs/debris-and-drops.md` — which `Game1.create*Debris` overloads route loot to `Game1.currentLocation` vs the passed `location`; the `ResourceClump.destroy()` leak (hardwood/stone spawn at the *player's* location, not the clump's) and the `InvokeTaskActionGuarded` sweep that recovers it.
-- `docs/sound-cues.md` — the **worker-sound invariant** (every worker action emits the player's sound, gated on `Game1.player.currentLocation == location`; silent off-location), the verified cue-per-action table, how to enumerate cue names from the XACT sound bank, and the `IsLocalPlayer` gotcha (vanilla machine-collect `"coin"` won't fire for the fake worker farmer).
-- `docs/chests.md` — `Chest` capacity/special-type API (`SpecialChestTypes.BigChest` → `GetActualCapacity()` 70, serialized so it persists) and why `BuildingData.Chests` can't express capacity — backing the office porch chests being upgraded to Big Chests in `Dayswork/Integration/CabinChestService.cs`; also the wood/stone/big chest id table (`232` is the Stone Chest, not the Big Chest).
-- `docs/time-and-pacing.md` — verified game-clock constants (`realMilliSecondsPerGameMinute = 700`; the `gameTimeInterval > 7000 + ExtraMillisecondsPerInGameMinute*10` ten-minute trigger; ~42 ticks/in-game-minute at 60 UPS) and the tile→minute walk-time conversion backing `Dayswork.Core/Shifts/ShiftClockEstimator.cs` (time-aware wrap-up, #5). Confirmed 2026-07-07.
-- `docs/pathing.md` — the worker passability probe (`IsTilePassableForWorker`, inset `+1/62` rect), the verified `isCollidingPosition(character: null, …)` block table (**FarmAnimals do NOT block** — the animal loop is skipped when `character` is null), the Core `GridPathfinder`/`PassabilityGrid` BFS extraction (N,E,S,W tie-break is load-bearing), and the per-shift `LocationPassabilityCache` (which call sites are cached vs. live, the staleness contract, and the three invalidation mechanisms). Built 2026-07-07.
+- `docs/game-data/zoom-and-viewport.md` — how the frozen farm view zooms/pans (`Game1.options.desiredBaseZoomLevel`, viewport recompute, `getMouseX(false)` zoom-awareness, MonoGame `TouchPanel` for pinch).
+- `docs/game-data/machines.md` — `Data/Machines` schema + machine runtime API (`GetMachineData`, `PlaceInMachine`/`AttemptAutoLoad`, `MachineDataUtility`, `readyForHarvest`/`heldObject`) backing the Manage Machines feature (built 2026-06-19; reader = `Dayswork/Orchestration/MachineReader.cs`); archived plan in `docs/plans/archive/machine-and-pond-management.md`. Its "Fish ponds" section verifies the `StardewValley.Buildings.FishPond` API (`output` NetRef, `tileX/tileY` identity, direct-null collect, 5×5 footprint) backing Manage Fish Ponds (built 2026-06-23; reader = `Dayswork/Orchestration/FishPondReader.cs`); archived plan in the same file.
+- `docs/game-data/farmhand-art.md` — farmhand sprite/portrait dimensions, frame layout, verified NPC/farmer animation constants, and the decision to keep body animation separate from tool/effect sprites.
+- `docs/game-data/fences-and-gates.md` — `StardewValley.Fence` gate API (`isGate`, `gatePosition` 0/88, `health > 1f`, `isPassable`, `toggleGate`, `updateWhenCurrentLocation` auto-close rule) backing the worker's open-gates-while-pathing logic in `Dayswork/Worker/WorkerMovementDriver.cs`.
+- `docs/game-data/debris-and-drops.md` — which `Game1.create*Debris` overloads route loot to `Game1.currentLocation` vs the passed `location`; the `ResourceClump.destroy()` leak (hardwood/stone spawn at the *player's* location, not the clump's) and the `InvokeTaskActionGuarded` sweep that recovers it.
+- `docs/game-data/sound-cues.md` — the **worker-sound invariant** (every worker action emits the player's sound, gated on `Game1.player.currentLocation == location`; silent off-location), the verified cue-per-action table, how to enumerate cue names from the XACT sound bank, and the `IsLocalPlayer` gotcha (vanilla machine-collect `"coin"` won't fire for the fake worker farmer).
+- `docs/game-data/chests.md` — `Chest` capacity/special-type API (`SpecialChestTypes.BigChest` → `GetActualCapacity()` 70, serialized so it persists) and why `BuildingData.Chests` can't express capacity — backing the office porch chests being upgraded to Big Chests in `Dayswork/Integration/CabinChestService.cs`; also the wood/stone/big chest id table (`232` is the Stone Chest, not the Big Chest).
+- `docs/game-data/time-and-pacing.md` — verified game-clock constants (`realMilliSecondsPerGameMinute = 700`; the `gameTimeInterval > 7000 + ExtraMillisecondsPerInGameMinute*10` ten-minute trigger; ~42 ticks/in-game-minute at 60 UPS) and the tile→minute walk-time conversion backing `Dayswork.Core/Shifts/ShiftClockEstimator.cs` (time-aware wrap-up, #5). Confirmed 2026-07-07.
+- `docs/game-data/pathing.md` — the worker passability probe (`IsTilePassableForWorker`, inset `+1/62` rect), the verified `isCollidingPosition(character: null, …)` block table (**FarmAnimals do NOT block** — the animal loop is skipped when `character` is null), the Core `GridPathfinder`/`PassabilityGrid` BFS extraction (N,E,S,W tie-break is load-bearing), and the per-shift `LocationPassabilityCache` (which call sites are cached vs. live, the staleness contract, and the three invalidation mechanisms). Built 2026-07-07.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
 the office building/chest ids in `Dayswork/Integration/HiringBuilding.cs`, the animal-product
@@ -168,7 +178,7 @@ ids in `HiringBuilding.BuildData`.
   on-location, silent off-location. Many vanilla APIs that "play the sound for you" gate it behind
   `who.IsLocalPlayer`, which is false for the worker's `CreateFakeEventFarmer()` (e.g.
   `Object.CheckForActionOnMachine`'s collect `"coin"`), so the sound silently doesn't play — emit it
-  yourself. When adding any collect/work path, wire its cue per `docs/sound-cues.md`.
+  yourself. When adding any collect/work path, wire its cue per `docs/game-data/sound-cues.md`.
 
 ## Current state
 

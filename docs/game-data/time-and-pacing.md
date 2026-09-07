@@ -49,5 +49,7 @@ work-headroom reserve to `timeOfDay` and checks it lands at or before the 8pm ca
 Phase 0 (measure-only) is wired: `ShiftOrchestrator.MeasureWrapUpFit` logs a
 `[Dayswork][wrapup-measure]` line at each `WorkEntry` travel start (gated by `DevLog.Enabled`, so
 absent from release; never changes behavior). The provisional headroom constant
-(`WrapUpWorkHeadroomMinutes = 10`) and the live skip-gate (`ShiftStopReason.DayEndingSoon`) await
-calibration from real play before being enabled — see `docs/plans/time-aware-wrapup.md`.
+(`WrapUpWorkHeadroomMinutes = 10`) and the live skip-gate (`ShiftStopReason.DayEndingSoon`) were
+never calibrated, and the plan was **parked incomplete on 2026-09-07** — see
+[`docs/plans/archive/time-aware-wrapup.md`](../plans/archive/time-aware-wrapup.md). The constants
+verified on this page stand regardless; the Phase-0 code above is still live and behavior-neutral.

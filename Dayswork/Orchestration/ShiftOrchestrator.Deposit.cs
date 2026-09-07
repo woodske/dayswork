@@ -455,7 +455,7 @@ internal sealed partial class ShiftOrchestrator
 
         // Dev tripwire summary: if vanilla mis-routed any worker loot into the player's location
         // this shift, report the recovered/stranded tally. Stranded > 0 means loot escaped the
-        // recovery sweep and should be investigated (see docs/debris-and-drops.md).
+        // recovery sweep and should be investigated (see docs/game-data/debris-and-drops.md).
         if (DevLog.Enabled && (Session.LeakBeatsObserved > 0 || Session.LeakItemsStranded > 0))
             LogLeakAudit(Session.LeakItemsStranded > 0 ? LogLevel.Warn : LogLevel.Info);
 

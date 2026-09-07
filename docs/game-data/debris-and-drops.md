@@ -2,7 +2,7 @@
 
 How vanilla spawns the *collectible* loot from things the worker clears, and which of those
 paths route the loot to the wrong location. Confirmed against a decompile of the installed
-`Stardew Valley.dll` (see [[reference_sdv_decompile_access]] / `docs/game-content-search.md`),
+`Stardew Valley.dll` (see [[reference_sdv_decompile_access]] / `docs/game-data/game-content-search.md`),
 2026-06-22.
 
 ## `Game1` debris-creation overloads and where the loot lands

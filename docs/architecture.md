@@ -25,8 +25,9 @@ and uses **zero Harmony patches** — everything is driven by SMAPI events.
   requires a local Stardew install, same as the mod. Testing policy lives in `AGENTS.md` ("Code
   conventions"): persistence formats, pricing/money, and item-routing invariants must be tested;
   per-feature ritual coverage is not required.
-- **`docs/`** — reference docs (this file; `farm-warps/` documents per-farm entrance/warp tiles
-  for vanilla + SVE).
+- **`docs/`** — this file plus three indexed folders: `game-data/` (verified vanilla/SVE content,
+  incl. `farm-warps/`), `analysis/` (research and design-decision records), and `plans/`
+  (implementation plans + `archive/` for finished ones).
 
 `Dayswork/ModEntry.cs` is the composition root: a hand-wired dependency graph (no DI container).
 Read it top-to-bottom to see every service and which SMAPI events drive it.
@@ -61,7 +62,7 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 ### Worker (`Dayswork/Worker/`) — the NPC
 - **`FarmhandNpc`** — a custom `NPC` (placeholder Marnie sprite/portrait) added to the farm's
   characters; draws its own stamina bar. The art contract for replacing the placeholder lives in
-  `docs/farmhand-art.md`. **Must be removed before save** — its parameterless ctor exists only for
+  `docs/game-data/farmhand-art.md`. **Must be removed before save** — its parameterless ctor exists only for
   the XML serializer and is never expected to run.
 - **`WorkerMovementDriver`** — pathfinds with `StardewValley.Pathfinding.PathFindController`; on no
   path / impassable path, falls back to an internal BFS; else reports `NavigationFailed`. Worker

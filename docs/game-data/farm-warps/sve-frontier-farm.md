@@ -4,7 +4,7 @@
 - **Map asset:** `Maps/Farm` ← loaded from `Assets/Maps/FrontierFarm.tmx`
 - **Size:** 156 × 65
 - **Farm signature in code:** `FarmMapSignature(156, 65)` → entrance override `(142,16)`
-  in [`SveExpansionProfile.cs`](../../Dayswork.Core/Compat/SveExpansionProfile.cs)
+  in [`SveExpansionProfile.cs`](../../../Dayswork.Core/Compat/SveExpansionProfile.cs)
 
 > Unlike Grandpa's Farm, Frontier's main Farm -> Bus Stop exit is an edge warp
 > (it shows up in `GameLocation.warps`). The Bus Stop -> Farm return has an SVE

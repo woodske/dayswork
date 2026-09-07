@@ -9,8 +9,9 @@ Original plans: `architecture-review-index.md` (the index), `architecture-doc-re
 `core-pathfinding-and-passability-cache.md` (#2), `travel-aware-batch-ordering.md` (#3),
 `work-activity-abstraction.md` (#4), `deposit-trip-ordering.md` (#6), `pathing-polish.md` (#7).
 
-Item **#5 (time-aware wrap-up)** is *not* archived here — only its measure-only Phase 0 shipped, so
-it remains an active plan in [`../time-aware-wrapup.md`](../time-aware-wrapup.md).
+Item **#5 (time-aware wrap-up)** is not covered here — only its measure-only Phase 0 shipped, and it
+was parked incomplete on 2026-09-07 with its own artifact,
+[`time-aware-wrapup.md`](time-aware-wrapup.md).
 
 Item **#1 was not a code item.** It was a gate: clear the pending in-game smoke-pass backlog before
 stacking structural refactors on top of unverified refactors. That backlog (travel consolidation +
@@ -72,7 +73,7 @@ throttling only caps selection *frequency*, it doesn't make a selection cheaper.
 - The **live** probe is retained where a cache must not be trusted: `StartNavigation`'s validation
   of a vanilla `PathFindController` path, and rare single-tile spot checks.
 
-**Hard rule 7 resolution (recorded in `docs/pathing.md`):** with `character: null`,
+**Hard rule 7 resolution (recorded in `docs/game-data/pathing.md`):** with `character: null`,
 `isCollidingPosition` skips the animal loop entirely — **FarmAnimals were never in the probe's
 answer**, so they need no special handling and no live-probe exemption. The inset-rect `+1/62`
 corner math transfers unchanged because the grid is built from the same probe.
@@ -176,14 +177,14 @@ grid.
 moment the path was planned, so a gate 40 tiles ahead visibly opened before the worker was anywhere
 near it. Worse, `TryCloseGate` only fired for waypoints actually *reached* — so any route cleared
 mid-walk (work re-selection, stuck recovery, travel cancel, `Clear()`) left already-opened gates
-open. Per `docs/fences-and-gates.md` the vanilla auto-close rule runs in `updateWhenCurrentLocation`
+open. Per `docs/game-data/fences-and-gates.md` the vanilla auto-close rule runs in `updateWhenCurrentLocation`
 only, so an **off-screen leaked gate stays open indefinitely**.
 
 The driver now records the route's openable gate tiles, opens each lazily as it becomes the next
 waypoint (matching how a player reads the animation), tracks what it opened, and closes every
 tracked gate it hasn't walked through on `Clear()` / navigation completion / `WarpWorker` —
 excluding the worker's own tile, since closing a gate onto the worker would trap or clip it.
-`toggleGate` occupant behavior was verified against `docs/fences-and-gates.md` (the NPC worker isn't
+`toggleGate` occupant behavior was verified against `docs/game-data/fences-and-gates.md` (the NPC worker isn't
 collision-blocked, so this is safe). Close-behind on waypoint pass was preserved.
 
 **(b) Sweep segments.** `SerpentineSweep.Rank` was pure tile geometry, so a row bisected by a pond,

@@ -69,7 +69,7 @@ APIs play their cues on **`Game1.player.currentLocation`** — the *player's* lo
 location the action happens in — so they're **always audible wherever the player stands** (e.g.
 greenhouse harvest heard from town). The worst offender is `Crop.harvest()` (called with
 `junimoHarvester == null` in `InvokeHarvest`), which plays `"harvest"`/delayed-`"coin"`/`"dwoop"`
-this way. Rather than wrap each such call, [`InvokeTaskActionGuarded`](../Dayswork/Orchestration/ShiftOrchestrator.TaskActions.cs)
+this way. Rather than wrap each such call, [`InvokeTaskActionGuarded`](../../Dayswork/Orchestration/ShiftOrchestrator.TaskActions.cs)
 points `Game1.player.currentLocation` at the work `location` for the whole worker beat (restored in
 `finally`, alongside the other `Game1.player` state it already snapshots). The engine's distance
 gate then silences any such cue off-location and plays it normally when the player is present —

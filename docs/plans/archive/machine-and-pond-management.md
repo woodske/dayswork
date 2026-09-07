@@ -5,7 +5,7 @@ Two plans for the "worker services a producer and routes its output" family. Mac
 subsystem (2026-06-23, smoke pass passed 2026-07-07). Both are release-ready.
 
 Original plans: `machine-management.md`, `fish-ponds.md`.
-Game-content reference: [`docs/machines.md`](../../machines.md) — verified `Data/Machines` schema +
+Game-content reference: [`docs/game-data/machines.md`](../../game-data/machines.md) — verified `Data/Machines` schema +
 API and, in its "Fish ponds" section, the `FishPond` API, both for SDV 1.6.15.
 
 ---

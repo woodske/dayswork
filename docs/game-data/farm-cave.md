@@ -74,7 +74,7 @@ private static bool IsCaveHarvestReady(SObject obj) =>
 Always gate the call with `loc.Name == "FarmCave"` to prevent false positives from spawned
 objects elsewhere. `(BC)128` guard is belt-and-suspenders; `readyForHarvest` is the live flag.
 
-## Warp tiles (confirmed in docs/farm-warps/vanilla-farms.md)
+## Warp tiles (confirmed in docs/game-data/farm-warps/vanilla-farms.md)
 
 - Entry: farm.warps TargetName=="FarmCave" → warp.TargetX/Y == (8, 11) for all vanilla farms
 - Exit: farmCave.warps TargetName=="Farm" → arrival on Farm at (34,6) for 80-wide farms

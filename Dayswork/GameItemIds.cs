@@ -2,7 +2,7 @@ namespace Dayswork;
 
 /// <summary>
 /// Verified game item QualifiedItemIds. All entries confirmed against the base game DLL
-/// (see docs/item-ids.md). Use these constants instead of inline string literals.
+/// (see docs/game-data/item-ids.md). Use these constants instead of inline string literals.
 /// </summary>
 internal static class GameItemIds
 {

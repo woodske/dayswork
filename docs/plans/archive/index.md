@@ -10,6 +10,7 @@ Active and deferred plans live in [`../index.md`](../index.md).
 |---|---|
 | [architecture-review-2026-07-07.md](architecture-review-2026-07-07.md) | The 2026-07-07 pathing/efficiency review, items #0–#7 — the Core pathfinding extraction + passability cache, travel-aware batch ordering, the work-activity handler list, cross-location deposit ordering, and the gate/sweep-segment pathing fixes. |
 | [machine-and-pond-management.md](machine-and-pond-management.md) | Manage Machines and Manage Fish Ponds — why ponds are a parallel subsystem rather than a machine special case, the physical-fetch input model, and the flavored/quality preservation work that came out of them. |
+| [time-aware-wrapup.md](time-aware-wrapup.md) | Review item #5, **parked incomplete** — don't start a trip that can't finish before the 8pm cap. Only the measure-only Phase 0 shipped; keeps the full design sketch so the plan can be resumed. |
 
 ## Original plan → artifact
 
@@ -26,16 +27,31 @@ Docs, code comments, and commit messages may still reference these by filename.
 | pathing-polish.md (#7) | [architecture-review-2026-07-07.md](architecture-review-2026-07-07.md) |
 | machine-management.md | [machine-and-pond-management.md](machine-and-pond-management.md) |
 | fish-ponds.md | [machine-and-pond-management.md](machine-and-pond-management.md) |
+| time-aware-wrapup.md (#5) | [time-aware-wrapup.md](time-aware-wrapup.md) |
 
-Review item **#5** was not archived — only its measure-only phase shipped, so it remains active as
-[`../time-aware-wrapup.md`](../time-aware-wrapup.md). Item **#1** was a smoke-pass gate, not a plan
-file.
+Review item **#5** was archived separately on 2026-09-07 as
+[`time-aware-wrapup.md`](time-aware-wrapup.md) — **parked, not completed**. Only its measure-only
+Phase 0 shipped; the live skip-gate was never enabled. It is here so the plans folder reflects what
+is actually being worked on, not because the work is done. Item **#1** was a smoke-pass gate, not a
+plan file.
+
+> This is the one artifact in this folder that does **not** describe shipped work. Everything else
+> here is finished; that one is a resume point.
+
+## Parked, not finished
+
+| Artifact | State of the code | To resume |
+|---|---|---|
+| [time-aware-wrapup.md](time-aware-wrapup.md) | `ShiftClockEstimator` + tests + a DevLog-gated `MeasureWrapUpFit` are live and behavior-neutral; `ShiftStopReason.DayEndingSoon` is declared but unused | Collect `[Dayswork][wrapup-measure]` play data, calibrate the headroom constant, then replace the log with the gate |
 
 ## Open threads carried out of these plans
 
 Deferred by decision, not blocked, and none scheduled. Recorded so they don't evaporate with the plan
 files; the artifacts hold the reasoning.
 
+- **Time-aware wrap-up (#5)** — parked 2026-09-07 with its Phase-0 measurement code live in the
+  tree. Blocked on play data, not on a build task; see
+  [time-aware-wrapup.md](time-aware-wrapup.md).
 - **Casks (cellar)** — the last machine-family phase. Verify the cask state model first.
 - **Retrofit managed-crop seed consumption to physical fetch trips**, making crops symmetric with
   machines (which deliberately rejected the abstract-pool shortcut).

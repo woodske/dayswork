@@ -63,7 +63,7 @@ internal sealed partial class ShiftOrchestrator
     // mis-routed this beat (sampled before recovery); anything still present afterward is STRANDED
     // (an unrecovered leak — e.g. a drop whose id our resolver can't normalize) and is logged loudly
     // plus tallied for the shift-end summary. Scoped to Game1.currentLocation, the only sink vanilla
-    // routes loot to (see docs/debris-and-drops.md); it does not scan unrelated locations, so the
+    // routes loot to (see docs/game-data/debris-and-drops.md); it does not scan unrelated locations, so the
     // player's own roaming activity never produces false positives.
     private void AuditForeignLeak(
         HashSet<Debris> before,
