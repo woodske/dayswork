@@ -70,6 +70,6 @@ while making auto-grabbers valid machine **input** chests.
   whose name isn't in the data; it never resets an existing chest's properties.
 - Consequence: a building chest can only be made "big" by setting `SpecialChestType = BigChest` on
   the runtime `Chest` instance after the game creates it — done idempotently in
-  `CabinChestService.EnsureOfficeChests` (`SaveLoaded` + `DayStarted`) for the office input/output
+  `OfficeChestService.EnsureOfficeChests` (`SaveLoaded` + `DayStarted`) for the office input/output
   chests, so it also self-heals pre-upgrade saves. Building chests are drawn as part of the building
   sprite (not as world chest sprites), so this has no visual effect beyond the 70-slot grid.

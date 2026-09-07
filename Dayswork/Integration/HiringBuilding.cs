@@ -40,7 +40,7 @@ internal static class HiringBuilding
     // well above the 3-tile footprint).
     public const int TilesWide = 5;
     public const int TilesHigh = 3;
-    // Output chest on the porch, right of the door (the cabin's mailbox spot) when facing the house.
+    // Output chest on the porch, right of the door (the mailbox spot) when facing the house.
     public static readonly Point OutputChestDisplayTile = new(3, 2);
     // Input chest on the porch, left of the door when facing the house.
     public static readonly Point InputChestDisplayTile = new(1, 2);

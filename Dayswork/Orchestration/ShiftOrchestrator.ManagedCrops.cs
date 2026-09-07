@@ -20,7 +20,7 @@ internal sealed partial class ShiftOrchestrator
     private readonly ManagedCropFieldReader _cropFieldReader = new();
     private readonly CropShiftPlanner _cropShiftPlanner = new();
     private readonly PlantingViabilityCalculator _viability = new();
-    private readonly CabinChestService _cabinChests = new();
+    private readonly OfficeChestService _officeChests = new();
     private readonly ShopStockReader _shopStockReader = new();
     private readonly ShopPurchaseService _shopPurchaseService = new();
     private readonly ShiftSupplyAggregator _shiftSupplyAggregator = new();
@@ -1034,7 +1034,7 @@ internal sealed partial class ShiftOrchestrator
             if (!string.Equals(building.buildingType.Value, HiringBuilding.BuildingType, StringComparison.Ordinal))
                 continue;
 
-            return _cabinChests.EnsureInputChest(building);
+            return _officeChests.EnsureInputChest(building);
         }
 
         return null;

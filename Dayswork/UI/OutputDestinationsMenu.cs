@@ -348,7 +348,7 @@ internal sealed class OutputDestinationsMenu : IClickableMenu
         _draft.Destinations[task] = destination;
     }
 
-    // Returning to the hub locks in a default (cabin chest) for any output task left unset, matching
+    // Returning to the hub locks in a default (office chest) for any output task left unset, matching
     // the old "Next" behavior so output is always routed somewhere.
     private void ApplyDefaultsAndBack()
     {

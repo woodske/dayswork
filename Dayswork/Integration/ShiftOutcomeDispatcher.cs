@@ -26,8 +26,8 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
 
         var deposited = DepositToBuildingChestOrBin(built, out var usedChest, out var chestWasFull);
 
-        var destination = usedChest && !chestWasFull ? "the farmhand cabin chest"
-                        : chestWasFull               ? "the farmhand cabin chest (partial) + shipping bin"
+        var destination = usedChest && !chestWasFull ? "the farmhand office chest"
+                        : chestWasFull               ? "the farmhand office chest (partial) + shipping bin"
                         :                              "the shipping bin";
         ModEntry.ModMonitor.Log(
             $"[Dayswork] Deposited {deposited} overflow item stack(s) to {destination}.",

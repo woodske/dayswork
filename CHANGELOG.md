@@ -15,6 +15,9 @@
 
 ### Changed
 
+- The farmhand building is now called the Farmhand Office everywhere, instead of the Farmhand
+  Cabin. Its two porch chests are named "Farmhand Office - Input" and "Farmhand Office - Output",
+  and the menus and notices that mention them were reworded to match.
 - The office screen is now a single "Contract" page showing the one contract you have, instead of
   a scrollable list of contracts.
 - New contracts now default to managing machines when they finish their assigned work early,

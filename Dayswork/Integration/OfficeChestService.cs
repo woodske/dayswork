@@ -6,7 +6,7 @@ using StardewValley.Objects;
 
 namespace Dayswork.Integration;
 
-internal sealed class CabinChestService
+internal sealed class OfficeChestService
 {
     internal const string InputChestNameKey = "building.office.input_chest.name";
     internal const string OutputChestNameKey = "building.office.output_chest.name";

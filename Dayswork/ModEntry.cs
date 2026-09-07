@@ -52,7 +52,7 @@ public sealed class ModEntry : Mod
 
         // ── Mod singletons ───────────────────────────────────────────────────
         var chestResolver = new ChestResolver(Helper);
-        var cabinChestService = new CabinChestService();
+        var officeChestService = new OfficeChestService();
         Coordinator = new HiringFlowCoordinator(contractTermsBuilder, configManager, store, upgradeStore, chestResolver, Helper);
         var buildingInteraction = new HiringBuildingInteraction(helper);
         var buildingOverlay = new HiringBuildingOverlayRenderer();
@@ -110,7 +110,7 @@ public sealed class ModEntry : Mod
         };
         helper.Events.GameLoop.ReturnedToTitle += sessionResetHandler.OnReturnedToTitle;
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
-        helper.Events.GameLoop.SaveLoaded   += cabinChestService.OnSaveLoaded;
+        helper.Events.GameLoop.SaveLoaded   += officeChestService.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += persistAdapter.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += upgradePersistAdapter.OnSaveLoaded;
         // Stop and settle any in-flight shift (sleep-stop + overflow delivery) BEFORE contracts
@@ -120,7 +120,7 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.Saving       += persistAdapter.OnSaving;
         helper.Events.GameLoop.Saving       += upgradePersistAdapter.OnSaving;
         helper.Events.GameLoop.DayStarted   += scheduler.OnDayStarted;
-        helper.Events.GameLoop.DayStarted   += cabinChestService.OnDayStarted;
+        helper.Events.GameLoop.DayStarted   += officeChestService.OnDayStarted;
         // Reset the "worker done for the day" animation flag each morning (office goes dark again).
         helper.Events.GameLoop.DayStarted   += (_, _) => HiringBuilding.WorkCompletedToday = false;
         helper.Events.GameLoop.UpdateTicked += orchestrator.OnUpdateTicked;

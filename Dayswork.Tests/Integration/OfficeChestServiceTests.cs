@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Dayswork.Tests.Integration;
 
-public sealed class CabinChestServiceTests
+public sealed class OfficeChestServiceTests
 {
     [Fact]
     public void BuiltInDisplayTile_helpers_delegate_to_hiring_building_roles()
@@ -12,7 +12,7 @@ public sealed class CabinChestServiceTests
             FindWorkspaceRoot(),
             "Dayswork",
             "Integration",
-            "CabinChestService.cs"));
+            "OfficeChestService.cs"));
 
         Assert.Contains("HiringBuilding.IsInputChestDisplayTile(localX, localY)", source);
         Assert.Contains("HiringBuilding.IsOutputChestDisplayTile(localX, localY)", source);
@@ -25,7 +25,7 @@ public sealed class CabinChestServiceTests
             FindWorkspaceRoot(),
             "Dayswork",
             "Integration",
-            "CabinChestService.cs"));
+            "OfficeChestService.cs"));
 
         // Both porch chests get the vanilla Big Chest capacity (70 vs 36); the fallback-created
         // input chest is born big, and EnsureOfficeChests upgrades both idempotently.
@@ -37,9 +37,9 @@ public sealed class CabinChestServiceTests
     [Fact]
     public void BuiltInChestNameKeys_are_distinct_and_role_specific()
     {
-        Assert.Equal("building.office.input_chest.name", CabinChestService.InputChestNameKey);
-        Assert.Equal("building.office.output_chest.name", CabinChestService.OutputChestNameKey);
-        Assert.NotEqual(CabinChestService.InputChestNameKey, CabinChestService.OutputChestNameKey);
+        Assert.Equal("building.office.input_chest.name", OfficeChestService.InputChestNameKey);
+        Assert.Equal("building.office.output_chest.name", OfficeChestService.OutputChestNameKey);
+        Assert.NotEqual(OfficeChestService.InputChestNameKey, OfficeChestService.OutputChestNameKey);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public sealed class CabinChestServiceTests
     {
         Assert.Equal(
             "[LOCALIZED_TEXT building.office.input_chest.name]",
-            CabinChestService.ToLocalizedTextToken(CabinChestService.InputChestNameKey));
+            OfficeChestService.ToLocalizedTextToken(OfficeChestService.InputChestNameKey));
     }
 
     private static string FindWorkspaceRoot()

@@ -3,14 +3,20 @@
 ## Overview
 
 Dayswork is a single-player SMAPI mod that lets the player construct a farm building
-(`Bindicle.Dayswork_Office`) and hire an NPC farmhand from it. The farmhand spawns at the office
-door each morning, **physically walks** the farm performing the contract's configured tasks
-(water/harvest crops, collect fruit, animal care, clear rocks/weeds/grass/trees, plus full
-"managed crop" lifecycle), deposits output into the player's designated chests, and exits. The
-player pays **upfront** for a block of worker energy (labor capacity). The mod is
+(`Bindicle.Dayswork_Office`) and hire an NPC farmhand from it. The farmhand spawns just outside the
+office's human door each morning, **physically walks** the farm performing the contract's configured
+tasks (water/harvest crops, collect fruit, animal care, clear rocks/weeds/grass/trees, plus full
+"managed crop" lifecycle), deposits output into the player's designated chests, and returns to that
+same door tile to clock out. The player pays **upfront** for a block of worker energy (labor
+capacity). The mod is
 **progression-aware** (the worker inherits the player's tool upgrade levels), **safe** (items are
 never lost — anything undelivered is mailed back via the building's output chest / shipping bin),
 and uses **zero Harmony patches** — everything is driven by SMAPI events.
+
+*Single-player* is a current property, not a permanent one: the one-office / one-worker /
+`Game1.player`-is-the-sponsor assumptions described below are what
+[`plans/dayswork-2.0.md`](plans/dayswork-2.0.md) sets out to replace. Until that plan lands, every
+statement here about "the player" means the local, only player.
 
 ## Project structure & the Core-purity rule
 
@@ -49,7 +55,7 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 - **`ToolLevelReader`** — snapshots the player's axe/pickaxe levels into a `ToolSnapshot` at shift
   start (the progression-inheritance source).
 - **`ModConfigManager` / `GMCMRegistrar`** — config + optional GMCM page (changes apply next shift,
-  read live). `ChestResolver`, `CabinChestService`, `ShopStockReader`, `ShopPurchaseService`,
+  read live). `ChestResolver`, `OfficeChestService`, `ShopStockReader`, `ShopPurchaseService`,
   `CropCatalogProvider`, `CropHudNotifier` support deposits and managed-crop shopping.
 
 ### UI (`Dayswork/UI/`) — the hiring flow
@@ -168,7 +174,8 @@ task-tagged `ItemBuffer`, never the player's inventory.
 Stop conditions: energy exhausted, 8pm hard cap (`TimeChanged`), player cancel, sleep (`Saving`),
 or all work complete. Any stop routes through **Depositing**: `DepositPlanner` builds trips from
 the buffer to assigned chests / the shipping bin (entering buildings by door when needed), then the
-worker walks to the farm exit and despawns. Undelivered/overflow items are consolidated and dropped
+worker walks back to its spawn tile — the office door (`Session.FarmExitTile`, named for the
+no-office fallback) — and despawns. Undelivered/overflow items are consolidated and dropped
 into the office Output chest (falling back to the shipping bin) with a HUD notice — **nothing is
 lost**.
 
@@ -251,8 +258,10 @@ Skip rules confirmed in code:
   used for tool actions clears it before stopping (see `CreateWorkerActionFarmer`).
 - **Custom NPC lifecycle:** the farmhand is added to `farm.characters` at shift start and **removed
   before `Saving`** (`StopForSleepAndSettle`), so it's never serialized into the save.
-- **Single-player only:** `MultiplayerGuard.IsMultiplayer()` = `Context.IsMultiplayer` (true also in
-  split-screen); guards both the building interaction and the day-start scheduler.
+- **Single-player only (today):** `MultiplayerGuard.IsMultiplayer()` = `Context.IsMultiplayer`
+  (true also in split-screen); guards both the building interaction and the day-start scheduler.
+  [`plans/dayswork-2.0.md`](plans/dayswork-2.0.md) replaces this guard with an `Authority`
+  host/client split in its Phase 4 — until then, treat single-player as the only supported mode.
 
 ## Compatibility (SVE): shape & rationale
 
