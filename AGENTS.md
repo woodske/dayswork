@@ -150,6 +150,13 @@ The load-bearing ones are called out below.
 - `docs/game-data/sound-cues.md` — the **worker-sound invariant** (every worker action emits the player's sound, gated on `Game1.player.currentLocation == location`; silent off-location), the verified cue-per-action table, how to enumerate cue names from the XACT sound bank, and the `IsLocalPlayer` gotcha (vanilla machine-collect `"coin"` won't fire for the fake worker farmer).
 - `docs/game-data/chests.md` — `Chest` capacity/special-type API (`SpecialChestTypes.BigChest` → `GetActualCapacity()` 70, serialized so it persists) and why `BuildingData.Chests` can't express capacity — backing the office porch chests being upgraded to Big Chests in `Dayswork/Integration/CabinChestService.cs`; also the wood/stone/big chest id table (`232` is the Stone Chest, not the Big Chest).
 - `docs/game-data/time-and-pacing.md` — verified game-clock constants (`realMilliSecondsPerGameMinute = 700`; the `gameTimeInterval > 7000 + ExtraMillisecondsPerInGameMinute*10` ten-minute trigger; ~42 ticks/in-game-minute at 60 UPS) and the tile→minute walk-time conversion backing `Dayswork.Core/Shifts/ShiftClockEstimator.cs` (time-aware wrap-up, #5). Confirmed 2026-07-07.
+- `docs/game-data/multiplayer-and-ownership.md` — **`Farmer.IsLocalPlayer` is identity-based**
+  (`UniqueMultiplayerID == Game1.player`'s) and vanilla gates machine collect (`Object.cs:4626`) and
+  tree XP/stats (`Tree.cs:1498/1514`) on it, so the worker's fake action farmer must keep the
+  host's id; where `gainExperience` routes XP for local / remote-online (game message 17) / offline
+  (silently dropped) farmers; `Building.owner` is set in `buildStructure`; painting needs a
+  `Data/PaintData` entry, not just a `_PaintMask`. Backs `docs/plans/dayswork-2.0.md`. Confirmed
+  2026-09-07.
 - `docs/game-data/pathing.md` — the worker passability probe (`IsTilePassableForWorker`, inset `+1/62` rect), the verified `isCollidingPosition(character: null, …)` block table (**FarmAnimals do NOT block** — the animal loop is skipped when `character` is null), the Core `GridPathfinder`/`PassabilityGrid` BFS extraction (N,E,S,W tie-break is load-bearing), and the per-shift `LocationPassabilityCache` (which call sites are cached vs. live, the staleness contract, and the three invalidation mechanisms). Built 2026-07-07.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):

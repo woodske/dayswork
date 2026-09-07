@@ -3,8 +3,8 @@
 ## Overview
 
 Dayswork is a single-player SMAPI mod that lets the player construct a farm building
-(`Bindicle.Dayswork_Office`) and hire an NPC farmhand from it. The farmhand spawns at the farm
-entrance each morning, **physically walks** the farm performing the contract's configured tasks
+(`Bindicle.Dayswork_Office`) and hire an NPC farmhand from it. The farmhand spawns at the office
+door each morning, **physically walks** the farm performing the contract's configured tasks
 (water/harvest crops, collect fruit, animal care, clear rocks/weeds/grass/trees, plus full
 "managed crop" lifecycle), deposits output into the player's designated chests, and exits. The
 player pays **upfront** for a block of worker energy (labor capacity). The mod is
@@ -146,8 +146,11 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
    collect, then that building's grazing animals), then a farm-wide forage sweep (truffles), then
    managed-crop batches, greenhouses, outdoor crops, outdoor clearing. `WorkAreaScanner` populates
    each batch's tile/animal work.
-3. If no applicable work exists, **no worker spawns**. Otherwise spawn `FarmhandNpc` at the farm
-   entrance tile (resolved from `farm.warps`, expansion-overridable).
+3. If no applicable work exists, **no worker spawns**. Otherwise spawn `FarmhandNpc` just outside
+   the office's human door (`ResolveSpawnExitTile` → `FindHiringBuilding` +
+   `getPointForHumanDoor()`); the same tile is the return point at shift end. The farm-entrance
+   heuristic (`FindFarmExitTile`, from `farm.warps`, expansion-overridable) is only the fallback
+   when no office exists.
 
 Per `UpdateTicked` (gated on `Game1.shouldTimePass(false)`), tool animation
 (`ToolSwapAnimator.Update`), the movement driver (`WorkerMovementDriver.Update` — so the worker

@@ -66,7 +66,7 @@ Multiplayer is currently *disabled*, not supported: `MultiplayerGuard.IsMultipla
 ## Verified engine facts — confirmed against the decompiled game; do not re-derive or second-guess
 
 Decompiled from `X:\Steam\steamapps\common\Stardew Valley\Stardew Valley.dll`. Per hard rule 7,
-record any *additional* facts you confirm under `docs/`.
+record any *additional* facts you confirm under `docs/game-data/`.
 
 ### Custom NPCs over the network — why the mod is mandatory for all players
 
@@ -273,7 +273,7 @@ All of AGENTS.md's hard rules except #3 and #6 remain in force, in particular:
    fallback chain must survive, now with a sponsor-aware shipping bin.
 5. **The worker is despawned before save** — with N workers and clients that may sleep at different
    times, `CalendarHandlers.OnSavingHook` must clear *all* of them.
-7. **Verify game content, never guess**, and record newly confirmed facts under `docs/`.
+7. **Verify game content, never guess**, and record newly confirmed facts under `docs/game-data/`.
 
 Also preserve: `net6.0`, `TreatWarningsAsErrors`, nullable enabled. Testing policy is unchanged —
 tests are **required** for persistence formats and migrations, money math, and item-routing

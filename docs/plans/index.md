@@ -33,13 +33,17 @@ live in [`../analysis/`](../analysis/index.md) and carry no status. Verified gam
 
 *Last verified against code: 2026-09-07.*
 
-**None.** No plan is currently scheduled or in flight.
-
 | Plan | Status | Depends on | Verify (state of the code, not the doc) |
 |---|---|---|---|
-| — | — | — | — |
+| [dayswork-2.0](dayswork-2.0.md) — N offices, ownership, multiplayer, appearance, painting (six phases) | `NOT STARTED` — plan written and all design decisions resolved with the user 2026-09-07 (see the plan's final section); next step is Phase 0 | — | Phase 0: `grep -rni cabin Dayswork Dayswork.Tests` → only the footprint comment. Phase 1: `grep -rn "class ShiftFleet\|class OfficeContractStore" Dayswork/` hits and `grep -rn OnePerFarmBuildCondition Dayswork/` is empty. Phase 2: `grep -rn "Game1\.player\.Money" Dayswork/` is empty. Phase 3: `ls Dayswork/assets/farmhand_PaintMask.png`. Phase 4: `grep -rn "class MultiplayerGuard" Dayswork/` is empty and `grep -rn "PeerContextReceived" Dayswork/` hits. Phase 5: `grep -rn "Data/PaintData" Dayswork/` hits. |
 
 ### Notes
+
+**dayswork-2.0** supersedes the *recommendation* of
+[../analysis/multiplayer-readiness.md](../analysis/multiplayer-readiness.md) (its facts still hold).
+It also revives, on their merits, three pieces deleted by the 2026-08-30 revert (`f4116b5`):
+`WorkClaimRegistry`, `ShoppingBudgetLedger`, and the per-contract `FarmhandNpc.Name` +
+`getTextureName()` override. The many-workers-per-office model is **not** coming back.
 
 **time-aware-wrapup** was parked and archived on 2026-09-07 without being completed — see
 [archive/time-aware-wrapup.md](archive/time-aware-wrapup.md). Its Phase-0 code (`ShiftClockEstimator`,

@@ -20,7 +20,7 @@ Nothing here carries status. If an analysis turns into scheduled work, write a p
 
 | File | What it covers |
 |---|---|
-| [multiplayer-readiness.md](multiplayer-readiness.md) | Feasibility study for multiplayer support — what the single-player assumptions are, the host-authority model it would need, and the effort estimate. Not scheduled; the mod is single-player by design. |
+| [multiplayer-readiness.md](multiplayer-readiness.md) | Feasibility study for multiplayer support — what the single-player assumptions are, the host-authority model it would need, and the effort estimate. Its **facts** still hold; its **recommendation** (one shared host-only worker) was superseded on 2026-09-07 by [`../plans/dayswork-2.0.md`](../plans/dayswork-2.0.md), which schedules per-office, per-owner workers with host authority and client-side editing. |
 | [stand-coverage-routing.md](stand-coverage-routing.md) | Design record for multi-target stand coverage ("Option D") — planning one standing tile that services several work targets. Deferred 2026-07-03; its prerequisites shipped, so it is eligible for a re-measure against real shift timings. |
 
 ## Adding to this folder
