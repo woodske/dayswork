@@ -23,6 +23,9 @@
   harvesting always has. The Preferences screen has a toggle to turn a contract's experience off.
 - Preferences also gained a "Work while you're away" toggle, so you can say whether your farmhand
   should keep working when you aren't around.
+- Farmhands can be given one of ten colour palettes from the Preferences screen, so the workers of
+  different offices are easy to tell apart at a glance. The screen shows a live preview of the
+  sprite as you flick through them.
 
 ### Changed
 

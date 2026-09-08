@@ -1,3 +1,4 @@
+using Dayswork.Core.Domain;
 using Dayswork.Integration;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -7,25 +8,34 @@ namespace Dayswork.Worker;
 
 internal sealed class FarmhandNpc : NPC
 {
-    internal const string SpritePath         = "Characters\\DaysworkFarmhand";
-    internal const string PlaceholderPortraitPath = "Portraits\\Marnie";
+    internal const string PlaceholderPortraitPath = "Portraits/Marnie";
     internal const string InternalName            = "DaysworkFarmhand";
 
-    // Required by Stardew Valley's XML serializer. The game should never reach this path
-    // because OnSaving removes the NPC before the save is written.
+    // Per-worker state that has to reach other players lives in the NPC's modData, which is a
+    // synced net field — appearance in particular, because it is the whole of what a remote client
+    // needs to draw the right sprite (getTextureName below). The worker is never serialized into a
+    // save (OnSaving despawns it), so these keys live only as long as the shift.
+    internal const string NameModDataKey    = "Bindicle.Dayswork/Name";
+    internal const string VariantModDataKey = "Bindicle.Dayswork/Variant";
+    internal const string StaminaModDataKey = "Bindicle.Dayswork/Stamina";
+
+    // Required by Stardew Valley's XML serializer. Deliberately inert — no content loads and no
+    // appearance work, because the serializer constructs it outside any shift. The game should
+    // never reach this path anyway: OnSaving removes the NPC before the save is written.
     public FarmhandNpc() { }
 
-    public FarmhandNpc(Vector2 spawnPixelPosition, Guid officeId, string workerName)
+    public FarmhandNpc(Vector2 spawnPixelPosition, Guid officeId, string workerName, string appearanceKey)
         : base(
-            new AnimatedSprite(SpritePath, 0, 16, 32),
+            new AnimatedSprite(FarmhandAppearance.SpriteAssetFor(appearanceKey), 0, 16, 32),
             spawnPixelPosition,
             2,
             // Unique per office so N concurrent workers never collide in the game's name-based
             // lookups (getCharacterFromName, net sync, serialization guards).
             NameFor(officeId))
     {
-        this.displayName = DisplayNameFor(workerName);
-        this.Portrait = Game1.content.Load<Texture2D>(PlaceholderPortraitPath);
+        this.modData[NameModDataKey] = workerName ?? "";
+        this.modData[VariantModDataKey] = WorkerAppearances.Resolve(appearanceKey).Key;
+        this.modData[StaminaModDataKey] = FormatStamina(0, 0);
         this.AllowDynamicAppearance = false;
         this.IsInvisible = false;
         this.HideShadow = false;
@@ -41,20 +51,60 @@ internal sealed class FarmhandNpc : NPC
             ? I18nHelper.Get("npc.farmhand.name")
             : workerName;
 
+    // Read from modData rather than the base class's cached field so the name survives net sync,
+    // and ignore writes: the name is owned by the contract, and vanilla would otherwise overwrite
+    // it with translateName() (the unique per-office NPC name) from reloadSprite.
+    public override string displayName
+    {
+        get => DisplayNameFor(this.modData.TryGetValue(NameModDataKey, out var name) ? name : "");
+        set { }
+    }
+
     // The unique per-office Name would otherwise drive vanilla texture resolution:
     // getTextureName() falls back to the NPC name when there's no Data/Characters entry, and
-    // ChooseAppearance/reloadSprite build "Characters/…" + "Portraits/…" paths from it. Pin it
-    // to the shared asset name so every worker loads the one farmhand sprite/portrait.
-    // (Phase 3 makes this variant-aware.)
-    public override string getTextureName() => InternalName;
+    // ChooseAppearance/reloadSprite build "Characters/…" + "Portraits/…" paths from it. Pin it to
+    // this worker's appearance variant so those paths land on the asset the sprite already uses —
+    // which also makes ChooseAppearance a no-op instead of a sprite reset.
+    public override string getTextureName() =>
+        FarmhandAppearance.TextureNameFor(this.modData.TryGetValue(VariantModDataKey, out var key) ? key : null);
 
-    private int _staminaRemaining;
-    private int _staminaCapacity;
+    /// <summary>~5% granularity for the published energy value. The bar is 40px wide, so a finer
+    /// step is invisible.</summary>
+    private const int StaminaSteps = 20;
 
     public void SetStamina(int remaining, int capacity)
     {
-        _staminaRemaining = Math.Max(0, remaining);
-        _staminaCapacity = Math.Max(0, capacity);
+        remaining = Math.Max(0, remaining);
+        capacity = Math.Max(0, capacity);
+
+        // Quantise before publishing. This runs once per work beat and modData is a synced net
+        // field, so writing the exact figure would put hundreds of updates a day on the wire for
+        // changes nobody can see. Empty and full are never rounded away.
+        if (capacity > 0 && remaining > 0 && remaining < capacity)
+        {
+            var step = (double)capacity / StaminaSteps;
+            remaining = Math.Clamp((int)Math.Round(Math.Round(remaining / step) * step), 1, capacity - 1);
+        }
+
+        var published = FormatStamina(remaining, capacity);
+        if (!this.modData.TryGetValue(StaminaModDataKey, out var current) || current != published)
+            this.modData[StaminaModDataKey] = published;
+    }
+
+    private static string FormatStamina(int remaining, int capacity) => $"{remaining}/{capacity}";
+
+    private bool TryReadStamina(out int remaining, out int capacity)
+    {
+        remaining = 0;
+        capacity = 0;
+
+        if (!this.modData.TryGetValue(StaminaModDataKey, out var raw))
+            return false;
+
+        var separator = raw.IndexOf('/');
+        return separator > 0
+            && int.TryParse(raw.AsSpan(0, separator), out remaining)
+            && int.TryParse(raw.AsSpan(separator + 1), out capacity);
     }
 
     public void StopTaskAnimation()
@@ -84,7 +134,7 @@ internal sealed class FarmhandNpc : NPC
     {
         base.drawAboveAlwaysFrontLayer(b);
 
-        if (_staminaCapacity <= 0)
+        if (!TryReadStamina(out var remaining, out var capacity) || capacity <= 0)
             return;
 
         var local = Game1.GlobalToLocal(Game1.viewport, this.Position + new Vector2(0f, -80f));
@@ -92,7 +142,7 @@ internal sealed class FarmhandNpc : NPC
         const int barHeight = 6;
         var barX = (int)local.X - (barWidth / 2) + 32;
         var barY = (int)local.Y;
-        var fillWidth = Math.Clamp((int)Math.Round((double)_staminaRemaining / _staminaCapacity * (barWidth - 2)), 0, barWidth - 2);
+        var fillWidth = Math.Clamp((int)Math.Round((double)remaining / capacity * (barWidth - 2)), 0, barWidth - 2);
 
         b.Draw(Game1.staminaRect, new Rectangle(barX, barY, barWidth, barHeight), Color.Black * 0.8f);
         b.Draw(Game1.staminaRect, new Rectangle(barX + 1, barY + 1, barWidth - 2, barHeight - 2), new Color(50, 34, 18));

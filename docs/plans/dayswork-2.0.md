@@ -525,6 +525,31 @@ sheet if the mask fails to load). `FarmhandNpc`: `getTextureName()` returns the 
 worker's palette; the preview matches the in-world sprite; tool/effect overlays are unaffected;
 `FarmhandNpc()` constructs without touching `Game1.content`.
 
+**As built (2026-09-07)** — four details settled differently from the sketch above, none of them a
+change of approach:
+
+- **The default palette is the plain base sheet**, not a painted variant of itself. `denim` is a real
+  key in the preset list (so the cycle has a name for it and `""` resolves to it), but
+  `TextureNameFor` returns the bare `DaysworkFarmhand` for it — vanilla's own painter refuses a
+  no-op recolour anyway (`RequiresRecolor()`), so painting the default would have meant a null
+  return and a needless texture copy every time.
+- **The portrait is not loaded in the constructor at all**, rather than loaded lazily in draw.
+  Dropping the eager `Game1.content.Load` leaves vanilla's own lazy `Portrait` getter to resolve
+  `Portraits/DaysworkFarmhand_<key>`, which `FarmhandAppearance` serves (placeholder for every
+  variant — only the body sheet is recoloured). Nothing reads the worker's portrait today.
+- **`displayName`'s setter is a no-op.** The getter reads `modData`, as designed; the setter has to
+  swallow writes because `reloadSprite` assigns `translateName()` — which for this NPC is the unique
+  per-office internal name — and that would clobber the player's chosen name.
+- **Stamina lives only in `modData`**, read back in `drawAboveAlwaysFrontLayer`, instead of being
+  mirrored in private fields — one source of truth rather than a second copy no remote client could
+  see. It is quantised to 5 % of capacity on write, per D1: `SetStamina` runs once per work beat, and
+  the bar is 40 px wide, so the exact figure would be hundreds of net updates a day for changes
+  nobody can see. Empty and full are never rounded away.
+
+Sprite asset names use forward slashes throughout so that the name vanilla computes in
+`ChooseAppearance` (`"Characters/" + getTextureName()`) matches `Sprite.textureName` exactly, which
+makes `TryLoadSprites` an early return instead of a mid-shift sprite reset.
+
 ## Phase 4 — Multiplayer authority, handshake, client editing
 
 **Problem.** Everything runs on every peer; there is no protocol; the NPC is host-only in spirit.

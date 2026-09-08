@@ -162,14 +162,8 @@ public sealed class ModEntry : Mod
 
     private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
     {
-        if (e.NameWithoutLocale.IsEquivalentTo($"Characters/{FarmhandNpc.InternalName}"))
-            e.LoadFromModFile<Texture2D>("assets/farmhand.png", AssetLoadPriority.Medium);
-
-        // Portrait still uses Marnie until a custom portrait is ready.
-        if (e.NameWithoutLocale.IsEquivalentTo($"Portraits/{FarmhandNpc.InternalName}"))
-            e.LoadFrom(
-                () => Game1.content.Load<Texture2D>(FarmhandNpc.PlaceholderPortraitPath),
-                AssetLoadPriority.Medium);
+        // The worker's sprite sheet, its paint mask, every painted colour variant, and the portrait.
+        FarmhandAppearance.OnAssetRequested(e);
 
         // The hiring building's texture + Data/Buildings entry.
         HiringBuilding.OnAssetRequested(e, this.Helper);

@@ -144,7 +144,8 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
   owns the office's `modData` keys and `OfficeContractPersistence` is the only thing that writes
   them — including the one-time 1.x → 2.0 contract adoption.
 - `Dayswork/UI/` — the hub-and-spoke hiring menus + a small layout toolkit (`UI/Layout/`).
-- `Dayswork/Worker/` — the NPC, movement driver, tool animation.
+- `Dayswork/Worker/` — the NPC, movement driver, tool animation, and `FarmhandAppearance` (the
+  sprite/portrait/paint-mask assets and the painted colour variants).
 - `Dayswork/Compat/` — SVE / farm-expansion support (vanilla path is a no-op).
 - `Dayswork.Core/` — domain, capabilities, pricing, energy, shift state machine + planner,
   inventory/deposit, persistence DTOs.
@@ -214,8 +215,8 @@ ids in `HiringBuilding.BuildData`.
 
 ## Current state
 
-Builds clean and runs. **2.0 Phases 1 and 2 landed 2026-09-07** (branch `dayswork-2.0`; both owe
-their in-game smoke passes, deferred until every phase is built).
+Builds clean and runs. **2.0 Phases 1, 2 and 3 landed 2026-09-07** (branch `dayswork-2.0`; all three
+owe their in-game smoke passes, deferred until every phase is built).
 
 *Phase 1* — the farm may hold **any number of offices, one farmhand each**. A contract belongs to its
 office — stored in that building's `modData` under schema v4, keyed by `Building.id`, carrying an
@@ -237,6 +238,15 @@ contract's `GrantExperience` preference is off or the owner is not connected. Fi
 (tree/rock) now reaches the owner — it never did before. The worker's fake action farmer keeps the
 **host's** identity forever; see hard rule 8 below. In single-player the owner is always the local
 player, so all of this is behaviour-preserving except the new fieldwork XP.
+
+*Phase 3* — each contract picks one of **ten worker colour palettes** (Preferences → Appearance, with
+a live sprite preview). A palette is not a drawn sheet: `assets/farmhand_PaintMask.png` marks the
+cap / shirt / overalls, and `Dayswork/Worker/FarmhandAppearance.cs` serves
+`Characters/DaysworkFarmhand_<key>` as the base sheet run through vanilla's own `BuildingPainter`
+(palettes are pure data in `Dayswork.Core/Domain/WorkerAppearance.cs`; the API is verified in
+`docs/game-data/painting.md`). Because each variant is a real content asset, appearance travels as
+nothing but a texture name — `FarmhandNpc.getTextureName()` derives it from the NPC's synced
+`modData`, which also now carries the worker's name and (5 %-quantised) energy.
 
 Working today: build an office and hire from its bulletin board; the
 hiring flow (tasks, zone-draw work scope, output chests, energy tier, task priority, one-time vs

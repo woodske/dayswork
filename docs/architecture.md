@@ -72,10 +72,17 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 - Custom layout toolkit in `UI/Layout/` (VStack/HStack/cards/scroll panels) backs the menus.
 
 ### Worker (`Dayswork/Worker/`) — the NPC
-- **`FarmhandNpc`** — a custom `NPC` (placeholder Marnie sprite/portrait) added to the farm's
-  characters; draws its own stamina bar. The art contract for replacing the placeholder lives in
-  `docs/game-data/farmhand-art.md`. **Must be removed before save** — its parameterless ctor exists only for
-  the XML serializer and is never expected to run.
+- **`FarmhandNpc`** — a custom `NPC` (own sprite sheet, placeholder Marnie portrait) added to the
+  farm's characters; draws its own stamina bar. Its name, appearance variant and energy live in the
+  NPC's synced `modData` — `getTextureName()` and the `displayName` getter read from there, so the
+  variant is all a remote client needs to draw the right worker. The art contract lives in
+  `docs/game-data/farmhand-art.md`. **Must be removed before save** — its parameterless ctor exists
+  only for the XML serializer and is never expected to run.
+- **`FarmhandAppearance`** — serves the worker's sprite sheet, paint mask, colour variants and
+  portrait as content assets. A variant is the base sheet run through vanilla's `BuildingPainter`
+  with `assets/farmhand_PaintMask.png` (cap / shirt / overalls); the palettes themselves are pure
+  data in `Dayswork.Core/Domain/WorkerAppearance.cs`, picked per contract on the Preferences spoke.
+  See `docs/game-data/painting.md`.
 - **`WorkerMovementDriver`** — pathfinds with `StardewValley.Pathfinding.PathFindController`; on no
   path / impassable path, falls back to an internal BFS; else reports `NavigationFailed`. Worker
   walks pixel-by-pixel along waypoints. Also exposes static BFS route-cost maps used by routing.

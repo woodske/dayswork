@@ -322,7 +322,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         }
 
         var spawnPos = new Vector2(farmExitTile.X, farmExitTile.Y) * 64f;
-        var farmhand = new FarmhandNpc(spawnPos, contract.OfficeId, contract.Preferences.WorkerName);
+        var farmhand = new FarmhandNpc(spawnPos, contract.OfficeId, contract.Preferences.WorkerName, contract.Preferences.Appearance);
         farm.addCharacter(farmhand);
         _toolAnimator.SetWorker(farmhand);
         _toolAnimator.SetPacingProfile(pacingProfile);

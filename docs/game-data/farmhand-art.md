@@ -61,6 +61,35 @@ The portrait replacement should be:
 - Recommended: `64x384` with six vertical frames matching the vanilla NPC
   portrait order: neutral, happy, sad, custom/concerned, blush, angry.
 
+## Colour variants and the paint mask
+
+The worker's colour palettes are not hand-drawn sheets. `Dayswork/assets/farmhand_PaintMask.png`
+marks three recolourable regions of `farmhand.png`, and each palette is generated at runtime by the
+game's own `BuildingPainter` — see [painting.md](painting.md) for that API's exact rules.
+
+Mask contract:
+
+- File: `Dayswork/assets/farmhand_PaintMask.png`, **exactly the same size as `farmhand.png`**
+  (`64x128` today). The painter matches pixels by flat index, so a size mismatch mis-paints
+  silently; `Dayswork.Tests/Integration/FarmhandPaintMaskTests.cs` guards the pairing.
+- Colours are matched **exactly**; only these three, plus fully transparent for "leave alone":
+
+  | Mask colour | Region | Base-sheet pixels it covers |
+  |---|---|---|
+  | `255,0,0` (red) | Cap | the four cap blues (`19,43,185` / `35,102,222` / `51,113,222` / `58,127,250`) |
+  | `0,255,0` (lime) | Shirt and sleeves | the plaid reds (`165,38,38` / `126,27,27`) and the sleeve/cuff greys (`106,93,93` / `170,158,158` / `237,223,223`) |
+  | `0,0,255` (blue) | Overalls | the five overall blues (`48,96,183` / `10,49,118` / `29,70,144` / `38,29,134` / `9,26,129`) |
+
+  The cap blues and the overall blues are disjoint colour sets in the base sheet, which is what lets
+  the two be tinted independently.
+- Skin, hair, eyes and boots are deliberately **outside** every region, so a palette changes clothing
+  only.
+- Only the body sheet is recoloured. Tool and effect overlays are separate sprites and are untouched,
+  exactly as the separation above requires.
+
+If `farmhand.png` is ever redrawn, regenerate the mask from the new palette rather than editing it by
+hand, and re-check that the three regions still use disjoint colour sets.
+
 ## Style requirements
 
 - Match Stardew-compatible pixel art: crisp pixels, no antialiasing, no soft

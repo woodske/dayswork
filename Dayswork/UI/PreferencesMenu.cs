@@ -56,6 +56,12 @@ internal sealed class PreferencesMenu : LayoutMenu
                     }),
                     OpenWorkerNamingMenu,
                     textAlign: HAlign.Left),
+                new AppearanceRow(
+                    I18nHelper.Get("ui.preferences.appearance"),
+                    WorkerAppearances.Resolve(_draft.Preferences.Appearance).Key,
+                    AppearanceName(_draft.Preferences.Appearance),
+                    () => SetAppearance(WorkerAppearances.PreviousKey(_draft.Preferences.Appearance)),
+                    () => SetAppearance(WorkerAppearances.NextKey(_draft.Preferences.Appearance))),
                 new ToggleRow(
                     I18nHelper.Get("ui.preferences.avoid_blue_grass"),
                     _draft.Preferences.AvoidBlueGrass,
@@ -87,6 +93,16 @@ internal sealed class PreferencesMenu : LayoutMenu
                         Rebuild();
                     }),
                 new Label(I18nHelper.Get("ui.preferences.run_while_offline_description"))));
+    }
+
+    private static string AppearanceName(string appearanceKey) =>
+        I18nHelper.Get($"ui.preferences.appearance.{WorkerAppearances.Resolve(appearanceKey).Key}");
+
+    private void SetAppearance(string appearanceKey)
+    {
+        _draft.Preferences = _draft.Preferences with { Appearance = appearanceKey };
+        _draft.MarkDirty();
+        Rebuild();
     }
 
     // Vanilla NamingMenu as a modal step (there's no text-input layout element): done-naming
