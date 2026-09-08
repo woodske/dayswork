@@ -6,6 +6,15 @@ using StardewValley;
 
 namespace Dayswork.Worker;
 
+/// <summary>
+/// The farmhand. Driven entirely by its <see cref="Dayswork.Orchestration.ShiftOrchestrator"/> on
+/// the host; on every other peer it is inert without any override of ours, because vanilla already
+/// gates movement on the host: <c>Character.update</c> runs <c>updateMovement</c> and the
+/// <c>controller</c> only when <c>Game1.IsMasterGame</c>, and otherwise calls
+/// <c>updateSlaveAnimation</c>, which replays the synced sprite state (verified against the
+/// decompile, 2026-09-07 — see <c>docs/game-data/multiplayer-and-ownership.md</c>). A client
+/// therefore watches the worker walk and swing without simulating anything.
+/// </summary>
 internal sealed class FarmhandNpc : NPC
 {
     internal const string PlaceholderPortraitPath = "Portraits/Marnie";

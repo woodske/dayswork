@@ -180,6 +180,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     /// evening lights. Null when no shift is running.</summary>
     public Guid? ActiveOfficeId => _session?.OfficeId;
 
+    /// <summary>The player sponsoring this shift. Null when no shift is running.</summary>
+    public long? ActiveOwnerId => _session?.OwnerId;
+
     /// <summary>The office building itself, or null once it has been demolished mid-shift.</summary>
     private Building? ActiveOffice =>
         _session is { } session ? OfficeResolver.TryGet(Game1.getFarm(), session.OfficeId) : null;

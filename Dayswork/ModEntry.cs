@@ -9,6 +9,7 @@ using Dayswork.Core.Pricing;
 using Dayswork.Core.Upgrades;
 using Dayswork.Diagnostics;
 using Dayswork.Integration;
+using Dayswork.Net;
 using Dayswork.Orchestration;
 using Dayswork.UI;
 using Dayswork.Worker;
@@ -27,6 +28,12 @@ public sealed class ModEntry : Mod
     internal static HiringFlowCoordinator Coordinator { get; private set; } = null!;
     /// <summary>Every live shift — one per office with a farmhand out today.</summary>
     internal static ShiftFleet Fleet { get; private set; } = null!;
+    /// <summary>The one way a contract changes: menus submit here and the host decides. On the
+    /// host's own computer the answer is synchronous, so single-player reads exactly as before.</summary>
+    internal static ContractRequestClient Requests { get; private set; } = null!;
+    /// <summary>Whether Dayswork is standing down for an incompatible peer, and (on a client)
+    /// whether the host can run it at all.</summary>
+    internal static DaysworkSuspension Suspension { get; private set; } = null!;
     // Expansion-compatibility seam. Vanilla-by-default; active profile resolved at GameLaunched.
     internal static ExpansionCompatService ExpansionCompat { get; private set; } = null!;
 
@@ -55,13 +62,15 @@ public sealed class ModEntry : Mod
         var chestResolver = new ChestResolver(Helper);
         var officeChestService = new OfficeChestService();
         Coordinator = new HiringFlowCoordinator(contractTermsBuilder, configManager, store, upgradeStore, chestResolver, Helper);
-        var buildingInteraction = new HiringBuildingInteraction(helper);
         var buildingOverlay = new HiringBuildingOverlayRenderer();
-        // Missed/overflow items are deposited into the shift's own office chest and notices are
-        // shown as HUD messages — no Mail Framework Mod, no mailbox delivery.
+        // Missed/overflow items are deposited into the shift's own office chest; notices go to the
+        // contract's owner through OwnerNotifier — no Mail Framework Mod, no mailbox delivery.
         var shiftOutcomeDispatcher = new ShiftOutcomeDispatcher();
         var contractPersistence = new OfficeContractPersistence(
             store, serializer, helper.Data, this.ModManifest.Version.ToString(), shiftOutcomeDispatcher);
+        // The interaction re-reads contracts from the world before opening a menu, so a client's
+        // card reflects the host's latest rather than what it loaded with.
+        var buildingInteraction = new HiringBuildingInteraction(helper, contractPersistence);
         var upgradePersistAdapter = new FarmhandUpgradePersistenceAdapter(
             upgradeStore, upgradeSerializer, helper.Data);
         var toolReader      = new ToolLevelReader();
@@ -91,8 +100,32 @@ public sealed class ModEntry : Mod
         var officeDemolition = new OfficeDemolitionHandler(store, fleet, shiftOutcomeDispatcher);
         var sessionResetHandler = new SessionResetHandler(fleet);
         var calendarHandlers = new CalendarHandlers(fleet);
+
+        // ── Multiplayer (2.0 Phase 4) ────────────────────────────────────────
+        // Host-authoritative: the engine above runs on the host alone, and every peer's menus reach
+        // it through one request path. On the host's own computer that path is a direct call, so
+        // single-player behaves exactly as it did before there was a protocol.
+        var suspension = new DaysworkSuspension();
+        var netChannel = new NetChannel(helper.Multiplayer);
+        var requestHandler = new ContractRequestHandler(
+            store, serializer, contractTermsBuilder, configManager, upgradeStore,
+            new ContractReferenceResolver(chestResolver), chestResolver, fleet, suspension);
+        var requestClient = new ContractRequestClient(
+            netChannel, requestHandler, serializer, this.ModManifest.Version.ToString());
+        var network = new DaysworkNetwork(
+            helper, netChannel, requestHandler, requestClient, suspension, configManager, store, fleet,
+            this.ModManifest.Version.ToString());
+        // A request the host never answered. The player's draft is still on screen (the flow only
+        // closes on an acceptance), and the host may in fact have committed — reopening the office
+        // reads its modData and shows the truth — so this says "not saved", not "lost".
+        requestClient.TimedOut = () => Game1.addHUDMessage(
+            new HUDMessage(I18nHelper.Get("ui.net.no_response"), HUDMessage.error_type));
+        Requests = requestClient;
+        Suspension = suspension;
+
         var scheduler       = new RecurringContractScheduler(
-            store, fleet, calendarHandlers, recurringDecisionEngine, configManager, upgradeStore, shiftOutcomeDispatcher);
+            store, fleet, calendarHandlers, recurringDecisionEngine, configManager, upgradeStore,
+            shiftOutcomeDispatcher, suspension);
         var gmcmRegistrar = new GMCMRegistrar(helper, this.ModManifest, configManager);
 
         // ── Expansion compatibility ───────────────────────────────
@@ -113,7 +146,11 @@ public sealed class ModEntry : Mod
             expansionCompat.SetActiveProfile(expansionDetector.ResolveActiveProfile());
         };
         helper.Events.GameLoop.ReturnedToTitle += sessionResetHandler.OnReturnedToTitle;
+        helper.Events.GameLoop.ReturnedToTitle += network.OnReturnedToTitle;
         helper.Events.GameLoop.SaveLoaded   += sessionResetHandler.OnSaveLoaded;
+        // The peer picture is re-derived per save: whether this process is the host, and which
+        // already-connected peers can run Dayswork, are both only knowable once a save is loaded.
+        helper.Events.GameLoop.SaveLoaded   += network.OnSaveLoaded;
         helper.Events.GameLoop.SaveLoaded   += officeChestService.OnSaveLoaded;
         // Office chests are ensured first, so a contract hydrated from an office always finds
         // its porch chests in place.
@@ -132,6 +169,9 @@ public sealed class ModEntry : Mod
         helper.Events.GameLoop.DayStarted   += officeChestService.OnDayStarted;
         helper.Events.GameLoop.UpdateTicked += fleet.OnUpdateTicked;
         helper.Events.GameLoop.TimeChanged  += fleet.OnTimeChanged;
+        // A remote client's outstanding requests time out here; on the host this never has anything
+        // to do, because its own requests are answered synchronously.
+        helper.Events.GameLoop.UpdateTicked += requestClient.OnUpdateTicked;
         // Keep each shift's passability cache in step with world changes (all no-op when no shift
         // is active). Worker-cleared resource clumps have no event and are invalidated at the clear
         // site; everything else rides these.
@@ -145,6 +185,16 @@ public sealed class ModEntry : Mod
         helper.Events.Input.ButtonPressed += buildingInteraction.OnButtonPressed;
         // Evening lit-windows + chimney smoke once the worker has finished for the day.
         helper.Events.Display.RenderedWorld += buildingOverlay.OnRenderedWorld;
+        // The "Dayswork is paused" banner, drawn over the HUD for as long as it lasts.
+        helper.Events.Display.Rendered += suspension.OnRendered;
+
+        // Multiplayer: the handshake, the incompatible-peer policy, and the request protocol.
+        // Registered unconditionally — which side of each handler runs is decided inside, since
+        // Context.IsMainPlayer is only meaningful once a save is loaded.
+        helper.Events.Multiplayer.PeerContextReceived += network.OnPeerContextReceived;
+        helper.Events.Multiplayer.PeerConnected       += network.OnPeerConnected;
+        helper.Events.Multiplayer.PeerDisconnected    += network.OnPeerDisconnected;
+        helper.Events.Multiplayer.ModMessageReceived  += network.OnModMessageReceived;
 
         // Dev tooling (verbose diagnostics + debug console commands) — gated by DevLog.Enabled, which
         // is off for release. One switch keeps the whole dev kit out of shipped builds.

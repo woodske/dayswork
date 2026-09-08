@@ -11,8 +11,9 @@ namespace Dayswork.Integration;
 
 // Missed/overflow items are deposited into the hiring building's static output chest (falling back
 // to the SPONSOR's shipping bin so nothing is ever lost). Money and notices follow the sponsor too:
-// festival one-time refunds are credited to the owner's wallet, and a notice is a HUD message when
-// the owner is the player at this screen and a log line otherwise.
+// festival one-time refunds are credited to the owner's wallet, and every notice goes out through
+// OwnerNotifier, which reaches the owner wherever they are (this screen, another player's screen,
+// or the log when they are not connected).
 internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
 {
     public void DispatchOverflowDelivery(
@@ -39,22 +40,26 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         var notifyKey = usedChest && !chestWasFull ? "notify.items_deposited_chest"
                       : chestWasFull               ? "notify.items_deposited_chest_overflow"
                       :                              "notify.items_deposited_bin";
-        ShowInfo(ownerId, I18nHelper.Get(notifyKey));
+        OwnerNotifier.ShowInfo(ownerId, notifyKey);
     }
 
     public void ShowCannotAffordNotice(Contract contract, int dailyPrice, int shortfall)
     {
-        ShowError(contract.OwnerId, I18nHelper.Get("notify.cannot_afford", new { price = dailyPrice, shortfall }));
+        OwnerNotifier.ShowError(contract.OwnerId, "notify.cannot_afford", new Dictionary<string, string>
+        {
+            ["price"] = dailyPrice.ToString(),
+            ["shortfall"] = shortfall.ToString(),
+        });
     }
 
     public void ShowContractLostNotice(long ownerId)
     {
-        ShowError(ownerId, I18nHelper.Get("notify.contract_lost"));
+        OwnerNotifier.ShowError(ownerId, "notify.contract_lost");
     }
 
     public void ShowNeedsAttentionNotice(Contract contract)
     {
-        ShowError(contract.OwnerId, I18nHelper.Get("notify.needs_attention"));
+        OwnerNotifier.ShowError(contract.OwnerId, "notify.needs_attention");
     }
 
     public void ShowFestivalNotice(Contract contract, int refundGold)
@@ -62,11 +67,14 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         if (refundGold > 0)
         {
             Sponsor.Credit(contract.OwnerId, refundGold);
-            ShowInfo(contract.OwnerId, I18nHelper.Get("notify.festival_refund", new { refund = refundGold }));
+            OwnerNotifier.ShowInfo(contract.OwnerId, "notify.festival_refund", new Dictionary<string, string>
+            {
+                ["refund"] = refundGold.ToString(),
+            });
         }
         else
         {
-            ShowInfo(contract.OwnerId, I18nHelper.Get("notify.festival"));
+            OwnerNotifier.ShowInfo(contract.OwnerId, "notify.festival");
         }
     }
 
@@ -106,25 +114,6 @@ internal sealed class ShiftOutcomeDispatcher : IShiftOutcomeDispatcher
         }
 
         return count;
-    }
-
-    private static void ShowInfo(long ownerId, string text) =>
-        Show(ownerId, text, HUDMessage.newQuest_type);
-
-    private static void ShowError(long ownerId, string text) =>
-        Show(ownerId, text, HUDMessage.error_type);
-
-    // A notice belongs to the contract's owner. Shown on the HUD when that is the player at this
-    // screen; logged otherwise, until Phase 4 adds delivery to a remote owner.
-    private static void Show(long ownerId, string text, int hudType)
-    {
-        if (Sponsor.IsLocal(ownerId))
-        {
-            Game1.addHUDMessage(new HUDMessage(text, hudType));
-            return;
-        }
-
-        ModEntry.ModMonitor.Log($"[Dayswork] Notice for owner {ownerId}: {text}", DevLog.WarnLevel);
     }
 
     private static List<Item> BuildItems(IReadOnlyList<ItemStack> stacks, IReadOnlyDictionary<string, SObject> flavorTemplates)

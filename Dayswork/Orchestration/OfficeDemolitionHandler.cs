@@ -36,6 +36,10 @@ internal sealed class OfficeDemolitionHandler
     {
         if (e.Location is not Farm)
             return;
+        // Removing the contract is a host write; clients see the office (and its contract) vanish
+        // through the building sync.
+        if (!Guards.Authority.IsHost)
+            return;
 
         foreach (var building in e.Removed)
         {

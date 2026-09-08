@@ -2,7 +2,7 @@
 
 ## Overview
 
-Dayswork is a single-player SMAPI mod that lets the player construct farm buildings
+Dayswork is a SMAPI mod that lets a player construct farm buildings
 (`Bindicle.Dayswork_Office`) — any number of them, one farmhand each — and hire an NPC farmhand from
 each. A farmhand spawns just outside its own office's human door each morning, **physically walks** the farm performing the contract's configured
 tasks (water/harvest crops, collect fruit, animal care, clear rocks/weeds/grass/trees, plus full
@@ -14,11 +14,11 @@ receives output, and their skills earn the experience the worker generates. The 
 building's output chest / shipping bin), and uses **zero Harmony patches** — everything is driven by
 SMAPI events.
 
-*Single-player* is a current property, not a permanent one. The one-office / one-worker assumptions
-are gone (2.0 Phase 1) and sponsor identity now flows through **`Sponsor`** (2.0 Phase 2); the
-remaining work is the host/client authority split in
-[`plans/dayswork-2.0.md`](plans/dayswork-2.0.md) Phase 4. Until it lands, every statement here about
-"the player" means the local, only player — who is also every office's owner.
+**Co-op works, host-authoritatively** (2.0 Phase 4): every connected player must run the same
+Dayswork protocol version, the engine runs on the host alone, and any player may hire from an office
+they built. In single-player there is one player, who is also every office's owner, so every
+statement below about "the owner" reads as "the player". See
+[Multiplayer: authority and the request path](#multiplayer-authority-and-the-request-path).
 
 ## Project structure & the Core-purity rule
 
@@ -52,12 +52,21 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 - **`HiringBuildingOverlayRenderer`** — draws evening lit-windows + chimney smoke once the worker
   is done (`Display.RenderedWorld`), because `BuildingDrawLayer` can't be conditioned in this game
   version.
-- **`ContractPersistenceAdapter`** — `Helper.Data.Read/WriteSaveData` under key `Dayswork.Contracts`;
-  versioned via `SaveDataSerializer` (v1→v2).
+- **`OfficeContractPersistence`** — the only reader/writer of an office's contract `modData`
+  (schema v4 via `SaveDataSerializer`), written back the moment a contract changes rather than at
+  save time. It also performs the one-time 1.x → 2.0 adoption of the legacy `Dayswork.Contracts`
+  save key. Hydration runs on every peer (modData is synced); **writing is host-only** and refuses
+  loudly otherwise.
 - **`Sponsor`** — the single seam through which owner identity enters the engine: wallet
   (`team.GetMoney(owner)`), shipping bin, owner lookup, and XP grants. The worker's fake action
   farmer deliberately keeps the **host's** identity forever, because vanilla gates machine collect
   and tree XP on `Farmer.IsLocalPlayer`.
+- **`OwnerNotifier`** — the notice counterpart to `Sponsor`. A shift notice belongs to the
+  contract's owner, so it is a HUD message when they are at this screen, an `OwnerNotice` message
+  (i18n key + tokens, so it reads in their language) when they are connected elsewhere, and a log
+  line when they are away. Notices raised deep in the managed-crop pipeline
+  (`CropHudNotifier`) are the exception and stay host-local — they are deduplicated across all of
+  the day's workers, so they have no single owner to address.
 - **`ToolLevelReader`** — snapshots the **sponsor's** axe/pickaxe levels into a `ToolSnapshot` at
   shift start (the progression-inheritance source).
 - **`ModConfigManager` / `GMCMRegistrar`** — config + optional GMCM page (changes apply next shift,
@@ -150,8 +159,10 @@ Read it top-to-bottom to see every service and which SMAPI events drive it.
 2. The hub-and-spoke menus mutate a `ContractDraft`; every change re-runs
    `ContractTermsBuilder.BuildPreview` → live energy + price + validation. Confirm is gated on a
    valid chargeable scope×task pairing.
-3. On confirm: for a **one-time** contract the price is charged immediately and the `Contract` is
-   stored Active. Recurring contracts are charged each morning instead.
+3. On confirm the draft is submitted to the host (`ContractRequestClient`), which re-prices it,
+   re-resolves every chest / machine / pond it names, and commits. For a **one-time** contract the
+   host charges the owner immediately; recurring contracts are charged each morning instead. A
+   rejection names its reason and reopens the hub with the draft intact.
 4. `Contract` carries: enabled tasks, per-task output destinations, schedule, scope selection
    (outdoor zones / animal buildings / greenhouses), energy tier + `TermsSnapshot`, the player's
    category priority ordering, and the managed-crop plan.
@@ -288,10 +299,50 @@ Skip rules confirmed in code:
   used for tool actions clears it before stopping (see `CreateWorkerActionFarmer`).
 - **Custom NPC lifecycle:** the farmhand is added to `farm.characters` at shift start and **removed
   before `Saving`** (`StopForSleepAndSettle`), so it's never serialized into the save.
-- **Single-player only (today):** `MultiplayerGuard.IsMultiplayer()` = `Context.IsMultiplayer`
-  (true also in split-screen); guards both the building interaction and the day-start scheduler.
-  [`plans/dayswork-2.0.md`](plans/dayswork-2.0.md) replaces this guard with an `Authority`
-  host/client split in its Phase 4 — until then, treat single-player as the only supported mode.
+- **`Character.update` gates movement on `Game1.IsMasterGame`** and otherwise runs
+  `updateSlaveAnimation`, so the farmhand is inert on clients with no override of ours — a client
+  watches the synced sprite and simulates nothing.
+- **`Multiplayer.sendChatMessage` excludes the sender.** It is the only way to put arbitrary text in
+  front of a player without the mod; the host adds its own copy with `chatBox.addInfoMessage`.
+
+## Multiplayer: authority and the request path
+
+Host-authoritative (AGENTS.md hard rule 6). The whole of the engine described above runs where
+`Authority.IsHost`; everything else — menus, the evening overlay, asset loading, the office
+interaction — runs on every peer, because `Building.modData` is synced and so every client already
+has every contract to read.
+
+**One commit path.** A contract change never happens in place. `ContractRequestClient.SubmitContract`
+/ `SubmitAction` produce a request; `ContractRequestHandler` validates it against the host's world
+and commits. When the host is in this process (single-player, the host's own screen, or a
+split-screen guest — `Authority.HostIsInThisProcess`) that is a direct call answered on the same
+tick, so single-player reads exactly as it did before there was a protocol. Only a genuinely remote
+client puts a message on the wire, and only that path has a 10-second timeout.
+
+The decision itself is pure and lives in `Dayswork.Core/Net/`: `ContractCommitValidator` and
+`ContractActionValidator` take a snapshot of what the host found and return a
+`ContractRejectionCode` or null, which is why every rejection reason has a unit test.
+`RequestIdCache` makes a retried request idempotent — the reason a timed-out commit cannot charge a
+one-time contract twice.
+
+**What a client cannot see.** Stardew keeps a location in sync only while a player is in it, so a
+client's own scan of an expansion map or the greenhouse finds nothing. Those two pickers (expansion
+work locations; off-farm machine input chests) are therefore *restricted, not synced*: the host
+answers a `MenuSnapshotRequest` with what it can see, `MenuSnapshotCache` holds it per screen, and
+until it arrives the pickers say so. The host re-resolves every reference at commit time regardless,
+so a stale snapshot costs a rejection, never a bad contract.
+
+**Ownership.** Any player may open any office and read its card; `OfficeViewerRoles` decides what
+they may do (owner: everything; host on someone else's office: Pause / Cancel, and Claim when the
+owner's save slot is gone; anyone else: read-only).
+
+**Peers that cannot run Dayswork.** The farmhand is a custom `NPC` subclass in a synced collection,
+so a peer whose game cannot resolve the type throws in the netcode rather than degrading.
+`DaysworkSuspension` therefore stands the whole mod down while such a peer is connected — live
+shifts end through the normal path, no worker spawns, and a chat line (readable without the mod)
+plus an on-screen banner say why. `KickIncompatiblePeers` swaps that for a kick; it is the
+recommended host setting for a public lobby, because `PeerContextReceived` does not always give the
+host time to despawn before a vanilla client is handed the world.
 
 ## Compatibility (SVE): shape & rationale
 

@@ -21,6 +21,7 @@ internal static class RuntimeConfigSnapshotMapper
             WorkerEntranceHoldTicks = Math.Max(0, config.WorkerEntranceHoldTicks),
             WorkOnHolidays = config.WorkOnHolidays,
             EagerChestDeposits = config.EagerChestDeposits,
+            KickIncompatiblePeers = config.KickIncompatiblePeers,
             EnergyTierEnergy = NormalizePositiveDictionary(
                 config.EnergyTierEnergy,
                 defaults.EnergyTierEnergy,

@@ -5,6 +5,7 @@ using Dayswork.Core.Pricing;
 using Dayswork.Core.Upgrades;
 using Dayswork.Guards;
 using Dayswork.Integration;
+using Dayswork.Net;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -26,6 +27,7 @@ internal sealed class RecurringContractScheduler
     private readonly ModConfigManager _configManager;
     private readonly FarmhandUpgradeStore _upgradeStore;
     private readonly IShiftOutcomeDispatcher _shiftOutcomes;
+    private readonly DaysworkSuspension _suspension;
 
     public RecurringContractScheduler(
         OfficeContractStore store,
@@ -34,7 +36,8 @@ internal sealed class RecurringContractScheduler
         RecurringDayStartDecisionEngine decisionEngine,
         ModConfigManager configManager,
         FarmhandUpgradeStore upgradeStore,
-        IShiftOutcomeDispatcher shiftOutcomes)
+        IShiftOutcomeDispatcher shiftOutcomes,
+        DaysworkSuspension suspension)
     {
         _store = store;
         _fleet = fleet;
@@ -43,13 +46,25 @@ internal sealed class RecurringContractScheduler
         _configManager = configManager;
         _upgradeStore = upgradeStore;
         _shiftOutcomes = shiftOutcomes;
+        _suspension = suspension;
     }
 
     public void OnDayStarted(object? sender, DayStartedEventArgs e)
     {
-        // Multiplayer guard — no-op in multiplayer sessions.
-        if (MultiplayerGuard.IsMultiplayer())
+        // The shift engine is the host's alone: a client never starts a shift, spends money, or
+        // writes a contract (2.0 plan D2).
+        if (!Authority.IsHost)
             return;
+
+        // While an incompatible peer is connected, no worker goes out — the NPC is a custom type
+        // their game cannot read (plan D8). The suspension lifts on a later day start.
+        if (_suspension.IsSuspended)
+        {
+            ModEntry.ModMonitor.Log(
+                "[Dayswork] Skipped day start: Dayswork is suspended while an incompatible player is connected.",
+                DevLog.WarnLevel);
+            return;
+        }
 
         var today = CurrentGameDate();
         // Deterministic order (the store is dictionary-backed): earliest hire first, contract id as
@@ -64,13 +79,19 @@ internal sealed class RecurringContractScheduler
         if (contractsForToday.Count == 0)
             return;
 
-        var config = FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, _upgradeStore.State);
-        var holidaySkip = _calendar.IsFestivalToday() && !config.WorkOnHolidays;
+        // WorkOnHolidays is a global setting, so the festival gate does not depend on whose
+        // upgrades apply; each contract's own config is resolved per owner below.
+        var holidaySkip = _calendar.IsFestivalToday() && !_configManager.CurrentSnapshot.WorkOnHolidays;
 
         foreach (var contract in contractsForToday)
         {
             try
             {
+                // Upgrades belong to the office's OWNER (2.0 plan D9), so the config a shift runs
+                // under is resolved per contract rather than once for the farm.
+                var config = FarmhandUpgradeEffects.Apply(
+                    _configManager.CurrentSnapshot,
+                    _upgradeStore.For(contract.OwnerId));
                 StartOne(contract, config, holidaySkip);
             }
             catch (Exception ex)
@@ -84,6 +105,17 @@ internal sealed class RecurringContractScheduler
 
     private void StartOne(Contract contract, ConfigSnapshot config, bool holidaySkip)
     {
+        // An office whose owner no longer exists (their farmhand slot was deleted) cannot be
+        // charged or paid, so it is skipped until the host claims it (2.0 plan D4). Nothing is
+        // charged and the contract is left alone — claiming is a deliberate act.
+        if (Sponsor.Resolve(contract.OwnerId) is null)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Contract {contract.Id.Value}'s owner ({contract.OwnerId}) is not a player on this save — skipping it. The host can claim the office to take it over.",
+                DevLog.WarnLevel);
+            return;
+        }
+
         // An office demolished while its contract was still active: the contract goes with the
         // building (no refund — see the 2.0 plan's D1). Nothing is charged for it today.
         if (OfficeResolver.TryGet(contract.OfficeId) is null)

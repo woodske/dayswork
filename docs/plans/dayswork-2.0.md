@@ -579,7 +579,47 @@ makes `TryLoadSprites` an early return instead of a mid-shift sprite reset.
 accept/reject code) for every rejection code; request-id dedupe; revision/stale logic; per-owner
 upgrade store v1→v2.
 
+### What was actually built (2026-09-07) — corrections to this phase as written
+
+1. **The loopback test is `Context.IsOnHostComputer`, not "am I the host".** A split-screen guest
+   shares the host's process, so its request is handed to `ContractRequestHandler` directly rather
+   than sent as a message — which is both simpler and more reliable than trusting a mod message to
+   loop back between local screens. `Authority.HostIsInThisProcess` wraps it, and it is *also* the
+   right guard for the office-modData write-back: the write a split-screen guest triggers is the
+   host's write. `IsSplitScreen` would have been the wrong test — SMAPI only sets it on the host's
+   computer, so split-screen players on a *guest* machine are plain remote clients (verified;
+   recorded in `docs/game-data/multiplayer-and-ownership.md`).
+2. **The upgrade store goes to schema v3, not v2.** It was already at v2 — the second speed
+   upgrade added that — so per-owner keying is v3. A v1 or v2 payload migrates onto the host's id,
+   which is the only player who could have bought those upgrades.
+3. **`KickIncompatiblePeers` is not in `ConfigSnapshot`.** It is a host networking policy that no
+   part of the shift engine reads, so it lives on `ModConfig` only; adding it to the Core snapshot
+   would have rippled through `ConfigSnapshotFactory`, `ConfigDefaults`, `FarmhandUpgradeEffects`,
+   and their tests for nothing.
+4. **`FarmhandNpc` needs no client-inertness override.** `Character.update` already runs
+   `updateMovement`/`controller.update` only under `Game1.IsMasterGame` and otherwise calls
+   `updateSlaveAnimation`, so an override would have been dead code. Verified against the decompile
+   and recorded in the game-data file; S11 still confirms it in-world.
+5. **There is no separate read-only card.** `ContractMenu` is the one office page and
+   `OfficeViewerRoles` decides which of its actions exist for the player at that screen — a second
+   card would be a second thing to keep in step for no gain.
+6. **`Handshake` is not its own class.** The peer handshake, the incompatible-peer policy, and
+   message dispatch are all one small subscriber (`DaysworkNetwork`), per the no-ceremony rule.
+7. **Notices route through a new `OwnerNotifier`**, not through `ShiftOutcomeDispatcher` alone —
+   it is the notice counterpart to `Sponsor` and picks HUD / message / log by where the owner is.
+   **Scope limit:** `CropHudNotifier`'s managed-crop notices stay host-local. They are deduplicated
+   across every one of the day's workers, so they have no single owner to address; routing them
+   would mean threading an owner id through that whole pipeline and giving up the shared dedup.
+   Recorded in AGENTS.md as a known limitation.
+8. **A client re-reads contracts from the world when it opens an office**
+   (`OfficeContractPersistence.RehydrateFromWorld`), rather than gaining a refresh protocol.
+   `Building.modData` is synced, so this is all a live card needs.
+9. **Day start skips a contract whose owner no longer exists** (rather than only handling orphans in
+   the UI), with a log line; the host's Claim action is what un-sticks it.
+
 **Acceptance.** The whole multiplayer section of the smoke matrix below, including split-screen.
+Built and unit-tested 2026-09-07 (build + 781 tests green); **S10–S31 are unrun** — the in-game
+smoke passes for Phases 1–4 are deliberately deferred until every phase is built.
 
 ## Phase 5 — Paintable offices
 

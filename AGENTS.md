@@ -1,14 +1,15 @@
 # Dayswork — AI context
 
-Single-player Stardew Valley SMAPI mod. The player builds farm offices
+Stardew Valley SMAPI mod, single-player and host-authoritative co-op. A player builds farm offices
 (`Bindicle.Dayswork_Office`) — **any number of them, one farmhand each** — and hires an NPC farmhand
 from each. A worker spawns just outside its own office's door each morning, **walks** the farm doing
 that contract's configured work (water/harvest crops, collect fruit, animal care, clear
-rocks/weeds/grass/trees, plus a full managed-crop lifecycle), deposits output into the player's
-chests, and returns to its office. Payment is **upfront** for a block of worker energy. Constraints baked into the design: progression-aware (worker inherits the
-player's tool levels), safe (items are never lost — undelivered output goes to the office output
-chest / shipping bin), single-player only, and the worker must physically walk (no warping except
-stuck-recovery and building doors).
+rocks/weeds/grass/trees, plus a full managed-crop lifecycle), deposits output into the owner's
+chests, and returns to its office. Payment is **upfront** for a block of worker energy. Constraints
+baked into the design: progression-aware (worker inherits the owner's tool levels), safe (items are
+never lost — undelivered output goes to the office output chest / shipping bin), the engine runs on
+the host alone (all peers must run the same protocol version), and the worker must physically walk
+(no warping except stuck-recovery and building doors).
 
 See **`docs/architecture.md`** for the full subsystem map and the shift loop. Start any code task
 from **`Dayswork/ModEntry.cs`** — it's the hand-wired composition root (no DI container); every
@@ -80,9 +81,17 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
 5. **The worker is removed before save.** `CalendarHandlers.OnSavingHook` runs before persistence
    and despawns the live `FarmhandNpc` (via `ShiftOrchestrator.StopForSleepAndSettle`); never let one
    serialize into the save.
-6. **Single-player only (until 2.0 Phase 4).** Guard new entry points with
-   `MultiplayerGuard.IsMultiplayer()`. `docs/plans/dayswork-2.0.md` replaces this rule with a
-   host/client `Authority` split; until it lands, treat multiplayer as unsupported.
+6. **Host-authoritative multiplayer.** All connected players must run the same Dayswork
+   `ProtocolVersion`. **Clients never run a shift loop, write save data or office `modData`, spend
+   money, or mutate the world — they send requests.** The engine (day-start scheduler, every
+   `ShiftOrchestrator`, sleep-settle, persistence, money, XP, chest ensure, demolition handling)
+   runs only where `Authority.IsHost`; menus, overlays, asset loading, and interaction run
+   everywhere. A contract change of any kind — the host's own included — goes through
+   `ContractRequestClient` → `ContractRequestHandler`, which on the host's own computer
+   (`Authority.HostIsInThisProcess`, true for split-screen too) is a direct call, so single-player
+   and co-op share one commit path and one set of checks. Anything the host cannot safely share
+   (a peer without the mod, or with a different protocol version) suspends the mod for everyone,
+   or kicks that peer when `KickIncompatiblePeers` is on.
 7. **Verify game content — never guess.** Warp/entrance tiles, item ids, qualified ids, building
    ids, category numbers, event/data keys, animal data, etc. must be confirmed against the actual
    game data or a decompile before use — not recalled from memory. When you investigate and confirm
@@ -140,9 +149,16 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
   dispatch in `ShiftOrchestrator.Travel.cs`.
 - `Dayswork/Integration/` — building definition + interaction, persistence, config/GMCM, chest and
   shop resolution. `Sponsor` is the owner-identity seam (hard rule 8) — wallet, tools, shipping,
-  XP. `OfficeResolver` finds offices (by id, by tile, or all of them); `OfficeModData`
+  XP — and `OwnerNotifier` is its notice counterpart (HUD here / message to the owner / log when
+  they are away). `OfficeResolver` finds offices (by id, by tile, or all of them); `OfficeModData`
   owns the office's `modData` keys and `OfficeContractPersistence` is the only thing that writes
   them — including the one-time 1.x → 2.0 contract adoption.
+- `Dayswork/Net/` — the multiplayer layer (hard rule 6). `ContractRequestClient` is the only way to
+  change a contract; `ContractRequestHandler` is the host side that decides and commits;
+  `DaysworkNetwork` owns the peer handshake, the incompatible-peer policy, and message dispatch;
+  `DaysworkSuspension` holds the stand-down state and draws its banner; `MenuSnapshotCache` holds
+  what a remote client cannot see of the host's world. The pure parts — message DTOs, the commit
+  and action validators, the request-id dedupe — live in `Dayswork.Core/Net/` and are unit-tested.
 - `Dayswork/UI/` — the hub-and-spoke hiring menus + a small layout toolkit (`UI/Layout/`).
 - `Dayswork/Worker/` — the NPC, movement driver, tool animation, and `FarmhandAppearance` (the
   sprite/portrait/paint-mask assets and the painted colour variants).
@@ -215,8 +231,8 @@ ids in `HiringBuilding.BuildData`.
 
 ## Current state
 
-Builds clean and runs. **2.0 Phases 1, 2 and 3 landed 2026-09-07** (branch `dayswork-2.0`; all three
-owe their in-game smoke passes, deferred until every phase is built).
+Builds clean and runs. **2.0 Phases 1, 2, 3 and 4 landed 2026-09-07** (branch `dayswork-2.0`; all
+four owe their in-game smoke passes, deferred until every phase is built).
 
 *Phase 1* — the farm may hold **any number of offices, one farmhand each**. A contract belongs to its
 office — stored in that building's `modData` under schema v4, keyed by `Building.id`, carrying an
@@ -248,6 +264,23 @@ cap / shirt / overalls, and `Dayswork/Worker/FarmhandAppearance.cs` serves
 nothing but a texture name — `FarmhandNpc.getTextureName()` derives it from the NPC's synced
 `modData`, which also now carries the worker's name and (5 %-quantised) energy.
 
+*Phase 4* — **host-authoritative multiplayer** (hard rule 6). `Authority` replaces
+`MultiplayerGuard`; the engine is host-only, and every contract change — the host's own included —
+goes through `ContractRequestClient` → `ContractRequestHandler`, a direct call when the host is in
+this process (`Authority.HostIsInThisProcess`, true for split-screen) and a message otherwise. The
+decision is pure and unit-tested per rejection code (`Dayswork.Core/Net/ContractCommitValidator`,
+`ContractActionValidator`), and `RequestIdCache` makes a retried commit idempotent so a timed-out
+one-time contract cannot be charged twice. Any player may open any office;
+`UI/OfficeViewerRoles` decides what they may do (owner: everything; host on another player's
+office: Pause / Cancel, plus Claim when that owner's save slot is gone; anyone else: read-only). The
+two pickers a client cannot populate from its own world — expansion work locations, off-farm machine
+input chests — are **restricted, not synced**, filled from a `MenuSnapshotResponse` and labelled
+"waiting for the host" until it arrives. Upgrades became **per owner** (save schema v3; a v1/v2 save
+migrates onto the host). Shift notices reach their owner through `OwnerNotifier` (HUD here, message
+there, log when they are away). A peer that cannot run Dayswork **suspends** the mod for everyone —
+live shifts end, nothing spawns, a chat line readable without the mod plus an on-screen banner say
+why — or is kicked when the new `KickIncompatiblePeers` config is on.
+
 Working today: build an office and hire from its bulletin board; the
 hiring flow (tasks, zone-draw work scope, output chests, energy tier, task priority, one-time vs
 recurring schedule, managed crops, **Manage Machines**, **Manage Fish Ponds**); the full shift loop
@@ -268,6 +301,14 @@ blueberry wine, flavored honey…) end-to-end via the per-shift `FlavorItemRegis
 `BufferedItem.FlavorId` (capture-and-clone; benefits machine output too). The worker is
 **player-nameable** (`ContractPreferences.WorkerName`, set via the vanilla `NamingMenu` from the
 Preferences spoke, persisted and shown in HUD notices and the Manage list). `DepositTripRunner`
-holds ~3s when the player has the destination chest open before falling through to overflow. Dev
+holds ~3s when the player has the destination chest open before falling through to overflow.
+
+**Known Phase-4 limitation:** managed-crop shift notices (`CropHudNotifier` — shopping, skipped
+plantings, missing tools) stay on the host's HUD rather than reaching the contract's owner. They are
+deduplicated across every one of the day's workers, so they have no single owner to address;
+routing them would mean threading an owner id through that whole pipeline and giving up the shared
+dedup. Everything `ShiftOutcomeDispatcher` raises does reach its owner.
+
+Dev
 tooling (verbose logs + console commands like `dayswork_end_shift`, `dayswork_debug_machines`,
 `dayswork_debug_leaks`) is gated behind `DevLog.Enabled`, off for release.

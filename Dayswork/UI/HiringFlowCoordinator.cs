@@ -2,10 +2,13 @@ using Dayswork.Core.Config;
 using Dayswork.Core.Crops;
 using Dayswork.Core.Domain;
 using Dayswork.Core.Machines;
+using Dayswork.Core.Net;
 using Dayswork.Core.Persistence;
 using Dayswork.Core.Pricing;
 using Dayswork.Core.Upgrades;
+using Dayswork.Guards;
 using Dayswork.Integration;
+using Dayswork.Net;
 using Dayswork.Orchestration;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
@@ -63,8 +66,9 @@ internal sealed class HiringFlowCoordinator
         var draft = new ContractDraft
         {
             OfficeId = office.id.Value,
-            OwnerId = ResolveOwner(office),
+            OwnerId = ContractRequestHandler.ResolveOwner(office),
         };
+        RequestMenuSnapshot(draft.OfficeId);
         ShowHub(draft);
     }
 
@@ -75,6 +79,7 @@ internal sealed class HiringFlowCoordinator
             return;
 
         _cropCatalog = null;
+        RequestMenuSnapshot(officeId);
         ShowHub(CreateEditDraft(contract));
     }
 
@@ -83,21 +88,33 @@ internal sealed class HiringFlowCoordinator
         Game1.activeClickableMenu = new ContractMenu(_contractStore, officeId);
     }
 
-    /// <summary>Entry point from an office's tile action: manage that office's contract, else hire
-    /// a farmhand for it.</summary>
+    /// <summary>
+    /// Entry point from an office's tile action: manage that office's contract, else hire a
+    /// farmhand for it — but only for the office's owner. Anyone else gets the same page in its
+    /// read-only form (2.0 plan D4), which is <see cref="ContractMenu"/> with the actions their
+    /// role allows, so there is no second card to keep in step.
+    /// </summary>
     public void OpenFromBuilding(Building office)
     {
-        if (_contractStore.HasOpenContract(office.id.Value))
+        if (_contractStore.HasOpenContract(office.id.Value) || !OfficeViewerRoles.Resolve(office).CanEdit())
             OpenManageFlow(office.id.Value);
         else
             OpenHiringFlow(office);
     }
 
-    // Building.owner is set by buildStructure, so a carpenter-built office carries its builder's
-    // id. A 0 means the building predates ownership (or was placed by a path that bypasses
-    // buildStructure) — treat it as the host's, matching the 1.x → 2.0 adoption rule.
-    private static long ResolveOwner(Building office) =>
-        office.owner.Value != 0 ? office.owner.Value : Game1.MasterPlayer.UniqueMultiplayerID;
+    /// <summary>
+    /// A client asks the host for the parts of its world it cannot see (expansion locations and
+    /// their chests) as the flow opens, so the answer is usually there by the time the player
+    /// reaches a picker that needs it. No-op on the host, which reads the world directly.
+    /// </summary>
+    private void RequestMenuSnapshot(Guid officeId)
+    {
+        if (Authority.IsRemoteClient)
+        {
+            Net.MenuSnapshotCache.Current = null;
+            ModEntry.Requests.RequestMenuSnapshot(officeId);
+        }
+    }
 
     // Hub-and-spoke navigation: the hub is the home page and every spoke returns to it. RefreshPreview
     // here keeps the hub's per-section status and the Confirm gate current after any change.
@@ -130,82 +147,83 @@ internal sealed class HiringFlowCoordinator
     public void ShowUpgradesFromManage(Guid officeId)
     {
         Game1.activeClickableMenu = new UpgradesMenu(
-            _upgradeStore.State,
-            onPurchase: kind => PurchaseUpgradeFromManage(officeId, kind),
+            MyUpgrades(),
+            onPurchase: kind => PurchaseUpgrade(officeId, kind, () => ShowUpgradesFromManage(officeId)),
             onBack: () => OpenManageFlow(officeId));
     }
 
     private void ShowUpgrades(ContractDraft draft)
     {
         Game1.activeClickableMenu = new UpgradesMenu(
-            _upgradeStore.State,
-            onPurchase: kind => PurchaseUpgradeFromDraft(draft, kind),
+            MyUpgrades(),
+            onPurchase: kind => PurchaseUpgrade(draft.OfficeId, kind, () =>
+            {
+                RefreshPreview(draft);
+                ShowUpgrades(draft);
+            }),
             onBack: () => ShowHub(draft));
     }
 
-    private void PurchaseUpgradeFromDraft(ContractDraft draft, FarmhandUpgradeKind kind)
-    {
-        if (TryPurchaseUpgrade(kind))
-            RefreshPreview(draft);
+    /// <summary>
+    /// This player's own upgrades. They are per owner (2.0 plan D9) and live in host save data, so
+    /// a remote client reads them from the host's menu snapshot instead of the store.
+    /// </summary>
+    private FarmhandUpgradeState MyUpgrades() =>
+        Authority.IsRemoteClient
+            ? Net.MenuSnapshotCache.Upgrades
+            : _upgradeStore.For(Game1.player.UniqueMultiplayerID);
 
-        ShowUpgrades(draft);
-    }
-
-    private void PurchaseUpgradeFromManage(Guid officeId, FarmhandUpgradeKind kind)
+    /// <summary>
+    /// Buying is a host action: it moves money and writes host save data. The menu sends a request
+    /// and redraws from the answer — on the host that is the same tick, so this reads exactly like
+    /// the old direct purchase.
+    /// </summary>
+    private void PurchaseUpgrade(Guid officeId, FarmhandUpgradeKind kind, Action reopen)
     {
-        TryPurchaseUpgrade(kind);
-        ShowUpgradesFromManage(officeId);
-    }
-
-    private bool TryPurchaseUpgrade(FarmhandUpgradeKind kind)
-    {
-        // Upgrades are bought by whoever is standing at the menu, out of their own wallet.
-        var buyerWallet = Sponsor.Wallet(Game1.player.UniqueMultiplayerID);
-        var result = FarmhandUpgradePurchaser.TryPurchase(kind, _upgradeStore.State, buyerWallet.Value);
-        switch (result.Status)
+        // The two "you already know this" cases are answered locally from the state the page is
+        // already drawing, so they keep their specific wording; everything else is the host's call.
+        var current = MyUpgrades();
+        if (current.IsPurchased(kind))
         {
-            case FarmhandUpgradePurchaseStatus.Purchased:
-                buyerWallet.Value = result.RemainingGold;
-                _upgradeStore.Replace(result.State);
-                if (kind == FarmhandUpgradeKind.Energy)
-                    ApplyEnergyUpgradeToOpenContracts();
+            reopen();
+            return;
+        }
 
+        if (kind == FarmhandUpgradeKind.Speed2 && !current.IsPurchased(FarmhandUpgradeKind.Speed))
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("ui.upgrades.prereq_required"),
+                HUDMessage.error_type));
+            reopen();
+            return;
+        }
+
+        ModEntry.Requests.SubmitAction(officeId, ContractActionKind.PurchaseUpgrade, response =>
+        {
+            if (response.Accepted)
+            {
                 Game1.addHUDMessage(new HUDMessage(
                     I18nHelper.Get("notify.upgrade_purchased", new { name = UpgradeDisplayName(kind) }),
                     HUDMessage.newQuest_type));
-                return true;
-
-            case FarmhandUpgradePurchaseStatus.InsufficientFunds:
+            }
+            else if (response.Code == ContractRejectionCode.CannotAfford)
+            {
                 Game1.addHUDMessage(new HUDMessage(
                     I18nHelper.Get("ui.upgrades.cant_afford"),
                     HUDMessage.error_type));
-                return false;
-
-            case FarmhandUpgradePurchaseStatus.PrerequisiteNotMet:
+            }
+            else
+            {
                 Game1.addHUDMessage(new HUDMessage(
-                    I18nHelper.Get("ui.upgrades.prereq_required"),
+                    ContractRejectionText.Describe(response.Code),
                     HUDMessage.error_type));
-                return false;
+            }
 
-            case FarmhandUpgradePurchaseStatus.AlreadyPurchased:
-                return false;
-
-            default:
-                throw new ArgumentOutOfRangeException(nameof(result.Status), result.Status, null);
-        }
-    }
-
-    private void ApplyEnergyUpgradeToOpenContracts()
-    {
-        foreach (var contract in _contractStore.OpenContracts())
-        {
-            _contractStore.Update(
-                contract.OfficeId,
-                contract with
-                {
-                    TermsSnapshot = FarmhandUpgradeEffects.AddEnergyBonus(contract.TermsSnapshot),
-                });
-        }
+            // The response carries the buyer's upgrade state, so a client's page is right without
+            // a second round trip.
+            Net.MenuSnapshotCache.ApplyUpgradeState(response);
+            reopen();
+        }, upgradeKind: kind.ToString());
     }
 
     private void ShowTaskSelection(ContractDraft draft)
@@ -402,7 +420,30 @@ internal sealed class HiringFlowCoordinator
                 IsAvailable: Game1.getFarm().greenhouseUnlocked.Value),
         };
 
-        if (ModEntry.ExpansionCompat is { } compat)
+        // Locations outside the farm are the host's to report: a client's game does not keep them
+        // in sync, so it would judge every one of them unavailable. On a client the list is
+        // whatever the host's menu snapshot said, and empty until that arrives (2.0 plan D3).
+        if (Authority.IsRemoteClient)
+        {
+            // Until the host answers, say so rather than showing a list that is short for reasons
+            // the player cannot see.
+            if (Net.MenuSnapshotCache.IsWaiting)
+            {
+                options.Add(new CropGroupLocationOption(
+                    "Dayswork_WaitingForHost",
+                    I18nHelper.Get("ui.net.waiting_for_host"),
+                    IsAvailable: false));
+            }
+
+            foreach (var location in Net.MenuSnapshotCache.ExpansionLocations)
+            {
+                options.Add(new CropGroupLocationOption(
+                    location.LocationName,
+                    location.DisplayName,
+                    IsAvailable: location.IsAvailable));
+            }
+        }
+        else if (ModEntry.ExpansionCompat is { } compat)
         {
             foreach (var descriptor in compat.GetExpansionLocationDescriptors())
             {
@@ -614,6 +655,16 @@ internal sealed class HiringFlowCoordinator
         // Auto-grabbers are valid input sources here only — a grabber's collected animal products can
         // feed reload machines. Output/deposit pickers stay grabber-free (includeAutoGrabbers default).
         var locations = _chestResolver.BuildChestMapLocations(Game1.getFarm(), draft.Greenhouses, includeAutoGrabbers: true);
+
+        // Chests outside the farm come from the host's snapshot; before it arrives the picker shows
+        // only the farm's own, which is worth saying out loud (2.0 plan D3).
+        if (Net.MenuSnapshotCache.IsWaiting)
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("ui.net.waiting_for_host"),
+                HUDMessage.newQuest_type));
+        }
+
         draft.MachinePlan.TryGetGroup(groupId, out var current);
 
         Game1.activeClickableMenu = new ZoneDrawMenu(
@@ -940,6 +991,25 @@ internal sealed class HiringFlowCoordinator
                 yield return (greenhouse, I18nHelper.Get("ui.manage_machines.location_greenhouse"));
         }
 
+        // As with the crop-group location list, a client takes the eligible expansion locations
+        // from the host's snapshot rather than judging availability itself. It still has to be able
+        // to resolve the location to scan it for machines; one it cannot reach is simply not
+        // offered, which is the restriction the plan asks for rather than a silent empty picker.
+        if (Authority.IsRemoteClient)
+        {
+            foreach (var entry in Net.MenuSnapshotCache.ExpansionLocations)
+            {
+                if (!entry.IsAvailable)
+                    continue;
+
+                var location = Game1.getLocationFromName(entry.LocationName);
+                if (location is not null)
+                    yield return (location, entry.DisplayName);
+            }
+
+            yield break;
+        }
+
         if (ModEntry.ExpansionCompat is { } compat)
         {
             foreach (var descriptor in compat.GetExpansionLocationDescriptors())
@@ -995,8 +1065,14 @@ internal sealed class HiringFlowCoordinator
         ShowEnergy(draft);
     }
 
+    /// <summary>
+    /// The config the previewed contract would run under: the base snapshot plus the OFFICE
+    /// OWNER's upgrades, which since 2.0 are per player rather than per farm (plan D9). The player
+    /// authoring the draft is always its owner, so this is also their own upgrade state — the host
+    /// re-derives it the same way when it prices the commit.
+    /// </summary>
     private ConfigSnapshot EffectiveConfig() =>
-        FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, _upgradeStore.State);
+        FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, MyUpgrades());
 
     private static string UpgradeDisplayName(FarmhandUpgradeKind kind) =>
         I18nHelper.Get(kind switch
@@ -1095,50 +1171,51 @@ internal sealed class HiringFlowCoordinator
         draft.PreviewState = HiringFlowViewModelBuilder.Build(draft, draft.PreviewState.Preview);
     }
 
+    /// <summary>
+    /// Hands the finished draft to the host to commit. Money, pricing, and the world checks are all
+    /// the host's (2.0 plan D3), so this side only submits and reacts: on acceptance the flow
+    /// closes; on rejection the player is told why and the hub reopens <b>with the draft intact</b>
+    /// so they can fix the one thing that was wrong rather than start again.
+    /// </summary>
     private void ConfirmContract(ContractDraft draft)
     {
         var proposedTerms = draft.PreviewState.Preview.ProposedTerms;
         if (!draft.PreviewState.ReviewModel.CanConfirm || proposedTerms is null)
             return;
 
-        if (!draft.IsEditing && draft.Schedule == ContractSchedule.OneTime)
+        var original = draft.EditingId.HasValue ? _contractStore.ForOffice(draft.OfficeId) : null;
+        var submitted = BuildContract(draft, proposedTerms);
+        if (original is not null)
         {
-            // The office's owner sponsors the contract, so the up-front price comes out of their
-            // wallet — the same wallet the shift's daily charges and shopping will draw on.
-            var totalPrice = proposedTerms.Pricing.TotalPrice;
-            if (Sponsor.Money(draft.OwnerId) < totalPrice)
-            {
-                Game1.addHUDMessage(new HUDMessage(
-                    I18nHelper.Get("ui.error.cant_afford"),
-                    HUDMessage.error_type));
-                return;
-            }
-
-            Sponsor.Charge(draft.OwnerId, totalPrice);
-        }
-
-        var builtContract = BuildContract(draft, proposedTerms);
-
-        if (draft.EditingId.HasValue)
-        {
-            var original = _contractStore.ForOffice(draft.OfficeId)
-                ?? throw new InvalidOperationException($"Office {draft.OfficeId} no longer has a contract to edit.");
-            var updated = builtContract with
+            submitted = submitted with
             {
                 Id = original.Id,
                 Status = original.Status,
                 HireDate = original.HireDate,
                 Revision = original.Revision,
             };
-
-            _contractStore.Update(draft.OfficeId, updated);
-        }
-        else
-        {
-            _contractStore.Add(builtContract);
         }
 
-        CloseFlow();
+        ModEntry.Requests.SubmitContract(
+            draft.OfficeId,
+            submitted,
+            isEdit: original is not null,
+            expectedRevision: original?.Revision ?? 0,
+            response =>
+            {
+                if (response.Accepted)
+                {
+                    CloseFlow();
+                    return;
+                }
+
+                Game1.addHUDMessage(new HUDMessage(
+                    response.Code == ContractRejectionCode.CannotAfford
+                        ? I18nHelper.Get("ui.error.cant_afford")
+                        : ContractRejectionText.Describe(response.Code),
+                    HUDMessage.error_type));
+                ShowHub(draft);
+            });
     }
 
     private static Contract BuildContract(

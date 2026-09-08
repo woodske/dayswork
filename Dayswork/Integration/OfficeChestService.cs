@@ -20,6 +20,11 @@ internal sealed class OfficeChestService
         if (farm is null)
             return;
 
+        // Adding a chest to a building is a world mutation, so it belongs to the host alone
+        // (2.0 plan D2). Clients see the result through the building's own sync.
+        if (!Guards.Authority.IsHost)
+            return;
+
         foreach (var building in OfficeResolver.EnumerateOffices(farm))
         {
             EnsureInputChest(building);

@@ -35,7 +35,7 @@ live in [`../analysis/`](../analysis/index.md) and carry no status. Verified gam
 
 | Plan | Status | Depends on | Verify (state of the code, not the doc) |
 |---|---|---|---|
-| [dayswork-2.0](dayswork-2.0.md) — N offices, ownership, multiplayer, appearance, painting (six phases) | `IN PROGRESS 2026-09-07` — **Phases 0, 1, 2 and 3 built** on branch `dayswork-2.0`, build + 720 tests green; Phases 1, 2 and 3 all owe their in-game smoke passes (deferred until every phase is built, per the user). Phases 4–5 not started | — | Phase 0: `grep -rni cabin Dayswork Dayswork.Tests` → only the footprint comment. Phase 1: `grep -rn "class ShiftFleet\|class OfficeContractStore" Dayswork/` hits and `grep -rn OnePerFarmBuildCondition Dayswork/` is empty. Phase 2: `grep -rn "Game1\.player\.Money" Dayswork/` is empty. Phase 3: `ls Dayswork/assets/farmhand_PaintMask.png` and `grep -rn "class WorkerAppearances" Dayswork.Core/` both hit. Phase 4: `grep -rn "class MultiplayerGuard" Dayswork/` is empty and `grep -rn "PeerContextReceived" Dayswork/` hits. Phase 5: `grep -rn "Data/PaintData" Dayswork/` hits. |
+| [dayswork-2.0](dayswork-2.0.md) — N offices, ownership, multiplayer, appearance, painting (six phases) | `IN PROGRESS 2026-09-07` — **Phases 0, 1, 2, 3 and 4 built** on branch `dayswork-2.0`, build + 781 tests green; Phases 1–4 all owe their in-game smoke passes (deferred until every phase is built, per the user) — that is the whole of S1–S31. Phase 5 not started | — | Phase 0: `grep -rni cabin Dayswork Dayswork.Tests` → only the footprint comment. Phase 1: `grep -rn "class ShiftFleet\|class OfficeContractStore" Dayswork/` hits and `grep -rn OnePerFarmBuildCondition Dayswork/` is empty. Phase 2: `grep -rn "Game1\.player\.Money" Dayswork/` is empty. Phase 3: `ls Dayswork/assets/farmhand_PaintMask.png` and `grep -rn "class WorkerAppearances" Dayswork.Core/` both hit. Phase 4: `grep -rn "class MultiplayerGuard" Dayswork/` is empty and `grep -rn "PeerContextReceived" Dayswork/` hits; `ls Dayswork.Core/Net Dayswork/Net` both list files. Phase 5: `grep -rn "Data/PaintData" Dayswork/` hits. |
 
 ### Notes
 
@@ -59,7 +59,10 @@ neither carries a status any more:
   was to be measured against shipped 2026-07-03 and passed its smoke pass 2026-07-07. Verify with
   `grep -rn "StandCoveragePlanner" Dayswork.Core/` — no hits means not started.
 - **[multiplayer-readiness](../analysis/multiplayer-readiness.md)** — a feasibility study, not a
-  plan. Nothing in it has been implemented; do not advertise the mod as multiplayer-ready.
+  plan. Its *recommendation* was superseded by dayswork-2.0, whose Phase 4 (built 2026-09-07)
+  implements the host-authoritative model it sketched. Its facts still hold, but it describes the
+  1.x codebase, so read it as history. **Do not advertise the mod as multiplayer-ready until
+  S10–S31 have actually been run in-game** — Phase 4 is built and unit-tested, not smoke-tested.
 
 ## Recently archived
 

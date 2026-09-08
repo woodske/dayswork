@@ -19,6 +19,10 @@ public class HardcodedUserFacingStringLintTests
     {
         // Exception messages are developer-facing (they surface in the SMAPI log, not the HUD).
         new(@"new \w*Exception\(", RegexOptions.Compiled),
+        // A network rejection's `detail` is developer-facing too: it is logged and carried in a
+        // message field the UI never renders. What the player sees is ContractRejectionText, which
+        // maps the rejection CODE to an i18n key.
+        new(@"\bReject(?:Action)?\(", RegexOptions.Compiled),
         new(@"I18nHelper\.Get\(", RegexOptions.Compiled),
         new(@"_helper\.Translation\.Get\(", RegexOptions.Compiled),
         new(@"\.Log\(", RegexOptions.Compiled),

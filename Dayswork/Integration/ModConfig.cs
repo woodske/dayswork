@@ -16,6 +16,15 @@ public sealed class ModConfig
     public bool WorkOnHolidays { get; set; } = DefaultSnapshot.WorkOnHolidays;
     public bool EagerChestDeposits { get; set; } = DefaultSnapshot.EagerChestDeposits;
 
+    /// <summary>
+    /// Host-only multiplayer policy: kick a joining player who cannot run Dayswork instead of
+    /// suspending the mod for everyone. Off by default because suspending is the gentler failure,
+    /// but recommended for public lobbies — the host cannot always despawn its workers before a
+    /// modless client is handed the world (2.0 plan D8 / correction 8). Not part of ConfigSnapshot:
+    /// nothing in the shift engine reads it.
+    /// </summary>
+    public bool KickIncompatiblePeers { get; set; }
+
     public Dictionary<string, int> EnergyTierEnergy { get; set; } = CreateEnergyTierEnergyDefaults();
     public Dictionary<string, int> EnergyTierPrice { get; set; } = CreateEnergyTierPriceDefaults();
     public Dictionary<string, int> WorkActionCosts { get; set; } = CreateWorkActionCostDefaults();

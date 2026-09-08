@@ -44,6 +44,11 @@ internal sealed class CalendarHandlers
     }
 
     // GameLoop.Saving handler (registered before the contract persistence hook so every live shift
-    // settles into today's state before the day rolls over).
-    public void OnSavingHook(object? sender, SavingEventArgs e) => _fleet.StopForSleepAndSettle();
+    // settles into today's state before the day rolls over). The day ends when the HOST saves; a
+    // client going to bed early changes nothing for anyone's farmhand (2.0 plan D10).
+    public void OnSavingHook(object? sender, SavingEventArgs e)
+    {
+        if (Guards.Authority.IsHost)
+            _fleet.StopForSleepAndSettle();
+    }
 }

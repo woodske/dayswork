@@ -1,4 +1,3 @@
-using Dayswork.Guards;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -10,13 +9,23 @@ namespace Dayswork.Integration;
 /// <summary>
 /// Handles action-clicks on a farmhand office. Clicking anywhere on an office's footprint opens
 /// the hire/manage flow <b>for that office</b>, except the two porch chests which open their own
-/// UI. Single-player only until the 2.0 plan's Phase 4.
+/// UI.
+///
+/// This runs on every peer: any player may walk up to any office and read its card, and the
+/// coordinator decides from <c>Building.owner</c> what they may do there (2.0 plan D4). When the
+/// host cannot run Dayswork, the card says so rather than opening a flow whose every action would
+/// be refused.
 /// </summary>
 internal sealed class HiringBuildingInteraction
 {
     private readonly IModHelper _helper;
+    private readonly OfficeContractPersistence _contractPersistence;
 
-    public HiringBuildingInteraction(IModHelper helper) => _helper = helper;
+    public HiringBuildingInteraction(IModHelper helper, OfficeContractPersistence contractPersistence)
+    {
+        _helper = helper;
+        _contractPersistence = contractPersistence;
+    }
 
     public void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
     {
@@ -25,8 +34,6 @@ internal sealed class HiringBuildingInteraction
         // Also accept MouseLeft: on Android gamepadControls=true causes IsActionButton()
         // to reject touch taps (which fire as SButton.MouseLeft).
         if (!e.Button.IsActionButton() && e.Button != SButton.MouseLeft)
-            return;
-        if (MultiplayerGuard.IsMultiplayer())
             return;
         if (Game1.currentLocation is not Farm farm)
             return;
@@ -66,6 +73,21 @@ internal sealed class HiringBuildingInteraction
 
         // Any non-chest tile on the building opens the hire/manage flow.
         _helper.Input.Suppress(e.Button);
+
+        // Nothing this menu offers can be committed when the host has no compatible Dayswork, so
+        // say that once instead of letting every action come back rejected.
+        if (ModEntry.Suspension.HostIsIncompatible)
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                I18nHelper.Get("ui.net.host_incompatible_card"),
+                HUDMessage.error_type));
+            return;
+        }
+
+        // Contracts live in synced building modData, so re-reading them here is all a client needs
+        // to show what the host currently holds — no refresh protocol, no staleness window wider
+        // than the moment before the menu opens.
+        _contractPersistence.RehydrateFromWorld();
         ModEntry.Coordinator.OpenFromBuilding(building);
     }
 

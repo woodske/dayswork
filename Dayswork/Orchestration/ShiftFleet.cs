@@ -64,8 +64,46 @@ internal sealed class ShiftFleet : ISessionBoundaryResettable
     public ShiftOrchestrator? ForOffice(Guid officeId) =>
         _active.FirstOrDefault(o => o.ActiveOfficeId == officeId);
 
+    /// <summary>
+    /// Ends every live shift sponsored by this player, through the normal early-stop path (items
+    /// deposited, worker despawned). Used when an owner disconnects and their contract says the
+    /// farmhand should not keep working without them.
+    /// </summary>
+    public int EndShiftsForOwner(long ownerId)
+    {
+        var ended = 0;
+        foreach (var orchestrator in Snapshot())
+        {
+            if (orchestrator.ActiveOwnerId != ownerId)
+                continue;
+
+            orchestrator.EndShiftEarly();
+            ended++;
+        }
+
+        return ended;
+    }
+
+    /// <summary>The contract behind each live shift, for owner-scoped decisions.</summary>
+    public IReadOnlyList<(Guid OfficeId, long OwnerId)> LiveShifts() =>
+        _active
+            .Where(o => o.ActiveOfficeId is not null && o.ActiveOwnerId is not null)
+            .Select(o => (o.ActiveOfficeId!.Value, o.ActiveOwnerId!.Value))
+            .ToList();
+
     public void StartShift(Contract contract, ConfigSnapshot runtimeConfig)
     {
+        // The engine is host-only (2.0 plan D2). Every caller is already host-gated; this is the
+        // invariant stated where it is enforced, so a future entry point cannot spawn a worker on
+        // a client — which would desync the world and throw on peers that cannot read the NPC type.
+        if (!Guards.Authority.IsHost)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] StartShift was called off the host for contract {contract.Id.Value} — ignoring. Only the host runs shifts.",
+                LogLevel.Error);
+            return;
+        }
+
         if (IsShiftRunning(contract.Id))
         {
             ModEntry.ModMonitor.Log(

@@ -46,6 +46,22 @@ internal sealed class OfficeContractPersistence
 
     public void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
     {
+        RehydrateFromWorld();
+
+        // Adoption rewrites save data and charges nobody, but it is still a world mutation: the
+        // host does it, and every client then sees the result through the office's synced modData.
+        if (Guards.Authority.IsHost)
+            AdoptLegacyContractIfAny();
+    }
+
+    /// <summary>
+    /// Rebuilds the in-memory map from what the offices currently hold. Every peer can do this —
+    /// <c>Building.modData</c> is synced — which is how a client shows a live contract card without
+    /// a message channel of its own. Called at save load, and again whenever a client opens an
+    /// office's menu, so its view is the host's latest rather than the one it loaded with.
+    /// </summary>
+    public void RehydrateFromWorld()
+    {
         var farm = Game1.getFarm();
         var hydrated = new List<KeyValuePair<Guid, Contract>>();
 
@@ -57,8 +73,6 @@ internal sealed class OfficeContractPersistence
         }
 
         _store.HydrateAll(hydrated);
-
-        AdoptLegacyContractIfAny();
     }
 
     /// <summary>
@@ -124,6 +138,19 @@ internal sealed class OfficeContractPersistence
 
     private void WriteBack(Guid officeId, Contract? contract)
     {
+        // modData authority is a discipline, not something the netcode enforces (2.0 plan, "Risks").
+        // A remote client writing here would produce a contract the host never agreed to and that
+        // the next sync silently overwrites, so it is refused loudly instead. The test is "is the
+        // host in this process", not "is this screen the host": a split-screen guest commits by
+        // calling the host's handler directly, and that write is the host's.
+        if (!Guards.Authority.HostIsInThisProcess)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Refused a contract write-back for office {officeId:N}: only the host may write contract data. This is a bug — the change should have gone through a request.",
+                LogLevel.Error);
+            return;
+        }
+
         var office = OfficeResolver.TryGet(officeId);
         if (office is null)
         {

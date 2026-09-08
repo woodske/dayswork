@@ -127,6 +127,15 @@ this value.
 - `Game1.getFarmer(long id)` (`Game1.cs:10922`) is **online-only and falls back to `MasterPlayer`**
   — do not use it for owner resolution; a missing owner would silently become the host.
 - `getAllFarmhands()` / `getOfflineFarmhands()` (`Game1.cs:10967, 10983`) enumerate `farmhandData`.
+- **Re-confirmed 2026-09-07 (Phase 4)**, because the sponsor model turns on it:
+  - An **offline owner still resolves**, to their `farmhandData` `Farmer` frozen at their last
+    disconnect. That is what makes the offline-owner tool snapshot
+    (`ToolLevelReader.ReadSnapshot`) and their shipping bin work while they are away.
+  - A **null** result therefore means the farmhand slot was genuinely deleted — the orphaned-office
+    case (2.0 plan D4), not merely "not logged in". Day start skips such a contract and the host
+    can claim the office.
+  - `onlyOnline: true` is the right test for "may this player receive XP", since only
+    `Game1.otherFarmers` message queues are ever flushed.
 
 ## Shipping
 
@@ -190,15 +199,43 @@ this value.
   `false`). `NPC.reloadSprite` → `ChooseAppearance` → `getTextureName()` (`NPC.cs:1101, 1170`) can
   re-derive the sprite from `Name`, which is why the 2026-07-08 build overrode `getTextureName()`.
 - `NPC.update` gates schedule/controller movement and `animateOnce` on `Game1.IsMasterGame`
-  (`NPC.cs:3187, 3317, 3369`); clients interpolate the synced position. Still verify in-game that a
-  `FarmhandNpc` constructed on a client is inert (no controller, no local pathing).
+  (`NPC.cs:3187, 3317, 3369`); clients interpolate the synced position.
+- **Confirmed 2026-09-07 (Phase 4):** the gate is in `Character.update(GameTime, GameLocation, long,
+  bool)` itself. It runs `updateMovement` and `controller.update` only under
+  `if (Game1.IsMasterGame || <this character is an actor in a temporary/event location>)`, and
+  otherwise calls `updateSlaveAnimation(time)`. So a custom NPC on a client replays the synced
+  sprite state and simulates nothing — **`FarmhandNpc` needs no client-inertness override**, and
+  adding one would be dead code. (In-world confirmation is still a smoke item, S11.)
 
-## Kicking a peer
+## Kicking a peer, and text that reaches a modless guest
 
-`GameServer.kick(long disconnectee)` (`GameServer.cs:401`) exists on `Game1.server` and disconnects
-one peer. Also available: `Multiplayer.sendChatMessage(LanguageCode, string, long recipientID)`
-(`Multiplayer.cs:1127`) and `globalChatInfoMessageEvenInSinglePlayer` (`Multiplayer.cs:1178`) for
-text that reaches peers without the mod.
+`kick(long disconnectee)` is on the `IGameServer` interface, so `Game1.server.kick(peerId)` is the
+whole of it (`Game1.server` is a public static `IGameServer`; null in single-player, so null-check).
+
+For chat, `Multiplayer.sendChatMessage(LanguageCode, string, long recipientID)` is the only way to
+put **arbitrary** text in front of a player who does not have the mod — `globalChatInfoMessage` takes
+a `Strings\UI:Chat_*` key, which a mod cannot add for a vanilla client. Verified 2026-09-07:
+
+- `Game1.Multiplayer` is a **public static property** over the `protected internal static`
+  `Game1.multiplayer` field, so no reflection is needed.
+- `Multiplayer.AllPlayers` is `0L`.
+- On the host the method iterates `Game1.otherFarmers.Keys` and sends message type 10 with
+  `Game1.player` as the source farmer — so it reaches **every other player and not the sender**. The
+  host must add its own copy with `Game1.chatBox?.addInfoMessage(text)`
+  (`ChatBox.addInfoMessage` -> `receiveChatMessage(0L, userNotificationMessage, ...)`).
+- The receiving side renders it through `Multiplayer.receiveChatMessage` -> `ChatBox`, which needs no
+  mod at all.
+
+## `Context.IsOnHostComputer` is the loopback test
+
+SMAPI's own docs (confirmed 2026-09-07): `Context.IsSplitScreen` is *"only applicable when
+`IsOnHostComputer` is true, since split-screen players on another computer are just regular remote
+players"*, and `IsOnHostComputer` is *"true for both the main player and split-screen players"*.
+
+So `IsOnHostComputer` — not `IsSplitScreen` — is the correct test for "the host's own code is in
+this process, so a request can be a direct call instead of a message". A split-screen player on a
+guest's machine correctly answers false and goes over the wire. Dayswork wraps this as
+`Authority.HostIsInThisProcess`.
 
 ## SMAPI multiplayer API (from `StardewModdingAPI.xml`)
 

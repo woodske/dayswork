@@ -119,6 +119,14 @@ internal sealed class GMCMRegistrar
             () => I18nHelper.Get("gmcm.worker.eager_chest_deposits.tooltip"),
             fieldId: "worker-eager-chest-deposits");
 
+        api.AddBoolOption(
+            _manifest,
+            () => _config.Editable.KickIncompatiblePeers,
+            value => _config.Editable.KickIncompatiblePeers = value,
+            () => I18nHelper.Get("gmcm.worker.kick_incompatible_peers.name"),
+            () => I18nHelper.Get("gmcm.worker.kick_incompatible_peers.tooltip"),
+            fieldId: "worker-kick-incompatible-peers");
+
         RegisterFloatOption(
             api,
             new FloatOptionSpec(

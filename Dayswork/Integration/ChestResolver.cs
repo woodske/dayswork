@@ -100,27 +100,95 @@ internal sealed class ChestResolver
                         out _))
                     continue;
 
-                var location = Game1.getLocationFromName(descriptor.LocationName);
-                if (location is null)
+                foreach (var entry in EnumerateOffFarmChestsAt(descriptor.LocationName, descriptor.DisplayName, includeAutoGrabbers))
+                    result.Add(entry);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Chests in one location outside the farm. On the host's own computer (split-screen guests
+    /// included) this is a live scan; on a remote client it reads the host's menu snapshot, because
+    /// Stardew only keeps a location in sync while a player is in it — a client scanning an
+    /// expansion map it is not standing on finds nothing, which would silently offer an empty
+    /// picker rather than an honest one (2.0 plan D3).
+    /// </summary>
+    private IEnumerable<ChestEntry> EnumerateOffFarmChestsAt(string locationName, string groupLabel, bool includeAutoGrabbers)
+    {
+        if (Guards.Authority.IsRemoteClient)
+        {
+            foreach (var snapshot in Net.MenuSnapshotCache.OffFarmChests)
+            {
+                if (!string.Equals(snapshot.LocationName, locationName, StringComparison.Ordinal))
+                    continue;
+                if (snapshot.IsAutoGrabber && !includeAutoGrabbers)
                     continue;
 
-                foreach (var (tile, obj) in location.Objects.Pairs)
+                yield return new ChestEntry(
+                    new ChestRef(snapshot.LocationName, new TileCoord(snapshot.TileX, snapshot.TileY)),
+                    snapshot.DisplayName,
+                    groupLabel);
+            }
+
+            yield break;
+        }
+
+        var location = Game1.getLocationFromName(locationName);
+        if (location is null)
+            yield break;
+
+        foreach (var (tile, obj) in location.Objects.Pairs)
+        {
+            var tileX = (int)tile.X;
+            var tileY = (int)tile.Y;
+            var chestRef = new ChestRef(location.NameOrUniqueName, new TileCoord(tileX, tileY));
+
+            if (obj is Chest chest)
+                yield return new ChestEntry(chestRef, GetDisplayName(chest, location, tileX, tileY), groupLabel);
+            else if (includeAutoGrabbers && GetGrabberInputChest(obj) is not null)
+                yield return new ChestEntry(chestRef, GetGrabberDisplayName(obj), groupLabel);
+        }
+    }
+
+    /// <summary>
+    /// Every chest and auto-grabber outside the farm that a contract could point at, for the host's
+    /// menu snapshot. Unfiltered by greenhouse selection: the client applies that filter itself (it
+    /// has the same expansion profile — what it lacks is the world data).
+    /// </summary>
+    internal List<Net.SnapshotChestEntry> GetOffFarmChests()
+    {
+        var result = new List<Net.SnapshotChestEntry>();
+        if (Game1.getFarm() is not { } farm || ModEntry.ExpansionCompat is not { } compat)
+            return result;
+
+        foreach (var descriptor in compat.GetExpansionLocationDescriptors())
+        {
+            if (!descriptor.IsWorkScopeEligible)
+                continue;
+            if (!compat.TryValidateRoute(farm, "Farm", descriptor.LocationName, ExpansionRoutePurpose.DepositEntry, out _, out _))
+                continue;
+
+            var location = Game1.getLocationFromName(descriptor.LocationName);
+            if (location is null)
+                continue;
+
+            foreach (var (tile, obj) in location.Objects.Pairs)
+            {
+                var tileX = (int)tile.X;
+                var tileY = (int)tile.Y;
+                if (obj is Chest chest)
                 {
-                    var tileX = (int)tile.X;
-                    var tileY = (int)tile.Y;
-                    if (obj is Chest chest)
-                    {
-                        var chestRef = new ChestRef(location.NameOrUniqueName, new TileCoord(tileX, tileY));
-                        result.Add(new ChestEntry(
-                            chestRef,
-                            GetDisplayName(chest, location, tileX, tileY),
-                            descriptor.DisplayName));
-                    }
-                    else if (includeAutoGrabbers && GetGrabberInputChest(obj) is not null)
-                    {
-                        var chestRef = new ChestRef(location.NameOrUniqueName, new TileCoord(tileX, tileY));
-                        result.Add(new ChestEntry(chestRef, GetGrabberDisplayName(obj), descriptor.DisplayName));
-                    }
+                    result.Add(new Net.SnapshotChestEntry(
+                        location.NameOrUniqueName, descriptor.DisplayName, tileX, tileY,
+                        GetDisplayName(chest, location, tileX, tileY), IsAutoGrabber: false));
+                }
+                else if (GetGrabberInputChest(obj) is not null)
+                {
+                    result.Add(new Net.SnapshotChestEntry(
+                        location.NameOrUniqueName, descriptor.DisplayName, tileX, tileY,
+                        GetGrabberDisplayName(obj), IsAutoGrabber: true));
                 }
             }
         }

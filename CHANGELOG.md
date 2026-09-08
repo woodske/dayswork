@@ -26,12 +26,29 @@
 - Farmhands can be given one of ten colour palettes from the Preferences screen, so the workers of
   different offices are easy to tell apart at a glance. The screen shows a live preview of the
   sprite as you flick through them.
+- **Dayswork now works in co-op.** Every player can build offices and hire their own farmhand, and
+  everyone sees everyone else's workers out on the farm. Everyone playing needs the same version of
+  Dayswork installed.
+- Walking up to another player's office shows their farmhand's contract as a read-only card, so you
+  can see who is working where without being able to change anything. The host can additionally
+  pause or cancel any contract, which is how an absent player's farmhand can be stopped.
+- If an office belongs to a farmhand slot that has since been deleted, its worker stays home and the
+  host gets a "Claim office" button to take the building over.
+- Farmhand upgrades are now bought and owned per player, out of your own wallet, instead of being
+  shared across the whole farm.
+- A new option, "Disconnect players without Dayswork", is available to the host. It is off by
+  default, but recommended if you host a public lobby.
 
 ### Changed
 
 - Everything about a contract — the fee, the seeds and fertiliser your farmhand buys, the tool
   levels it works with, and where its output is shipped — now follows the player who owns the
   office, rather than whoever happens to be playing.
+- Messages about your farmhand's day now reach *you*, wherever you are playing from, rather than
+  appearing on the host's screen.
+- If someone joins who does not have Dayswork installed (or has a different version of it), every
+  farmhand comes home and no new ones go out until they leave. A message in the chat explains why,
+  so the joining player can see it too.
 
 - Farmhands no longer plan a shopping trip for gold another farmhand is already on the way to
   spend, so two workers can't both set out and leave one arriving at an empty till.
