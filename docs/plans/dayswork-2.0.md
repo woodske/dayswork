@@ -626,16 +626,32 @@ smoke passes for Phases 1–4 are deliberately deferred until every phase is bui
 **Problem.** Robin's paint menu refuses the office.
 
 **Design.** Per the game-data file: author `assets/farmhand_office_PaintMask.png` (160×122; red /
-lime / blue regions for walls / roof / trim; glow and smoke frames unmasked) served as
-`Mods/Bindicle.Dayswork/Building_PaintMask`; edit `Data/PaintData` to add
-`Bindicle.Dayswork_Office: "Walls/-100 100/Roof/-100 100/Trim/-100 100"`; edit `Strings/Buildings`
-to add `Paint_Region_Walls|Roof|Trim` from i18n. The evening overlay draws the glow from
-`building.texture.Value` (the painted texture) instead of reloading the raw sheet so a repainted
-wall and its lit window agree. Nothing to persist or sync (`netBuildingPaintColor` is both).
+lime / blue regions for the walls / roof / trim; glow and smoke frames unmasked) served as
+`Mods/Bindicle.Dayswork/Building_PaintMask`, and edit `Data/PaintData` to add an entry for
+`Bindicle.Dayswork_Office`. The evening overlay draws the glow from `building.texture.Value` (the
+painted texture) instead of reloading the raw sheet so a repainted wall and its lit window agree.
+Nothing to persist or sync (`netBuildingPaintColor` is both).
+
+**Two changes to this design, made while building it (2026-09-07).** Both came out of dumping the
+real `Data/PaintData` and `Strings/Buildings` rather than assuming their contents — the numbers and
+names are now recorded in [`../game-data/painting.md`](../game-data/painting.md):
+
+1. **No `Strings/Buildings` edit, and the regions are named `Building` / `Roof` / `Trim`, not
+   `Walls`.** Every vanilla `Data/PaintData` entry already uses those three names, and vanilla
+   already ships `Paint_Region_Building|Roof|Trim` translated in all 13 languages. Reusing them
+   gets the office localized labels for nothing; the planned `Walls` would have meant shipping a
+   string of our own *and* overwriting one of vanilla's keys to place it.
+2. **The brightness pairs are `-20 20` / `-15 10` / `-15 10`, not `-100 100`.** The two numbers are
+   the region's lightness slider range, and no vanilla building uses the parser's `-100 100`
+   fallback — they are tuned per building to stop a paint job crushing that region's shading ramp.
+   These match the Log Cabin's, the building the office sprite is modelled on.
 
 **Acceptance.** Robin → Paint Buildings lists the office; three regions repaint; the colour
 survives save/load and is visible to clients; the lit-window overlay matches the painted base; an
 unpainted office renders byte-identical to today.
+
+Built 2026-09-07 (build + 786 tests green, five of them new). **S32 is unrun** — like Phases 1–4,
+its in-game smoke pass is deferred.
 
 ---
 

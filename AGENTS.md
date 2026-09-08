@@ -199,6 +199,13 @@ The load-bearing ones are called out below.
   fields a worker-beat guard has to restore, and that `CreateFakeEventFarmer` copies **no** XP (so a
   fresh action farmer's totals are the beat's delta); painting needs a `Data/PaintData` entry, not
   just a `_PaintMask`. Backs `docs/plans/dayswork-2.0.md`. Confirmed 2026-09-07.
+- `docs/game-data/painting.md` — `BuildingPainter.Apply` / `BuildingPaintColor`: the exact
+  red/lime/blue mask colours matched by **equality**, the flat-index rule (**a mask must be exactly
+  the size of the sheet it paints**), the two cases where `Apply` returns null (and caches that
+  failure for the session), and why the hue/saturation/lightness numbers read as absolutes. Also the
+  full vanilla `Data/PaintData` table — every entry reuses the region names `Building`/`Roof`/`Trim`,
+  already translated in `Strings/Buildings`, so a custom building needs no string edit — and how the
+  office's mask is derived from its sprite. Backs both the worker palettes and the paintable office.
 - `docs/game-data/pathing.md` — the worker passability probe (`IsTilePassableForWorker`, inset `+1/62` rect), the verified `isCollidingPosition(character: null, …)` block table (**FarmAnimals do NOT block** — the animal loop is skipped when `character` is null), the Core `GridPathfinder`/`PassabilityGrid` BFS extraction (N,E,S,W tie-break is load-bearing), and the per-shift `LocationPassabilityCache` (which call sites are cached vs. live, the staleness contract, and the three invalidation mechanisms). Built 2026-07-07.
 
 Hard-coded ids that are already verified in code (keep them centralized when you touch them):
@@ -231,8 +238,8 @@ ids in `HiringBuilding.BuildData`.
 
 ## Current state
 
-Builds clean and runs. **2.0 Phases 1, 2, 3 and 4 landed 2026-09-07** (branch `dayswork-2.0`; all
-four owe their in-game smoke passes, deferred until every phase is built).
+Builds clean and runs. **All of 2.0 — Phases 0–5 — landed 2026-09-07** (branch `dayswork-2.0`;
+every phase still owes its in-game smoke pass, deferred until the whole thing was built).
 
 *Phase 1* — the farm may hold **any number of offices, one farmhand each**. A contract belongs to its
 office — stored in that building's `modData` under schema v4, keyed by `Building.id`, carrying an
@@ -281,13 +288,25 @@ there, log when they are away). A peer that cannot run Dayswork **suspends** the
 live shifts end, nothing spawns, a chat line readable without the mod plus an on-screen banner say
 why — or is kicked when the new `KickIncompatiblePeers` config is on.
 
+*Phase 5* — the office is **paintable** at Robin's, like a barn or a coop.
+`assets/farmhand_office_PaintMask.png` marks its walls / roof / trim, served under the one name
+vanilla will ask for (`Mods/Bindicle.Dayswork/Building_PaintMask`, i.e.
+`textureName() + "_PaintMask"`), and `HiringBuilding` adds the `Data/PaintData` entry without which
+the carpenter menu refuses the building outright. The three regions reuse **vanilla's own** names
+(`Building` / `Roof` / `Trim`), so their menu labels come from the base game's already-translated
+`Strings/Buildings:Paint_Region_*` and Dayswork ships no string of its own; the brightness pairs are
+the Log Cabin's. The colour needs neither persistence nor sync — `netBuildingPaintColor` is both.
+`HiringBuildingOverlayRenderer` now draws the evening glow and smoke from each office's own
+`building.texture.Value` rather than reloading the raw sheet, so a repainted office and its lit
+window can never disagree. See `docs/game-data/painting.md` for the mask's derivation.
+
 Working today: build an office and hire from its bulletin board; the
 hiring flow (tasks, zone-draw work scope, output chests, energy tier, task priority, one-time vs
 recurring schedule, managed crops, **Manage Machines**, **Manage Fish Ponds**); the full shift loop
 (animal care, crops, fieldwork, managed-crop planting with auto-buy, **machine collect/reload**,
 **fish-pond collect**, multi-trip deposits, overflow safety, stuck recovery, 8pm cap, sleep settle);
-save/load persistence; per-office evening lighting/smoke; optional GMCM config; and SVE expansion
-compatibility. **Manage Machines** (2026-06-19) is built, unit-tested, and **passed its in-game smoke
+save/load persistence; per-office evening lighting/smoke; repainting the office at Robin's;
+optional GMCM config; and SVE expansion compatibility. **Manage Machines** (2026-06-19) is built, unit-tested, and **passed its in-game smoke
 pass (milestone 8) on 2026-06-28 — release-ready**: worker collect/reload, fish-smoker (fish+coal) and
 dehydrator (×5) loads, flavored-roe round-trip, filtered loads, and the **per-group fetch-first
 single-visit** workflow (worker fetches a group's inputs in one chest trip, then visits each machine

@@ -50,6 +50,10 @@ public class HardcodedUserFacingStringLintTests
         new(@"Guid\.NewGuid", RegexOptions.Compiled),
         new(@"TaskKind\.", RegexOptions.Compiled),
         new(@"BUILDINGS_CONSTRUCTED", RegexOptions.Compiled),
+        // A Data/PaintData value. Its region names are vanilla data keys, not display text: the
+        // paint menu labels each one from Strings/Buildings:Paint_Region_<name>, which the base
+        // game already ships translated. Translating them here would break the lookup.
+        new(@"PaintData", RegexOptions.Compiled),
         // Stardew's displayNameFormat control token — it names an i18n key rather than being
         // display text itself, so it is the opposite of a hardcoded user-facing string.
         new(@"LOCALIZED_TEXT", RegexOptions.Compiled),

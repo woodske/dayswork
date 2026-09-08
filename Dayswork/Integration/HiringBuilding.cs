@@ -21,6 +21,24 @@ internal static class HiringBuilding
     public const string TextureAsset = "Mods/Bindicle.Dayswork/Building";
     private const string TextureFile = "assets/farmhand_office.png";
 
+    /// <summary>
+    /// The paint mask vanilla looks for when repainting the office. The name is not ours to choose:
+    /// <c>Building.resetTexture()</c> asks for <c>textureName() + "_PaintMask"</c>, and
+    /// <c>textureName()</c> is this building's <see cref="TextureAsset"/>.
+    /// </summary>
+    public const string PaintMaskAsset = TextureAsset + "_PaintMask";
+    private const string PaintMaskFile = "assets/farmhand_office_PaintMask.png";
+
+    /// <summary>
+    /// The office's <c>Data/PaintData</c> value: three regions in Robin's paint menu, each with the
+    /// lightness range its slider is clamped to. The region <em>names</em> are vanilla's own
+    /// (<c>Building</c> / <c>Roof</c> / <c>Trim</c>), so their labels come from the base game's
+    /// already-translated <c>Strings/Buildings:Paint_Region_*</c> entries and we neither ship nor
+    /// clobber a string of our own. The ranges match the Log Cabin's, the building this sprite is
+    /// modelled on.
+    /// </summary>
+    public const string PaintData = "Building/-20 20/Roof/-15 10/Trim/-15 10";
+
     /// <summary>Id of the building's built-in output chest where missed/overflow items are deposited.</summary>
     public const string OutputChestId = "Bindicle.Dayswork_Output";
     /// <summary>Id of the building's built-in input chest where crop-management supplies are stored.</summary>
@@ -59,6 +77,20 @@ internal static class HiringBuilding
         if (e.NameWithoutLocale.IsEquivalentTo(TextureAsset))
         {
             e.LoadFromModFile<Texture2D>(TextureFile, AssetLoadPriority.Medium);
+            return;
+        }
+
+        if (e.NameWithoutLocale.IsEquivalentTo(PaintMaskAsset))
+        {
+            e.LoadFromModFile<Texture2D>(PaintMaskFile, AssetLoadPriority.Medium);
+            return;
+        }
+
+        // Without a Data/PaintData entry the carpenter menu refuses the office outright — a
+        // _PaintMask texture on its own is not enough (Building.GetPaintDataKey).
+        if (e.NameWithoutLocale.IsEquivalentTo("Data/PaintData"))
+        {
+            e.Edit(asset => asset.AsDictionary<string, string>().Data[BuildingType] = PaintData);
             return;
         }
 

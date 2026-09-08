@@ -38,6 +38,8 @@
   shared across the whole farm.
 - A new option, "Disconnect players without Dayswork", is available to the host. It is off by
   default, but recommended if you host a public lobby.
+- The Farmhand Office can now be repainted at Robin's shop, like a barn or a coop. Its walls, roof
+  and trim recolour separately, and the colour is saved with the building and seen by everyone.
 
 ### Changed
 

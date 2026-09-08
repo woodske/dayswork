@@ -21,20 +21,26 @@ namespace Dayswork.Integration;
 /// </summary>
 internal sealed class HiringBuildingOverlayRenderer
 {
-    private Texture2D? _texture;
-
     public void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
     {
         if (Game1.currentLocation is not Farm farm)
             return;
 
-        Texture2D? texture = null;
         foreach (var office in OfficeResolver.EnumerateOffices(farm))
         {
             if (!OfficeModData.IsDoneToday(office))
                 continue;
 
-            texture ??= _texture ??= Game1.content.Load<Texture2D>(HiringBuilding.TextureAsset);
+            // The office's own texture, not a fresh load of the raw sheet: when the office has been
+            // repainted this is vanilla's painted copy, so the glow and smoke drawn from it agree
+            // with the walls underneath. Each office keeps its own, so two differently painted
+            // offices light correctly. (The glow and smoke frames are left out of the paint mask,
+            // so they read the same either way — but the texture is per-building, and this is the
+            // one that is always the right one.)
+            var texture = office.texture?.Value;
+            if (texture is null)
+                continue;
+
             DrawDoneForTheDay(e.SpriteBatch, texture, office);
         }
     }

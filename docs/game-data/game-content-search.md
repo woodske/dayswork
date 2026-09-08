@@ -62,6 +62,29 @@ shipping-bin ownership, and NPC synchronization behavior. Pair decompile checks 
 docs (`StardewModdingAPI.xml`) for `Context.IsMultiplayer`, `Context.IsMainPlayer`, multiplayer
 events, `Helper.Multiplayer.SendMessage<T>`, and main-player-only save-data behavior.
 
+### Dumping a base-game `.xnb` data asset without the game running
+
+Base `.xnb` files are **LZX-compressed** (header flag `0x80`), so `strings`/`rg` over them finds
+nothing and Python has no decoder. The cheapest way to read one is to let MonoGame do it: a throwaway
+`net6.0` console app referencing the game's own `MonoGame.Framework.dll` can load any non-graphics
+asset with a `ContentManager` whose `IServiceProvider` returns `null` for everything (no
+`GraphicsDevice` is needed for a `Dictionary<string, string>`).
+
+```csharp
+class Svc : IServiceProvider { public object GetService(Type t) => null; }
+
+var cm = new ContentManager(new Svc(), @"X:\Steam\steamapps\common\Stardew Valley\Content");
+foreach (var kv in cm.Load<Dictionary<string, string>>("Data/PaintData"))
+    Console.WriteLine(kv.Key + "\t" + kv.Value);
+```
+
+with a `<Reference Include="MonoGame.Framework">` pointing at
+`X:\Steam\steamapps\common\Stardew Valley\MonoGame.Framework.dll`. Build it and run the `.exe`
+directly — `dotnet run --` forwards its own flags into `args`. This was used to confirm
+`Data/PaintData` and `Strings/Buildings:Paint_Region_*` for the paintable office (see
+[painting.md](painting.md)). It works for any asset whose type has a built-in `ContentTypeReader`;
+textures and maps still need the game or game-aware tooling.
+
 ## SVE Structure
 
 Important roots under `C:\Users\kwood\Repos\StardewValleyExpanded`:
