@@ -11,6 +11,13 @@ design; see "Corrections to the brief").
 recommendation superseded).
 **Status:** tracked only in [`index.md`](index.md).
 
+**Approved amendment (2026-09-08):** the user replaced the blanket no-Harmony constraint with
+SMAPI events first, allowing narrow patches where they remove substantial complexity. The specific
+exception is worker-tree drop attribution around `Tree.tickUpdate`, specified in
+[review fix R6](dayswork-2.0-review-fixes.md#r6--prevent-cross-worker-capture-of-delayed-tree-drops).
+Networking and XP retain their event/request and Sponsor paths. This amendment supersedes that
+constraint in the original brief; it does not change the other fixed architecture decisions.
+
 ---
 
 ## Problem
@@ -29,7 +36,8 @@ top of a correct N-worker engine, not a separate feature.
 The brief's decisions stand: N identical offices, exactly one worker each, no cap; "office" never
 "cabin"; all connected players must run Dayswork; sponsor = `Building.owner`; offline owners' workers
 keep working (per-contract opt-in, default on); owner gains XP for all tasks with a toggle; vanilla
-painting path; no Harmony; Core stays SMAPI-free; items never lost or degraded; every worker despawned
+painting path; SMAPI-first integration with the narrow exception above; Core stays SMAPI-free;
+items never lost or degraded; every worker despawned
 before save; game content verified, never guessed. AGENTS.md hard rules **3** (single active
 contract) and **6** (single-player only) are rewritten by this plan — Phase 1 and Phase 4
 respectively — not silently violated.

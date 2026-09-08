@@ -59,8 +59,14 @@ facts under `docs/game-data/` and add a row to its `index.md`. Update `docs/game
 1. **Core purity.** `Dayswork.Core/` must reference **zero** SMAPI/Stardew types — it has no
    `ModBuildConfig` reference, only `Dayswork/` does. Put game-touching code in `Dayswork/`;
    put pure logic (pricing, energy, state machine, planning, DTOs) in Core where it's unit-tested.
-2. **No Harmony.** The mod uses SMAPI events only — there are no Harmony patches and no
-   `<EnableHarmony>`. Don't add one without a hard reason; prefer an event hook.
+2. **SMAPI events first; narrowly scoped Harmony exceptions.** Prefer events and direct game APIs.
+   Use Harmony when a verified game-method boundary removes substantial complexity or improves
+   correctness. The approved exception (2026-09-08) is host-only attribution of worker-felled tree
+   drops around `Tree.tickUpdate`; see `docs/plans/dayswork-2.0-review-fixes.md`, R6. Keep patches in
+   `Dayswork/`, preserve vanilla behavior for unrelated calls, and test item fidelity, ownership,
+   and lifecycle cleanup. This exception uses before/after hooks with exception-safe cleanup,
+   not a transpiler or global loot/XP/admission rewrite. Networking and XP retain their existing
+   event/request and Sponsor paths.
 3. **One contract per office; N offices ⇒ N contracts.** An office holds at most one
    Active/Paused contract and runs at most one live shift; the farm may have any number of offices.
    The contract belongs to its office — it lives in that building's `modData`, is keyed by

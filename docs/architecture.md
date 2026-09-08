@@ -11,8 +11,12 @@ same door tile to clock out. The office's **owner sponsors** it: their wallet pa
 block of worker energy (labor capacity), their tool levels the worker inherits, their shipping bin
 receives output, and their skills earn the experience the worker generates. The mod is
 **progression-aware**, **safe** (items are never lost — anything undelivered is mailed back via the
-building's output chest / shipping bin), and uses **zero Harmony patches** — everything is driven by
-SMAPI events.
+building's output chest / shipping bin). The current implementation uses **zero Harmony patches**
+and is driven by SMAPI events. The integration policy is **SMAPI events first, with narrow Harmony
+exceptions where a verified game boundary substantially simplifies the code**. The user approved
+one such exception for worker-tree drop attribution on 2026-09-08; its design is in
+[review fix R6](plans/dayswork-2.0-review-fixes.md#r6--prevent-cross-worker-capture-of-delayed-tree-drops)
+and implementation status is in [the plan index](plans/index.md).
 
 **Co-op works, host-authoritatively** (2.0 Phase 4): every connected player must run the same
 Dayswork protocol version, the engine runs on the host alone, and any player may hire from an office
