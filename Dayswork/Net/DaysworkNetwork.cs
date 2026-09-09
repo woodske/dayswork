@@ -444,7 +444,7 @@ internal sealed class DaysworkNetwork
             {
                 var snapshot = e.ReadAs<MenuSnapshotResponseMessage>();
                 if (snapshot.ProtocolVersion == DaysworkProtocol.Version)
-                    MenuSnapshotCache.Current = snapshot;
+                    MenuSnapshotCache.ApplySnapshot(snapshot);
                 break;
             }
 
@@ -504,7 +504,7 @@ internal sealed class DaysworkNetwork
     private void ResetSessionState()
     {
         _client.ResetCurrentScreen();
-        MenuSnapshotCache.Current = null;
+        MenuSnapshotCache.ClearCurrentScreen();
         // Sequence numbers are per host session and start again from one, so a stale high-water
         // mark from the last session would reject every state of the new one (R7).
         AuthoritativeContractCache.ClearCurrentScreen();

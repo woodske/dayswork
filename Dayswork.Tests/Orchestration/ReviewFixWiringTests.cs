@@ -162,6 +162,51 @@ public sealed class ReviewFixWiringTests
         AssertOrder(running, "Authority.IsRemoteClient", "AuthoritativeContractCache.ShiftRunning", "ModEntry.Fleet.IsShiftRunning");
     }
 
+    [Fact]
+    public void Dayswork2Review_R8_EveryUpgradesEntryPathAsksTheHostForOwnership()
+    {
+        var source = ReadSource("Dayswork", "UI", "HiringFlowCoordinator.cs");
+        var manage = MethodBody(source, "public void OpenManageFlow", "/// <summary>");
+        var fromManage = MethodBody(source, "public void ShowUpgradesFromManage", "private void ShowUpgrades(");
+        var request = MethodBody(source, "private void RequestMenuSnapshot", "// Hub-and-spoke");
+
+        Assert.Contains("RequestMenuSnapshot(officeId, clearWorldSnapshot: false)", manage, StringComparison.Ordinal);
+        Assert.Contains("RequestMenuSnapshot(officeId, clearWorldSnapshot: false)", fromManage, StringComparison.Ordinal);
+        // Only the world half is dropped while a request is outstanding — clearing the upgrade
+        // half is what made an owned upgrade read as unpurchased.
+        Assert.Contains("MenuSnapshotCache.ClearWorldSnapshot()", request, StringComparison.Ordinal);
+        Assert.DoesNotContain("MenuSnapshotCache.Current = null", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dayswork2Review_R8_UpgradeStateIsHeldApartFromTheWorldSnapshotAndCorrelated()
+    {
+        var cache = ReadSource("Dayswork", "Net", "MenuSnapshotCache.cs");
+        var client = ReadSource("Dayswork", "Net", "ContractRequestClient.cs");
+        var network = ReadSource("Dayswork", "Net", "DaysworkNetwork.cs");
+        var applyPurchase = MethodBody(cache, "public static void ApplyUpgradeState", "public static void ClearCurrentScreen");
+        var applySnapshot = MethodBody(cache, "public static void ApplySnapshot", "/// <summary>");
+
+        // A purchase acknowledgment updates ownership with no world snapshot in hand.
+        Assert.DoesNotContain("Snapshot.Value is not", applyPurchase, StringComparison.Ordinal);
+        Assert.Contains("Merge(", applyPurchase, StringComparison.Ordinal);
+        Assert.Contains("PendingRequestId.Value", applySnapshot, StringComparison.Ordinal);
+        Assert.Contains("MenuSnapshotCache.BeginRequest(requestId)", client, StringComparison.Ordinal);
+        Assert.Contains("MenuSnapshotCache.ApplySnapshot(snapshot)", network, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dayswork2Review_R8_UpgradesPageWaitsRatherThanShowingAnEmptyPurchaseHistory()
+    {
+        var source = ReadSource("Dayswork", "UI", "UpgradesMenu.cs");
+        var update = MethodBody(source, "public override void update", "protected override ILayoutElement BuildLayout");
+        var layout = MethodBody(source, "protected override ILayoutElement BuildLayout", "private ILayoutElement BuildUpgradeRow");
+
+        Assert.Contains("_state is null", layout, StringComparison.Ordinal);
+        Assert.Contains("ui.net.waiting_for_host", layout, StringComparison.Ordinal);
+        AssertOrder(update, "_readState()", "_state = current", "Rebuild()");
+    }
+
     private static void AssertOrder(string source, params string[] tokens)
     {
         var previous = -1;

@@ -138,17 +138,22 @@ internal sealed class ContractRequestClient
     }
 
     /// <summary>
-    /// Asks the host for the parts of its world this client cannot see. Only a remote client needs
-    /// this: on the host's own computer the menus read the world directly.
+    /// Asks the host for the parts of its world this client cannot see, and for the asker's own
+    /// upgrade state, which lives in host save data. Only a remote client needs this: on the host's
+    /// own computer the menus read the world and the store directly.
+    /// <para>The request id is recorded so the answer can be matched to it — an answer to a request
+    /// this screen has already superseded must not repopulate a picker for another office.</para>
     /// </summary>
     public void RequestMenuSnapshot(Guid officeId)
     {
         if (!Authority.IsRemoteClient || !CanDispatchToHost())
             return;
 
+        var requestId = NewRequestId();
+        MenuSnapshotCache.BeginRequest(requestId);
         _channel.SendToHost(DaysworkProtocol.MenuSnapshotRequest, new MenuSnapshotRequestMessage
         {
-            RequestId = NewRequestId(),
+            RequestId = requestId,
             ProtocolVersion = DaysworkProtocol.Version,
             OfficeId = officeId.ToString("N"),
         });

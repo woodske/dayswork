@@ -14,13 +14,20 @@ namespace Dayswork.Net;
 /// The host re-validates every reference at commit time regardless, so a stale snapshot costs a
 /// rejection, never a bad contract.
 ///
+/// Upgrade state is held apart from the world snapshot (R8). The two arrive together but are not
+/// the same fact: a purchase acknowledgment updates upgrades with no world snapshot in hand, and
+/// "we have not been told yet" has to be distinguishable from "nothing is purchased" — otherwise
+/// the Upgrades page reads a fresh connection as an empty purchase history and relocks Speed2.
+///
 /// Per screen, because in split-screen two players can have the hub open at once.
 /// </summary>
 internal static class MenuSnapshotCache
 {
     private static readonly PerScreen<MenuSnapshotResponseMessage?> Snapshot = new();
+    private static readonly PerScreen<FarmhandUpgradeState?> UpgradeState = new();
+    private static readonly PerScreen<string> PendingRequestId = new(() => "");
 
-    /// <summary>The most recent snapshot for this screen, or null while one is outstanding.</summary>
+    /// <summary>The most recent world snapshot for this screen, or null while one is outstanding.</summary>
     public static MenuSnapshotResponseMessage? Current
     {
         get => Snapshot.Value;
@@ -40,28 +47,63 @@ internal static class MenuSnapshotCache
     public static IReadOnlyList<SnapshotChest> OffFarmChests =>
         Snapshot.Value?.OffFarmChests ?? (IReadOnlyList<SnapshotChest>)Array.Empty<SnapshotChest>();
 
-    /// <summary>This client's own upgrades, as the host reported them. Empty until the snapshot
-    /// arrives, which is the safe default: the upgrades page shows nothing purchased and a
-    /// purchase attempt is answered by the host anyway.</summary>
-    public static FarmhandUpgradeState Upgrades =>
-        Snapshot.Value is { } snapshot
-            ? new FarmhandUpgradeState(snapshot.SpeedPurchased, snapshot.EnergyPurchased, snapshot.Speed2Purchased)
-            : FarmhandUpgradeState.Empty;
+    /// <summary>This client's own upgrades as the host last reported them, or null while that is
+    /// still unknown. Null is not "nothing purchased" — the page says it is waiting rather than
+    /// showing a purchase history it does not have.</summary>
+    public static FarmhandUpgradeState? Upgrades => UpgradeState.Value;
+
+    /// <summary>Records the id of the snapshot request now outstanding, so an answer to a request
+    /// this screen has already replaced (a second office opened, a retry) is ignored.</summary>
+    public static void BeginRequest(string requestId) => PendingRequestId.Value = requestId;
 
     /// <summary>
-    /// Folds the upgrade state an action response carries back into the cached snapshot, so a
-    /// client's upgrades page redraws from the purchase it just made without another round trip.
+    /// Takes the host's answer, if it is the one this screen is waiting for. The upgrade half is
+    /// merged rather than assigned: upgrades are only ever bought, never given back, so OR-ing them
+    /// means a snapshot that was in flight while a purchase completed cannot relock what the player
+    /// has just paid for.
+    /// </summary>
+    public static void ApplySnapshot(MenuSnapshotResponseMessage snapshot)
+    {
+        if (!string.Equals(snapshot.RequestId, PendingRequestId.Value, StringComparison.Ordinal))
+            return;
+
+        PendingRequestId.Value = "";
+        Snapshot.Value = snapshot;
+        Merge(new FarmhandUpgradeState(
+            snapshot.SpeedPurchased,
+            snapshot.EnergyPurchased,
+            snapshot.Speed2Purchased));
+    }
+
+    /// <summary>
+    /// Folds the upgrade state an action response carries back in, so a client's upgrades page
+    /// redraws from the purchase it just made without another round trip — and does so even when
+    /// no world snapshot has arrived, which is the case when Upgrades was opened from Manage.
     /// No-op on the host, which reads the store.
     /// </summary>
     public static void ApplyUpgradeState(ContractActionResponseMessage response)
     {
-        if (Snapshot.Value is not { } snapshot || !response.Accepted)
+        if (!response.Accepted)
             return;
 
-        snapshot.SpeedPurchased = response.SpeedPurchased;
-        snapshot.Speed2Purchased = response.Speed2Purchased;
-        snapshot.EnergyPurchased = response.EnergyPurchased;
+        Merge(new FarmhandUpgradeState(
+            response.SpeedPurchased,
+            response.EnergyPurchased,
+            response.Speed2Purchased));
     }
 
-    public static void ClearCurrentScreen() => Snapshot.Value = null;
+    public static void ClearCurrentScreen()
+    {
+        Snapshot.Value = null;
+        UpgradeState.Value = null;
+        PendingRequestId.Value = "";
+    }
+
+    /// <summary>Drops the world half only — the pickers must not show the previous office's
+    /// locations and chests while a new request is outstanding. Upgrades belong to the player, not
+    /// the office, so they survive.</summary>
+    public static void ClearWorldSnapshot() => Snapshot.Value = null;
+
+    private static void Merge(FarmhandUpgradeState incoming) =>
+        UpgradeState.Value = FarmhandUpgradeState.Merge(UpgradeState.Value, incoming);
 }

@@ -85,6 +85,9 @@ internal sealed class HiringFlowCoordinator
 
     public void OpenManageFlow(Guid officeId)
     {
+        // Manage leads to Upgrades, which a remote client can only fill in from the host: without
+        // this a fresh connection reads its own purchase history as empty and relocks Speed2 (R8).
+        RequestMenuSnapshot(officeId, clearWorldSnapshot: false);
         Game1.activeClickableMenu = new ContractMenu(_contractStore, officeId);
     }
 
@@ -107,13 +110,18 @@ internal sealed class HiringFlowCoordinator
     /// their chests) as the flow opens, so the answer is usually there by the time the player
     /// reaches a picker that needs it. No-op on the host, which reads the world directly.
     /// </summary>
-    private void RequestMenuSnapshot(Guid officeId)
+    private void RequestMenuSnapshot(Guid officeId, bool clearWorldSnapshot = true)
     {
-        if (Authority.IsRemoteClient)
-        {
-            Net.MenuSnapshotCache.Current = null;
-            ModEntry.Requests.RequestMenuSnapshot(officeId);
-        }
+        if (!Authority.IsRemoteClient)
+            return;
+
+        // The pickers must not offer the previous office's locations and chests while the new
+        // answer is in flight. Upgrade state belongs to the player rather than the office, so it
+        // is never cleared here — clearing it is what made a known purchase look unmade (R8).
+        if (clearWorldSnapshot)
+            Net.MenuSnapshotCache.ClearWorldSnapshot();
+
+        ModEntry.Requests.RequestMenuSnapshot(officeId);
     }
 
     // Hub-and-spoke navigation: the hub is the home page and every spoke returns to it. RefreshPreview
@@ -146,8 +154,12 @@ internal sealed class HiringFlowCoordinator
 
     public void ShowUpgradesFromManage(Guid officeId)
     {
+        // Asked for again on the way in: the player may have sat on the Manage page long enough
+        // for a purchase made on another screen to matter, and a first request may have been sent
+        // while the host was still unverified.
+        RequestMenuSnapshot(officeId, clearWorldSnapshot: false);
         Game1.activeClickableMenu = new UpgradesMenu(
-            MyUpgrades(),
+            MyUpgradesOrNull,
             onPurchase: kind => PurchaseUpgrade(officeId, kind, () => ShowUpgradesFromManage(officeId)),
             onBack: () => OpenManageFlow(officeId));
     }
@@ -155,7 +167,7 @@ internal sealed class HiringFlowCoordinator
     private void ShowUpgrades(ContractDraft draft)
     {
         Game1.activeClickableMenu = new UpgradesMenu(
-            MyUpgrades(),
+            MyUpgradesOrNull,
             onPurchase: kind => PurchaseUpgrade(draft.OfficeId, kind, () =>
             {
                 RefreshPreview(draft);
@@ -168,7 +180,14 @@ internal sealed class HiringFlowCoordinator
     /// This player's own upgrades. They are per owner (2.0 plan D9) and live in host save data, so
     /// a remote client reads them from the host's menu snapshot instead of the store.
     /// </summary>
-    private FarmhandUpgradeState MyUpgrades() =>
+    private FarmhandUpgradeState MyUpgrades() => MyUpgradesOrNull() ?? FarmhandUpgradeState.Empty;
+
+    /// <summary>
+    /// The same, but null on a remote client the host has not answered yet. Pricing has to assume
+    /// something and assumes no upgrades — the host re-derives the real terms at commit — but the
+    /// Upgrades page must not present that assumption as the player's purchase history (R8).
+    /// </summary>
+    private FarmhandUpgradeState? MyUpgradesOrNull() =>
         Authority.IsRemoteClient
             ? Net.MenuSnapshotCache.Upgrades
             : _upgradeStore.For(Game1.player.UniqueMultiplayerID);

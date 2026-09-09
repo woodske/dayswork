@@ -292,9 +292,9 @@ overwriting a newer purchase acknowledgment. Reuse the existing snapshot/request
 
 **Acceptance.**
 
-- [ ] Fresh connection → existing office → Manage → Upgrades shows previously owned upgrades
+- [x] Fresh connection → existing office → Manage → Upgrades shows previously owned upgrades
   and correctly unlocks Speed2, without first opening Edit.
-- [ ] Opening the page before the reply and purchasing before a delayed snapshot are covered;
+- [x] Opening the page before the reply and purchasing before a delayed snapshot are covered;
   no lost ownership display, duplicate charge, or stale relock.
 
 ## R9 — Show the host's terms before accepting a purchase
