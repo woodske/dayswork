@@ -40,4 +40,13 @@ public enum ContractRejectionCode
     /// <summary>The requested action does not apply to the contract's current state (pausing a
     /// cancelled contract, cancelling while its shift is running, hiring over an open contract).</summary>
     InvalidAction,
+
+    /// <summary>
+    /// The host's terms are not the terms the player reviewed — the host's pricing/energy
+    /// configuration or the owner's upgrades differ from what the draft was quoted against (R9).
+    /// Nothing was charged; the answer carries the host's terms so the client can requote and ask
+    /// the player to confirm the real price. Appended last on purpose: the code travels as its
+    /// ordinal, so existing values must keep theirs.
+    /// </summary>
+    TermsChanged,
 }

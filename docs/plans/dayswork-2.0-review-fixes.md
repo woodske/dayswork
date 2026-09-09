@@ -313,10 +313,18 @@ require another confirmation before charging. Preserve host authority and per-ow
 
 **Acceptance.**
 
-- [ ] Different host/client tier prices, energy settings, and upgrade state produce a displayed
-  quote equal to committed terms and the actual wallet debit.
-- [ ] Changing host terms after the quote rejects/requotes without spending money; accepting the
-  replacement quote charges exactly once. Test insufficient funds and duplicate delivery too.
+- [x] Different host/client tier prices, energy settings, and upgrade state produce a displayed
+  quote equal to committed terms and the actual wallet debit. The menu snapshot carries the host's
+  base pricing/energy tables (`SnapshotPricingConfig`); the client lays them over its own snapshot
+  and applies the owner's upgrades on top, so a purchase mid-flow still reprices at once.
+- [x] Changing host terms after the quote rejects/requotes without spending money; accepting the
+  replacement quote charges exactly once. Test insufficient funds and duplicate delivery too. The
+  requote is decided in `ContractCommitValidator` ahead of the wallet check, and the answer carries
+  the host's terms, which the client resubmits verbatim — so a second attempt cannot mismatch for
+  the same reason, and the existing `RequestIdCache` still makes a redelivered request idempotent.
+- [ ] Verify over a real connection with a host and client whose config files disagree: the hire
+  screen, Energy page and summary all show the host's figures, and a GMCM change made while a client
+  sits on the summary produces the confirmation dialog rather than a silent debit.
 
 ## R10 — Send current suspension state to joining clients
 

@@ -24,6 +24,9 @@ namespace Dayswork.Core.Net;
 /// <param name="OwnerMoney">The owner's wallet balance.</param>
 /// <param name="UpfrontPrice">What committing costs now — the one-time price for a new one-time
 /// contract, zero otherwise.</param>
+/// <param name="TermsMatchQuote">The terms carried by the submitted draft — the ones the player
+/// reviewed — are the terms the host has just computed for itself. False when the host's pricing or
+/// energy configuration says something the client's preview did not (R9).</param>
 public sealed record CommitValidationContext(
     bool ProtocolMatches,
     bool Suspended,
@@ -37,7 +40,8 @@ public sealed record CommitValidationContext(
     IReadOnlyCollection<string> MissingMachines,
     IReadOnlyCollection<string> MissingPonds,
     int OwnerMoney,
-    int UpfrontPrice);
+    int UpfrontPrice,
+    bool TermsMatchQuote);
 
 /// <summary>
 /// The host's commit gate. Pure: the same function decides for a remote client's request and for
@@ -88,6 +92,12 @@ public static class ContractCommitValidator
             return ContractRejectionCode.MachineMissing;
         if (context.MissingPonds.Count > 0)
             return ContractRejectionCode.PondMissing;
+
+        // Before the wallet check on purpose: a player quoted 500g and about to be charged 1000g
+        // should be told the price moved, not that they are poor — and either way nothing is spent
+        // until they have confirmed the host's own figure.
+        if (!context.TermsMatchQuote)
+            return ContractRejectionCode.TermsChanged;
 
         if (context.UpfrontPrice > 0 && context.OwnerMoney < context.UpfrontPrice)
             return ContractRejectionCode.CannotAfford;

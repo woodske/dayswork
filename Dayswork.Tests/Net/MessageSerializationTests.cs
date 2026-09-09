@@ -1,5 +1,7 @@
 namespace Dayswork.Tests.Net;
 
+using Dayswork.Core.Domain;
+using Dayswork.Core.Energy;
 using Dayswork.Core.Net;
 using Newtonsoft.Json;
 using Xunit;
@@ -149,6 +151,53 @@ public class MessageSerializationTests
         Assert.True(result.Accepted);
         Assert.Equal(9, result.Revision);
         Assert.Null(result.Code);
+    }
+
+    [Fact]
+    public void Dayswork2Review_R9_MenuSnapshotRoundTripsTheHostsPricingTables()
+    {
+        var result = RoundTrip(new MenuSnapshotResponseMessage
+        {
+            RequestId = "abc",
+            ProtocolVersion = DaysworkProtocol.Version,
+            OfficeId = "office-1",
+            Pricing = new SnapshotPricingConfig
+            {
+                EnergyTierEnergy = new Dictionary<EnergyTier, int> { [EnergyTier.FullDay] = 777 },
+                EnergyTierPrice = new Dictionary<EnergyTier, int> { [EnergyTier.FullDay] = 1000 },
+                WorkActionCosts = new Dictionary<WorkActionKind, int> { [WorkActionKind.WaterTile] = 3 },
+            },
+        });
+
+        Assert.NotNull(result.Pricing);
+        Assert.Equal(777, result.Pricing!.EnergyTierEnergy[EnergyTier.FullDay]);
+        Assert.Equal(1000, result.Pricing.EnergyTierPrice[EnergyTier.FullDay]);
+        Assert.Equal(3, result.Pricing.WorkActionCosts[WorkActionKind.WaterTile]);
+    }
+
+    [Fact]
+    public void Dayswork2Review_R9_ARequoteRoundTripsTheHostsTermsAndPricing()
+    {
+        var result = RoundTrip(new ContractCommitResponseMessage
+        {
+            RequestId = "r1",
+            Accepted = false,
+            Code = ContractRejectionCode.TermsChanged,
+            HostTerms = new ContractTermsSnapshot(
+                new PricingSnapshot(1000),
+                new WorkerEnergyProfile(320, new Dictionary<WorkActionKind, int> { [WorkActionKind.WaterTile] = 3 })),
+            HostPricing = new SnapshotPricingConfig
+            {
+                EnergyTierPrice = new Dictionary<EnergyTier, int> { [EnergyTier.FullDay] = 1000 },
+            },
+        });
+
+        Assert.Equal(ContractRejectionCode.TermsChanged, result.Code);
+        Assert.NotNull(result.HostTerms);
+        Assert.Equal(1000, result.HostTerms!.Pricing.TotalPrice);
+        Assert.Equal(320, result.HostTerms.Energy.DailyCapacity);
+        Assert.Equal(3, result.HostTerms.Energy.ActionCosts[WorkActionKind.WaterTile]);
+        Assert.Equal(1000, result.HostPricing!.EnergyTierPrice[EnergyTier.FullDay]);
     }
 
     [Fact]

@@ -129,10 +129,18 @@ internal sealed class ContractRequestHandler
             MissingMachines: missing.MissingMachines,
             MissingPonds: missing.MissingPonds,
             OwnerMoney: office is null ? 0 : Sponsor.Money(ownerId),
-            UpfrontPrice: upfrontPrice);
+            UpfrontPrice: upfrontPrice,
+            // The draft carries the terms the player was shown; these are the host's own. A client
+            // whose config file or upgrade state disagrees with the host quoted the wrong bargain,
+            // and the fix is to requote it rather than to charge the difference silently (R9).
+            TermsMatchQuote: ContractTermsSnapshot.SameTerms(submitted.TermsSnapshot, preview.ProposedTerms));
 
         if (ContractCommitValidator.Validate(request, context) is { } rejection)
-            return Reject(request.RequestId, officeId, rejection, $"office {officeId:N}, sender {senderId}");
+        {
+            return rejection == ContractRejectionCode.TermsChanged
+                ? RequoteTerms(request.RequestId, officeId, preview.ProposedTerms, $"office {officeId:N}, sender {senderId}")
+                : Reject(request.RequestId, officeId, rejection, $"office {officeId:N}, sender {senderId}");
+        }
 
         var terms = preview.ProposedTerms!;
         if (upfrontPrice > 0)
@@ -299,6 +307,10 @@ internal sealed class ContractRequestHandler
             SpeedPurchased = upgrades.SpeedPurchased,
             Speed2Purchased = upgrades.Speed2Purchased,
             EnergyPurchased = upgrades.EnergyPurchased,
+            // The host's base pricing, so the client's preview quotes what the host will charge
+            // rather than what its own config file says (R9). Base, not effective: the client
+            // applies the upgrades above itself, so a purchase mid-flow reprices immediately.
+            Pricing = PricingConfigTransfer.From(_configManager.CurrentSnapshot),
         };
 
         if (ModEntry.ExpansionCompat is { } compat)
@@ -367,6 +379,34 @@ internal sealed class ContractRequestHandler
             ContractJson = contract is null ? "" : _serializer.SerializeOne(contract, _modVersion),
             Revision = contract?.Revision ?? -1,
             ShiftRunning = contract is not null && _fleet.IsShiftRunning(contract.Id),
+        };
+    }
+
+    /// <summary>
+    /// The terms the player reviewed are not the ones the host would commit. Nothing is charged;
+    /// the answer carries the host's own terms — which the client resubmits verbatim once the
+    /// player has accepted them, so a second attempt cannot mismatch for the same reason — and its
+    /// pricing tables, so every later preview in that flow is quoted correctly too (R9).
+    /// </summary>
+    private ContractCommitResponseMessage RequoteTerms(
+        string requestId,
+        Guid officeId,
+        ContractTermsSnapshot? hostTerms,
+        string detail)
+    {
+        ModEntry.ModMonitor.Log(
+            $"[Dayswork] Requoted a contract commit: the host's terms are not the ones the player reviewed ({detail}).",
+            DevLog.WarnLevel);
+
+        return new ContractCommitResponseMessage
+        {
+            RequestId = requestId,
+            Accepted = false,
+            Code = ContractRejectionCode.TermsChanged,
+            Detail = detail,
+            State = BuildState(officeId),
+            HostTerms = hostTerms,
+            HostPricing = PricingConfigTransfer.From(_configManager.CurrentSnapshot),
         };
     }
 

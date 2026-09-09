@@ -73,6 +73,9 @@
 
 - Nearby farmhands chopping trees at the same time now keep their own wood, sap, seeds, quality,
   and flavored drops; one worker can no longer collect another worker's delayed tree output.
+- In co-op, a contract's price and energy allowance are now quoted from the host's settings, so the
+  figure you agree to is the figure you are charged. If the price changes between the quote and the
+  hire, you are shown the new terms and asked to confirm before any gold is spent.
 - Joining or leaving split-screen during a shift no longer resets the host's workers, purchases,
   work claims, upgrades, or collected output.
 - A farmhand called home during a shopping trip now stops buying, returns everything already paid

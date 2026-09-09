@@ -44,7 +44,8 @@ public class ContractCommitValidatorTests
         string[]? missingMachines = null,
         string[]? missingPonds = null,
         int ownerMoney = 10_000,
-        int upfrontPrice = 0) =>
+        int upfrontPrice = 0,
+        bool termsMatchQuote = true) =>
         new(
             ProtocolMatches: protocolMatches,
             Suspended: suspended,
@@ -58,7 +59,8 @@ public class ContractCommitValidatorTests
             MissingMachines: missingMachines ?? Array.Empty<string>(),
             MissingPonds: missingPonds ?? Array.Empty<string>(),
             OwnerMoney: ownerMoney,
-            UpfrontPrice: upfrontPrice);
+            UpfrontPrice: upfrontPrice,
+            TermsMatchQuote: termsMatchQuote);
 
     [Fact]
     public void NewHireOnAFreeOffice_IsAccepted() =>
@@ -175,6 +177,29 @@ public class ContractCommitValidatorTests
     [Fact]
     public void ARecurringEditCostsNothingUpFrontAndIgnoresAnEmptyWallet() =>
         Assert.Null(ContractCommitValidator.Validate(Edit(4), Valid(stored: StoredActive, ownerMoney: 0)));
+
+    [Fact]
+    public void Dayswork2Review_R9_TermsThatAreNotTheOnesTheClientQuoted_AreRequoted() =>
+        Assert.Equal(
+            ContractRejectionCode.TermsChanged,
+            ContractCommitValidator.Validate(NewHire(), Valid(termsMatchQuote: false, upfrontPrice: 500)));
+
+    [Fact]
+    public void Dayswork2Review_R9_ARequoteBeatsTheWalletCheck()
+    {
+        // A player quoted 500g by their own config file, facing a host that charges 1000g they
+        // cannot afford. They are told the price moved — the thing they can act on — rather than
+        // being called broke for a price they were never shown, and nothing is spent either way.
+        var context = Valid(termsMatchQuote: false, ownerMoney: 500, upfrontPrice: 1000);
+
+        Assert.Equal(ContractRejectionCode.TermsChanged, ContractCommitValidator.Validate(NewHire(), context));
+    }
+
+    [Fact]
+    public void Dayswork2Review_R9_AnAcceptedRequoteCommitsOnTheSecondAttempt() =>
+        Assert.Null(ContractCommitValidator.Validate(
+            NewHire(),
+            Valid(termsMatchQuote: true, ownerMoney: 1000, upfrontPrice: 1000)));
 
     [Fact]
     public void TheRootCauseIsReportedFirst()

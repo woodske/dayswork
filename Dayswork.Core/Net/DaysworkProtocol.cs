@@ -14,7 +14,7 @@ namespace Dayswork.Core.Net;
 public static class DaysworkProtocol
 {
     /// <summary>Bumped on any change to the message DTOs or the modData formats.</summary>
-    public const int Version = 3;
+    public const int Version = 4;
 
     /// <summary>The mod id every message is addressed to.</summary>
     public const string ModId = "Bindicle.Dayswork";

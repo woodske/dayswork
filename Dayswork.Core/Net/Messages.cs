@@ -1,3 +1,6 @@
+using Dayswork.Core.Domain;
+using Dayswork.Core.Energy;
+
 namespace Dayswork.Core.Net;
 
 /// <summary>
@@ -63,6 +66,27 @@ public sealed class MenuSnapshotResponseMessage
     public bool SpeedPurchased { get; set; }
     public bool Speed2Purchased { get; set; }
     public bool EnergyPurchased { get; set; }
+
+    /// <summary>The host's pricing and energy numbers, so the client quotes what the host will
+    /// actually charge rather than what its own config file says (R9). Null only from a host that
+    /// predates this field, which the protocol version already rules out.</summary>
+    public SnapshotPricingConfig? Pricing { get; set; }
+}
+
+/// <summary>
+/// The bounded slice of the host's configuration a client needs to price a draft: the per-tier
+/// energy and price tables and the per-action energy costs. Everything else in
+/// <c>ConfigSnapshot</c> governs how the shift runs on the host, which a client never simulates,
+/// so it stays off the wire (R9 — extend the finite snapshot, do not sync the world).
+/// <para>These are the host's <b>base</b> numbers, before upgrades: the client applies the owner's
+/// upgrades itself, from the state this same snapshot carries, so a purchase made mid-flow shows in
+/// the preview without another round trip.</para>
+/// </summary>
+public sealed class SnapshotPricingConfig
+{
+    public Dictionary<EnergyTier, int> EnergyTierEnergy { get; set; } = new();
+    public Dictionary<EnergyTier, int> EnergyTierPrice { get; set; } = new();
+    public Dictionary<WorkActionKind, int> WorkActionCosts { get; set; } = new();
 }
 
 public sealed class SnapshotLocation
@@ -120,6 +144,17 @@ public sealed class ContractCommitResponseMessage
     /// <summary>The office's authoritative state after the host decided, accepted or not — a
     /// rejection is exactly when the client's own copy is most likely to be wrong.</summary>
     public AuthoritativeContractState? State { get; set; }
+
+    /// <summary>
+    /// Set with <see cref="ContractRejectionCode.TermsChanged"/>: the terms the host would commit,
+    /// freshly computed. The client shows these for confirmation and resubmits them verbatim, so
+    /// the second attempt cannot mismatch again for the same reason (R9).
+    /// </summary>
+    public ContractTermsSnapshot? HostTerms { get; set; }
+
+    /// <summary>Sent alongside <see cref="HostTerms"/> so every later preview in the same flow is
+    /// quoted against the host's numbers too.</summary>
+    public SnapshotPricingConfig? HostPricing { get; set; }
 }
 
 public enum ContractActionKind

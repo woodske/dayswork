@@ -1097,9 +1097,20 @@ internal sealed class HiringFlowCoordinator
     /// OWNER's upgrades, which since 2.0 are per player rather than per farm (plan D9). The player
     /// authoring the draft is always its owner, so this is also their own upgrade state — the host
     /// re-derives it the same way when it prices the commit.
+    /// <para>
+    /// On a remote client the base snapshot is the HOST's, not this game's config file: the two can
+    /// disagree, and it is the host's numbers that get charged, so quoting our own would show one
+    /// price and bill another (R9). Until the host has answered we quote our own and the host
+    /// requotes the commit rather than silently substituting terms.
+    /// </para>
     /// </summary>
     private ConfigSnapshot EffectiveConfig() =>
-        FarmhandUpgradeEffects.Apply(_configManager.CurrentSnapshot, MyUpgrades());
+        FarmhandUpgradeEffects.Apply(BaseConfig(), MyUpgrades());
+
+    private ConfigSnapshot BaseConfig() =>
+        Authority.IsRemoteClient
+            ? PricingConfigTransfer.ApplyTo(_configManager.CurrentSnapshot, Net.MenuSnapshotCache.PricingConfig)
+            : _configManager.CurrentSnapshot;
 
     private static string UpgradeDisplayName(FarmhandUpgradeKind kind) =>
         I18nHelper.Get(kind switch
@@ -1204,9 +1215,14 @@ internal sealed class HiringFlowCoordinator
     /// closes; on rejection the player is told why and the hub reopens <b>with the draft intact</b>
     /// so they can fix the one thing that was wrong rather than start again.
     /// </summary>
-    private void ConfirmContract(ContractDraft draft)
+    private void ConfirmContract(ContractDraft draft) => ConfirmContract(draft, quotedTerms: null);
+
+    /// <param name="quotedTerms">The host's own terms, when the player is accepting a requote. They
+    /// are submitted verbatim so the host's freshly computed terms cannot disagree with them for the
+    /// same reason twice (R9).</param>
+    private void ConfirmContract(ContractDraft draft, ContractTermsSnapshot? quotedTerms)
     {
-        var proposedTerms = draft.PreviewState.Preview.ProposedTerms;
+        var proposedTerms = quotedTerms ?? draft.PreviewState.Preview.ProposedTerms;
         if (!draft.PreviewState.ReviewModel.CanConfirm || proposedTerms is null)
             return;
 
@@ -1247,6 +1263,12 @@ internal sealed class HiringFlowCoordinator
                     return;
                 }
 
+                if (response.Code == ContractRejectionCode.TermsChanged)
+                {
+                    ShowRequotedTermsChoice(draft, response.HostTerms);
+                    return;
+                }
+
                 Game1.addHUDMessage(new HUDMessage(
                     response.Code == ContractRejectionCode.CannotAfford
                         ? I18nHelper.Get("ui.error.cant_afford")
@@ -1284,6 +1306,40 @@ internal sealed class HiringFlowCoordinator
                 draft.BaseRevision = current.Revision;
                 ShowHub(draft);
             });
+    }
+
+    /// <summary>
+    /// The host would have committed different terms from the ones the player reviewed — its
+    /// pricing or energy configuration is not what this client quoted against (R9). Nothing has
+    /// been charged: the player is shown the host's real figures and chooses whether to accept
+    /// them. Accepting resubmits the host's own terms, so the second attempt is the price shown.
+    /// </summary>
+    private void ShowRequotedTermsChoice(ContractDraft draft, ContractTermsSnapshot? hostTerms)
+    {
+        // The host answered without terms it could stand behind (a draft it would not accept at
+        // all). Nothing to offer, so the generic line and the hub, draft intact.
+        if (hostTerms is null)
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                ContractRejectionText.Describe(ContractRejectionCode.TermsChanged),
+                HUDMessage.error_type));
+            ShowHub(draft);
+            return;
+        }
+
+        // Read before refreshing: this is the figure the player actually agreed to, and the dialog
+        // is only meaningful as the difference between it and the host's.
+        var quotedPrice = draft.PreviewState.Preview.ProposedTerms?.Pricing.TotalPrice ?? 0;
+
+        // The response also carried the host's pricing tables, so every preview from here on quotes
+        // them; the hub behind the dialog is rebuilt with the corrected numbers.
+        RefreshPreview(draft);
+
+        Game1.activeClickableMenu = new ConfirmRequotedTermsMenu(
+            quotedPrice,
+            hostTerms,
+            onAccept: () => ConfirmContract(draft, hostTerms),
+            onDecline: () => ShowHub(draft));
     }
 
     private static Contract BuildContract(

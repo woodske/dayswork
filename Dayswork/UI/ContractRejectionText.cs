@@ -27,6 +27,7 @@ internal static class ContractRejectionText
             ContractRejectionCode.PondMissing     => "ui.net.rejected.pond_missing",
             ContractRejectionCode.CannotAfford    => "ui.net.rejected.cannot_afford",
             ContractRejectionCode.InvalidAction   => "ui.net.rejected.invalid_action",
+            ContractRejectionCode.TermsChanged    => "ui.net.rejected.terms_changed",
             _                                     => "ui.net.rejected.unknown",
         };
 }

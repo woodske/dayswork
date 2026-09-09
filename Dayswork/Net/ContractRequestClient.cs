@@ -167,6 +167,10 @@ internal sealed class ContractRequestClient
             return;
 
         ApplyAuthoritativeState(response.State);
+
+        // A requote carries the host's pricing tables; taking them here means the menu that redraws
+        // next already quotes the host's numbers rather than this client's config file (R9).
+        MenuSnapshotCache.ApplyPricing(response.HostPricing);
         pending.OnCommit?.Invoke(response);
     }
 

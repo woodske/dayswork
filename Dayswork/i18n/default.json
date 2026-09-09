@@ -266,6 +266,12 @@
     "ui.stale_contract.description": "This contract changed while you were editing it. Review the current version, or keep your changes and overwrite it.",
     "ui.stale_contract.review_btn": "Review Theirs",
     "ui.stale_contract.keep_btn": "Keep Mine",
+    "ui.requoted_terms.title": "Terms Changed",
+    "ui.requoted_terms.description": "The host's price for this contract isn't the one you were shown, so nothing has been charged. Accept the host's terms, or go back and change the contract.",
+    "ui.requoted_terms.was": "You were quoted: {{amount}}g",
+    "ui.requoted_terms.now": "The host charges: {{amount}}g for {{energy}} energy",
+    "ui.requoted_terms.accept_btn": "Accept",
+    "ui.requoted_terms.decline_btn": "Go Back",
 
     "ui.confirm_cancel_contract.title": "Cancel Contract?",
     "ui.confirm_cancel_contract.description": "This will permanently cancel the contract. This cannot be undone.",
@@ -385,6 +391,7 @@
     "ui.net.rejected.pond_missing": "A fish pond you selected is no longer there.",
     "ui.net.rejected.cannot_afford": "You can't afford that.",
     "ui.net.rejected.invalid_action": "That can't be done right now.",
+    "ui.net.rejected.terms_changed": "The host's terms for that contract aren't the ones you were shown.",
     "ui.net.rejected.unknown": "The host turned that down.",
 
     "log.festival.skipped": "Festival today — the farmhand is taking the day off.",

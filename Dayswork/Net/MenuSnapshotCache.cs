@@ -18,6 +18,8 @@ namespace Dayswork.Net;
 /// the same fact: a purchase acknowledgment updates upgrades with no world snapshot in hand, and
 /// "we have not been told yet" has to be distinguishable from "nothing is purchased" — otherwise
 /// the Upgrades page reads a fresh connection as an empty purchase history and relocks Speed2.
+/// The host's pricing tables are held apart for the same reason, and because a client that priced a
+/// draft from its own config file would show the player one bargain and be charged another (R9).
 ///
 /// Per screen, because in split-screen two players can have the hub open at once.
 /// </summary>
@@ -25,6 +27,7 @@ internal static class MenuSnapshotCache
 {
     private static readonly PerScreen<MenuSnapshotResponseMessage?> Snapshot = new();
     private static readonly PerScreen<FarmhandUpgradeState?> UpgradeState = new();
+    private static readonly PerScreen<SnapshotPricingConfig?> Pricing = new();
     private static readonly PerScreen<string> PendingRequestId = new(() => "");
 
     /// <summary>The most recent world snapshot for this screen, or null while one is outstanding.</summary>
@@ -52,6 +55,14 @@ internal static class MenuSnapshotCache
     /// showing a purchase history it does not have.</summary>
     public static FarmhandUpgradeState? Upgrades => UpgradeState.Value;
 
+    /// <summary>
+    /// The host's pricing and energy tables, or null while unknown. Held apart from the world
+    /// snapshot for the same reason upgrades are: a requote answer carries fresh pricing with no
+    /// world snapshot in hand, and pricing is about the host rather than about one office, so it
+    /// survives opening a different one (R9).
+    /// </summary>
+    public static SnapshotPricingConfig? PricingConfig => Pricing.Value;
+
     /// <summary>Records the id of the snapshot request now outstanding, so an answer to a request
     /// this screen has already replaced (a second office opened, a retry) is ignored.</summary>
     public static void BeginRequest(string requestId) => PendingRequestId.Value = requestId;
@@ -69,10 +80,20 @@ internal static class MenuSnapshotCache
 
         PendingRequestId.Value = "";
         Snapshot.Value = snapshot;
+        ApplyPricing(snapshot.Pricing);
         Merge(new FarmhandUpgradeState(
             snapshot.SpeedPurchased,
             snapshot.EnergyPurchased,
             snapshot.Speed2Purchased));
+    }
+
+    /// <summary>Takes the host's pricing tables from whichever answer carried them — the menu
+    /// snapshot, or a requote. Ignores a null, which is an answer that simply had nothing new to
+    /// say about pricing.</summary>
+    public static void ApplyPricing(SnapshotPricingConfig? pricing)
+    {
+        if (pricing is not null)
+            Pricing.Value = pricing;
     }
 
     /// <summary>
@@ -96,6 +117,7 @@ internal static class MenuSnapshotCache
     {
         Snapshot.Value = null;
         UpgradeState.Value = null;
+        Pricing.Value = null;
         PendingRequestId.Value = "";
     }
 
