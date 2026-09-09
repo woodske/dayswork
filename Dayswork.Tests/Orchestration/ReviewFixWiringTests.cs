@@ -207,6 +207,50 @@ public sealed class ReviewFixWiringTests
         AssertOrder(update, "_readState()", "_state = current", "Rebuild()");
     }
 
+    [Fact]
+    public void Dayswork2Review_R11_ShiftNoticesAddressTheContractOwnerNotWhoeverIsAtTheKeyboard()
+    {
+        var start = ReadSource("Dayswork", "Orchestration", "ShiftOrchestrator.cs");
+        var deposit = ReadSource("Dayswork", "Orchestration", "ShiftOrchestrator.Deposit.cs");
+        var travel = ReadSource("Dayswork", "Orchestration", "ShiftOrchestrator.Travel.cs");
+        var unreachable = MethodBody(travel, "private void SkipCurrentBatchAfterEntryFailure", "// Friendly name");
+
+        Assert.Contains(
+            "OwnerNotifier.ShowInfo(contract.OwnerId, \"notify.shift_started\"",
+            start,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "OwnerNotifier.ShowInfo(Session.OwnerId, \"notify.farmhand_exhausted\"",
+            deposit,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "OwnerNotifier.ShowError(Session.OwnerId, \"notify.building_unreachable\"",
+            unreachable,
+            StringComparison.Ordinal);
+
+        // The operational log stays alongside the owner notice: an unreachable destination must
+        // remain visible in a release SMAPI console even when nobody is there to see the HUD.
+        AssertOrder(unreachable, "OwnerNotifier.ShowError", "log.building.unreachable", "_buildingNavigator.LogSkipped");
+    }
+
+    [Fact]
+    public void Dayswork2Review_R11_TheShiftEngineHasNoDirectHudCallsLeft()
+    {
+        var engine = Directory.EnumerateFiles(
+            Path.Combine(FindWorkspaceRoot(), "Dayswork", "Orchestration"),
+            "*.cs",
+            SearchOption.AllDirectories);
+
+        var offenders = engine
+            .Where(file => File.ReadAllText(file).Contains("Game1.addHUDMessage", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.True(
+            offenders.Length == 0,
+            $"Shift-engine notices must go through OwnerNotifier: {string.Join(", ", offenders)}");
+    }
+
     private static void AssertOrder(string source, params string[] tokens)
     {
         var previous = -1;

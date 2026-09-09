@@ -373,14 +373,15 @@ internal sealed partial class ShiftOrchestrator
             return;
 
         // Walk-only policy: the worker never warps to reach work. When it can't path to a
-        // destination, tell the player (HUD) and emit an always-on error so the unreachable work is
-        // visible in the production SMAPI console, then skip the batch. LogSkipped adds the detailed
-        // route/resolve diagnostics for bug reports.
+        // destination, tell this office's owner and emit an always-on error so the unreachable work
+        // is visible in the production SMAPI console, then skip the batch. LogSkipped adds the
+        // detailed route/resolve diagnostics for bug reports.
         var locationName = Session.Ctx.Batches[Session.Ctx.CurrentBatchIndex].LocationName;
         var destination = ResolveDestinationDisplayName(locationName);
-        Game1.addHUDMessage(new HUDMessage(
-            I18nHelper.Get("notify.building_unreachable", new { destination }),
-            HUDMessage.error_type));
+        OwnerNotifier.ShowError(Session.OwnerId, "notify.building_unreachable", new Dictionary<string, string>
+        {
+            ["destination"] = destination,
+        });
         ModEntry.ModMonitor.Log(
             I18nHelper.Get("log.building.unreachable", new { destination }),
             LogLevel.Error);

@@ -194,10 +194,10 @@ internal sealed partial class ShiftOrchestrator
         var stopReason = Session.Ctx.PendingStopReason ?? ShiftStopReason.Completed;
         Session.Ctx.PendingStopReason = null;
         if (stopReason == ShiftStopReason.Exhausted)
-            Game1.addHUDMessage(new HUDMessage(
-                I18nHelper.Get("notify.farmhand_exhausted",
-                    new { name = FarmhandNpc.DisplayNameFor(Session.Ctx.Preferences.WorkerName) }),
-                HUDMessage.newQuest_type));
+            OwnerNotifier.ShowInfo(Session.OwnerId, "notify.farmhand_exhausted", new Dictionary<string, string>
+            {
+                ["name"] = FarmhandNpc.DisplayNameFor(Session.Ctx.Preferences.WorkerName),
+            });
         if (!Session.Deposits.HasPending)
         {
             Session.Ctx.StateMachine.BeginWrapUp(new IntentDepositInShippingBin(), stopReason);

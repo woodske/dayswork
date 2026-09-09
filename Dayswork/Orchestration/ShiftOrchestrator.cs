@@ -391,13 +391,11 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             _chestResolver,
             _buildingNavigator);
 
-        Game1.addHUDMessage(new HUDMessage(
-            I18nHelper.Get("notify.shift_started", new
-            {
-                name = FarmhandNpc.DisplayNameFor(contract.Preferences.WorkerName),
-                price = contract.TermsSnapshot.Pricing.TotalPrice,
-            }),
-            HUDMessage.newQuest_type));
+        OwnerNotifier.ShowInfo(contract.OwnerId, "notify.shift_started", new Dictionary<string, string>
+        {
+            ["name"] = FarmhandNpc.DisplayNameFor(contract.Preferences.WorkerName),
+            ["price"] = contract.TermsSnapshot.Pricing.TotalPrice.ToString(),
+        });
 
         BeginCurrentBatch();
     }

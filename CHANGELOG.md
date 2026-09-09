@@ -27,8 +27,9 @@
   different offices are easy to tell apart at a glance. The screen shows a live preview of the
   sprite as you flick through them.
 - **Dayswork now works in co-op.** Every player can build offices and hire their own farmhand, and
-  everyone sees everyone else's workers out on the farm. Everyone playing needs the same version of
-  Dayswork installed.
+  everyone sees everyone else's workers out on the farm. Notices about a farmhand — when it starts
+  work, when it runs out of energy, when it can't reach a building — go to the player who hired it,
+  not to whoever is hosting. Everyone playing needs the same version of Dayswork installed.
 - Walking up to another player's office shows their farmhand's contract as a read-only card, so you
   can see who is working where without being able to change anything. The host can additionally
   pause or cancel any contract, which is how an absent player's farmhand can be stopped.

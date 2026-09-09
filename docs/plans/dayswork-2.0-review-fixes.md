@@ -357,6 +357,9 @@ explicitly deferred managed-crop shared-dedup notices out of scope.
 
 **Acceptance.**
 
+- [x] All three notices address the session/contract owner, keeping their translation keys and
+  tokens, and the unreachable-route operational log still runs alongside the notice. The shift
+  engine has no direct `Game1.addHUDMessage` call left.
 - [ ] Host-owned work uses the host HUD; remote-owned work reaches that owner once; offline-owned
   work logs without showing another player's HUD notice. Include a local split-screen owner.
 
