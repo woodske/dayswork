@@ -114,9 +114,10 @@ public sealed class ModEntry : Mod
         var netChannel = new NetChannel(helper.Multiplayer);
         var requestHandler = new ContractRequestHandler(
             store, serializer, contractTermsBuilder, configManager, upgradeStore,
-            new ContractReferenceResolver(chestResolver), chestResolver, fleet, suspension);
+            new ContractReferenceResolver(chestResolver), chestResolver, fleet, suspension,
+            this.ModManifest.Version.ToString());
         var requestClient = new ContractRequestClient(
-            netChannel, requestHandler, serializer, this.ModManifest.Version.ToString(), suspension);
+            netChannel, requestHandler, serializer, this.ModManifest.Version.ToString(), suspension, store);
         var network = new DaysworkNetwork(
             helper, netChannel, requestHandler, requestClient, suspension, configManager, store, fleet,
             this.ModManifest.Version.ToString());

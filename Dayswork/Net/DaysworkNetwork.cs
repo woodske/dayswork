@@ -505,6 +505,9 @@ internal sealed class DaysworkNetwork
     {
         _client.ResetCurrentScreen();
         MenuSnapshotCache.Current = null;
+        // Sequence numbers are per host session and start again from one, so a stale high-water
+        // mark from the last session would reject every state of the new one (R7).
+        AuthoritativeContractCache.ClearCurrentScreen();
 
         if (Authority.IsHost)
         {

@@ -116,6 +116,10 @@ public sealed class ContractCommitResponseMessage
 
     /// <summary>Free-text detail for the log; never shown to the player.</summary>
     public string Detail { get; set; } = "";
+
+    /// <summary>The office's authoritative state after the host decided, accepted or not — a
+    /// rejection is exactly when the client's own copy is most likely to be wrong.</summary>
+    public AuthoritativeContractState? State { get; set; }
 }
 
 public enum ContractActionKind
@@ -152,6 +156,46 @@ public sealed class ContractActionResponseMessage
     public bool SpeedPurchased { get; set; }
     public bool Speed2Purchased { get; set; }
     public bool EnergyPurchased { get; set; }
+
+    /// <summary>The office's authoritative state after the host decided. This is what stops a
+    /// client redrawing an accepted Pause from its own untouched copy of the contract.</summary>
+    public AuthoritativeContractState? State { get; set; }
+}
+
+/// <summary>
+/// Host → client: what one office holds right now, sent with every commit/action answer so the
+/// client's read cache can be corrected before the menu redraws. The contract travels in the save
+/// serializer's envelope, the same format modData uses.
+/// <para>
+/// <see cref="Sequence"/> is a host-session counter stamped on every state the host emits. It is
+/// the only ordering the client has — revisions restart at zero for a new contract and say nothing
+/// at all when an office holds none — so the client applies a state only when its sequence is
+/// higher than the last one it applied for that office.
+/// </para>
+/// </summary>
+public sealed class AuthoritativeContractState
+{
+    public string OfficeId { get; set; } = "";
+
+    /// <summary>Monotonic per host session; higher is newer.</summary>
+    public long Sequence { get; set; }
+
+    /// <summary>False once the office has been demolished on the host.</summary>
+    public bool OfficeExists { get; set; }
+
+    /// <summary>False when the office holds no contract at all; <see cref="ContractJson"/> is then
+    /// empty and the client drops whatever it had cached for that office.</summary>
+    public bool HasContract { get; set; }
+
+    /// <summary>The contract, in the save serializer's envelope format.</summary>
+    public string ContractJson { get; set; } = "";
+
+    /// <summary>The contract's revision, or -1 when the office holds none.</summary>
+    public int Revision { get; set; } = -1;
+
+    /// <summary>Whether a shift for this office is live on the host. A client's own fleet is
+    /// permanently empty, so this is the only way its menu can know.</summary>
+    public bool ShiftRunning { get; set; }
 }
 
 /// <summary>

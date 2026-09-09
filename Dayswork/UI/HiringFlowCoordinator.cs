@@ -160,7 +160,7 @@ internal sealed class HiringFlowCoordinator
             {
                 RefreshPreview(draft);
                 ShowUpgrades(draft);
-            }),
+            }, draft),
             onBack: () => ShowHub(draft));
     }
 
@@ -178,7 +178,7 @@ internal sealed class HiringFlowCoordinator
     /// and redraws from the answer — on the host that is the same tick, so this reads exactly like
     /// the old direct purchase.
     /// </summary>
-    private void PurchaseUpgrade(Guid officeId, FarmhandUpgradeKind kind, Action reopen)
+    private void PurchaseUpgrade(Guid officeId, FarmhandUpgradeKind kind, Action reopen, ContractDraft? editing = null)
     {
         // The two "you already know this" cases are answered locally from the state the page is
         // already drawing, so they keep their specific wording; everything else is the host's call.
@@ -222,6 +222,14 @@ internal sealed class HiringFlowCoordinator
             // The response carries the buyer's upgrade state, so a client's page is right without
             // a second round trip.
             Net.MenuSnapshotCache.ApplyUpgradeState(response);
+
+            // The energy upgrade rewrites every open contract's terms, which bumps the revision an
+            // edit in progress was authored against. Rebasing it here is safe and is not the silent
+            // rebase R7 forbids: the change was this player's own purchase, and the only field it
+            // touched is the terms snapshot this draft recomputes at Confirm anyway.
+            if (response.Accepted && editing is { } draft && draft.IsEditing)
+                draft.BaseRevision = _contractStore.ForOffice(draft.OfficeId)?.Revision ?? draft.BaseRevision;
+
             reopen();
         }, upgradeKind: kind.ToString());
     }
@@ -1183,7 +1191,12 @@ internal sealed class HiringFlowCoordinator
         if (!draft.PreviewState.ReviewModel.CanConfirm || proposedTerms is null)
             return;
 
-        var original = draft.EditingId.HasValue ? _contractStore.ForOffice(draft.OfficeId) : null;
+        // Identity comes from the draft, not from a fresh read of the store: the store may have
+        // moved on since the flow opened (another screen paused it, the host edited it), and the
+        // revision submitted here has to be the one the player actually authored against, so the
+        // host can tell us it is stale rather than let us overwrite the change unseen (R7).
+        var isEdit = draft.EditingId.HasValue;
+        var original = isEdit ? _contractStore.ForOffice(draft.OfficeId) : null;
         var submitted = BuildContract(draft, proposedTerms);
         if (original is not null)
         {
@@ -1192,15 +1205,15 @@ internal sealed class HiringFlowCoordinator
                 Id = original.Id,
                 Status = original.Status,
                 HireDate = original.HireDate,
-                Revision = original.Revision,
+                Revision = draft.BaseRevision,
             };
         }
 
         ModEntry.Requests.SubmitContract(
             draft.OfficeId,
             submitted,
-            isEdit: original is not null,
-            expectedRevision: original?.Revision ?? 0,
+            isEdit: isEdit,
+            expectedRevision: draft.BaseRevision,
             response =>
             {
                 if (response.Accepted)
@@ -1209,11 +1222,47 @@ internal sealed class HiringFlowCoordinator
                     return;
                 }
 
+                if (response.Code == ContractRejectionCode.Stale)
+                {
+                    ShowStaleContractChoice(draft);
+                    return;
+                }
+
                 Game1.addHUDMessage(new HUDMessage(
                     response.Code == ContractRejectionCode.CannotAfford
                         ? I18nHelper.Get("ui.error.cant_afford")
                         : ContractRejectionText.Describe(response.Code),
                     HUDMessage.error_type));
+                ShowHub(draft);
+            });
+    }
+
+    /// <summary>
+    /// The host refused the commit because the office moved on under the draft. The response has
+    /// already corrected this screen's read cache, so the two versions are both in hand — and the
+    /// player picks which one wins rather than losing their work or silently clobbering the other
+    /// change (R7).
+    /// </summary>
+    private void ShowStaleContractChoice(ContractDraft draft)
+    {
+        var current = _contractStore.ForOffice(draft.OfficeId);
+
+        // Nothing to reconcile against: the office was hired for by someone else while this was a
+        // new hire, or its contract is gone. Either way the office's own page is the truth.
+        if (!draft.IsEditing || current is null)
+        {
+            Game1.addHUDMessage(new HUDMessage(
+                ContractRejectionText.Describe(ContractRejectionCode.Stale),
+                HUDMessage.error_type));
+            OpenManageFlow(draft.OfficeId);
+            return;
+        }
+
+        Game1.activeClickableMenu = new ConfirmStaleContractMenu(
+            onReviewTheirs: () => OpenEditFlow(draft.OfficeId),
+            onKeepMine: () =>
+            {
+                draft.BaseRevision = current.Revision;
                 ShowHub(draft);
             });
     }
@@ -1255,6 +1304,7 @@ internal sealed class HiringFlowCoordinator
             OwnerId = contract.OwnerId,
             Schedule = contract.Schedule,
             Tier = contract.Tier,
+            BaseRevision = contract.Revision,
         };
 
         draft.EnabledTasks.UnionWith(contract.EnabledTasks);

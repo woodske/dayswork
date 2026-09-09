@@ -35,6 +35,7 @@ internal sealed class ContractRequestClient
     private readonly SaveDataSerializer _serializer;
     private readonly string _modVersion;
     private readonly DaysworkSuspension _suspension;
+    private readonly OfficeContractStore _store;
 
     // Per screen: two local players can each have a menu and outstanding request. This is keyed
     // explicitly instead of using PerScreen<T> because lifecycle cleanup must remove exactly the
@@ -46,13 +47,15 @@ internal sealed class ContractRequestClient
         ContractRequestHandler handler,
         SaveDataSerializer serializer,
         string modVersion,
-        DaysworkSuspension suspension)
+        DaysworkSuspension suspension,
+        OfficeContractStore store)
     {
         _channel = channel;
         _handler = handler;
         _serializer = serializer;
         _modVersion = modVersion;
         _suspension = suspension;
+        _store = store;
     }
 
     /// <summary>Raised when a request times out with no answer, so the UI can say so and keep the
@@ -155,14 +158,49 @@ internal sealed class ContractRequestClient
 
     public void ReceiveCommitResponse(ContractCommitResponseMessage response)
     {
-        if (Take(response.RequestId) is { } pending)
-            pending.OnCommit?.Invoke(response);
+        if (Take(response.RequestId) is not { } pending)
+            return;
+
+        ApplyAuthoritativeState(response.State);
+        pending.OnCommit?.Invoke(response);
     }
 
     public void ReceiveActionResponse(ContractActionResponseMessage response)
     {
-        if (Take(response.RequestId) is { } pending)
-            pending.OnAction?.Invoke(response);
+        if (Take(response.RequestId) is not { } pending)
+            return;
+
+        ApplyAuthoritativeState(response.State);
+        pending.OnAction?.Invoke(response);
+    }
+
+    /// <summary>
+    /// Folds the host's word on an office into this client's read cache, before the callback that
+    /// redraws the menu runs (R7). Without this the menu redraws from the copy the client loaded
+    /// with: an accepted Pause still reads Active, and clicking again submits the same Pause.
+    /// <para>
+    /// Only a remote client does this. On the host's own computer — single-player included — the
+    /// store <em>is</em> the authority and was already mutated by the handler; hydrating it back
+    /// from a serialized copy would be a pointless round trip through JSON.
+    /// </para>
+    /// </summary>
+    internal void ApplyAuthoritativeState(AuthoritativeContractState? state)
+    {
+        if (Authority.HostIsInThisProcess || !AuthoritativeContractCache.TryAccept(state))
+            return;
+
+        if (!Guid.TryParse(state!.OfficeId, out var officeId))
+            return;
+
+        AuthoritativeContractCache.RememberShiftRunning(officeId, state.ShiftRunning);
+
+        // A demolished office keeps no contract to show; the building itself is gone from the
+        // client's synced world too, so the menu closes on its own next refresh.
+        var contract = state is { OfficeExists: true, HasContract: true }
+            ? _serializer.DeserializeOne(state.ContractJson)
+            : null;
+
+        _store.HydrateOffice(officeId, contract);
     }
 
     /// <summary>

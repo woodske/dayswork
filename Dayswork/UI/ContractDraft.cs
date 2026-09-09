@@ -12,6 +12,15 @@ internal sealed class ContractDraft
     public ContractSchedule Schedule { get; set; } = ContractSchedule.Recurring;
     public ContractId? EditingId { get; set; }
 
+    /// <summary>
+    /// The revision of the contract this edit was authored against, captured when the flow opened
+    /// (R7). It is what the host checks for staleness, so it must be the base the player actually
+    /// saw — reading the store again at Confirm time would silently adopt a change made meanwhile
+    /// and overwrite it. Rebased only where the player says so, or where the change was the
+    /// player's own energy-upgrade purchase, which only rewrites terms this draft recomputes.
+    /// </summary>
+    public int BaseRevision { get; set; }
+
     /// <summary>The office this contract is being written for (its Building.id) — set when the
     /// flow opens from a building and carried through to the committed contract.</summary>
     public Guid OfficeId { get; set; }

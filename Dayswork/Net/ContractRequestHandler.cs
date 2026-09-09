@@ -32,8 +32,14 @@ internal sealed class ContractRequestHandler
     private readonly ChestResolver _chestResolver;
     private readonly ShiftFleet _fleet;
     private readonly DaysworkSuspension _suspension;
+    private readonly string _modVersion;
 
     private readonly RequestIdCache _handled = new();
+
+    /// <summary>Stamped on every authoritative state this host emits, so a client can tell which
+    /// of two answers about the same office is the later one (R7). Never reset inside a session:
+    /// a client that has applied sequence 12 must not be handed a fresh 1 for the same office.</summary>
+    private long _stateSequence;
 
     public ContractRequestHandler(
         OfficeContractStore store,
@@ -44,7 +50,8 @@ internal sealed class ContractRequestHandler
         ContractReferenceResolver references,
         ChestResolver chestResolver,
         ShiftFleet fleet,
-        DaysworkSuspension suspension)
+        DaysworkSuspension suspension,
+        string modVersion)
     {
         _store = store;
         _serializer = serializer;
@@ -55,6 +62,7 @@ internal sealed class ContractRequestHandler
         _chestResolver = chestResolver;
         _fleet = fleet;
         _suspension = suspension;
+        _modVersion = modVersion;
     }
 
     /// <summary>Forgets remembered request ids — a new session's ids start clean.</summary>
@@ -80,11 +88,11 @@ internal sealed class ContractRequestHandler
     private ContractCommitResponseMessage BuildCommitResponse(ContractCommitRequestMessage request, long senderId)
     {
         if (!Guid.TryParse(request.OfficeId, out var officeId))
-            return Reject(request.RequestId, ContractRejectionCode.OfficeGone, "unparseable office id");
+            return Reject(request.RequestId, null, ContractRejectionCode.OfficeGone, "unparseable office id");
 
         var submitted = _serializer.DeserializeOne(request.ContractJson);
         if (submitted is null)
-            return Reject(request.RequestId, ContractRejectionCode.VersionMismatch, "contract payload could not be read");
+            return Reject(request.RequestId, officeId, ContractRejectionCode.VersionMismatch, "contract payload could not be read");
 
         var office = OfficeResolver.TryGet(officeId);
         var ownerId = office is null ? 0L : ResolveOwner(office);
@@ -124,7 +132,7 @@ internal sealed class ContractRequestHandler
             UpfrontPrice: upfrontPrice);
 
         if (ContractCommitValidator.Validate(request, context) is { } rejection)
-            return Reject(request.RequestId, rejection, $"office {officeId:N}, sender {senderId}");
+            return Reject(request.RequestId, officeId, rejection, $"office {officeId:N}, sender {senderId}");
 
         var terms = preview.ProposedTerms!;
         if (upfrontPrice > 0)
@@ -164,6 +172,7 @@ internal sealed class ContractRequestHandler
             RequestId = request.RequestId,
             Accepted = true,
             Revision = committed.Revision,
+            State = BuildState(officeId),
         };
     }
 
@@ -201,7 +210,7 @@ internal sealed class ContractRequestHandler
             OwnerIsResolvable: office is not null && Sponsor.Resolve(ownerId) is not null);
 
         if (ContractActionValidator.Validate(request, context) is { } rejection)
-            return RejectAction(request, rejection, $"office {officeId:N}, sender {senderId}");
+            return RejectAction(request, officeId, rejection, $"office {officeId:N}, sender {senderId}");
 
         switch (request.Action)
         {
@@ -227,16 +236,16 @@ internal sealed class ContractRequestHandler
                 break;
 
             case ContractActionKind.PurchaseUpgrade:
-                return HandleUpgradePurchase(request, senderId);
+                return HandleUpgradePurchase(request, officeId, senderId);
         }
 
-        return AcceptAction(request, senderId);
+        return AcceptAction(request, officeId, senderId);
     }
 
-    private ContractActionResponseMessage HandleUpgradePurchase(ContractActionRequestMessage request, long senderId)
+    private ContractActionResponseMessage HandleUpgradePurchase(ContractActionRequestMessage request, Guid officeId, long senderId)
     {
         if (!Enum.TryParse<FarmhandUpgradeKind>(request.UpgradeKind, ignoreCase: false, out var kind))
-            return RejectAction(request, ContractRejectionCode.InvalidAction, $"unknown upgrade '{request.UpgradeKind}'");
+            return RejectAction(request, officeId, ContractRejectionCode.InvalidAction, $"unknown upgrade '{request.UpgradeKind}'");
 
         // Upgrades are bought by whoever asked, out of their own wallet, and belong to them alone.
         var state = _upgradeStore.For(senderId);
@@ -249,13 +258,13 @@ internal sealed class ContractRequestHandler
                 _upgradeStore.Replace(senderId, result.State);
                 if (kind == FarmhandUpgradeKind.Energy)
                     ApplyEnergyUpgradeToOpenContracts(senderId);
-                return AcceptAction(request, senderId);
+                return AcceptAction(request, officeId, senderId);
 
             case FarmhandUpgradePurchaseStatus.InsufficientFunds:
-                return RejectAction(request, ContractRejectionCode.CannotAfford, kind.ToString());
+                return RejectAction(request, officeId, ContractRejectionCode.CannotAfford, kind.ToString());
 
             default:
-                return RejectAction(request, ContractRejectionCode.InvalidAction, $"{kind} {result.Status}");
+                return RejectAction(request, officeId, ContractRejectionCode.InvalidAction, $"{kind} {result.Status}");
         }
     }
 
@@ -338,7 +347,30 @@ internal sealed class ContractRequestHandler
     private static GameDate Today() =>
         new(Game1.Date.DayOfMonth, Enum.Parse<Season>(Game1.currentSeason, ignoreCase: true), Game1.year);
 
-    private static ContractCommitResponseMessage Reject(string requestId, ContractRejectionCode code, string detail)
+    /// <summary>
+    /// What the office holds right now, stamped with the next sequence number. Sent with every
+    /// answer, accepted or rejected, so the asking client can correct its read cache before its
+    /// menu redraws — a rejection is exactly when that cache is most likely to be wrong (R7).
+    /// </summary>
+    private AuthoritativeContractState? BuildState(Guid? officeId)
+    {
+        if (officeId is not { } id || id == Guid.Empty)
+            return null;
+
+        var contract = _store.ForOffice(id);
+        return new AuthoritativeContractState
+        {
+            OfficeId = id.ToString("N"),
+            Sequence = ++_stateSequence,
+            OfficeExists = OfficeResolver.TryGet(id) is not null,
+            HasContract = contract is not null,
+            ContractJson = contract is null ? "" : _serializer.SerializeOne(contract, _modVersion),
+            Revision = contract?.Revision ?? -1,
+            ShiftRunning = contract is not null && _fleet.IsShiftRunning(contract.Id),
+        };
+    }
+
+    private ContractCommitResponseMessage Reject(string requestId, Guid? officeId, ContractRejectionCode code, string detail)
     {
         ModEntry.ModMonitor.Log($"[Dayswork] Rejected a contract commit ({code}): {detail}.", DevLog.WarnLevel);
         return new ContractCommitResponseMessage
@@ -347,10 +379,11 @@ internal sealed class ContractRequestHandler
             Accepted = false,
             Code = code,
             Detail = detail,
+            State = BuildState(officeId),
         };
     }
 
-    private static ContractActionResponseMessage RejectAction(ContractActionRequestMessage request, ContractRejectionCode code, string detail)
+    private ContractActionResponseMessage RejectAction(ContractActionRequestMessage request, Guid? officeId, ContractRejectionCode code, string detail)
     {
         ModEntry.ModMonitor.Log($"[Dayswork] Rejected a {request.Action} request ({code}): {detail}.", DevLog.WarnLevel);
         return new ContractActionResponseMessage
@@ -360,10 +393,11 @@ internal sealed class ContractRequestHandler
             Accepted = false,
             Code = code,
             Detail = detail,
+            State = BuildState(officeId),
         };
     }
 
-    private ContractActionResponseMessage AcceptAction(ContractActionRequestMessage request, long senderId)
+    private ContractActionResponseMessage AcceptAction(ContractActionRequestMessage request, Guid? officeId, long senderId)
     {
         var upgrades = _upgradeStore.For(senderId);
         return new ContractActionResponseMessage
@@ -374,6 +408,7 @@ internal sealed class ContractRequestHandler
             SpeedPurchased = upgrades.SpeedPurchased,
             Speed2Purchased = upgrades.Speed2Purchased,
             EnergyPurchased = upgrades.EnergyPurchased,
+            State = BuildState(officeId),
         };
     }
 }

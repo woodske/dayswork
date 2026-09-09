@@ -262,6 +262,10 @@
     "ui.confirm_discard.description": "You have unsaved changes to this contract. They will be lost if you close now.",
     "ui.confirm_discard.go_back_btn": "Go Back",
     "ui.confirm_discard.close_anyway_btn": "Close Anyway",
+    "ui.stale_contract.title": "Contract Changed",
+    "ui.stale_contract.description": "This contract changed while you were editing it. Review the current version, or keep your changes and overwrite it.",
+    "ui.stale_contract.review_btn": "Review Theirs",
+    "ui.stale_contract.keep_btn": "Keep Mine",
 
     "ui.confirm_cancel_contract.title": "Cancel Contract?",
     "ui.confirm_cancel_contract.description": "This will permanently cancel the contract. This cannot be undone.",

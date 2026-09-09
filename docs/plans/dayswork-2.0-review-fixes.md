@@ -270,10 +270,10 @@ purchase changing open contract revisions while an edit is in progress.
 
 **Acceptance.**
 
-- [ ] Delay the world modData delta until after the acknowledgment: Pause changes to Resume,
+- [x] Delay the world modData delta until after the acknowledgment: Pause changes to Resume,
   Resume changes to Pause, and Cancel removes the active contract immediately on the client.
-- [ ] Edit after an action and purchase-energy-while-editing both reach a usable, accurate flow.
-- [ ] Stale/out-of-order responses cannot overwrite newer state or discard authored changes.
+- [x] Edit after an action and purchase-energy-while-editing both reach a usable, accurate flow.
+- [x] Stale/out-of-order responses cannot overwrite newer state or discard authored changes.
 - [ ] Expand S19/S21/S23/S31 to check the still-open menu, not only close-and-reopen behavior.
 
 ## R8 — Initialize and refresh remote upgrade state on every entry path

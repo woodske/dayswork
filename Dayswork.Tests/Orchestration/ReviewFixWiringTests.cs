@@ -104,6 +104,64 @@ public sealed class ReviewFixWiringTests
         AssertOrder(reset, "TreeDropAttribution.ClearFor", "_session = null");
     }
 
+    [Fact]
+    public void Dayswork2Review_R7_ClientAppliesHostStateBeforeTheMenuCallbackRedraws()
+    {
+        var source = ReadSource("Dayswork", "Net", "ContractRequestClient.cs");
+        var commit = MethodBody(source, "public void ReceiveCommitResponse", "public void ReceiveActionResponse");
+        var action = MethodBody(source, "public void ReceiveActionResponse", "/// <summary>");
+        var apply = MethodBody(source, "internal void ApplyAuthoritativeState", "public void OnUpdateTicked");
+
+        AssertOrder(commit, "ApplyAuthoritativeState(response.State)", "pending.OnCommit");
+        AssertOrder(action, "ApplyAuthoritativeState(response.State)", "pending.OnAction");
+        AssertOrder(apply, "AuthoritativeContractCache.TryAccept", "_store.HydrateOffice");
+        Assert.Contains("Authority.HostIsInThisProcess", apply, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dayswork2Review_R7_HostStampsEveryAnswerWithTheOfficeState()
+    {
+        var source = ReadSource("Dayswork", "Net", "ContractRequestHandler.cs");
+        var reject = MethodBody(source, "private ContractCommitResponseMessage Reject", "private ContractActionResponseMessage RejectAction");
+        var rejectAction = MethodBody(source, "private ContractActionResponseMessage RejectAction", "private ContractActionResponseMessage AcceptAction");
+        var accept = source[source.IndexOf("private ContractActionResponseMessage AcceptAction", StringComparison.Ordinal)..];
+        var build = MethodBody(source, "private AuthoritativeContractState? BuildState", "private ContractCommitResponseMessage Reject");
+
+        Assert.Contains("State = BuildState(officeId)", reject, StringComparison.Ordinal);
+        Assert.Contains("State = BuildState(officeId)", rejectAction, StringComparison.Ordinal);
+        Assert.Contains("State = BuildState(officeId)", accept, StringComparison.Ordinal);
+        Assert.Contains("Sequence = ++_stateSequence", build, StringComparison.Ordinal);
+        Assert.Contains("_fleet.IsShiftRunning", build, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dayswork2Review_R7_EditsSubmitTheRevisionTheyWereAuthoredAgainst()
+    {
+        var source = ReadSource("Dayswork", "UI", "HiringFlowCoordinator.cs");
+        var confirm = MethodBody(source, "private void ConfirmContract", "private void ShowStaleContractChoice");
+        var stale = MethodBody(source, "private void ShowStaleContractChoice", "private static Contract BuildContract");
+        var edit = MethodBody(source, "internal static ContractDraft CreateEditDraft", "private void MaybeCloseFlow");
+
+        Assert.Contains("expectedRevision: draft.BaseRevision", confirm, StringComparison.Ordinal);
+        Assert.Contains("isEdit: isEdit", confirm, StringComparison.Ordinal);
+        Assert.DoesNotContain("expectedRevision: original?.Revision", confirm, StringComparison.Ordinal);
+        AssertOrder(confirm, "ContractRejectionCode.Stale", "ShowStaleContractChoice");
+        Assert.Contains("BaseRevision = contract.Revision", edit, StringComparison.Ordinal);
+        // The player picks; nothing rebases the draft on its own.
+        AssertOrder(stale, "onReviewTheirs: () => OpenEditFlow", "onKeepMine:", "draft.BaseRevision = current.Revision");
+    }
+
+    [Fact]
+    public void Dayswork2Review_R7_RemoteCancelConsultsTheHostsShiftFlagNotTheEmptyLocalFleet()
+    {
+        var source = ReadSource("Dayswork", "UI", "ContractMenu.cs");
+        var cancel = MethodBody(source, "private void TryCancel", "/// <summary>");
+        var running = MethodBody(source, "private bool ShiftIsRunning", "/// <summary>");
+
+        Assert.Contains("ShiftIsRunning(contract)", cancel, StringComparison.Ordinal);
+        AssertOrder(running, "Authority.IsRemoteClient", "AuthoritativeContractCache.ShiftRunning", "ModEntry.Fleet.IsShiftRunning");
+    }
+
     private static void AssertOrder(string source, params string[] tokens)
     {
         var previous = -1;

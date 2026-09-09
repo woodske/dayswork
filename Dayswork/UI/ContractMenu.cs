@@ -343,7 +343,7 @@ internal sealed class ContractMenu : IClickableMenu
         // A running shift is stopped by the day, not by the menu: the worker is out with items on
         // it. The host validates this too; catching it here keeps the confirmation dialog from
         // opening on something that cannot succeed.
-        if (ModEntry.Fleet.IsShiftRunning(contract.Id))
+        if (ShiftIsRunning(contract))
         {
             Game1.addHUDMessage(new HUDMessage(_cancelBlockedMsg, HUDMessage.error_type));
             return;
@@ -353,6 +353,17 @@ internal sealed class ContractMenu : IClickableMenu
             onGoBack:  () => Game1.activeClickableMenu = this,
             onConfirm: () => { Game1.activeClickableMenu = this; Submit(ContractActionKind.Cancel); });
     }
+
+    /// <summary>
+    /// Whether this office's worker is out. The engine runs on the host alone, so a remote
+    /// client's own fleet is permanently empty and would always answer no; it uses what the host
+    /// last told it instead, and falls back to letting the host decide when it has not been told
+    /// yet (R7).
+    /// </summary>
+    private bool ShiftIsRunning(Contract contract) =>
+        Guards.Authority.IsRemoteClient
+            ? Net.AuthoritativeContractCache.ShiftRunning(_officeId) ?? false
+            : ModEntry.Fleet.IsShiftRunning(contract.Id);
 
     /// <summary>
     /// Sends one contract action and refreshes when the answer comes back. On the host that is the
