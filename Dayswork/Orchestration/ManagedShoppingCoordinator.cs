@@ -7,6 +7,7 @@ using Dayswork.Worker;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.Objects;
 
 namespace Dayswork.Orchestration;
 
@@ -122,6 +123,59 @@ internal sealed class ManagedShoppingCoordinator
 
     /// <summary>Pacing through counter purchases one beat at a time; the tick loop calls <see cref="ContinuePurchaseTick"/>.</summary>
     public bool IsPurchasing => _phase == Phase.Purchasing;
+
+    /// <summary>
+    /// Stops an in-flight trip at an external wrap-up boundary. No unbought line may execute after
+    /// this point. Already-paid items return through the ordinary shopping travel, settle into the
+    /// office input chest (or overflow), then hand control back to terminal deposit.
+    /// </summary>
+    public bool InterruptForWrapUp()
+    {
+        if (!_inProgress)
+            return false;
+
+        // A repeated cancellation while the worker is already returning must not restart travel,
+        // release the reservation early, or settle the same purchase twice.
+        if (_wrapAfterReturn)
+            return true;
+
+        if (_session.Worker is null)
+        {
+            SettleForShutdown();
+            return false;
+        }
+
+        _wrapAfterReturn = true;
+        _groups.Clear();
+        _group = null;
+        _storeRoute = null;
+        _pendingOutcomes.Clear();
+        _purchaseLineIndex = 0;
+        _waitTicks = 0;
+        _toolAnimator.StopSwing();
+        _host.CancelActiveTravel();
+
+        DevLog.Log(
+            $"[Dayswork][managed-crops][shopping] interrupted phase={_phase}; returning paid supplies before wrap-up.",
+            LogLevel.Info);
+        BeginReturnToFarm();
+        return true;
+    }
+
+    /// <summary>
+    /// Immediate save/suspension settlement, where the game cannot spend more ticks walking home.
+    /// Idempotently cancels shopping, releases its wallet reservation, and routes paid items before
+    /// the shift session is discarded.
+    /// </summary>
+    public void SettleForShutdown()
+    {
+        _host.CancelActiveTravel();
+        _toolAnimator.StopSwing();
+        _host.ReleaseShoppingBudget();
+        SettleCarriedItems(showHud: false);
+        ClearRuntime(clearCarriedItems: false);
+        _nav.Clear();
+    }
 
     /// <summary>Clears per-batch shopping runtime state (called when a managed batch begins).</summary>
     public void ResetState()
@@ -639,7 +693,6 @@ internal sealed class ManagedShoppingCoordinator
         _host.CancelActiveTravel();
         CropHudNotifier.ShoppingUnavailable();
         WarpWorkerToFarm();
-        SettleCarriedItems(showHud: false);
         CompleteReturn();
     }
 
@@ -667,31 +720,49 @@ internal sealed class ManagedShoppingCoordinator
     /// </summary>
     public void SettleCarriedItems(bool showHud)
     {
-        if (_carriedItems.Count == 0)
-            return;
-
         var inputChest = _host.TryGetInputChest();
+        var deposited = SettleCarriedItems(_carriedItems, inputChest, AddOverflow);
+
+        inputChest?.clearNulls();
+        if (showHud && deposited > 0)
+            CropHudNotifier.ShoppingDeposited(deposited);
+    }
+
+    /// <summary>Item-preserving settlement core, split out so the paid-quantity and idempotence
+    /// invariants can be regression-tested without constructing a live shift.</summary>
+    internal static int SettleCarriedItems(
+        IList<Item> carriedItems,
+        Chest? inputChest,
+        Action<Item, OverflowReason> addOverflow) =>
+        SettleCarriedItems(
+            carriedItems,
+            inputChest is null ? null : inputChest.addItem,
+            addOverflow);
+
+    internal static int SettleCarriedItems(
+        IList<Item> carriedItems,
+        Func<Item, Item?>? tryAddToInputChest,
+        Action<Item, OverflowReason> addOverflow)
+    {
         var deposited = 0;
-        foreach (var item in _carriedItems)
+        foreach (var item in carriedItems)
         {
-            if (inputChest is null)
+            if (tryAddToInputChest is null)
             {
-                AddOverflow(item, OverflowReason.ChestMissing);
+                addOverflow(item, OverflowReason.ChestMissing);
                 continue;
             }
 
             var before = Math.Max(1, item.Stack);
-            var leftover = inputChest.addItem(item);
+            var leftover = tryAddToInputChest(item);
             var rejected = Math.Max(0, leftover?.Stack ?? 0);
             deposited += Math.Max(0, before - rejected);
             if (leftover is not null && leftover.Stack > 0)
-                AddOverflow(leftover, OverflowReason.ChestFull);
+                addOverflow(leftover, OverflowReason.ChestFull);
         }
 
-        inputChest?.clearNulls();
-        _carriedItems.Clear();
-        if (showHud && deposited > 0)
-            CropHudNotifier.ShoppingDeposited(deposited);
+        carriedItems.Clear();
+        return deposited;
     }
 
     private void AddOverflow(Item item, OverflowReason reason)

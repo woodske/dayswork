@@ -18,20 +18,46 @@ public class MessageSerializationTests
     [Fact]
     public void Hello_RoundTrips()
     {
-        var result = RoundTrip(new HelloMessage { ProtocolVersion = 7, ModVersion = "2.0.0" });
+        var result = RoundTrip(new HelloMessage
+        {
+            ProtocolVersion = 7,
+            ModVersion = "2.0.0",
+            Suspended = true,
+            SuspensionReason = SuspensionReason.Version,
+            SuspendedPlayerName = "Sam",
+        });
 
         Assert.Equal(7, result.ProtocolVersion);
         Assert.Equal("2.0.0", result.ModVersion);
+        Assert.True(result.Suspended);
+        Assert.Equal(SuspensionReason.Version, result.SuspensionReason);
+        Assert.Equal("Sam", result.SuspendedPlayerName);
     }
 
     [Fact]
     public void HelloAck_RoundTrips()
     {
-        var result = RoundTrip(new HelloAckMessage { ProtocolVersion = 3, ModVersion = "1.9.9", Suspended = true });
+        var result = RoundTrip(new HelloAckMessage { ProtocolVersion = 3, ModVersion = "1.9.9" });
 
         Assert.Equal(3, result.ProtocolVersion);
         Assert.Equal("1.9.9", result.ModVersion);
+    }
+
+    [Fact]
+    public void Dayswork2Review_R10_HelloRoundTripsCurrentHostSuspension()
+    {
+        var result = RoundTrip(new HelloMessage
+        {
+            ProtocolVersion = DaysworkProtocol.Version,
+            ModVersion = "2.0.0-beta.1",
+            Suspended = true,
+            SuspensionReason = SuspensionReason.NoMod,
+            SuspendedPlayerName = "Late join blocker",
+        });
+
         Assert.True(result.Suspended);
+        Assert.Equal(SuspensionReason.NoMod, result.SuspensionReason);
+        Assert.Equal("Late join blocker", result.SuspendedPlayerName);
     }
 
     [Fact]

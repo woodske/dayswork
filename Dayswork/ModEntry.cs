@@ -42,6 +42,11 @@ public sealed class ModEntry : Mod
         ModMonitor = this.Monitor;
         I18nHelper.Init(helper);
 
+        // Tree trunk drops are emitted later by Tree.tickUpdate, outside the worker's guarded axe
+        // beat. This one verified Harmony boundary attributes those drops to the exact tree/shift;
+        // if registration fails, only standing-tree work is disabled and the rest of the mod runs.
+        TreeDropAttribution.Install(this.ModManifest.UniqueID);
+
         // ── Core singletons (dependency order) ──────────────────────────────
         var logWarning  = (string msg) => this.Monitor.Log(msg, DevLog.WarnLevel);
         var configManager = new ModConfigManager(helper, msg => this.Monitor.Log(msg, DevLog.WarnLevel));
@@ -111,7 +116,7 @@ public sealed class ModEntry : Mod
             store, serializer, contractTermsBuilder, configManager, upgradeStore,
             new ContractReferenceResolver(chestResolver), chestResolver, fleet, suspension);
         var requestClient = new ContractRequestClient(
-            netChannel, requestHandler, serializer, this.ModManifest.Version.ToString());
+            netChannel, requestHandler, serializer, this.ModManifest.Version.ToString(), suspension);
         var network = new DaysworkNetwork(
             helper, netChannel, requestHandler, requestClient, suspension, configManager, store, fleet,
             this.ModManifest.Version.ToString());
@@ -172,6 +177,7 @@ public sealed class ModEntry : Mod
         // A remote client's outstanding requests time out here; on the host this never has anything
         // to do, because its own requests are answered synchronously.
         helper.Events.GameLoop.UpdateTicked += requestClient.OnUpdateTicked;
+        helper.Events.GameLoop.UpdateTicked += network.OnUpdateTicked;
         // Keep each shift's passability cache in step with world changes (all no-op when no shift
         // is active). Worker-cleared resource clumps have no event and are invalidated at the clear
         // site; everything else rides these.

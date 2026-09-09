@@ -112,15 +112,13 @@ internal sealed partial class ShiftOrchestrator
         ReturnWorkerToFarmForDeposit();
         // Valid from Working, Stuck, Recovering (all have Depositing as a successor).
         Session.MorningEntranceHoldTicks = 0;
-        if (Session.PendingDebrisSweeps.Count > 0)
+        if (TreeDropAttribution.CountFor(this) > 0)
         {
             Session.WaitingForDebrisBeforeDeposit = true;
             Session.ActionPending = true;
             _toolAnimator.StopSwing();
             return;
         }
-
-        FlushPendingDebrisSweeps();
 
         // Return any inputs still in the machine carry buffer (mid-reload wrap-up) before depositing.
         SettleCarriedInputs();

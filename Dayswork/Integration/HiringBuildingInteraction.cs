@@ -76,10 +76,19 @@ internal sealed class HiringBuildingInteraction
 
         // Nothing this menu offers can be committed when the host has no compatible Dayswork, so
         // say that once instead of letting every action come back rejected.
-        if (ModEntry.Suspension.HostIsIncompatible)
+        if (ModEntry.Suspension.CannotUseMenus)
         {
+            var text = ModEntry.Suspension.HostIsUnverified
+                ? I18nHelper.Get("ui.net.waiting_for_host")
+                : ModEntry.Suspension.HostIsIncompatible
+                    ? I18nHelper.Get("ui.net.host_incompatible_card")
+                    : I18nHelper.Get(
+                        ModEntry.Suspension.Reason == Core.Net.SuspensionReason.NoMod
+                            ? "ui.net.suspended_no_mod"
+                            : "ui.net.suspended_version",
+                        new { player = ModEntry.Suspension.PlayerName });
             Game1.addHUDMessage(new HUDMessage(
-                I18nHelper.Get("ui.net.host_incompatible_card"),
+                text,
                 HUDMessage.error_type));
             return;
         }

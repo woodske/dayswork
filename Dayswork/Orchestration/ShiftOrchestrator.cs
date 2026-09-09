@@ -32,11 +32,9 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
     // Melee proximity range for hit-detection (Manhattan distance in tiles).
     private const float HitRangeTiles = 2.0f;
 
-    // Brief morning hold so the player sees the worker enter from the farm entrance.
-    // Vanilla tree debris can spawn after the tree-fall animation, not on the axe-hit tick.
+    // Immediate worker-action debris stays close to the action tile. Delayed standing-tree drops
+    // use the exact Tree.tickUpdate attribution boundary instead of a historical-radius sweep.
     private const int ImmediateDebrisSweepRadiusTiles = 3;
-    private const int DelayedTreeDebrisSweepTicks = 240;
-    private const int DelayedTreeDebrisSweepRadiusTiles = 6;
 
     private readonly ToolLevelReader      _toolReader;
     private readonly ToolSwapAnimator     _toolAnimator;
@@ -121,6 +119,13 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
 
         RequestBoundaryStop(reason, stopTime);
+
+        // Shopping owns the worker's current travel. Let it stop all future purchase beats and
+        // bring already-paid supplies home before terminal deposit replaces that travel plan.
+        // CompleteReturn calls back here after clearing the shopping phase, so this cannot loop.
+        if (Session.Shopping.InterruptForWrapUp())
+            return;
+
         BeginDeposit();
     }
 
@@ -254,6 +259,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
                 LogLevel.Trace);
         }
 
+        TreeDropAttribution.ClearFor(this);
         DespawnWorker();
         _session = null;
     }
@@ -967,10 +973,10 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
 
         _toolAnimator.Update(Game1.currentGameTime);
         _nav.Update();
-        ProcessPendingDebrisSweeps();
+        TreeDropAttribution.AdvanceFor(this);
         if (Session.WaitingForDebrisBeforeDeposit)
         {
-            if (Session.PendingDebrisSweeps.Count == 0)
+            if (TreeDropAttribution.CountFor(this) == 0)
             {
                 Session.WaitingForDebrisBeforeDeposit = false;
                 BeginDeposit();
@@ -1080,7 +1086,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
             return;
         }
 
-        FlushPendingDebrisSweeps();
+        TreeDropAttribution.FlushFor(this);
 
         var ctx = _session.Ctx;
         if (!ctx.ShiftEndTime.HasValue)
@@ -1094,7 +1100,7 @@ internal sealed partial class ShiftOrchestrator : ISessionBoundaryResettable
         // Route collected-but-undelivered items through their safe final destination; explicit
         // shipping-bin output goes straight to the bin, while all other undelivered output uses
         // automatic overflow. This must all happen BEFORE the session is discarded.
-        _session.Shopping.SettleCarriedItems(showHud: false);
+        _session.Shopping.SettleForShutdown();
         SettleCarriedInputs();
         _session.Deposits.AppendUndeliveredToOverflow();
 

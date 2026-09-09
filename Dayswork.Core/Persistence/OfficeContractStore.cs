@@ -166,10 +166,10 @@ public sealed class OfficeContractStore
         contract is { Status: ContractStatus.Active or ContractStatus.Paused };
 
     private static bool IsScheduledForDate(Contract contract, GameDate date) =>
-        contract.Schedule == ContractSchedule.Recurring || IsNextGameDay(contract.HireDate, date);
+        contract.Schedule == ContractSchedule.Recurring || IsOnOrAfterNextGameDay(contract.HireDate, date);
 
     // Stardew seasons are 28 days; four seasons per year cycling Spring→Summer→Fall→Winter→Spring.
-    private static bool IsNextGameDay(GameDate hire, GameDate candidate)
+    private static bool IsOnOrAfterNextGameDay(GameDate hire, GameDate candidate)
     {
         var nextDay    = hire.Day + 1;
         var nextSeason = hire.Season;
@@ -182,6 +182,10 @@ public sealed class OfficeContractStore
             if (nextSeason == Season.Spring) nextYear++;   // wrapped past Winter
         }
 
-        return candidate == new GameDate(nextDay, nextSeason, nextYear);
+        var due = new GameDate(nextDay, nextSeason, nextYear);
+        return ToOrdinal(candidate) >= ToOrdinal(due);
     }
+
+    private static int ToOrdinal(GameDate date) =>
+        date.Year * 4 * 28 + (int)date.Season * 28 + date.Day - 1;
 }

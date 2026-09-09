@@ -1017,7 +1017,9 @@ internal sealed partial class ShiftOrchestrator
         if (ObjectTargetClassifier.ClassifyAxe(vec, location) is { } axeTarget)
         {
             tool = WorkerTool.Axe;
-            capable = CapabilityMatrix.CanChop(Session.Ctx.ToolSnapshot.AxeLevel, axeTarget);
+            capable = !(tf is Tree) && CapabilityMatrix.CanChop(Session.Ctx.ToolSnapshot.AxeLevel, axeTarget)
+                || tf is Tree && TreeDropAttribution.CanStartTreeWork &&
+                    CapabilityMatrix.CanChop(Session.Ctx.ToolSnapshot.AxeLevel, axeTarget);
             return;
         }
 

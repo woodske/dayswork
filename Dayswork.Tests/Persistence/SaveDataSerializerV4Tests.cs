@@ -124,6 +124,23 @@ public sealed class SaveDataSerializerV4Tests
         Assert.True(ContractStructuralComparer.ContractsEqual(contract, hydrated!));
     }
 
+    [Fact]
+    public void Dayswork2Review_R5_DeferredPrepaidContractRemainsDueAfterSaveReload()
+    {
+        var contract = Bound() with
+        {
+            Schedule = ContractSchedule.OneTime,
+            Status = ContractStatus.Active,
+            HireDate = new GameDate(28, Season.Fall, 1),
+        };
+        var hydrated = _serializer.DeserializeOne(_serializer.SerializeOne(contract, "2.0.0-beta.1"));
+        var store = new OfficeContractStore(_warnings.Add);
+        store.HydrateOffice(contract.OfficeId, hydrated);
+
+        Assert.Single(store.ScheduledForDate(1, Season.Winter, 1));
+        Assert.Single(store.ScheduledForDate(1, Season.Spring, 2));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

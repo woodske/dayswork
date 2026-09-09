@@ -140,42 +140,79 @@ internal sealed partial class ShiftOrchestrator
                 (origin.HasValue && !IsDebrisNear(d, origin.Value, radiusTiles)))
                 continue;
 
-            if (!TryGetDebrisItem(d, out var itemId, out var stack))
+            if (!TryBufferDebris(d, sourceTask, provenance ?? OutputScopeProvenance.Unknown))
             {
                 LogInvalidDebris(loc, sourceTask, origin, d);
                 continue;
             }
 
-            Session.Ctx.Buffer.Add(itemId, stack, sourceTask, provenance ?? OutputScopeProvenance.Unknown);
-//             ModEntry.ModMonitor.Log(
-//                 $"[Dayswork][debris] collected {stack}x {itemId} from game debris task={sourceTask} chunks={d.Chunks.Count} debrisType={d.debrisType.Value} chunkType={d.chunkType.Value}.",
-//                 LogLevel.Trace);
             loc.debris.Remove(d);
             collected = true;
         }
         return collected;
     }
 
-    private static bool TryGetDebrisItem(Debris debris, out string itemId, out int stack)
+    /// <summary>Transfers one collectible debris object into this shift's buffer without reducing
+    /// real items to an id/count pair. Removal from the world is deliberately the caller's next
+    /// operation, after this method has established buffer ownership.</summary>
+    private bool TryBufferDebris(
+        Debris debris,
+        TaskKind sourceTask,
+        OutputScopeProvenance provenance)
     {
         if (debris.item is not null)
         {
-            stack = Math.Max(1, debris.item.Stack);
-            return DebrisItemIdResolver.TryResolveCollectibleItemId(debris.item.QualifiedItemId, out itemId);
-        }
+            if (!DebrisItemIdResolver.TryResolveCollectibleItemId(debris.item.QualifiedItemId, out var itemId))
+                return false;
 
-        var debrisItemId = debris.itemId.Value;
-        if (DebrisItemIdResolver.TryResolveCollectibleItemId(debrisItemId, out itemId))
-        {
-            stack = debris.debrisType.Value == Debris.DebrisType.RESOURCE
-                ? Math.Max(1, debris.Chunks.Count)
-                : 1;
+            var stack = Math.Max(1, debris.item.Stack);
+            var quality = (debris.item as StardewValley.Object)?.Quality ?? 0;
+            var flavorId = Session.Flavors.Register(debris.item);
+            Session.Ctx.Buffer.Add(itemId, stack, sourceTask, provenance, quality, flavorId);
             return true;
         }
 
-        itemId = "";
-        stack = 0;
-        return false;
+        var debrisItemId = debris.itemId.Value;
+        if (!DebrisItemIdResolver.TryResolveCollectibleItemId(debrisItemId, out var resourceItemId))
+            return false;
+
+        var resourceStack = debris.debrisType.Value == Debris.DebrisType.RESOURCE
+            ? Math.Max(1, debris.Chunks.Count)
+            : 1;
+        Session.Ctx.Buffer.Add(resourceItemId, resourceStack, sourceTask, provenance);
+        return true;
+    }
+
+    /// <summary>Receives only the debris emitted by one registered Tree.tickUpdate call. Owner and
+    /// office checks make a stale association fail safe: the debris remains in the world.</summary>
+    internal void CaptureAttributedTreeDebris(
+        long ownerId,
+        Guid officeId,
+        GameLocation location,
+        IReadOnlyList<Debris> emitted,
+        OutputScopeProvenance provenance)
+    {
+        if (_session is null || Session.OwnerId != ownerId || Session.OfficeId != officeId)
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Ignored stale tree-drop attribution for owner={ownerId}, office={officeId:N}; emitted debris remains in {location.NameOrUniqueName}.",
+                DevLog.WarnLevel);
+            return;
+        }
+
+        foreach (var debris in emitted)
+        {
+            if (!location.debris.Contains(debris))
+                continue;
+
+            if (!TryBufferDebris(debris, TaskKind.CutTrees, provenance))
+            {
+                LogInvalidDebris(location, TaskKind.CutTrees, origin: null, debris);
+                continue;
+            }
+
+            location.debris.Remove(debris);
+        }
     }
 
     private static void LogInvalidDebris(GameLocation loc, TaskKind sourceTask, Vector2? origin, Debris debris)
@@ -206,72 +243,6 @@ internal sealed partial class ShiftOrchestrator
         itemId = "";
         stack = 0;
         return false;
-    }
-
-    private void QueueDelayedDebrisSweep(
-        GameLocation loc,
-        Vector2 tileVec,
-        HashSet<Debris> baseline,
-        TaskKind sourceTask,
-        OutputScopeProvenance provenance)
-    {
-        var origin = new Vector2(tileVec.X * 64f + 32f, tileVec.Y * 64f + 32f);
-        Session.PendingDebrisSweeps.Add(new PendingDebrisSweep(
-            loc,
-            origin,
-            baseline,
-            DelayedTreeDebrisSweepTicks,
-            DelayedTreeDebrisSweepRadiusTiles,
-            sourceTask,
-            provenance));
-    }
-
-    private void ProcessPendingDebrisSweeps()
-    {
-        for (var i = Session.PendingDebrisSweeps.Count - 1; i >= 0; i--)
-        {
-            var sweep = Session.PendingDebrisSweeps[i];
-            AdvanceOffscreenTreeFall(sweep);
-            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles, sweep.Provenance);
-            sweep.TicksRemaining--;
-            if (sweep.TicksRemaining <= 0)
-                Session.PendingDebrisSweeps.RemoveAt(i);
-        }
-    }
-
-    private void FlushPendingDebrisSweeps()
-    {
-        foreach (var sweep in Session.PendingDebrisSweeps)
-        {
-            AdvanceOffscreenTreeFall(sweep);
-            CollectNewDebris(sweep.Baseline, sweep.Location, sweep.SourceTask, sweep.Origin, sweep.RadiusTiles, sweep.Provenance);
-        }
-
-        Session.PendingDebrisSweeps.Clear();
-    }
-
-    // A non-current GameLocation is ticked by GameLocation.updateEvenIfFarmerIsntHere, which does NOT
-    // tick terrainFeatures — so a worker-felled tree's fall animation freezes and never spawns its
-    // trunk debris until the player walks back onto the location (at which point the fall finishes,
-    // playing treethud and dropping wood with no worker present). Drive the fall to completion here so
-    // the debris lands in loc.debris now — silently, since localSound no-ops off-screen — and the
-    // sweep can collect it. No-op for the fruit-tree and stump-removal sweeps that share this path:
-    // their debris spawns synchronously and the tree isn't in a falling state.
-    private static void AdvanceOffscreenTreeFall(PendingDebrisSweep sweep)
-    {
-        if (sweep.Location == Game1.currentLocation) return;
-
-        var tile = new Vector2(
-            (float)Math.Round((sweep.Origin.X - 32f) / 64f),
-            (float)Math.Round((sweep.Origin.Y - 32f) / 64f));
-
-        if (!sweep.Location.terrainFeatures.TryGetValue(tile, out var tf)
-            || tf is not Tree tree || !tree.falling.Value)
-            return;
-
-        var time = Game1.currentGameTime;
-        for (var guard = 0; guard < 1000 && tree.falling.Value; guard++)
-            tree.tickUpdate(time);
     }
 
     private static bool IsDebrisNear(Debris debris, Vector2 origin, int radiusTiles)

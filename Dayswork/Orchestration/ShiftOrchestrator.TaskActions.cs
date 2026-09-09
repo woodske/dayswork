@@ -471,10 +471,8 @@ internal sealed partial class ShiftOrchestrator
         if (hadFruit && Game1.player.currentLocation == loc)
             loc.playSound("leafrustle", tileVec);
         CollectNewDebrisAtTile(before, loc, Session.PendingTask, tileVec, Session.PendingOutputProvenance);
-        // Shaken fruit settles over the next several beats, so an immediate sweep misses it.
-        // Queue a delayed sweep (same mechanism trees use for falling wood) to catch it.
-        if (hadFruit)
-            QueueDelayedDebrisSweep(loc, tileVec, before, Session.PendingTask, Session.PendingOutputProvenance);
+        // FruitTree.shake creates its item debris synchronously and clears fruit in this call. The
+        // animation continues later, but no delayed item creation needs (or permits) a broad sweep.
         return new LaborBeatOutcome(true, true);
     }
 
@@ -636,21 +634,35 @@ internal sealed partial class ShiftOrchestrator
 
         if (loc.terrainFeatures.TryGetValue(tileVec, out var tf) && tf is Tree tree)
         {
+            // The delayed trunk drop is safe only while the exact Tree.tickUpdate boundary is
+            // available. Leave the tree untouched if Harmony registration failed at startup.
+            if (!TreeDropAttribution.CanStartTreeWork)
+                return new LaborBeatOutcome(true, true);
+
             bool wasStump   = tree.stump.Value;
             var  before     = new HashSet<Debris>(loc.debris);
             var  removeTree = tree.performToolAction(axe, 0, tileVec);
+
+            if (!wasStump && tree.falling.Value)
+            {
+                TreeDropAttribution.Register(
+                    tree,
+                    loc,
+                    this,
+                    Session.OwnerId,
+                    Session.OfficeId,
+                    Session.PendingOutputProvenance);
+            }
+
             if (removeTree && loc.terrainFeatures.ContainsKey(tileVec))
                 loc.terrainFeatures.Remove(tileVec);
 //             ModEntry.ModMonitor.Log(
 //                 $"[Dayswork][action] cut tree at ({tile.X},{tile.Y}) remove={removeTree} health={tree.health.Value:0.##} stump={tree.stump.Value}.",
 //                 LogLevel.Trace);
             CollectNewDebrisAtTile(before, loc, Session.PendingTask, tileVec, Session.PendingOutputProvenance);
-            // Queue a delayed sweep when debris may appear after an animation:
-            //   !wasStump && !removeTree — tree falling (fall animation produces delayed debris)
-            //   wasStump && removeTree  — stump destroyed (stump-removal effect may produce delayed debris)
-            // The only case not needing a sweep: wasStump && !removeTree (intermediate stump hit).
-            if (!wasStump && !removeTree || wasStump && removeTree)
-                QueueDelayedDebrisSweep(loc, tileVec, before, Session.PendingTask, Session.PendingOutputProvenance);
+            // Standing-tree trunk loot is emitted later and is captured by TreeDropAttribution.
+            // Stump-removal loot is emitted synchronously by performTreeFall and is already in the
+            // guarded collection above; retaining an old-radius sweep would steal nearby output.
 
             if (!wasStump && tree.stump.Value)
                 return new LaborBeatOutcome(true, false);

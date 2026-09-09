@@ -58,10 +58,10 @@ internal sealed class RecurringContractScheduler
 
         // While an incompatible peer is connected, no worker goes out — the NPC is a custom type
         // their game cannot read (plan D8). The suspension lifts on a later day start.
-        if (_suspension.IsSuspended)
+        if (_suspension.IsExecutionBlocked)
         {
             ModEntry.ModMonitor.Log(
-                "[Dayswork] Skipped day start: Dayswork is suspended while an incompatible player is connected.",
+                "[Dayswork] Skipped day start: a connected player's Dayswork protocol is not confirmed compatible.",
                 DevLog.WarnLevel);
             return;
         }
@@ -125,6 +125,17 @@ internal sealed class RecurringContractScheduler
             ModEntry.ModMonitor.Log(
                 $"[Dayswork] Contract {contract.Id.Value}'s office no longer exists — the contract has been dropped with no charge.",
                 DevLog.WarnLevel);
+            return;
+        }
+
+        // Existence and connectivity are intentionally separate: Game1.GetPlayer resolves saved
+        // offline farmhands too. Opting out of offline work defers this contract untouched — no
+        // recurring charge and no consumption of a prepaid one-time contract.
+        if (!CanRunForOwner(contract.Preferences.RunWhileOwnerOffline, Sponsor.IsConnected(contract.OwnerId)))
+        {
+            ModEntry.ModMonitor.Log(
+                $"[Dayswork] Contract {contract.Id.Value}'s owner ({contract.OwnerId}) is offline and this contract does not run while they are away — deferring with no charge.",
+                LogLevel.Trace);
             return;
         }
 
@@ -215,4 +226,7 @@ internal sealed class RecurringContractScheduler
         var season = Enum.Parse<Dayswork.Core.Domain.Season>(Game1.currentSeason, ignoreCase: true);
         return new GameDate(Game1.dayOfMonth, season, Game1.year);
     }
+
+    internal static bool CanRunForOwner(bool runWhileOwnerOffline, bool ownerIsConnected) =>
+        runWhileOwnerOffline || ownerIsConnected;
 }

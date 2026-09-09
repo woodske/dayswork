@@ -28,6 +28,7 @@ internal sealed class DaysworkSuspension
     // Host side: the peers we refuse to run alongside. Suspension is "this set is non-empty", so a
     // second offender joining and the first leaving cannot race into a spurious resume.
     private readonly Dictionary<long, (SuspensionReason Reason, string Name)> _incompatiblePeers = new();
+    private readonly HashSet<long> _unverifiedPeers = new();
 
     public bool IsSuspended { get; private set; }
 
@@ -42,10 +43,17 @@ internal sealed class DaysworkSuspension
     /// <summary>Raised on the host when the last incompatible peer leaves.</summary>
     public Action? SuspensionEnded { get; set; }
 
+    /// <summary>
+    /// Host-side request/spawn gate. A supported peer awaiting its acknowledgment doesn't force
+    /// live workers home, but no new mutation or shift starts until compatibility is proven.
+    /// </summary>
+    public bool IsExecutionBlocked => IsSuspended || _unverifiedPeers.Count > 0;
+
     // ── Host side ────────────────────────────────────────────────────────────
 
     public void MarkIncompatible(long playerId, SuspensionReason reason, string playerName)
     {
+        _unverifiedPeers.Remove(playerId);
         var wasSuspended = IsSuspended;
         _incompatiblePeers[playerId] = (reason, playerName);
         Recompute();
@@ -68,12 +76,24 @@ internal sealed class DaysworkSuspension
 
     public bool IsIncompatible(long playerId) => _incompatiblePeers.ContainsKey(playerId);
 
+    public void MarkUnverified(long playerId) => _unverifiedPeers.Add(playerId);
+
+    public void MarkVerified(long playerId) => _unverifiedPeers.Remove(playerId);
+
+    public void ForgetPeer(long playerId)
+    {
+        _unverifiedPeers.Remove(playerId);
+        MarkCompatible(playerId);
+    }
+
     public void Reset()
     {
         _incompatiblePeers.Clear();
+        _unverifiedPeers.Clear();
         IsSuspended = false;
         PlayerName = "";
         HostIsIncompatible = false;
+        HostIsUnverified = false;
     }
 
     // ── Client side ──────────────────────────────────────────────────────────
@@ -81,6 +101,11 @@ internal sealed class DaysworkSuspension
     /// <summary>Set on a client whose host has no Dayswork, or a different protocol version. All
     /// Dayswork UI on that client shows one explanatory card instead of the hiring flow.</summary>
     public bool HostIsIncompatible { get; set; }
+
+    /// <summary>A remote client has not yet received a protocol Hello from its host.</summary>
+    public bool HostIsUnverified { get; set; }
+
+    public bool CannotUseMenus => HostIsIncompatible || HostIsUnverified || IsSuspended;
 
     /// <summary>Mirrors a host broadcast so a client's banner matches the host's.</summary>
     public void ApplyRemoteState(bool suspended, SuspensionReason reason, string playerName)
@@ -101,10 +126,12 @@ internal sealed class DaysworkSuspension
     {
         if (!Context.IsWorldReady || Game1.activeClickableMenu is not null || Game1.eventUp)
             return;
-        if (!IsSuspended && !HostIsIncompatible)
+        if (!IsSuspended && !HostIsIncompatible && !HostIsUnverified)
             return;
 
-        var text = HostIsIncompatible
+        var text = HostIsUnverified
+            ? I18nHelper.Get("ui.net.waiting_for_host")
+            : HostIsIncompatible
             ? I18nHelper.Get("ui.net.host_incompatible_banner")
             : I18nHelper.Get(
                 Reason == SuspensionReason.NoMod ? "ui.net.suspended_no_mod" : "ui.net.suspended_version",

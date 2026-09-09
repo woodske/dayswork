@@ -10,6 +10,8 @@
     <RootNamespace>Dayswork</RootNamespace>
     <!-- Auto-deploy built mod to <StardewModsPath>/Dayswork/ after each build -->
     <EnableModDeploy>true</EnableModDeploy>
+    <!-- Narrow host-only attribution hook for worker-felled Tree.tickUpdate drops. -->
+    <EnableHarmony>true</EnableHarmony>
     <!-- Set true for release -->
     <EnableModZip>false</EnableModZip>
   </PropertyGroup>

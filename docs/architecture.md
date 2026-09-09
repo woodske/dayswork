@@ -283,18 +283,20 @@ Skip rules confirmed in code:
   returns `true`; never call `destroy()` manually — gate `resourceClumps.Remove` on the return.
 - **Tree felling is multi-phase:** don't swing while `tree.falling`; a felled tree becomes a stump
   before it's removable (`CutTrees` reports "not complete" at that point); trunk debris spawns
-  *after* the fall animation, so a **delayed debris sweep** catches it. Shaken fruit settles over
-  several beats and uses the same delayed-sweep mechanism.
+  *after* the fall animation. `TreeDropAttribution` associates the actual falling tree with its
+  shift and captures only the debris created by that tree's `Tree.tickUpdate(GameTime)` call through
+  the narrow Harmony hook registered in `ModEntry`. Fruit and stump collectible debris is created
+  synchronously and stays in the guarded action collection path.
 - **Off-screen locations don't tick terrain features.** A non-current `GameLocation` is updated via
   `GameLocation.updateEvenIfFarmerIsntHere` (characters, temp sprites, buildings, animals only);
   `terrainFeatures`/`resourceClumps`/debris-chunk ticking happens **only** in
   `UpdateWhenCurrentLocation`. So a worker-felled tree's fall animation *freezes* when the player is
   elsewhere — the trunk debris (`Tree.tickUpdate` → `createRadialDebris`) never spawns until the
   player returns (then `treethud` plays + wood drops with no worker present). Any multi-tick terrain
-  animation the worker triggers off-screen must be driven manually; tree falls are completed in
-  `ShiftOrchestrator.Debris.AdvanceOffscreenTreeFall` (pumps `tree.tickUpdate` to completion —
-  `localSound` no-ops off-screen, so it's silent). Resource clumps, stumps, and fruit drops are fine:
-  their debris spawns synchronously inside `performToolAction`/`shake`.
+  animation the worker triggers off-screen must be driven manually; registered tree falls are
+  completed by `TreeDropAttribution` (which pumps `tree.tickUpdate` to completion and captures each
+  exact call — `localSound` no-ops off-screen, so it's silent). Resource clumps, stumps, and fruit
+  drops are fine: their debris spawns synchronously inside `performToolAction`/`shake`.
 - **Chest mutex:** check `chest.GetMutex().IsLocked()` before writing — if the player has the chest
   UI open, the whole deposit is rerouted to overflow rather than mutating items behind their back.
 - **`BuildingDrawLayer` has no GameStateQuery condition** in this version → conditional building

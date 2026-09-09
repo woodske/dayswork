@@ -44,8 +44,10 @@ lands at the same tile coordinates **in the player's current location** and is s
 
 ### What does NOT leak (verified)
 
-- `Tree.performTreeFall` and `Tree.performToolAction` — all drops use the tree's `Location`
-  (incl. the offscreen-fall path driven by `AdvanceOffscreenTreeFall`). Felled-tree wood is safe.
+- `Tree.performTreeFall` and `Tree.performToolAction` — all drops use the tree's `Location`.
+  A standing tree's trunk output is delayed until its own `Tree.tickUpdate(GameTime)` crosses the
+  fall threshold; stump destruction emits its collectible output synchronously inside
+  `performTreeFall`. Reconfirmed against the installed 1.6.15 DLL on 2026-09-08.
 - `FruitTree` fruit shake and chop-down — all use `Location` (the drop routing is safe). **But**
   `FruitTree.shake(tile, doEvenIfStillShaking)` only runs the fruit-drop block when
   `maxShake == 0f || doEvenIfStillShaking`. `maxShake` is a plain transient field (not a
@@ -58,7 +60,9 @@ lands at the same tile coordinates **in the player's current location** and is s
   every subsequent `shake(tile, false)` is a no-op that replays the leaf animation but never clears
   the fruit. `InvokeCollectFruit` (`ShiftOrchestrator.TaskActions.cs`) therefore passes
   `doEvenIfStillShaking: true` to force the drop regardless of the frozen `maxShake`. Confirmed
-  against a decompile 2026-07-09.
+  against a decompile 2026-07-09. Rechecked 2026-09-08: `FruitTree.shake` constructs and adds every
+  collectible fruit debris object synchronously before returning; only the visual shake continues.
+  No delayed item sweep is needed.
 - `Object.performToolAction` (normal stones/forage/ore objects) — uses `Location`. (Plain stones
   are also covered by `TryGetRemovedStandardStoneDrop`'s 1-stone fallback in `InvokeClearRock`.)
 
@@ -71,6 +75,22 @@ work location, and `CollectLeakedWorkerDebris` (`ShiftOrchestrator.Debris.cs`) s
 that wasn't there before into the worker buffer afterward. The beat is synchronous, so every new
 debris in that location is worker-created — no origin filter is needed. Visual-only chips carry no
 item id and are skipped (and auto-despawn).
+
+## Delayed standing-tree attribution
+
+The guarded action snapshot remains correct for synchronous stump, fruit, twig, stone, weed and
+resource-clump output. Standing-tree trunk loot is different: it is created later, after the axe
+beat. Dayswork associates the actual falling `Tree` instance with its shift, then uses a narrow
+Harmony prefix/postfix/finalizer around the verified `Tree.tickUpdate(GameTime)` overload. The
+prefix snapshots debris references and the postfix transfers only references added by that one
+tree update. Prefix priority is last and postfix/finalizer priority is first, minimizing overlap
+with other patches around the vanilla original. The finalizer shares an idempotent completion gate
+with the postfix and returns the original exception unchanged.
+
+Offscreen locations do not tick terrain features, so the owner registry also drives a registered
+offscreen tree to completion. Sleep and other immediate teardown paths flush the same registry
+before output settlement. See [multi-worker-delayed-debris.md](multi-worker-delayed-debris.md) for
+the ownership proof and compatibility boundary.
 
 ## Dev-mode leak tripwire (gated by `DevLog.Enabled`)
 

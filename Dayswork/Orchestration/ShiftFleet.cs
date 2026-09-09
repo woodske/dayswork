@@ -122,10 +122,18 @@ internal sealed class ShiftFleet : ISessionBoundaryResettable
     }
 
     public void OnDayStarted(object? sender, DayStartedEventArgs e)
+        => BeginDay(Guards.Authority.IsHost);
+
+    internal void BeginDay(bool isHostScreen)
     {
+        if (!isHostScreen)
+            return;
+
         _day = new FleetDay();
         CropHudNotifier.ResetForDay();
     }
+
+    internal FleetDay CurrentDay => _day;
 
     public void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {

@@ -1,4 +1,5 @@
 using StardewModdingAPI.Events;
+using Dayswork.Guards;
 
 namespace Dayswork.Orchestration;
 
@@ -19,13 +20,19 @@ internal sealed class SessionResetHandler
 
     public SessionResetHandler(ISessionBoundaryResettable resettable) => _resettable = resettable;
 
-    internal void ResetForSaveLoaded() =>
-        _resettable.ResetForSessionBoundary(SessionResetBoundary.SaveLoaded);
+    internal void ResetForSaveLoaded(bool isHostScreen)
+    {
+        if (isHostScreen)
+            _resettable.ResetForSessionBoundary(SessionResetBoundary.SaveLoaded);
+    }
 
-    internal void ResetForReturnedToTitle() =>
-        _resettable.ResetForSessionBoundary(SessionResetBoundary.ReturnedToTitle);
+    internal void ResetForReturnedToTitle(bool isHostScreen)
+    {
+        if (isHostScreen)
+            _resettable.ResetForSessionBoundary(SessionResetBoundary.ReturnedToTitle);
+    }
 
-    public void OnSaveLoaded(object? sender, SaveLoadedEventArgs e) => ResetForSaveLoaded();
+    public void OnSaveLoaded(object? sender, SaveLoadedEventArgs e) => ResetForSaveLoaded(Authority.IsHost);
 
-    public void OnReturnedToTitle(object? sender, ReturnedToTitleEventArgs e) => ResetForReturnedToTitle();
+    public void OnReturnedToTitle(object? sender, ReturnedToTitleEventArgs e) => ResetForReturnedToTitle(Authority.IsHost);
 }

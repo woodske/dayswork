@@ -46,6 +46,11 @@ internal sealed class OfficeContractPersistence
 
     public void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
     {
+        // A local guest shares the host's store and sees the same synced buildings. Rehydrating it
+        // from the guest's per-screen SaveLoaded event can replace live host state mid-shift.
+        if (Guards.Authority.IsSplitScreenGuest)
+            return;
+
         RehydrateFromWorld();
 
         // Adoption rewrites save data and charges nobody, but it is still a world mutation: the

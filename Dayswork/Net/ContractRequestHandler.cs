@@ -110,7 +110,7 @@ internal sealed class ContractRequestHandler
 
         var context = new CommitValidationContext(
             ProtocolMatches: request.ProtocolVersion == DaysworkProtocol.Version,
-            Suspended: _suspension.IsSuspended,
+            Suspended: _suspension.IsExecutionBlocked,
             OfficeExists: office is not null,
             OfficeOwnerId: ownerId,
             SenderIsHost: senderIsHost,
@@ -191,7 +191,7 @@ internal sealed class ContractRequestHandler
 
         var context = new ActionValidationContext(
             ProtocolMatches: request.ProtocolVersion == DaysworkProtocol.Version,
-            Suspended: _suspension.IsSuspended,
+            Suspended: _suspension.IsExecutionBlocked,
             OfficeExists: office is not null,
             OfficeOwnerId: ownerId,
             SenderIsHost: senderId == Game1.MasterPlayer.UniqueMultiplayerID,

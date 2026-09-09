@@ -49,5 +49,13 @@ its tile, because a removed tree can be replaced at the same tile. This boundary
 synchronous emissions; items created later by another mod need separate verification. Hooking the
 method does not cause offscreen trees to tick — the existing offscreen advancement remains needed.
 
+The implemented hook runs its prefix at Harmony's last priority and its postfix/finalizer at first
+priority. This puts earlier-prefix output into the baseline and observes vanilla output before later
+postfix additions as far as Harmony ordering can guarantee. A mod which suppresses the original or
+emits loot asynchronously is outside the verified synchronous boundary and remains a required
+compatibility smoke case. Stump removal and `FruitTree.shake` were rechecked in the same 1.6.15
+decompile: both create their collectible debris synchronously, so the guarded action snapshot is
+enough and a historical radius sweep would be actively unsafe.
+
 The approved integration design and its cleanup/compatibility criteria are recorded in
 [review fix R6](../plans/dayswork-2.0-review-fixes.md#r6--prevent-cross-worker-capture-of-delayed-tree-drops).

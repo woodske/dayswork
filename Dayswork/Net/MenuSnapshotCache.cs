@@ -63,5 +63,5 @@ internal static class MenuSnapshotCache
         snapshot.EnergyPurchased = response.EnergyPurchased;
     }
 
-    public static void Clear() => Snapshot.ResetAllScreens();
+    public static void ClearCurrentScreen() => Snapshot.Value = null;
 }

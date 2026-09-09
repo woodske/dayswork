@@ -36,8 +36,12 @@ mod deliberately stores its state in `PerScreen<T>`. In particular, a guest's
 store, or replace the host's day-level claims and budget ledgers. Those actions belong
 to the host's lifecycle. Screen-specific UI/request resets must reset only that screen.
 
-When adding a host guard to return-to-title handling, verify its value at that event's
-stage; do not assume all connection/context flags still have their in-world values.
+At `ReturnedToTitle`, a host-screen authority guard still works. `Game1.CleanupReturningToTitle`
+calls `ResetGameStateOnTitleScreen` before SMAPI observes the ready → none transition; that reset
+sets `multiplayerMode` to zero, for which `Game1.IsMasterGame` returns true. The host remains screen
+0, so `Context.IsMainPlayer` is true when its `ReturnedToTitle` event is raised. A departing local
+guest keeps its nonzero screen id and therefore remains false. This makes `Authority.IsHost` a safe
+way to preserve guest state while retaining actual host-exit cleanup.
 
 ## Reproduce the source check
 

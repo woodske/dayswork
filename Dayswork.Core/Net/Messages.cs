@@ -18,6 +18,12 @@ public sealed class HelloMessage
 
     /// <summary>The sender's mod version, for logs and the mismatch warning.</summary>
     public string ModVersion { get; set; } = "";
+
+    /// <summary>The host's current stand-down state, included so a late joiner has the same banner
+    /// before it can open an editable office flow.</summary>
+    public bool Suspended { get; set; }
+    public SuspensionReason SuspensionReason { get; set; }
+    public string SuspendedPlayerName { get; set; } = "";
 }
 
 /// <summary>Host → peer, answering <see cref="HelloMessage"/>. Carries the same fields plus
@@ -26,7 +32,6 @@ public sealed class HelloAckMessage
 {
     public int ProtocolVersion { get; set; }
     public string ModVersion { get; set; } = "";
-    public bool Suspended { get; set; }
 }
 
 /// <summary>Client → host when the hiring hub opens. The host answers with the parts of its world

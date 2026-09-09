@@ -32,18 +32,32 @@ internal sealed class FarmhandUpgradePersistenceAdapter
 
     public void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
     {
-        if (!Authority.IsHost)
+        // A split-screen guest shares this store with the host. Their per-screen SaveLoaded must
+        // leave it alone; a genuinely remote client has its own process-local store and clears it
+        // because its upgrade state comes from menu snapshots instead.
+        if (Authority.IsSplitScreenGuest)
+            return;
+
+        var payload = Authority.IsHost ? _dataHelper.ReadSaveData<JToken>(SaveKey) : null;
+        ApplyLoadedState(Authority.IsHost, isSplitScreenGuest: false, payload, Game1.MasterPlayer.UniqueMultiplayerID);
+    }
+
+    internal void ApplyLoadedState(bool isHostScreen, bool isSplitScreenGuest, JToken? payload, long hostId)
+    {
+        if (isSplitScreenGuest)
+            return;
+
+        if (!isHostScreen)
         {
             _store.Clear();
             return;
         }
 
-        var payload = _dataHelper.ReadSaveData<JToken>(SaveKey);
         var json = payload?.ToString(Newtonsoft.Json.Formatting.None);
 
         // A pre-2.0 save held one global set of upgrades; the only player who could have bought
         // them is the host, so that is who they migrate to.
-        _store.Hydrate(_serializer.Deserialize(json, Game1.MasterPlayer.UniqueMultiplayerID));
+        _store.Hydrate(_serializer.Deserialize(json, hostId));
     }
 
     public void OnSaving(object? sender, SavingEventArgs e)

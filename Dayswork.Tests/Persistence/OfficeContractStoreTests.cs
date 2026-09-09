@@ -272,7 +272,7 @@ public sealed class OfficeContractStoreTests
     }
 
     [Fact]
-    public void ScheduledForDate_OneTimeContract_RunsOnTheDayAfterItWasHired()
+    public void ScheduledForDate_OneTimeContract_RemainsDueUntilItRuns()
     {
         _store.Add(MakeContract(OfficeA) with
         {
@@ -281,7 +281,35 @@ public sealed class OfficeContractStoreTests
         });
 
         Assert.Single(_store.ScheduledForDate(2, Season.Spring, 1));
-        Assert.Empty(_store.ScheduledForDate(3, Season.Spring, 1));
+        Assert.Single(_store.ScheduledForDate(3, Season.Spring, 1));
+    }
+
+    [Fact]
+    public void Dayswork2Review_R5_DeferredOneTimeContractSurvivesSeasonAndYearRollover()
+    {
+        _store.Add(MakeContract(OfficeA) with
+        {
+            Schedule = ContractSchedule.OneTime,
+            HireDate = new GameDate(28, Season.Winter, 1),
+        });
+
+        Assert.Single(_store.ScheduledForDate(1, Season.Spring, 2));
+        Assert.Single(_store.ScheduledForDate(12, Season.Summer, 2));
+    }
+
+    [Fact]
+    public void Dayswork2Review_R5_PausedPrepaidContractRunsAfterItIsResumedOverdue()
+    {
+        _store.Add(MakeContract(OfficeA, ContractStatus.Paused) with
+        {
+            Schedule = ContractSchedule.OneTime,
+            HireDate = new GameDate(1, Season.Spring, 1),
+        });
+
+        Assert.Empty(_store.ScheduledForDate(10, Season.Spring, 1));
+        _store.Resume(OfficeA);
+
+        Assert.Single(_store.ScheduledForDate(10, Season.Spring, 1));
     }
 
     [Fact]

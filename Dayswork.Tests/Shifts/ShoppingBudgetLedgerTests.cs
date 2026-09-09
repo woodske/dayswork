@@ -78,4 +78,16 @@ public sealed class ShoppingBudgetLedgerTests
 
         Assert.Equal(500, ledger.ReservedByOthers(OwnerB));
     }
+
+    [Fact]
+    public void Dayswork2Review_R2_RepeatedReleaseNeverRestoresOrDuplicatesAReservation()
+    {
+        var ledger = new ShoppingBudgetLedger();
+        ledger.Reserve(OwnerA, 500);
+
+        ledger.Release(OwnerA);
+        ledger.Release(OwnerA);
+
+        Assert.Equal(0, ledger.ReservedByOthers(OwnerB));
+    }
 }

@@ -4,7 +4,6 @@ using Dayswork.Core.Persistence;
 using Dayswork.Guards;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
-using StardewModdingAPI.Utilities;
 using StardewValley;
 
 namespace Dayswork.Net;
@@ -25,7 +24,7 @@ internal sealed class ContractRequestClient
     /// Wall clock, not game time: the host may be in a menu of its own.</summary>
     private static readonly TimeSpan ResponseTimeout = TimeSpan.FromSeconds(10);
 
-    private sealed record Pending(
+    internal sealed record Pending(
         string RequestId,
         DateTime SentAt,
         Action<ContractCommitResponseMessage>? OnCommit,
@@ -35,21 +34,25 @@ internal sealed class ContractRequestClient
     private readonly ContractRequestHandler _handler;
     private readonly SaveDataSerializer _serializer;
     private readonly string _modVersion;
+    private readonly DaysworkSuspension _suspension;
 
-    // Per screen: on a remote machine running split-screen, two guests each have their own menu
-    // and their own outstanding request.
-    private readonly PerScreen<Dictionary<string, Pending>> _pending = new(() => new Dictionary<string, Pending>(StringComparer.Ordinal));
+    // Per screen: two local players can each have a menu and outstanding request. This is keyed
+    // explicitly instead of using PerScreen<T> because lifecycle cleanup must remove exactly the
+    // screen whose event fired without touching another screen's callbacks.
+    private readonly Dictionary<int, Dictionary<string, Pending>> _pendingByScreen = new();
 
     public ContractRequestClient(
         NetChannel channel,
         ContractRequestHandler handler,
         SaveDataSerializer serializer,
-        string modVersion)
+        string modVersion,
+        DaysworkSuspension suspension)
     {
         _channel = channel;
         _handler = handler;
         _serializer = serializer;
         _modVersion = modVersion;
+        _suspension = suspension;
     }
 
     /// <summary>Raised when a request times out with no answer, so the UI can say so and keep the
@@ -65,6 +68,16 @@ internal sealed class ContractRequestClient
         int expectedRevision,
         Action<ContractCommitResponseMessage> onResult)
     {
+        if (Authority.IsRemoteClient && !CanDispatchToHost())
+        {
+            onResult(new ContractCommitResponseMessage
+            {
+                Accepted = false,
+                Code = HostUnavailableCode(),
+            });
+            return;
+        }
+
         var request = new ContractCommitRequestMessage
         {
             RequestId = NewRequestId(),
@@ -91,6 +104,17 @@ internal sealed class ContractRequestClient
         Action<ContractActionResponseMessage> onResult,
         string upgradeKind = "")
     {
+        if (Authority.IsRemoteClient && !CanDispatchToHost())
+        {
+            onResult(new ContractActionResponseMessage
+            {
+                Action = action,
+                Accepted = false,
+                Code = HostUnavailableCode(),
+            });
+            return;
+        }
+
         var request = new ContractActionRequestMessage
         {
             RequestId = NewRequestId(),
@@ -116,7 +140,7 @@ internal sealed class ContractRequestClient
     /// </summary>
     public void RequestMenuSnapshot(Guid officeId)
     {
-        if (!Authority.IsRemoteClient)
+        if (!Authority.IsRemoteClient || !CanDispatchToHost())
             return;
 
         _channel.SendToHost(DaysworkProtocol.MenuSnapshotRequest, new MenuSnapshotRequestMessage
@@ -148,7 +172,7 @@ internal sealed class ContractRequestClient
     /// </summary>
     public void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
-        var pending = _pending.Value;
+        var pending = PendingForScreen(Context.ScreenId);
         if (pending.Count == 0 || !e.IsMultipleOf(60))
             return;
 
@@ -164,15 +188,26 @@ internal sealed class ContractRequestClient
         }
     }
 
-    public void Reset() => _pending.ResetAllScreens();
+    /// <summary>Clears only the current screen's unanswered requests. Lifecycle events are raised
+    /// per local screen, so a guest loading or leaving must not cancel callbacks owned by another
+    /// screen in the same process.</summary>
+    public void ResetCurrentScreen() => ResetScreen(Context.ScreenId);
 
     // ── Internals ────────────────────────────────────────────────────────────
 
-    private void Track(Pending pending) => _pending.Value[pending.RequestId] = pending;
+    private void Track(Pending pending) => Track(Context.ScreenId, pending);
+
+    internal void Track(int screenId, Pending pending) =>
+        PendingForScreen(screenId)[pending.RequestId] = pending;
+
+    internal void ResetScreen(int screenId) => _pendingByScreen.Remove(screenId);
+
+    internal int PendingCount(int screenId) =>
+        _pendingByScreen.TryGetValue(screenId, out var pending) ? pending.Count : 0;
 
     private Pending? Take(string requestId)
     {
-        var pending = _pending.Value;
+        var pending = PendingForScreen(Context.ScreenId);
         if (!pending.TryGetValue(requestId, out var entry))
             return null;
 
@@ -180,5 +215,21 @@ internal sealed class ContractRequestClient
         return entry;
     }
 
+    private Dictionary<string, Pending> PendingForScreen(int screenId)
+    {
+        if (!_pendingByScreen.TryGetValue(screenId, out var pending))
+            _pendingByScreen[screenId] = pending = new Dictionary<string, Pending>(StringComparer.Ordinal);
+
+        return pending;
+    }
+
     private static string NewRequestId() => Guid.NewGuid().ToString("N");
+
+    private bool CanDispatchToHost() =>
+        !_suspension.HostIsUnverified
+        && !_suspension.HostIsIncompatible
+        && !_suspension.IsSuspended;
+
+    private ContractRejectionCode HostUnavailableCode() =>
+        _suspension.IsSuspended ? ContractRejectionCode.Paused : ContractRejectionCode.VersionMismatch;
 }

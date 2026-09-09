@@ -129,8 +129,7 @@ internal sealed class ShiftSession
     public int RescanBatchIndex = -1;
     public readonly HashSet<TileCoord> RescanEnqueuedTiles = new();
 
-    // ── Debris sweeps / deposit gating / exit ────────────────────────────────
-    public readonly List<PendingDebrisSweep> PendingDebrisSweeps = new();
+    // ── Delayed tree settlement / deposit gating / exit ──────────────────────
     public bool WaitingForDebrisBeforeDeposit;
     public TileCoord CurrentExitTile;
 
@@ -216,36 +215,6 @@ internal sealed class ShiftSession
     public FishPondStep? CurrentFishPondStep;
     public bool FishPondsActive;
     public string FishPondBatchLocationName = "Farm";
-}
-
-/// <summary>A delayed debris collection pass (felled-tree trunks, shaken fruit settle late).</summary>
-internal sealed class PendingDebrisSweep
-{
-    public PendingDebrisSweep(
-        GameLocation location,
-        Vector2 origin,
-        HashSet<Debris> baseline,
-        int ticksRemaining,
-        int radiusTiles,
-        TaskKind sourceTask,
-        OutputScopeProvenance provenance)
-    {
-        Location = location;
-        Origin = origin;
-        Baseline = baseline;
-        TicksRemaining = ticksRemaining;
-        RadiusTiles = radiusTiles;
-        SourceTask = sourceTask;
-        Provenance = provenance;
-    }
-
-    public GameLocation Location { get; }
-    public Vector2 Origin { get; }
-    public HashSet<Debris> Baseline { get; }
-    public int TicksRemaining { get; set; }
-    public int RadiusTiles { get; }
-    public TaskKind SourceTask { get; }
-    public OutputScopeProvenance Provenance { get; }
 }
 
 internal sealed record LaborBeatOutcome(bool UnitResolved, bool TaskFullyComplete);

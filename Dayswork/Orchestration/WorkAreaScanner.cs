@@ -214,6 +214,9 @@ internal sealed class WorkAreaScanner
 
             if (tf is Tree && enabled.Contains(TaskKind.CutTrees))
             {
+                if (!TreeDropAttribution.CanStartTreeWork)
+                    return null;
+
                 var axeTarget = ObjectTargetClassifier.ClassifyAxe(tileVec, loc);
                 if (axeTarget is null) return null;
                 if (!CapabilityMatrix.CanChop(snapshot.AxeLevel, axeTarget.Value))

@@ -15,7 +15,7 @@ and the subsystem map in [`../architecture.md`](../architecture.md).
 | [building-chest-sprites.md](building-chest-sprites.md) | Chest sprite dimensions and draw offsets (16×32 big-craftable source rect, 1×2 tile footprint) for drawing chests on the office building. |
 | [chests.md](chests.md) | `Chest` item ids (wood/stone/big), `SpecialChestTypes.BigChest` → 70 slots, and why `BuildingData.Chests` can't express capacity. |
 | [crops.md](crops.md) | `Data/Crops` keying, the wild-seed packets (495–498), and `replaceWithObjectOnFullGrown` harvest behavior. |
-| [debris-and-drops.md](debris-and-drops.md) | Which `Game1.create*Debris` overloads route loot to `Game1.currentLocation` instead of the passed location, and the `ResourceClump.destroy()` leak. |
+| [debris-and-drops.md](debris-and-drops.md) | Which `Game1.create*Debris` overloads route loot to `Game1.currentLocation`, the `ResourceClump.destroy()` leak, and verified synchronous fruit/stump versus delayed standing-tree drop timing. |
 | [farm-cave.md](farm-cave.md) | `FarmCave` unlock flags (`caveChoice`, `farmCaveReady`), bat/mushroom behavior, and its warp tiles. |
 | [farmhand-art.md](farmhand-art.md) | Farmhand sprite/portrait dimensions, frame layout, and verified NPC/farmer animation constants. |
 | [fences-and-gates.md](fences-and-gates.md) | `StardewValley.Fence` gate API — `isGate`, `gatePosition` 0/88, `toggleGate`, and the `updateWhenCurrentLocation` auto-close rule. |

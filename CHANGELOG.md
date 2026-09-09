@@ -71,6 +71,14 @@
 
 ### Fixed
 
+- Nearby farmhands chopping trees at the same time now keep their own wood, sap, seeds, quality,
+  and flavored drops; one worker can no longer collect another worker's delayed tree output.
+- Joining or leaving split-screen during a shift no longer resets the host's workers, purchases,
+  work claims, upgrades, or collected output.
+- A farmhand called home during a shopping trip now stops buying, returns everything already paid
+  for safely, and releases its reserved budget.
+- Farmhands configured not to work while their owner is away now stay home without charging or
+  consuming prepaid work; prepaid work runs once when the owner next returns.
 - Demolishing a Farmhand Office now ends that farmhand's shift safely — anything it was carrying is
   delivered or shipped rather than lost. The office's contract goes with the building, and its fee
   is not refunded.

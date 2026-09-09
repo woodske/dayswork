@@ -55,10 +55,10 @@ This is verified against the installed SMAPI decompile: see
 
 **Acceptance.**
 
-- [ ] Regression coverage drives host load, guest load/day-start, guest exit, and host exit in order;
+- [x] Regression coverage drives host load, guest load/day-start, guest exit, and host exit in order;
   guest events preserve workers, buffers, shopping reservations, and work claims.
-- [ ] Purchased upgrades survive local guest join, the next host save, and reload.
-- [ ] S29 is expanded to include a guest joining mid-shift while one worker has output and another
+- [x] Purchased upgrades survive local guest join, the next host save, and reload.
+- [x] S29 is expanded to include a guest joining mid-shift while one worker has output and another
   carries purchases; only the host runs and resets the engine.
 
 ## R2 — Settle shopping before an external early stop
@@ -85,11 +85,11 @@ through the existing travel primitive.
 
 **Acceptance.**
 
-- [ ] Interrupt outbound travel, waiting for opening, partial purchasing, and return travel.
-- [ ] Purchased quantity equals delivered quantity; the wallet is charged only for completed
+- [x] Interrupt outbound travel, waiting for opening, partial purchasing, and return travel.
+- [x] Purchased quantity equals delivered quantity; the wallet is charged only for completed
   purchases; no purchases occur after interruption; reservations are released.
-- [ ] Repeated interruption/sleep callbacks do not duplicate output or resume work.
-- [ ] Expand S6/S12 with shopping in progress, including a demolished or full input chest.
+- [x] Repeated interruption/sleep callbacks do not duplicate output or resume work.
+- [x] Expand S6/S12 with shopping in progress, including a demolished or full input chest.
 
 ## R3 — Clean up before approval even when kick mode is enabled
 
@@ -111,7 +111,7 @@ deferred kick. Announce the actual outcome, and do not restart settled shifts mi
 
 **Acceptance.**
 
-- [ ] An event-sequence regression asserts no live worker at the world-snapshot boundary for
+- [x] An event-sequence regression asserts no live worker at the world-snapshot boundary for
   default and kick policies, then verifies the deferred kick and cleanup of its pending state.
 - [ ] S26/S27 cover a live worker plus vanilla and SMAPI-without-Dayswork guests on the actual
   transport. No claim of safe connection behavior rests on a log saying an early kick was sent.
@@ -142,7 +142,7 @@ suspension/kick policy. Do not mistake type-level safety for permission to run a
 
 **Acceptance.**
 
-- [ ] Regression scenarios cover same mod ID/no response, 1.x host, 1.x guest, wrong protocol,
+- [x] Regression scenarios cover same mod ID/no response, 1.x host, 1.x guest, wrong protocol,
   matching protocol/different compatible patch version, disconnect before acknowledgment, and
   reconnect. Unsupported peers never permit shifts or mutations merely by having the mod ID.
 - [ ] Exercise S11/S26/S28 with a real pre-protocol build as well as a modified version constant.
@@ -170,11 +170,11 @@ demolition's no-refund rule.
 
 **Acceptance.**
 
-- [ ] Offline/false means no new charge, spawn, or consumption; offline/true keeps current behavior;
+- [x] Offline/false means no new charge, spawn, or consumption; offline/true keeps current behavior;
   online/false runs normally. Test load-with-owner-absent as well as disconnect-then-next-day.
-- [ ] A skipped prepaid contract runs once on its first eligible morning, with no second payment;
+- [x] A skipped prepaid contract runs once on its first eligible morning, with no second payment;
   save/reload and date/season rollover preserve that result.
-- [ ] Expand S12/S13 with both preference settings and the prepaid case.
+- [x] Expand S12/S13 with both preference settings and the prepaid case.
 
 ## R6 — Prevent cross-worker capture of delayed tree drops
 
@@ -236,13 +236,13 @@ this one-method hook over global item-creation interception.
 
 **Acceptance.**
 
-- [ ] Two concurrent worker-felled trees with distinct owners/destinations capture only their own
+- [x] Two concurrent worker-felled trees with distinct owners/destinations capture only their own
   emissions, regardless of update order; nearby player-created drops remain outside worker output.
-- [ ] Captured real items retain quantity, quality, and distinct traits; resource chunks retain
+- [x] Captured real items retain quantity, quality, and distinct traits; resource chunks retain
   their full quantity. Postfix/finalizer retries and thrown updates neither lose nor duplicate items.
 - [ ] Offscreen and onscreen falls both settle correctly. Sleep, demolition, owner disconnect,
   suspension, tree replacement, and session teardown leave no orphaned registrations or output.
-- [ ] A failed hook cannot start dependent tree work. Ordinary player tree actions remain unchanged;
+- [x] A failed hook cannot start dependent tree work. Ordinary player tree actions remain unchanged;
   guest screens never capture or route drops.
 - [ ] Expand S2/S15/S29 with nearby concurrent tree work, separate destinations, and host
   present/absent; compare each worker's output with its own actions. Smoke-test SVE and relevant
@@ -332,8 +332,8 @@ from the host, and keep local broadcast delivery from corrupting the host's own 
 
 **Acceptance.**
 
-- [ ] Incompatible guest → suspension → compatible late joiner: both see the same explanation.
-- [ ] The last offender leaving clears both clients' banners; disconnect/rejoin and save switches
+- [x] Incompatible guest → suspension → compatible late joiner: both see the same explanation.
+- [x] The last offender leaving clears both clients' banners; disconnect/rejoin and save switches
   do not retain another session's state.
 
 ## R11 — Route the remaining owner-specific shift notices
